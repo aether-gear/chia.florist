@@ -1,10 +1,8 @@
-```
-                                                                                                                                                                     
-                                                                                                                                                                     
+```                                            
 ▄█████ ▄▄ ▄▄  ▄▄▄▄ ▄▄▄▄▄▄ ▄▄▄▄▄ ▄▄   ▄▄    ▄████  ▄▄ ▄▄ ▄▄ ▄▄▄▄  ▄▄▄▄▄ ▄▄    ▄▄ ▄▄  ▄▄ ▄▄▄▄▄
 ▀▀▀▄▄▄ ▀███▀ ███▄▄   ██   ██▄▄  ██▀▄▀██   ██  ▄▄▄ ██ ██ ██ ██▀██ ██▄▄  ██    ██ ███▄██ ██▄▄ 
-█████▀   █   ▄▄██▀   ██   ██▄▄▄ ██   ██    ▀███▀  ▀███▀ ██ ████▀ ██▄▄▄ ██▄▄▄ ██ ██ ▀██ ██▄▄▄ - DFD Version                                                           
-                                                                                                                                                                     
+█████▀   █   ▄▄██▀   ██   ██▄▄▄ ██   ██    ▀███▀  ▀███▀ ██ ████▀ ██▄▄▄ ██▄▄▄ ██ ██ ▀██ ██▄▄▄ - DFD Version
+
 This section serves as a guideline for breaking down each process in the system into smaller,
     more manageable steps.
 It helps give a clearer picture of what happens inside each function and can be used as a
