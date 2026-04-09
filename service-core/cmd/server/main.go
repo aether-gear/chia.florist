@@ -7,12 +7,18 @@ import (
 	productHandler "service-core/internal/features/product/delivery/http"
 	productInfra "service-core/internal/features/product/repository"
 	productUsecase "service-core/internal/features/product/usecase"
+	database "service-core/internal/infra/db"
 
 	transactionHandler "service-core/internal/features/transaction/handler"
 	transactionInfra "service-core/internal/features/transaction/infra"
 )
 
 func main() {
+	cfg := database.LoadConfig()
+
+	db := database.NewConnection(cfg)
+	defer db.Close()
+
 	productRepo := productInfra.NewProductRepository()
 	findProducts := productUsecase.NewFindProductsUsecase(productRepo)
 	getProduct := productUsecase.NewGetProductsUsecase(productRepo)

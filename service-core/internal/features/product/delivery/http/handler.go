@@ -1,4 +1,4 @@
-package handler
+package http
 
 import (
 	"encoding/json"
@@ -58,8 +58,13 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	responses := make([]ProductOverviewResponse, 0, len(products))
+	for _, p := range products {
+		responses = append(responses, ToListResponse(p))
+	}
+
 	response := map[string]interface{}{
-		"products": products,
+		"products": responses,
 		"page":     page,
 		"limit":    limit,
 		"total":    total,
@@ -88,6 +93,8 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	result := ToDetailResponse(product)
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(product)
+	json.NewEncoder(w).Encode(result)
 }
