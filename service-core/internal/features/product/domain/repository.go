@@ -9,4 +9,5 @@ type FindProductParams struct {
 
 type ProductRepository interface {
 	FindProducts(params FindProductParams) ([]Product, int, error)
+	GetById(id string) (Product, error)
 }

@@ -1,10 +1,10 @@
-package http
+package handler
 
 import (
 	"encoding/json"
 	"net/http"
-	"service-core/internal/features/product/application"
 	"service-core/internal/features/product/domain"
+	application "service-core/internal/features/product/usecase"
 	"strconv"
 	"strings"
 )
@@ -85,11 +85,6 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	product, err := h.getUsecase.Execute(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if product == nil {
-		http.Error(w, "product not found", http.StatusNotFound)
 		return
 	}
 

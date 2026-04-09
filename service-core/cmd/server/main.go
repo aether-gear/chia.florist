@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 
-	productUsecase "service-core/internal/features/product/application"
-	productHandler "service-core/internal/features/product/handler/http"
-	productInfra "service-core/internal/features/product/infra"
+	productHandler "service-core/internal/features/product/delivery/http"
+	productInfra "service-core/internal/features/product/repository"
+	productUsecase "service-core/internal/features/product/usecase"
 
 	transactionHandler "service-core/internal/features/transaction/handler"
 	transactionInfra "service-core/internal/features/transaction/infra"

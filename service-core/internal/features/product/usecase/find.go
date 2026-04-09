@@ -1,4 +1,4 @@
-package application
+package usecase
 
 import "service-core/internal/features/product/domain"
 
