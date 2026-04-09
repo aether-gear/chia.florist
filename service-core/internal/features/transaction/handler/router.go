@@ -2,7 +2,7 @@ package handler
 
 import (
 	"net/http"
-	"service-core/internal/modules/transaction/domain"
+	"service-core/internal/features/transaction/domain"
 
 	"github.com/go-chi/chi/v5"
 )

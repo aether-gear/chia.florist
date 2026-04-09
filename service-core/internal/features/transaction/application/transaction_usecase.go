@@ -2,7 +2,7 @@ package application
 
 import (
 	"context"
-	"service-core/internal/modules/transaction/domain"
+	"service-core/internal/features/transaction/domain"
 )
 
 type TransactionUsecase struct {

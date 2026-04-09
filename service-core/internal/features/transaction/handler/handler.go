@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"service-core/internal/modules/transaction/application"
-	"service-core/internal/modules/transaction/domain"
+	"service-core/internal/features/transaction/application"
+	"service-core/internal/features/transaction/domain"
 )
 
 type TransactionHandler struct {
