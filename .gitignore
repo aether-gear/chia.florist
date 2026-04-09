@@ -1,0 +1,96 @@
+# =========================
+# OS / System
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# ENV / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+*.out
+
+# =========================
+# Nuxt / Node (e-commerce)
+# =========================
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# Nuxt build
+.nuxt/
+.output/
+dist/
+build/
+
+# =========================
+# Golang (service-core)
+# =========================
+bin/
+*.exe
+*.test
+*.out
+coverage.out
+
+vendor/
+
+# =========================
+# Python (FastAPI / AI)
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# Python build
+build/
+dist/
+*.egg-info/
+
+# =========================
+# WAF / Security tools
+# =========================
+*.pid
+*.seed
+*.tmp
+*.cache
+
+# =========================
+# Docker
+# =========================
+docker-compose.override.yml
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Testing / Coverage
+# =========================
+coverage/
+htmlcov/
+
+# =========================
+# Misc
+# =========================
+tmp/
+temp/
+.cache/
