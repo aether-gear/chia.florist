@@ -1,0 +1,113 @@
+```                                                                
+ ▄▄▄▄ ▄▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ ▄▄  ▄▄▄▄ ▄▄▄▄▄      ▄▄▄▄  ▄▄▄  ▄▄▄▄  ▄▄▄▄▄ 
+███▄▄ ██▄▄  ██▄█▄ ██▄██ ██ ██▀▀▀ ██▄▄  ▄▄▄ ██▀▀▀ ██▀██ ██▄█▄ ██▄▄  
+▄▄██▀ ██▄▄▄ ██ ██  ▀█▀  ██ ▀████ ██▄▄▄     ▀████ ▀███▀ ██ ██ ██▄▄▄ 
+
+A backend service designed to support the e-commerce operations of 
+    Chia Florist.
+Built with Go, this project emphasizes simplicity, clarity, and 
+    serves as a practical portfolio for developers.
+```
+
+## Objective
+- Build a modular and scalable backend service to support core e-commerce operations such as product management, transactions, and order handling
+- Demonstrate clean architecture principles with a feature-based structure for maintainability and clarity
+- Provide a practical learning and reference project for developers exploring backend development with Go
+- Serve as a portfolio project showcasing real-world backend design and implementation
+
+## How to Run
+### 1. Prequisites
+
+Make sure the system for development already installed:
+
+- Go (Version 1.20 or higher recommended)
+
+Check Go installation with
+
+```bash
+go version
+```
+
+### 2. Install Dependencies
+```bash
+go mod tidy
+```
+
+### 3. Run The Application
+
+```bash
+go run cmd/server/main.go 
+```
+
+    Verify server by seeing active log from the application.
+
+## Project Structure
+
+```
+├── cmd/
+│   └── server/
+│       └── main.go                # Application entry point
+
+├── internal/
+│   ├── shared/
+│   │   ├── email/
+│   │   │   ├── service.go
+│   │   │   └── smtp.go
+│   │   ├── hash/
+│   │   │   ├── service.go
+│   │   │   └── bcrypt.go
+│   │   └── logger/
+│   │       ├── logger.go
+│   │       └── zap.go
+
+│   ├── features/
+│   │   └── (...)/
+│   │       ├── domain/
+│   │       │   ├── entity.go
+│   │       │   └── repository.go
+│   │
+│   │       ├── usecase/
+│   │
+│   │       ├── delivery/
+│   │       │   └── http/
+│   │       │       ├── handler.go
+│   │       │       ├── request.go        # request DTO
+│   │       │       ├── response.go       # response shaping
+│   │       │       └── router.go         # route registration
+│   │
+│   │       └── repository/
+│   │           ├── postgres.go
+│   │           ├── mysql.go
+│   │           ├── mapper.go
+│   │           └── query.go
+
+│   └── infra/                    # Application-wide infrastructure
+│       ├── db/                   # DB connection setup
+│       │   ├── postgres.go
+│       │   ├── mysql.go
+│       │   └── migrate.go
+│       ├── logger/
+│       │   └── logger.go
+│       └── middleware/
+│           ├── auth.go
+│           ├── logging.go
+│           └── recovery.go
+
+├── go.mod
+└── go.sum
+```
+
+## Dependency Flow
+
+```
+delivery → usecase → domain (interface)
+                       ↑
+                  repository (implementation)
+```
+
+* Dependencies always point **inward**
+* Domain is the **center and most stable layer**
+
+```
+Happy coding (￣▽￣)╭ 
+```
