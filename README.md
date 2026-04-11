@@ -1,28 +1,23 @@
 ```
-                            @(\/)
-                         (\/)-{}-)@
-                       @(={}=)/\)(\/)
-                      (\/(/\)@| (-{}-)
-                     (={}=)@(\/)@(/\)@
-                      (/\)\(={}=)/(\/)
-                      @(\/)\(/\)/(={}=)
-                      (-{}-)""""@/(/\)
-                       (/\)|:   |
-                          /::'   \
-                         /:::     \
-                        |::'       |
-                        |::        |
-                        \::.       /
-                         ':______.'
-                          `""""""`
-
- ▄▄▄▄ ▄▄ ▄▄ ▄▄  ▄▄▄    ▄▄▄▄▄ ▄▄     ▄▄▄  ▄▄▄▄  ▄▄  ▄▄▄▄ ▄▄▄▄▄▄ 
-██▀▀▀ ██▄██ ██ ██▀██   ██▄▄  ██    ██▀██ ██▄█▄ ██ ███▄▄   ██   
-▀████ ██ ██ ██ ██▀██ ▄ ██    ██▄▄▄ ▀███▀ ██ ██ ██ ▄▄██▀   ██   
-
-A modular, scalable e-commerce system designed to simulate a real
-  -world production architecture — combining modern frontend,
-        backend, security, and AI intelligence layers.
+           .     .                          
+      ..   8"=,,88,   _.                    
+       8""=""8'  "88a88'                    
+  .. .;88m a8   ,8"" "8       ▄▄▄▄ ▄▄ ▄▄ ▄▄  ▄▄▄ 
+   "8"'  "88"  A"     8;     ██▀▀▀ ██▄██ ██ ██▀██
+    "8   8,  8,       "8     ▀████ ██ ██ ██ ██▀██
+     8,  "8, "8,    ___8,      ▄▄▄▄▄ ▄▄     ▄▄▄  ▄▄▄▄  ▄▄  ▄▄▄▄ ▄▄▄▄▄▄              
+     "8,  "8, "8mm""""""8m.    ██▄▄  ██    ██▀██ ██▄█▄ ██ ███▄▄   ██   
+      "8,am888i"'   ,mm"     ▄ ██    ██▄▄▄ ▀███▀ ██ ██ ██ ▄▄██▀   ██   
+      ,8"  _8"  .m888"                                   
+     ,88P"""""I888888        A modular, scalable e-commerce system
+     "'         "I888        designed to simulate a real-world
+                  "I8_              production architecture —
+      ,mmeem.m""i, I8""  ,mmeem,'.     combining modern frontend,
+     m""    . "8.8 I8  ,8"   .  "88     backend, security, and AI
+    i8  . '  ,mi""8I8 ,8 . '  ,8" 88     intelligence layers.
+    88.' ,mm""    "8I88"m,,mm'"    8     
+    "8_m""         "I8   ""'            (c) AETHERGEAR
+     "8             I8_             
 ```
 
 ## Project Structure
@@ -37,8 +32,6 @@ chia-florist/
 ├── service-core         # Core backend services (Golang)
 ├── README.md
 ```
-
----
 
 ## Architecture Overview
 
@@ -131,12 +124,9 @@ Ship fast. Learn faster. Improve continuously.
         `'-,_';//     ,  /|
              '((     .|\/./_
                \\ |\: .'`--.
-                \\, .' .--'
-                 ))'_,-'`
-(c) chia.florist //-'
-                // 
-               |/
-
-       grow • build • bloom
-            (❁´◡`❁)
+(❁´◡`❁)       \\, .' .--'
+(c) chia.florist ))'_,-'`
+                //-'
+grow • build   // 
+• bloom       |/
 ```
