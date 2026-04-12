@@ -1,0 +1,103 @@
+[
+    {
+        "id": "1",
+        "description": "HTML breaking injections including whitespace attacks",
+        "pattern": "(?:\"[^\"]*[^-]?>)|(?:[^\\w\\s]\\s*\\/>)|(?:>\")",
+        "tags": [
+            "xss",
+            "csrf"
+        ],
+        "impact": "4"
+    },
+    {
+        "id": "2",
+        "description": "Attribute breaking injections including whitespace attacks",
+        "pattern": "(?:\"+.*[<=]\\s*\"[^\"]+\")|(?:\"\\s*\\w+\\s*=)|(?:>\\w=\\/)|(?:#.+\\)[\\\"\\s]*>)|(?:\"\\s*(?:src|style|on\\w+)\\s*=\\s*\")|(?:[^\\\"]?\\\"[,;\\s]+\\w*[[\\[\\(])",
+        "tags": [
+            "xss",
+            "csrf"
+        ],
+        "impact": "4"
+    },
+    {
+        "id": "3",
+        "description": "Unquoted attribute breaking injections",
+        "pattern": "(?:^>[\\w\\s]*<\\/?\\w{2,}>)",
+        "tags": [
+            "xss",
+            "csrf"
+        ],
+        "impact": "2"
+    },
+    {
+        "id": "10",
+        "description": "Basic directory traversal",
+        "pattern": "(?:(?:\\/|\\\\)?\\.+(\\/|\\\\)(?:\\.+)?)|(?:\\w+\\.exe\\??\\s)|(?:;\\s*\\w+\\s*\\/[\\w*-]+\\/)|(?:\\d\\.\\dx\\|)|(?:%(?:c0\\.|af\\.|5c\\.))|(?:\\/(?:%2e){2})",
+        "tags": [
+            "dt",
+            "id",
+            "lfi"
+        ],
+        "impact": "5"
+    },
+    {
+        "id": "12",
+        "description": "etc/passwd inclusion attempts",
+        "pattern": "(?:etc\\/\\W*passwd)",
+        "tags": [
+            "dt",
+            "id",
+            "lfi"
+        ],
+        "impact": "5"
+    },
+    {
+        "id": "40",
+        "description": "MySQL comments, conditions and ch(a)r injections",
+        "pattern": "(?:\\)\\s*when\\s*\\d+\\s*then)|(?:\"\\s*(?:#|--|{))|(?:\\/\\*!\\s?\\d+)|(?:ch(?:a)?r\\s*\\(\\s*\\d)|(?:(?:(n?and|x?or|not)\\s+|\\|\\||\\&\\&)\\s*\\w+\\()",
+        "tags": [
+            "sqli",
+            "id",
+            "lfi"
+        ],
+        "impact": "6"
+    },
+    {
+        "id": "42",
+        "description": "Classic SQL injection probings 1/2",
+        "pattern": "(?:\"\\s*or\\s*\"?\\d)|(?:\\\\x(?:23|27|3d))|(?:^.?\"$)|(?:(?:^[\"\\\\]*(?:[\\d\"]+|[^\"]+\"))+\\s*(?:n?and|x?or|not|\\|\\||\\&\\&)\\s*[\\w\"[+&!@(),.-])|(?:[^\\w\\s]\\w+\\s*[|-]\\s*\"\\s*\\w)|(?:@\\w+\\s+(and|or)\\s*[\"\\d]+)|(?:@[\\w-]+\\s(and|or)\\s*[^\\w\\s])|(?:[^\\w\\s:]\\s*\\d\\W+[^\\w\\s]\\s*\".)|(?:\\Winformation_schema|table_name\\W)",
+        "tags": [
+            "sqli",
+            "id",
+            "lfi"
+        ],
+        "impact": "6"
+    },
+    {
+        "id": "1001",
+        "description": "SQL Injection Simple (Union/Select)",
+        "pattern": "(?i)(union\\s+select|select\\s+.*\\s+from|delete\\s+from|drop\\s+table|update\\s+set)",
+        "tags": [
+            "sqli"
+        ],
+        "impact": "5"
+    },
+    {
+        "id": "1002",
+        "description": "XSS Detection (Script Tag)",
+        "pattern": "(?i)(<script>|javascript:|on\\w+=)",
+        "tags": [
+            "xss"
+        ],
+        "impact": "5"
+    },
+    {
+        "id": "1003",
+        "description": "SQLi Detection (OR Logic)",
+        "pattern": "(?i)('\\s*OR\\s*\\d+=\\d+)",
+        "tags": [
+            "sqli"
+        ],
+        "impact": "5"
+    }
+]

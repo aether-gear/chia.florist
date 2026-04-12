@@ -1,0 +1,2687 @@
+[
+  {
+    "id": "1774876835401305900-1",
+    "timestamp": "2026-03-30T20:20:35.4013059+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/catalog?id=%27%20OR%201=1",
+    "status": "Blocked",
+    "rule_id": "1003",
+    "details": "Matched Rule: SQLi Detection (OR Logic)",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774876835419775000-2",
+    "timestamp": "2026-03-30T20:20:35.419775+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774877040692408100-3",
+    "timestamp": "2026-03-30T20:24:00.6924081+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/search?q=%3Cscript%3Ealert(%22Hacked!%22)%3C/script%3E",
+    "status": "Blocked",
+    "rule_id": "1",
+    "details": "Matched Rule: HTML breaking injections including whitespace attacks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774877040713702900-4",
+    "timestamp": "2026-03-30T20:24:00.7137029+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774877843530745600-1",
+    "timestamp": "2026-03-30T20:37:23.5307456+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/search?q=%3Cscript%3Ealert(%22Hacked!%22)%3C/script%3E",
+    "status": "Blocked",
+    "rule_id": "1",
+    "details": "Matched Rule: HTML breaking injections including whitespace attacks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774877843555090200-2",
+    "timestamp": "2026-03-30T20:37:23.5550902+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774877845311168400-3",
+    "timestamp": "2026-03-30T20:37:25.3111684+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/search?q=%3Cscript%3Ealert(%22Hacked!%22)%3C/script%3E",
+    "status": "Blocked",
+    "rule_id": "1",
+    "details": "Matched Rule: HTML breaking injections including whitespace attacks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774877845330445400-4",
+    "timestamp": "2026-03-30T20:37:25.3304454+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050362699200-5",
+    "timestamp": "2026-03-30T20:40:50.3626992+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_0",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050363225000-6",
+    "timestamp": "2026-03-30T20:40:50.363225+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_0",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050363225000-7",
+    "timestamp": "2026-03-30T20:40:50.363225+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_0",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050363225000-8",
+    "timestamp": "2026-03-30T20:40:50.363225+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_0",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050363821800-9",
+    "timestamp": "2026-03-30T20:40:50.3638218+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050379542000-10",
+    "timestamp": "2026-03-30T20:40:50.379542+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050380113300-11",
+    "timestamp": "2026-03-30T20:40:50.3801133+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050380634400-12",
+    "timestamp": "2026-03-30T20:40:50.3806344+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050381187400-13",
+    "timestamp": "2026-03-30T20:40:50.3811874+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_2",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050410168200-14",
+    "timestamp": "2026-03-30T20:40:50.4101682+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_2",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050410168200-15",
+    "timestamp": "2026-03-30T20:40:50.4101682+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_2",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050410168200-16",
+    "timestamp": "2026-03-30T20:40:50.4101682+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_2",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050410771000-17",
+    "timestamp": "2026-03-30T20:40:50.410771+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_3",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050442315000-18",
+    "timestamp": "2026-03-30T20:40:50.442315+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_3",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050442315000-19",
+    "timestamp": "2026-03-30T20:40:50.442315+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_3",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050442846800-20",
+    "timestamp": "2026-03-30T20:40:50.4428468+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_3",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050443373500-21",
+    "timestamp": "2026-03-30T20:40:50.4433735+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_4",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050474202000-22",
+    "timestamp": "2026-03-30T20:40:50.474202+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_4",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050474202000-23",
+    "timestamp": "2026-03-30T20:40:50.474202+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_4",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050474202000-24",
+    "timestamp": "2026-03-30T20:40:50.474202+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_4",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050474202000-25",
+    "timestamp": "2026-03-30T20:40:50.474202+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_5",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050504687700-26",
+    "timestamp": "2026-03-30T20:40:50.5046877+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_5",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050504687700-27",
+    "timestamp": "2026-03-30T20:40:50.5046877+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_5",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050505193400-28",
+    "timestamp": "2026-03-30T20:40:50.5051934+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_5",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050505193400-29",
+    "timestamp": "2026-03-30T20:40:50.5051934+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_6",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050535949100-30",
+    "timestamp": "2026-03-30T20:40:50.5359491+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_6",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050535949100-31",
+    "timestamp": "2026-03-30T20:40:50.5359491+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_6",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050536477400-32",
+    "timestamp": "2026-03-30T20:40:50.5364774+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_6",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050536477400-33",
+    "timestamp": "2026-03-30T20:40:50.5364774+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_7",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050565430200-34",
+    "timestamp": "2026-03-30T20:40:50.5654302+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_7",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050566424800-35",
+    "timestamp": "2026-03-30T20:40:50.5664248+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_7",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050566424800-36",
+    "timestamp": "2026-03-30T20:40:50.5664248+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_7",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050566424800-37",
+    "timestamp": "2026-03-30T20:40:50.5664248+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_8",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050597918100-38",
+    "timestamp": "2026-03-30T20:40:50.5979181+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_8",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050597918100-39",
+    "timestamp": "2026-03-30T20:40:50.5979181+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_8",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050597918100-40",
+    "timestamp": "2026-03-30T20:40:50.5979181+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_8",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050598460100-41",
+    "timestamp": "2026-03-30T20:40:50.5984601+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_9",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050629499700-42",
+    "timestamp": "2026-03-30T20:40:50.6294997+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_9",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050630126500-43",
+    "timestamp": "2026-03-30T20:40:50.6301265+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_9",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050630126500-44",
+    "timestamp": "2026-03-30T20:40:50.6301265+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_9",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050630126500-45",
+    "timestamp": "2026-03-30T20:40:50.6301265+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_10",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050660129700-46",
+    "timestamp": "2026-03-30T20:40:50.6601297+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_10",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050660129700-47",
+    "timestamp": "2026-03-30T20:40:50.6601297+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_10",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050660129700-48",
+    "timestamp": "2026-03-30T20:40:50.6601297+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_10",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050660129700-49",
+    "timestamp": "2026-03-30T20:40:50.6601297+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_11",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050691132800-50",
+    "timestamp": "2026-03-30T20:40:50.6911328+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_11",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050691691200-51",
+    "timestamp": "2026-03-30T20:40:50.6916912+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_11",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050691691200-52",
+    "timestamp": "2026-03-30T20:40:50.6916912+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_11",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050691691200-53",
+    "timestamp": "2026-03-30T20:40:50.6916912+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_12",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050722399400-54",
+    "timestamp": "2026-03-30T20:40:50.7223994+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_12",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050722399400-55",
+    "timestamp": "2026-03-30T20:40:50.7223994+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_12",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050722399400-56",
+    "timestamp": "2026-03-30T20:40:50.7223994+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_12",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050722399400-57",
+    "timestamp": "2026-03-30T20:40:50.7223994+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_13",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050753246000-58",
+    "timestamp": "2026-03-30T20:40:50.753246+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_13",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050753793300-59",
+    "timestamp": "2026-03-30T20:40:50.7537933+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_13",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050753793300-60",
+    "timestamp": "2026-03-30T20:40:50.7537933+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_13",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050754326100-61",
+    "timestamp": "2026-03-30T20:40:50.7543261+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_14",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050784404000-62",
+    "timestamp": "2026-03-30T20:40:50.784404+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_14",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050784404000-63",
+    "timestamp": "2026-03-30T20:40:50.784404+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_14",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050784932200-65",
+    "timestamp": "2026-03-30T20:40:50.7849322+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_15",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050784932200-64",
+    "timestamp": "2026-03-30T20:40:50.7849322+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_14",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050815100300-66",
+    "timestamp": "2026-03-30T20:40:50.8151003+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_15",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050815100300-67",
+    "timestamp": "2026-03-30T20:40:50.8151003+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_15",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050815100300-68",
+    "timestamp": "2026-03-30T20:40:50.8151003+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_15",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050815619900-69",
+    "timestamp": "2026-03-30T20:40:50.8156199+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_16",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050845557400-70",
+    "timestamp": "2026-03-30T20:40:50.8455574+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_16",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050845557400-71",
+    "timestamp": "2026-03-30T20:40:50.8455574+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_16",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050845557400-72",
+    "timestamp": "2026-03-30T20:40:50.8455574+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_16",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050846155300-73",
+    "timestamp": "2026-03-30T20:40:50.8461553+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_17",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050876662800-74",
+    "timestamp": "2026-03-30T20:40:50.8766628+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_18",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050876662800-75",
+    "timestamp": "2026-03-30T20:40:50.8771974+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_17",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050877197400-76",
+    "timestamp": "2026-03-30T20:40:50.8771974+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_17",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050877197400-77",
+    "timestamp": "2026-03-30T20:40:50.8771974+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_17",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050907684300-78",
+    "timestamp": "2026-03-30T20:40:50.9076843+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_18",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050907684300-79",
+    "timestamp": "2026-03-30T20:40:50.9076843+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_18",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050908224500-80",
+    "timestamp": "2026-03-30T20:40:50.9082245+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_18",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050908224500-81",
+    "timestamp": "2026-03-30T20:40:50.9082245+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_19",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050938596600-82",
+    "timestamp": "2026-03-30T20:40:50.9385966+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_19",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050938596600-83",
+    "timestamp": "2026-03-30T20:40:50.9385966+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_19",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050939161600-84",
+    "timestamp": "2026-03-30T20:40:50.9391616+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_19",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050939161600-85",
+    "timestamp": "2026-03-30T20:40:50.9391616+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_20",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050969784300-86",
+    "timestamp": "2026-03-30T20:40:50.9697843+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_20",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050970149100-87",
+    "timestamp": "2026-03-30T20:40:50.9701491+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_20",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050970654600-88",
+    "timestamp": "2026-03-30T20:40:50.9706546+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_21",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878050970654600-89",
+    "timestamp": "2026-03-30T20:40:50.9706546+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_20",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051001472900-90",
+    "timestamp": "2026-03-30T20:40:51.0014729+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_21",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051001472900-91",
+    "timestamp": "2026-03-30T20:40:51.0014729+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_21",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051001472900-92",
+    "timestamp": "2026-03-30T20:40:51.0014729+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_21",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051001987700-93",
+    "timestamp": "2026-03-30T20:40:51.0019877+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_22",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051031519800-94",
+    "timestamp": "2026-03-30T20:40:51.0315198+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_22",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051032026100-95",
+    "timestamp": "2026-03-30T20:40:51.0320261+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_22",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051032026100-96",
+    "timestamp": "2026-03-30T20:40:51.0320261+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_23",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051032666400-97",
+    "timestamp": "2026-03-30T20:40:51.0326664+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_22",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051063115200-98",
+    "timestamp": "2026-03-30T20:40:51.0631152+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_23",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051063115200-99",
+    "timestamp": "2026-03-30T20:40:51.0631152+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_23",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051063115200-100",
+    "timestamp": "2026-03-30T20:40:51.0631152+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_24",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051063702900-101",
+    "timestamp": "2026-03-30T20:40:51.0637029+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_23",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051093989600-102",
+    "timestamp": "2026-03-30T20:40:51.0939896+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_24",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051094518600-103",
+    "timestamp": "2026-03-30T20:40:51.0945186+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_24",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051094518600-104",
+    "timestamp": "2026-03-30T20:40:51.0945186+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_24",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051094518600-105",
+    "timestamp": "2026-03-30T20:40:51.0945186+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_25",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051126015900-106",
+    "timestamp": "2026-03-30T20:40:51.1260159+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_25",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051126015900-107",
+    "timestamp": "2026-03-30T20:40:51.1260159+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_25",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051126015900-108",
+    "timestamp": "2026-03-30T20:40:51.1260159+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_25",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051126537900-109",
+    "timestamp": "2026-03-30T20:40:51.1265379+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_26",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051157856600-110",
+    "timestamp": "2026-03-30T20:40:51.1578566+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_26",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051157856600-111",
+    "timestamp": "2026-03-30T20:40:51.1578566+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_26",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051157856600-112",
+    "timestamp": "2026-03-30T20:40:51.1578566+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_26",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051158939700-113",
+    "timestamp": "2026-03-30T20:40:51.1589397+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_27",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051187467100-114",
+    "timestamp": "2026-03-30T20:40:51.1874671+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_27",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051188548800-116",
+    "timestamp": "2026-03-30T20:40:51.1885488+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_27",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051188548800-115",
+    "timestamp": "2026-03-30T20:40:51.1885488+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_28",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051188548800-117",
+    "timestamp": "2026-03-30T20:40:51.1885488+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_27",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051219186400-118",
+    "timestamp": "2026-03-30T20:40:51.2191864+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_28",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051219186400-119",
+    "timestamp": "2026-03-30T20:40:51.2191864+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_28",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051219186400-120",
+    "timestamp": "2026-03-30T20:40:51.2191864+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_28",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051219780600-121",
+    "timestamp": "2026-03-30T20:40:51.2197806+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_29",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051250436500-122",
+    "timestamp": "2026-03-30T20:40:51.2504365+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_29",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051251000000-123",
+    "timestamp": "2026-03-30T20:40:51.251+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_29",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051251000000-124",
+    "timestamp": "2026-03-30T20:40:51.251+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_29",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051251532700-125",
+    "timestamp": "2026-03-30T20:40:51.2515327+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_30",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051281630300-126",
+    "timestamp": "2026-03-30T20:40:51.2816303+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_30",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051282748000-127",
+    "timestamp": "2026-03-30T20:40:51.282748+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_31",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051282748000-128",
+    "timestamp": "2026-03-30T20:40:51.282748+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_30",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051282748000-129",
+    "timestamp": "2026-03-30T20:40:51.282748+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_30",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051312147000-130",
+    "timestamp": "2026-03-30T20:40:51.312147+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_31",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051312661500-131",
+    "timestamp": "2026-03-30T20:40:51.3126615+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_31",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051312661500-132",
+    "timestamp": "2026-03-30T20:40:51.3126615+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_32",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051313291700-133",
+    "timestamp": "2026-03-30T20:40:51.3132917+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_31",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051342613600-134",
+    "timestamp": "2026-03-30T20:40:51.3426136+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_32",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051343138600-135",
+    "timestamp": "2026-03-30T20:40:51.3431386+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_32",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051343678100-136",
+    "timestamp": "2026-03-30T20:40:51.3436781+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_32",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051344873100-137",
+    "timestamp": "2026-03-30T20:40:51.3448731+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_33",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051373290600-138",
+    "timestamp": "2026-03-30T20:40:51.3732906+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_33",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051373290600-139",
+    "timestamp": "2026-03-30T20:40:51.3732906+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_33",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051373290600-140",
+    "timestamp": "2026-03-30T20:40:51.3732906+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_33",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051373823100-141",
+    "timestamp": "2026-03-30T20:40:51.3738231+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_34",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051403962500-142",
+    "timestamp": "2026-03-30T20:40:51.4039625+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_34",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051403962500-143",
+    "timestamp": "2026-03-30T20:40:51.4039625+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_34",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051412998400-144",
+    "timestamp": "2026-03-30T20:40:51.4129984+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_34",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051414066300-145",
+    "timestamp": "2026-03-30T20:40:51.4140663+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_35",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051434498600-146",
+    "timestamp": "2026-03-30T20:40:51.4344986+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_35",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051434498600-147",
+    "timestamp": "2026-03-30T20:40:51.4344986+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_35",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051434498600-148",
+    "timestamp": "2026-03-30T20:40:51.4344986+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_36",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051435027300-149",
+    "timestamp": "2026-03-30T20:40:51.4350273+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_35",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051465175800-150",
+    "timestamp": "2026-03-30T20:40:51.4651758+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_36",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051465175800-151",
+    "timestamp": "2026-03-30T20:40:51.4651758+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_36",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051465175800-152",
+    "timestamp": "2026-03-30T20:40:51.4651758+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_37",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051465723300-153",
+    "timestamp": "2026-03-30T20:40:51.4657233+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_36",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051496008400-154",
+    "timestamp": "2026-03-30T20:40:51.4960084+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_37",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051496547400-155",
+    "timestamp": "2026-03-30T20:40:51.4965474+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_37",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051496547400-156",
+    "timestamp": "2026-03-30T20:40:51.4965474+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_37",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051497081200-157",
+    "timestamp": "2026-03-30T20:40:51.4970812+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_38",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051527478800-158",
+    "timestamp": "2026-03-30T20:40:51.5274788+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_38",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051527478800-159",
+    "timestamp": "2026-03-30T20:40:51.5274788+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_38",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051527478800-160",
+    "timestamp": "2026-03-30T20:40:51.5274788+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_38",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051528009100-161",
+    "timestamp": "2026-03-30T20:40:51.5280091+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_39",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051557998600-162",
+    "timestamp": "2026-03-30T20:40:51.5579986+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_39",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051558610000-163",
+    "timestamp": "2026-03-30T20:40:51.55861+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_39",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051558610000-164",
+    "timestamp": "2026-03-30T20:40:51.5591432+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_39",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051559143200-165",
+    "timestamp": "2026-03-30T20:40:51.5591432+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_40",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051589204800-166",
+    "timestamp": "2026-03-30T20:40:51.5892048+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_40",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051589720200-167",
+    "timestamp": "2026-03-30T20:40:51.5897202+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_40",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051589720200-168",
+    "timestamp": "2026-03-30T20:40:51.5897202+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_40",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051589720200-169",
+    "timestamp": "2026-03-30T20:40:51.5897202+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_41",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051620561700-170",
+    "timestamp": "2026-03-30T20:40:51.6205617+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_41",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051620561700-171",
+    "timestamp": "2026-03-30T20:40:51.6210978+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_41",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051622224300-172",
+    "timestamp": "2026-03-30T20:40:51.6222243+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_42",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051622224300-173",
+    "timestamp": "2026-03-30T20:40:51.6222243+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_41",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051651826400-174",
+    "timestamp": "2026-03-30T20:40:51.6518264+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_42",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051652332000-175",
+    "timestamp": "2026-03-30T20:40:51.652332+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_42",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051653541500-176",
+    "timestamp": "2026-03-30T20:40:51.6535415+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_42",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051653541500-177",
+    "timestamp": "2026-03-30T20:40:51.6535415+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_43",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051683204000-178",
+    "timestamp": "2026-03-30T20:40:51.683204+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_43",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051683204000-179",
+    "timestamp": "2026-03-30T20:40:51.683204+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_43",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051683939300-180",
+    "timestamp": "2026-03-30T20:40:51.6839393+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_44",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051683939300-181",
+    "timestamp": "2026-03-30T20:40:51.6839393+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_43",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051714654800-182",
+    "timestamp": "2026-03-30T20:40:51.7146548+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_44",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051715385600-183",
+    "timestamp": "2026-03-30T20:40:51.7153856+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_44",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051715385600-184",
+    "timestamp": "2026-03-30T20:40:51.7153856+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_44",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051716435400-185",
+    "timestamp": "2026-03-30T20:40:51.7164354+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_45",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051745728700-186",
+    "timestamp": "2026-03-30T20:40:51.7457287+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_45",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051746326400-187",
+    "timestamp": "2026-03-30T20:40:51.7463264+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_45",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051746326400-188",
+    "timestamp": "2026-03-30T20:40:51.7463264+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_45",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051746916300-189",
+    "timestamp": "2026-03-30T20:40:51.7469163+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_46",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051777398800-190",
+    "timestamp": "2026-03-30T20:40:51.7773988+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_46",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051778662400-192",
+    "timestamp": "2026-03-30T20:40:51.7786624+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_46",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051777934400-191",
+    "timestamp": "2026-03-30T20:40:51.7786624+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_46",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051778662400-193",
+    "timestamp": "2026-03-30T20:40:51.7786624+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_47",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051809027000-194",
+    "timestamp": "2026-03-30T20:40:51.809027+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_47",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051809563900-195",
+    "timestamp": "2026-03-30T20:40:51.8095639+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_47",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051810651900-196",
+    "timestamp": "2026-03-30T20:40:51.8106519+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_47",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051810651900-197",
+    "timestamp": "2026-03-30T20:40:51.8106519+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_48",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051840543200-198",
+    "timestamp": "2026-03-30T20:40:51.8405432+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_48",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051841080600-199",
+    "timestamp": "2026-03-30T20:40:51.8410806+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_48",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051841714500-200",
+    "timestamp": "2026-03-30T20:40:51.8417145+07:00",
+    "ip": "71.6.146.185",
+    "method": "GET",
+    "url": "/search?q=spam_request_49",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051841714500-201",
+    "timestamp": "2026-03-30T20:40:51.8417145+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_48",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051871451500-202",
+    "timestamp": "2026-03-30T20:40:51.8714515+07:00",
+    "ip": "80.82.77.139",
+    "method": "GET",
+    "url": "/search?q=spam_request_49",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051872131400-203",
+    "timestamp": "2026-03-30T20:40:51.8721314+07:00",
+    "ip": "61.146.163.4",
+    "method": "GET",
+    "url": "/search?q=spam_request_49",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878051873216000-204",
+    "timestamp": "2026-03-30T20:40:51.873216+07:00",
+    "ip": "70.34.245.215",
+    "method": "GET",
+    "url": "/search?q=spam_request_49",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878110382976400-205",
+    "timestamp": "2026-03-30T20:41:50.3829764+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/70.34.245.215",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878111362592900-206",
+    "timestamp": "2026-03-30T20:41:51.3625929+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/analyze/70.34.245.215",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878119957342600-207",
+    "timestamp": "2026-03-30T20:41:59.9573426+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/70.34.245.215",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878120604304100-208",
+    "timestamp": "2026-03-30T20:42:00.6043041+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/analyze/70.34.245.215",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878407889641900-209",
+    "timestamp": "2026-03-30T20:46:47.8896419+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/::1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878408359933800-210",
+    "timestamp": "2026-03-30T20:46:48.3599338+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/analyze/::1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878437850040000-211",
+    "timestamp": "2026-03-30T20:47:17.85004+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/::1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878438320360900-212",
+    "timestamp": "2026-03-30T20:47:18.3203609+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/analyze/::1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878461145073600-213",
+    "timestamp": "2026-03-30T20:47:41.1450736+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/::1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878461507752000-214",
+    "timestamp": "2026-03-30T20:47:41.507752+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/analyze/::1",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878498898719900-215",
+    "timestamp": "2026-03-30T20:48:18.8987199+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/70.34.245.215",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774878499328219800-216",
+    "timestamp": "2026-03-30T20:48:19.3282198+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/analyze/70.34.245.215",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774879077430979500-1",
+    "timestamp": "2026-03-30T20:57:57.4309795+07:00",
+    "ip": "::1",
+    "method": "OPTIONS",
+    "url": "/api/analyze/61.146.163.4",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774879078752673800-2",
+    "timestamp": "2026-03-30T20:57:58.7526738+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/analyze/61.146.163.4",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880082897321500-1",
+    "timestamp": "2026-03-30T21:14:42.8973215+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880184666923300-1",
+    "timestamp": "2026-03-30T21:16:24.6669233+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880226192901100-2",
+    "timestamp": "2026-03-30T21:17:06.1929011+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880226194522500-3",
+    "timestamp": "2026-03-30T21:17:06.1945225+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880266644213400-4",
+    "timestamp": "2026-03-30T21:17:46.6442134+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/rahasia?q=MANGGA",
+    "status": "Blocked",
+    "rule_id": "KW-BLOCK",
+    "details": "Blocked by Keyword: MANGGA",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880266678579900-5",
+    "timestamp": "2026-03-30T21:17:46.6785799+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272291729900-6",
+    "timestamp": "2026-03-30T21:17:52.2917299+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272299177500-7",
+    "timestamp": "2026-03-30T21:17:52.2991775+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272299177500-8",
+    "timestamp": "2026-03-30T21:17:52.2991775+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272299776800-9",
+    "timestamp": "2026-03-30T21:17:52.2997768+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272300857300-10",
+    "timestamp": "2026-03-30T21:17:52.3008573+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272309569900-11",
+    "timestamp": "2026-03-30T21:17:52.3095699+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272345983900-12",
+    "timestamp": "2026-03-30T21:17:52.3459839+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880272347054400-13",
+    "timestamp": "2026-03-30T21:17:52.3470544+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880281542412300-14",
+    "timestamp": "2026-03-30T21:18:01.5424123+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880281545582400-15",
+    "timestamp": "2026-03-30T21:18:01.5455824+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880282991129500-16",
+    "timestamp": "2026-03-30T21:18:02.9911295+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880282994497900-17",
+    "timestamp": "2026-03-30T21:18:02.9944979+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880290301828200-18",
+    "timestamp": "2026-03-30T21:18:10.3018282+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880290305783400-19",
+    "timestamp": "2026-03-30T21:18:10.3057834+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880412271228700-1",
+    "timestamp": "2026-03-30T21:20:12.2712287+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880547580206900-2",
+    "timestamp": "2026-03-30T21:22:27.5802069+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880562664206700-3",
+    "timestamp": "2026-03-30T21:22:42.6642067+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880562668076200-4",
+    "timestamp": "2026-03-30T21:22:42.6680762+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880567257708100-5",
+    "timestamp": "2026-03-30T21:22:47.2577081+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880567263236100-6",
+    "timestamp": "2026-03-30T21:22:47.2632361+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880576671981700-7",
+    "timestamp": "2026-03-30T21:22:56.6719817+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880576678668000-8",
+    "timestamp": "2026-03-30T21:22:56.678668+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880578331470200-9",
+    "timestamp": "2026-03-30T21:22:58.3314702+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880578334474000-10",
+    "timestamp": "2026-03-30T21:22:58.334474+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880579569867100-11",
+    "timestamp": "2026-03-30T21:22:59.5698671+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880583831954900-12",
+    "timestamp": "2026-03-30T21:23:03.8319549+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880583836662300-13",
+    "timestamp": "2026-03-30T21:23:03.8366623+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880584940680500-14",
+    "timestamp": "2026-03-30T21:23:04.9406805+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880584944323700-15",
+    "timestamp": "2026-03-30T21:23:04.9443237+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880587872990200-16",
+    "timestamp": "2026-03-30T21:23:07.8729902+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880587877498600-17",
+    "timestamp": "2026-03-30T21:23:07.8774986+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880590491044800-18",
+    "timestamp": "2026-03-30T21:23:10.4910448+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880590495330700-19",
+    "timestamp": "2026-03-30T21:23:10.4953307+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880591746650000-20",
+    "timestamp": "2026-03-30T21:23:11.74665+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880591750533600-21",
+    "timestamp": "2026-03-30T21:23:11.7505336+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880592711819300-22",
+    "timestamp": "2026-03-30T21:23:12.7118193+07:00",
+    "ip": "127.0.0.1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880592715494400-23",
+    "timestamp": "2026-03-30T21:23:12.7154944+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880630600513200-24",
+    "timestamp": "2026-03-30T21:23:50.6005132+07:00",
+    "ip": "::1",
+    "method": "POST",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774880630606719700-25",
+    "timestamp": "2026-03-30T21:23:50.6067197+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1774881279215474600-1",
+    "timestamp": "2026-03-30T21:34:39.2154746+07:00",
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "url": "/api/filters",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  }
+]
