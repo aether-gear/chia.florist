@@ -5,21 +5,27 @@ import (
 	"net/http"
 
 	productHandler "service-core/internal/features/product/delivery/http"
-	productInfra "service-core/internal/features/product/repository"
+	productRepo "service-core/internal/features/product/persistence"
 	productUsecase "service-core/internal/features/product/usecase"
 	database "service-core/internal/infra/db"
 
 	transactionHandler "service-core/internal/features/transaction/handler"
 	transactionInfra "service-core/internal/features/transaction/infra"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, fallback to system env")
+	}
+
 	cfg := database.LoadConfig()
 
 	db := database.NewConnection(cfg)
 	defer db.Close()
 
-	productRepo := productInfra.NewProductRepository()
+	productRepo := productRepo.NewProductRepository(db)
 	findProducts := productUsecase.NewFindProductsUsecase(productRepo)
 	getProduct := productUsecase.NewGetProductsUsecase(productRepo)
 	productH := productHandler.NewProductHandler(findProducts, getProduct)

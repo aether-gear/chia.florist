@@ -1,29 +1,31 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type ProductStatus string
+
+const (
+	ProductStatusActive   ProductStatus = "active"
+	ProductStatusInactive ProductStatus = "inactive"
+	ProductStatusArchived ProductStatus = "archived"
+)
 
 type Product struct {
-	ID          string
+	ID          uuid.UUID
+	SKU         string
 	Name        string
-	Description string
-	Price       *int
-	Category    string
-	Stock       int
+	Description *string
+	Status      ProductStatus
 
-	Variants []ProductVariant
-	Images   []string
-
-	Rating       *float64
-	ReviewsCount *int
+	Price  int64
+	Weight *float64
 
 	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	UpdatedAt  *time.Time
 	ArchivedAt *time.Time
 	DeletedAt  *time.Time
-}
-
-type ProductVariant struct {
-	VariantID string `json:"variant_id"`
-	Name      string `json:"name"`
-	Price     int    `json:"price"`
 }

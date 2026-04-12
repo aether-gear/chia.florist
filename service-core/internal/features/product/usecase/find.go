@@ -1,15 +1,18 @@
 package usecase
 
-import "service-core/internal/features/product/domain"
+import (
+	"service-core/internal/features/product/domain"
+	"service-core/internal/features/product/repository"
+)
 
 type FindProductsUsecase struct {
-	repo domain.ProductRepository
+	repo repository.ProductRepository
 }
 
-func NewFindProductsUsecase(repo domain.ProductRepository) *FindProductsUsecase {
+func NewFindProductsUsecase(repo repository.ProductRepository) *FindProductsUsecase {
 	return &FindProductsUsecase{repo: repo}
 }
 
-func (u *FindProductsUsecase) Execute(params domain.FindProductParams) ([]domain.Product, int, error) {
+func (u *FindProductsUsecase) Execute(params repository.FindProductParams) ([]domain.Product, int, error) {
 	return u.repo.FindProducts(params)
 }

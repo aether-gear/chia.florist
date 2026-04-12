@@ -1,12 +1,15 @@
 package usecase
 
-import "service-core/internal/features/product/domain"
+import (
+	"service-core/internal/features/product/domain"
+	"service-core/internal/features/product/repository"
+)
 
 type GetProductUsecase struct {
-	repo domain.ProductRepository
+	repo repository.ProductRepository
 }
 
-func NewGetProductsUsecase(repo domain.ProductRepository) *GetProductUsecase {
+func NewGetProductsUsecase(repo repository.ProductRepository) *GetProductUsecase {
 	return &GetProductUsecase{repo: repo}
 }
 

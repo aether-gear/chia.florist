@@ -3,7 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
-	"service-core/internal/features/product/domain"
+	"service-core/internal/features/product/repository"
 	application "service-core/internal/features/product/usecase"
 	"strconv"
 	"strings"
@@ -40,7 +40,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	params := domain.FindProductParams{
+	params := repository.FindProductParams{
 		Page:  page,
 		Limit: limit,
 	}
