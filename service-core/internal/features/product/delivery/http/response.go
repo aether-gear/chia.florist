@@ -3,67 +3,55 @@ package http
 import (
 	"service-core/internal/features/product/domain"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-type ProductDetailResponse struct {
-	ID          string
-	Name        string
-	Description string
-	Price       *int
-	Category    string
-	Stock       int
+type ProductOverviewResponse struct {
+	ID     uuid.UUID            `json:"id"`
+	SKU    string               `json:"sku"`
+	Name   string               `json:"name"`
+	Status domain.ProductStatus `json:"status"`
 
-	Variants []domain.ProductVariant
-	Images   []string
-
-	Rating       *float64
-	ReviewsCount *int
-
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	ArchivedAt *time.Time
+	Price int64 `json:"price"`
 }
 
-type ProductOverviewResponse struct {
-	ID       string
-	Name     string
-	Price    *int
-	Category string
-	Stock    int
+type ProductDetailResponse struct {
+	ID          uuid.UUID            `json:"id"`
+	SKU         string               `json:"sku"`
+	Name        string               `json:"name"`
+	Description *string              `json:"description"`
+	Status      domain.ProductStatus `json:"status"`
 
-	Rating       *float64
-	ReviewsCount *int
+	Price  int64    `json:"price"`
+	Weight *float64 `json:"weight"`
+
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  *time.Time `json:"updated_at"`
+	ArchivedAt *time.Time `json:"archived_at"`
 }
 
 func ToListResponse(p domain.Product) ProductOverviewResponse {
 	return ProductOverviewResponse{
-		ID:           p.ID,
-		Name:         p.Name,
-		Price:        p.Price,
-		Category:     p.Category,
-		Stock:        p.Stock,
-		Rating:       p.Rating,
-		ReviewsCount: p.ReviewsCount,
+		ID:     p.ID,
+		SKU:    p.SKU,
+		Name:   p.Name,
+		Status: p.Status,
+		Price:  p.Price,
 	}
 }
 
 func ToDetailResponse(p domain.Product) ProductDetailResponse {
 	return ProductDetailResponse{
 		ID:          p.ID,
+		SKU:         p.SKU,
 		Name:        p.Name,
 		Description: p.Description,
+		Status:      p.Status,
 		Price:       p.Price,
-		Category:    p.Category,
-		Stock:       p.Stock,
-
-		Variants: p.Variants,
-		Images:   p.Images,
-
-		Rating:       p.Rating,
-		ReviewsCount: p.ReviewsCount,
-
-		CreatedAt:  p.CreatedAt,
-		UpdatedAt:  p.UpdatedAt,
-		ArchivedAt: p.ArchivedAt,
+		Weight:      p.Weight,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+		ArchivedAt:  p.ArchivedAt,
 	}
 }
