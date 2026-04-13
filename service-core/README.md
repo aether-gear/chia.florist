@@ -52,9 +52,24 @@ go run cmd/server/main.go
 
 ├── internal/
 │   ├── bootstrap/
+│   │   ├── app.go
+│   │   ├── router.go
+│   │   └── container.go
+
+│   ├── common/
+│   │   ├── errors/
+│   │   │   ├── error.go
+│   │   │   └── mapper.go
+│   │   ├── http/
+│   │   │   ├── request.go
+│   │   │   ├── response.go
+│   │   │   └── context.go
+│   │   ├── middleware/
+│   │   │   ├── auth.go
+│   │   │   ├── logger.go
+│   │   │   └── recovery.go
 │   │   └── logger/
-│   │       ├── logger.go
-│   │       └── zap.go
+│   │       └── logger.go
 
 │   ├── modules/
 │   │   └── (...)/
