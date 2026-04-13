@@ -7,6 +7,8 @@ import (
 	"service-core/internal/features/product/usecase"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type ProductHandler struct {
@@ -87,7 +89,13 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	product, err := h.getUsecase.Execute(id)
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	product, err := h.getUsecase.Execute(parsedID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

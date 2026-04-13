@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"service-core/internal/features/product/domain"
 	"service-core/internal/features/product/repository"
 )
 
@@ -13,6 +12,6 @@ func NewFindProductsUsecase(repo repository.ProductRepository) *FindProductsUsec
 	return &FindProductsUsecase{repo: repo}
 }
 
-func (u *FindProductsUsecase) Execute(params repository.FindProductParams) ([]domain.Product, int, error) {
+func (u *FindProductsUsecase) Execute(params repository.FindProductParams) ([]repository.ProductWithInventory, int, error) {
 	return u.repo.FindProducts(params)
 }

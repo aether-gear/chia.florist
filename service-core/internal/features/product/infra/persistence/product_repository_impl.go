@@ -2,13 +2,15 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	domain "service-core/internal/features/product/domain"
 	"service-core/internal/features/product/repository"
 	database "service-core/internal/infra/db"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,7 +22,7 @@ func NewProductRepository(conn *database.Connection) *productRepositoryImpl {
 	return &productRepositoryImpl{db: conn.Pool}
 }
 
-func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]domain.Product, int, error) {
+func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]repository.ProductWithInventory, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -30,32 +32,53 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 		argPos     = 1
 	)
 
-	query := `
-		SELECT id, sku, name, description, status,
-		       base_price, weight,
-		       created_at, updated_at, archived_at, deleted_at
-		FROM products
+	baseQuery := `
+		FROM products p
+		LEFT JOIN inventory i ON i.product_id = p.id
 	`
 
+	selectQuery := `
+	SELECT
+		p.id,
+		p.sku,
+		p.name,
+		p.description,
+		p.status,
+		p.base_price,
+		p.weight,
+		p.created_at,
+		p.updated_at,
+		p.archived_at,
+		p.deleted_at,
+		COALESCE(i.stock, 0) AS stock,
+		COALESCE(i.reserved_stock, 0) AS reserved_stock
+`
+
+	conditions = append(conditions, "p.deleted_at IS NULL")
+
 	if params.ID != nil {
-		conditions = append(conditions, fmt.Sprintf("id = $%d", argPos))
+		conditions = append(conditions, fmt.Sprintf("p.id = $%d", argPos))
 		args = append(args, *params.ID)
 		argPos++
 	}
 
 	if params.Name != nil {
-		conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", argPos))
+		conditions = append(conditions, fmt.Sprintf("p.name ILIKE $%d", argPos))
 		args = append(args, "%"+*params.Name+"%")
 		argPos++
 	}
 
+	whereClause := ""
 	if len(conditions) > 0 {
-		query += " WHERE " + strings.Join(conditions, " AND ")
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	countQuery := "SELECT COUNT(*) FROM products"
-	if len(conditions) > 0 {
-		countQuery += " WHERE " + strings.Join(conditions, " AND ")
+	countQuery := "SELECT COUNT(*) " + baseQuery + whereClause
+
+	var total int
+	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	limit := params.Limit
@@ -70,13 +93,10 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	offset := (page - 1) * limit
 
-	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d OFFSET %d", limit, offset)
+	query := selectQuery + baseQuery + whereClause +
+		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", argPos, argPos+1)
 
-	var total int
-	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
-	if err != nil {
-		return nil, 0, err
-	}
+	args = append(args, limit, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -84,76 +104,150 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	}
 	defer rows.Close()
 
-	var results []domain.Product
+	var results []repository.ProductWithInventory
 
 	for rows.Next() {
-		var m ProductModel
+		var item repository.ProductWithInventory
 
 		err := rows.Scan(
-			&m.ID,
-			&m.SKU,
-			&m.Name,
-			&m.Description,
-			&m.Status,
-			&m.BasePrice,
-			&m.Weight,
-			&m.CreatedAt,
-			&m.UpdatedAt,
-			&m.ArchivedAt,
-			&m.DeletedAt,
+			&item.Product.ID,
+			&item.Product.SKU,
+			&item.Product.Name,
+			&item.Product.Description,
+			&item.Product.Status,
+			&item.Product.Price,
+			&item.Product.Weight,
+			&item.Product.CreatedAt,
+			&item.Product.UpdatedAt,
+			&item.Product.ArchivedAt,
+			&item.Product.DeletedAt,
+			&item.Inventory.Stock,
+			&item.Inventory.ReservedStock,
 		)
 		if err != nil {
 			return nil, 0, err
 		}
 
-		d, err := m.ToDomain()
-		if err != nil {
-			return nil, 0, err
-		}
-
-		results = append(results, *d)
+		results = append(results, item)
 	}
 
 	return results, total, nil
 }
 
-func (r *productRepositoryImpl) GetById(id string) (*domain.Product, error) {
+func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithInventory, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	query := `
-		SELECT id, sku, name, description, status,
-		       base_price, weight,
-		       created_at, updated_at, archived_at, deleted_at
-		FROM products
-		WHERE id = $1
+		SELECT
+			p.id,
+			p.sku,
+			p.name,
+			p.description,
+			p.status,
+			p.base_price,
+			p.weight,
+			p.created_at,
+			p.updated_at,
+			p.archived_at,
+			p.deleted_at,
+			COALESCE(i.stock, 0) AS stock,
+			COALESCE(i.reserved_stock, 0) AS reserved_stock
+		FROM products p
+		LEFT JOIN inventory i on i.product_id = p.id
+		WHERE p.id = $1
 		LIMIT 1
 	`
 
-	var m ProductModel
+	var result repository.ProductWithInventory
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
-		&m.ID,
-		&m.SKU,
-		&m.Name,
-		&m.Description,
-		&m.Status,
-		&m.BasePrice,
-		&m.Weight,
-		&m.CreatedAt,
-		&m.UpdatedAt,
-		&m.ArchivedAt,
-		&m.DeletedAt,
+		&result.Product.ID,
+		&result.Product.SKU,
+		&result.Product.Name,
+		&result.Product.Description,
+		&result.Product.Status,
+		&result.Product.Price,
+		&result.Product.Weight,
+		&result.Product.CreatedAt,
+		&result.Product.UpdatedAt,
+		&result.Product.ArchivedAt,
+		&result.Product.DeletedAt,
+		&result.Inventory.Stock,
+		&result.Inventory.ReservedStock,
 	)
 
 	if err != nil {
-		return &domain.Product{}, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
-	d, err := m.ToDomain()
+	return &result, nil
+}
+
+func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.ProductWithInventory, error) {
+	if len(ids) == 0 {
+		return []repository.ProductWithInventory{}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT
+			p.id,
+			p.sku,
+			p.name,
+			p.description,
+			p.status,
+			p.base_price,
+			p.weight,
+			p.created_at,
+			p.updated_at,
+			p.archived_at,
+			p.deleted_at,
+			COALESCE(i.stock, 0) AS stock,
+			COALESCE(i.reserved_stock, 0) AS reserved_stock
+		FROM products p
+		LEFT JOIN inventory i on i.product_id = p.id
+		WHERE p.id = ANY($1)
+	`
+
+	rows, err := r.db.Query(ctx, query, ids)
 	if err != nil {
-		return &domain.Product{}, err
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []repository.ProductWithInventory
+
+	for rows.Next() {
+		var item repository.ProductWithInventory
+
+		err := rows.Scan(
+			&item.Product.ID,
+			&item.Product.SKU,
+			&item.Product.Name,
+			&item.Product.Description,
+			&item.Product.Status,
+			&item.Product.Price,
+			&item.Product.Weight,
+			&item.Product.CreatedAt,
+			&item.Product.UpdatedAt,
+			&item.Product.ArchivedAt,
+			&item.Product.DeletedAt,
+			&item.Inventory.Stock,
+			&item.Inventory.ReservedStock,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, item)
 	}
 
-	return d, nil
+	return results, nil
 }

@@ -1,8 +1,9 @@
 package usecase
 
 import (
-	"service-core/internal/features/product/domain"
 	"service-core/internal/features/product/repository"
+
+	"github.com/google/uuid"
 )
 
 type GetProductUsecase struct {
@@ -13,6 +14,6 @@ func NewGetProductsUsecase(repo repository.ProductRepository) *GetProductUsecase
 	return &GetProductUsecase{repo: repo}
 }
 
-func (u *GetProductUsecase) Execute(id string) (*domain.Product, error) {
-	return u.repo.GetById(id)
+func (u *GetProductUsecase) Execute(id uuid.UUID) (*repository.ProductWithInventory, error) {
+	return u.repo.GetByID(id)
 }

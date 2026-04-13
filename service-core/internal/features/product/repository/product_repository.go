@@ -1,6 +1,10 @@
 package repository
 
-import "service-core/internal/features/product/domain"
+import (
+	"service-core/internal/features/product/domain"
+
+	"github.com/google/uuid"
+)
 
 type FindProductParams struct {
 	Page  int
@@ -9,7 +13,16 @@ type FindProductParams struct {
 	Name  *string
 }
 
+type ProductWithInventory struct {
+	Product   domain.Product
+	Inventory struct {
+		Stock         int
+		ReservedStock int
+	}
+}
+
 type ProductRepository interface {
-	FindProducts(params FindProductParams) ([]domain.Product, int, error)
-	GetById(id string) (*domain.Product, error)
+	FindProducts(params FindProductParams) ([]ProductWithInventory, int, error)
+	GetByID(id uuid.UUID) (*ProductWithInventory, error)
+	FindByIDs(IDs []uuid.UUID) ([]ProductWithInventory, error)
 }
