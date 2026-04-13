@@ -45,53 +45,54 @@ go run cmd/server/main.go
 
 ```
 ├── cmd/
+│   ├── migrate/
+│   │   └── main.go                # Application entry point
 │   └── server/
 │       └── main.go                # Application entry point
 
 ├── internal/
-│   ├── shared/
-│   │   ├── email/
-│   │   │   ├── service.go
-│   │   │   └── smtp.go
-│   │   ├── hash/
-│   │   │   ├── service.go
-│   │   │   └── bcrypt.go
+│   ├── bootstrap/
 │   │   └── logger/
 │   │       ├── logger.go
 │   │       └── zap.go
 
-│   ├── features/
+│   ├── modules/
 │   │   └── (...)/
 │   │       ├── domain/
-│   │       │   ├── entity.go
-│   │       │   └── repository.go
+│   │       │   └── <entity>.go
+│   │       ├── repository/
+│   │       │   └── <repository>.go
 │   │
 │   │       ├── usecase/
 │   │
 │   │       ├── delivery/
+│   │       │   ├── grpc/
+│   │       │   ├── kafka/
 │   │       │   └── http/
 │   │       │       ├── handler.go
-│   │       │       ├── request.go        # request DTO
-│   │       │       ├── response.go       # response shaping
-│   │       │       └── router.go         # route registration
+│   │       │       ├── dto.go       # response shaping
+│   │       │       └── router.go    # route registration
 │   │
-│   │       └── repository/
-│   │           ├── postgres.go
-│   │           ├── mysql.go
-│   │           ├── mapper.go
-│   │           └── query.go
+│   │       └── infra/
+│   │           ├── service/
+│   │           └── persistence/
+│   │               ├── <repository_impl>.go
+│   │               ├── <model>.go
+│   │               └── mapper.go
 
-│   └── infra/                    # Application-wide infrastructure
-│       ├── db/                   # DB connection setup
-│       │   ├── postgres.go
-│       │   ├── mysql.go
-│       │   └── migrate.go
-│       ├── logger/
-│       │   └── logger.go
-│       └── middleware/
-│           ├── auth.go
-│           ├── logging.go
-│           └── recovery.go
+│   ├── infra/          # Application-wide infrastructure
+│   │   ├── db/         # DB connection setup
+│   │   │   ├── postgres.go
+│   │   │   ├── mysql.go
+│   │   │   └── migrate.go
+│   │   ├── logger/
+│   │   │   └── logger.go
+│   │   └── middleware/
+│   │       ├── auth.go
+│   │       ├── logging.go
+│   │       └── recovery.go
+
+│   └── shared/      # pure utilities 
 
 ├── go.mod
 └── go.sum
