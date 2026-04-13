@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	productHandler "service-core/internal/features/product/delivery/http"
-	productRepo "service-core/internal/features/product/persistence"
+	productRepo "service-core/internal/features/product/infra/persistence"
 	productUsecase "service-core/internal/features/product/usecase"
 	database "service-core/internal/infra/db"
 

@@ -13,6 +13,6 @@ func NewGetProductsUsecase(repo repository.ProductRepository) *GetProductUsecase
 	return &GetProductUsecase{repo: repo}
 }
 
-func (u *GetProductUsecase) Execute(id string) (domain.Product, error) {
+func (u *GetProductUsecase) Execute(id string) (*domain.Product, error) {
 	return u.repo.GetById(id)
 }

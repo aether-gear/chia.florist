@@ -11,5 +11,5 @@ type FindProductParams struct {
 
 type ProductRepository interface {
 	FindProducts(params FindProductParams) ([]domain.Product, int, error)
-	GetById(id string) (domain.Product, error)
+	GetById(id string) (*domain.Product, error)
 }

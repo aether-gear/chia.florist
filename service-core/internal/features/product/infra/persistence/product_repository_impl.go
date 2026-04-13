@@ -117,7 +117,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	return results, total, nil
 }
 
-func (r *productRepositoryImpl) GetById(id string) (domain.Product, error) {
+func (r *productRepositoryImpl) GetById(id string) (*domain.Product, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -147,13 +147,13 @@ func (r *productRepositoryImpl) GetById(id string) (domain.Product, error) {
 	)
 
 	if err != nil {
-		return domain.Product{}, err
+		return &domain.Product{}, err
 	}
 
 	d, err := m.ToDomain()
 	if err != nil {
-		return domain.Product{}, err
+		return &domain.Product{}, err
 	}
 
-	return *d, nil
+	return d, nil
 }

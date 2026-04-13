@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"service-core/internal/features/product/repository"
-	application "service-core/internal/features/product/usecase"
+	"service-core/internal/features/product/usecase"
 	"strconv"
 	"strings"
 )
 
 type ProductHandler struct {
-	findUsecase *application.FindProductsUsecase
-	getUsecase  *application.GetProductUsecase
+	findUsecase *usecase.FindProductsUsecase
+	getUsecase  *usecase.GetProductUsecase
 }
 
 func NewProductHandler(
-	find *application.FindProductsUsecase,
-	get *application.GetProductUsecase,
+	find *usecase.FindProductsUsecase,
+	get *usecase.GetProductUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
 		findUsecase: find,
@@ -93,7 +93,11 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := ToDetailResponse(product)
+	if product == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+	}
+
+	result := ToDetailResponse(*product)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
