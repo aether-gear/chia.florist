@@ -25,4 +25,6 @@ type ProductRepository interface {
 	FindProducts(params FindProductParams) ([]ProductWithInventory, int, error)
 	GetByID(id uuid.UUID) (*ProductWithInventory, error)
 	FindByIDs(IDs []uuid.UUID) ([]ProductWithInventory, error)
+	CreateProduct(product *domain.Product) error
+	CreateInventory(inventory *domain.Inventory) error
 }

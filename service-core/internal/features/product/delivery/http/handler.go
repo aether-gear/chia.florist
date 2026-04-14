@@ -1,8 +1,11 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
+	"service-core/internal/features/product/domain"
 	"service-core/internal/features/product/repository"
 	"service-core/internal/features/product/usecase"
 	"strconv"
@@ -12,17 +15,20 @@ import (
 )
 
 type ProductHandler struct {
-	findUsecase *usecase.FindProductsUsecase
-	getUsecase  *usecase.GetProductUsecase
+	findUsecase   *usecase.FindProductsUsecase
+	getUsecase    *usecase.GetProductUsecase
+	createUsecase *usecase.CreateProductUsecase
 }
 
 func NewProductHandler(
 	find *usecase.FindProductsUsecase,
 	get *usecase.GetProductUsecase,
+	create *usecase.CreateProductUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
-		findUsecase: find,
-		getUsecase:  get,
+		findUsecase:   find,
+		getUsecase:    get,
+		createUsecase: create,
 	}
 }
 
@@ -109,4 +115,68 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
+	var req CreateProductRequest
+
+	body, _ := io.ReadAll(r.Body)
+
+	r.Body = io.NopCloser(bytes.NewBuffer(body))
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "missing name", http.StatusBadRequest)
+		return
+	}
+	if req.SKU == "" {
+		http.Error(w, "missing sku", http.StatusBadRequest)
+		return
+	}
+	if req.Price < 0 {
+		http.Error(w, "price cannot be negative", http.StatusBadRequest)
+		return
+	}
+	if req.InitialStock < 0 {
+		http.Error(w, "stock cannot be negative", http.StatusBadRequest)
+		return
+	}
+	if !req.Status.isStatusValid() {
+		http.Error(w, "invalid status", http.StatusBadRequest)
+		return
+	}
+
+	err := h.createUsecase.Execute(usecase.CreateProductInput{
+		SKU:          req.SKU,
+		Name:         req.Name,
+		Description:  req.Description,
+		Status:       domain.ProductStatus(req.Status),
+		Price:        req.Price,
+		Weight:       req.Weight,
+		InitialStock: req.InitialStock,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "product successfully created",
+	})
+}
+
+func (s ProductStatusDTO) isStatusValid() bool {
+	switch s {
+	case ProductStatusActive,
+		ProductStatusInactive,
+		ProductStatusArchived:
+		return true
+	default:
+		return false
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"service-core/internal/features/product/domain"
 	"service-core/internal/features/product/repository"
 	database "service-core/internal/infra/db"
 	"strings"
@@ -38,21 +39,21 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	`
 
 	selectQuery := `
-	SELECT
-		p.id,
-		p.sku,
-		p.name,
-		p.description,
-		p.status,
-		p.base_price,
-		p.weight,
-		p.created_at,
-		p.updated_at,
-		p.archived_at,
-		p.deleted_at,
-		COALESCE(i.stock, 0) AS stock,
-		COALESCE(i.reserved_stock, 0) AS reserved_stock
-`
+		SELECT
+			p.id,
+			p.sku,
+			p.name,
+			p.description,
+			p.status,
+			p.base_price,
+			p.weight,
+			p.created_at,
+			p.updated_at,
+			p.archived_at,
+			p.deleted_at,
+			COALESCE(i.stock, 0) AS stock,
+			COALESCE(i.reserved_stock, 0) AS reserved_stock
+	`
 
 	conditions = append(conditions, "p.deleted_at IS NULL")
 
@@ -250,4 +251,62 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 	}
 
 	return results, nil
+}
+
+func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		INSERT INTO products (
+			id,
+			sku,
+			name,
+			description,
+			status,
+			base_price,
+			weight,
+			created_at
+		) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+
+	_, err := r.db.Query(ctx, query,
+		product.ID,
+		product.SKU,
+		product.Name,
+		product.Description,
+		product.Status,
+		product.Price,
+		product.Weight,
+		product.CreatedAt,
+	)
+
+	return err
+}
+
+func (r *productRepositoryImpl) CreateInventory(inventory *domain.Inventory) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		INSERT INTO inventory (
+			id,
+			product_id,
+			stock,
+			reserved_stock,
+			created_at
+		)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+
+	_, err := r.db.Query(ctx, query,
+		inventory.ID,
+		inventory.ProductID,
+		inventory.Stock,
+		inventory.ReservedStock,
+		inventory.CreatedAt,
+	)
+
+	return err
 }

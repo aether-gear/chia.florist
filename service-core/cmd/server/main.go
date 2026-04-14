@@ -50,6 +50,7 @@ func main() {
 
 	findProducts := pU.NewFindProductsUsecase(productRepo)
 	getProduct := pU.NewGetProductsUsecase(productRepo)
+	createProdoct := pU.NewCreateProductUsecase(productRepo)
 	loginAccount := aU.NewLoginUsecase(
 		authRepo,
 		hasher,
@@ -65,7 +66,11 @@ func main() {
 
 	// findUsers := uU.NewUser
 
-	productH := productHandler.NewProductHandler(findProducts, getProduct)
+	productH := productHandler.NewProductHandler(
+		findProducts,
+		getProduct,
+		createProdoct,
+	)
 	transactionH := transactionHandler.NewTransactionHandler(transactionRepo)
 	authH := authHandler.NewAuthHandler(
 		loginAccount,
@@ -75,8 +80,15 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/products", productH.FindProducts)
-	mux.HandleFunc("/products/", productH.GetProduct)
+	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			productH.FindProducts(w, r)
+		}
+		if r.Method == http.MethodPost {
+			productH.CreateProduct(w, r)
+		}
+	})
+	mux.HandleFunc("/product/", productH.GetProduct)
 
 	mux.HandleFunc("/transactions", transactionH.GetAll)
 
