@@ -5,27 +5,27 @@ import (
 	"net/http"
 	"time"
 
-	aU "service-core/internal/features/auth/usecase"
-	cU "service-core/internal/features/cart/usecase"
-	pU "service-core/internal/features/product/usecase"
+	aU "service-core/internal/modules/auth/usecase"
+	cU "service-core/internal/modules/cart/usecase"
+	pU "service-core/internal/modules/product/usecase"
 	"service-core/internal/shared/config"
 
-	// uU "service-core/internal/features/user/usecase"
+	// uU "service-core/internal/modules/user/usecase"
 
-	aR "service-core/internal/features/auth/infra/persistence"
-	cR "service-core/internal/features/cart/infra/persistence"
-	pR "service-core/internal/features/product/infra/persistence"
+	aR "service-core/internal/modules/auth/infra/persistence"
+	cR "service-core/internal/modules/cart/infra/persistence"
+	pR "service-core/internal/modules/product/infra/persistence"
 
-	services "service-core/internal/features/auth/infra/service"
+	services "service-core/internal/modules/auth/infra/service"
 
 	database "service-core/internal/infra/db"
 
-	authHandler "service-core/internal/features/auth/delivery/http"
-	cartHandler "service-core/internal/features/cart/delivery/http"
-	productHandler "service-core/internal/features/product/delivery/http"
-	transactionHandler "service-core/internal/features/transaction/handler"
+	authHandler "service-core/internal/modules/auth/delivery/http"
+	cartHandler "service-core/internal/modules/cart/delivery/http"
+	productHandler "service-core/internal/modules/product/delivery/http"
+	transactionHandler "service-core/internal/modules/transaction/handler"
 
-	transactionInfra "service-core/internal/features/transaction/infra"
+	transactionInfra "service-core/internal/modules/transaction/infra"
 
 	"github.com/joho/godotenv"
 )
