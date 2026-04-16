@@ -1,9 +1,6 @@
 package database
 
-import (
-	"fmt"
-	"os"
-)
+import "service-core/internal/shared/config"
 
 type Config struct {
 	Driver   string
@@ -17,13 +14,13 @@ type Config struct {
 
 func LoadConfig() Config {
 	return Config{
-		Driver:   mustGetEnv("DB_DRIVER"),
-		Host:     mustGetEnv("DB_HOST"),
-		Port:     mustGetEnv("DB_PORT"),
-		User:     mustGetEnv("DB_USER"),
-		Password: mustGetEnv("DB_PASSWORD"),
-		Name:     mustGetEnv("DB_NAME"),
-		SSLMode:  mustGetEnv("DB_SSLMODE"),
+		Driver:   config.MustGetEnv("DB_DRIVER"),
+		Host:     config.MustGetEnv("DB_HOST"),
+		Port:     config.MustGetEnv("DB_PORT"),
+		User:     config.MustGetEnv("DB_USER"),
+		Password: config.MustGetEnv("DB_PASSWORD"),
+		Name:     config.MustGetEnv("DB_NAME"),
+		SSLMode:  config.MustGetEnv("DB_SSLMODE"),
 	}
 }
 
@@ -40,12 +37,4 @@ func (c Config) DSN() string {
 	}
 
 	return dsn
-}
-
-func mustGetEnv(key string) string {
-	val, ok := os.LookupEnv(key)
-	if !ok || val == "" {
-		panic(fmt.Sprintf("Missing required environment variable: %s", key))
-	}
-	return val
 }

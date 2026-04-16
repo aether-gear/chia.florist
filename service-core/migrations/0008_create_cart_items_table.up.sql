@@ -7,7 +7,7 @@ CREATE TABLE cart_items (
     quantity INTEGER NOT NULL CHECK (quantity > 0),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
 
     CONSTRAINT fk_cart
@@ -20,3 +20,10 @@ CREATE TABLE cart_items (
         REFERENCES products(id)
         ON DELETE RESTRICT
 );
+
+CREATE UNIQUE INDEX unique_product_per_carts 
+ON cart_items(cart_id, product_id)
+WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_cart_items_cart_id 
+ON cart_items(cart_id);
