@@ -6,9 +6,8 @@ CREATE TABLE addresses (
     recipient_name TEXT NOT NULL,
     phone TEXT NOT NULL,
 
-    address_line1 TEXT NOT NULL,
-    address_line2 TEXT,
-
+    full_address TEXT NOT NULL,
+    district TEXT NOT NULL,
     city TEXT NOT NULL,
     province TEXT NOT NULL,
     postal_code TEXT NOT NULL,
