@@ -1,4 +1,4 @@
-package location
+package loader
 
 import (
 	"encoding/csv"

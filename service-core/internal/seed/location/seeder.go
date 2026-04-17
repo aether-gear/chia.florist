@@ -3,6 +3,8 @@ package location
 import (
 	"context"
 	"log"
+	"service-core/internal/shared/loader"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,22 +22,49 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	log.Println("seeding provinces...")
-	if err := seedProvinces(ctx, pool); err != nil {
+	if err := seedLocation(ctx,
+		pool,
+		"internal/seed/location/source/provinces.csv",
+		"provinces",
+		"id",
+		"name",
+	); err != nil {
 		return err
 	}
 
 	log.Println("seeding cities...")
-	if err := seedCities(ctx, pool); err != nil {
+	if err := seedLocation(ctx,
+		pool,
+		"internal/seed/location/source/regencies.csv",
+		"cities",
+		"id",
+		"province_id",
+		"name",
+	); err != nil {
 		return err
 	}
 
 	log.Println("seeding districts...")
-	if err := seedDistricts(ctx, pool); err != nil {
+	if err := seedLocation(ctx,
+		pool,
+		"internal/seed/location/source/districts.csv",
+		"districts",
+		"id",
+		"city_id",
+		"name",
+	); err != nil {
 		return err
 	}
 
 	log.Println("seeding villages...")
-	if err := seedDistricts(ctx, pool); err != nil {
+	if err := seedLocation(ctx,
+		pool,
+		"internal/seed/location/source/villages.csv",
+		"villages",
+		"id",
+		"district_id",
+		"name",
+	); err != nil {
 		return err
 	}
 
@@ -49,7 +78,7 @@ func isAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 		SELECT EXISTS (
 			SELECT 1 FROM seed_versions WHERE name = $1
 		)
-	`, "location_v2").Scan(&exists)
+	`, "location_v1").Scan(&exists)
 
 	return exists, err
 }
@@ -59,115 +88,55 @@ func markSeeded(ctx context.Context, pool *pgxpool.Pool) error {
 		INSERT INTO seed_versions (name, version)
 		VALUES ($1, $2)
 		ON CONFLICT (name) DO NOTHING
-	`, "location_v2", "1.0")
+	`, "location_v1", "1.0")
 
 	return err
 }
 
-func seedProvinces(ctx context.Context, pool *pgxpool.Pool) error {
-	rows, err := LoadCSV("internal/seed/location/source/provinces.csv")
+func seedLocation(ctx context.Context, pool *pgxpool.Pool, pathCSV string, table string, cols ...string) error {
+	rows, err := loader.LoadCSV(pathCSV)
 	if err != nil {
 		return err
 	}
 
-	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
+	totalCols := len(cols)
+	if len(rows) <= 1 {
+		return nil
 	}
-	defer tx.Rollback(ctx)
 
-	for _, r := range rows[1:] {
-		_, err := tx.Exec(ctx, `
-			INSERT INTO provinces (id, name)
-			VALUES ($1, $2)
-			ON CONFLICT (id) DO NOTHING
-		`, r[0], r[1])
+	data := rows[1:]
+	records := make([][]interface{}, 0, len(data))
 
-		if err != nil {
-			return err
+	for _, r := range data {
+		if len(r) == 1 {
+			r = strings.Split(r[0], ";")
 		}
-	}
 
-	return tx.Commit(ctx)
-}
-
-func seedCities(ctx context.Context, pool *pgxpool.Pool) error {
-	rows, err := LoadCSV("internal/seed/location/source/regencies.csv")
-	if err != nil {
-		return err
-	}
-
-	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	for _, r := range rows[1:] {
-		_, err := tx.Exec(ctx, `
-			INSERT INTO cities (id, province_id, name)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (id) DO NOTHING
-		`, r[0], r[1], r[2])
-
-		if err != nil {
-			return err
+		if len(r) < totalCols {
+			continue
 		}
-	}
 
-	return tx.Commit(ctx)
-}
-
-func seedDistricts(ctx context.Context, pool *pgxpool.Pool) error {
-	rows, err := LoadCSV("internal/seed/location/source/districts.csv")
-	if err != nil {
-		return err
-	}
-
-	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	for _, r := range rows[1:] {
-		_, err := tx.Exec(ctx, `
-			INSERT INTO districts (id, city_id, name)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (id) DO NOTHING
-		`, r[0], r[1], r[2])
-
-		if err != nil {
-			return err
+		record := make([]interface{}, totalCols)
+		for i := 0; i < totalCols; i++ {
+			record[i] = strings.TrimSpace(r[i])
 		}
+
+		records = append(records, record)
 	}
 
-	return tx.Commit(ctx)
-}
+	if len(records) == 0 {
+		return nil
+	}
 
-func seedVillages(ctx context.Context, pool *pgxpool.Pool) error {
-	rows, err := LoadCSV("internal/seed/location/source/villages.csv")
+	_, err = pool.CopyFrom(
+		ctx,
+		pgx.Identifier{table},
+		cols,
+		pgx.CopyFromRows(records),
+	)
 	if err != nil {
 		return err
 	}
 
-	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	for _, r := range rows[1:] {
-		_, err := tx.Exec(ctx, `
-			INSERT INTO villages (id, district_id, name)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (id) DO NOTHING
-		`, r[0], r[1], r[2])
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit(ctx)
+	return nil
 }
