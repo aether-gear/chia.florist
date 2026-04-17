@@ -7,6 +7,7 @@ import (
 
 	aU "service-core/internal/modules/auth/usecase"
 	cU "service-core/internal/modules/cart/usecase"
+	lU "service-core/internal/modules/location/usecase"
 	pU "service-core/internal/modules/product/usecase"
 	"service-core/internal/shared/config"
 
@@ -14,6 +15,7 @@ import (
 
 	aR "service-core/internal/modules/auth/infra/persistence"
 	cR "service-core/internal/modules/cart/infra/persistence"
+	lR "service-core/internal/modules/location/infra/persistence"
 	pR "service-core/internal/modules/product/infra/persistence"
 
 	services "service-core/internal/modules/auth/infra/service"
@@ -22,6 +24,7 @@ import (
 
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
+	locationHandler "service-core/internal/modules/location/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
 	transactionHandler "service-core/internal/modules/transaction/handler"
 
@@ -44,6 +47,7 @@ func main() {
 	authRepo := aR.NewAuthRepository(db)
 	transactionRepo := transactionInfra.NewTransactionRepository()
 	cartRepo := cR.NewCartRepositoryImpl(db)
+	locationRepo := lR.NewLocationRepositoryImpl(db)
 
 	tokenSvc := services.NewJWTService(
 		config.MustGetEnv("JWT_SECRET"),
@@ -71,6 +75,7 @@ func main() {
 	addItemCart := cU.NewAddItemUsecase(cartRepo, productRepo)
 	updateItemCart := cU.NewUpdateItemUsecase(cartRepo, productRepo)
 	removeItemCart := cU.NewRemoveItemUsecase(cartRepo)
+	listLocations := lU.NewListLocationUsecase(locationRepo)
 
 	// findUsers := uU.NewUser
 
@@ -86,6 +91,7 @@ func main() {
 		getAccount,
 	)
 	cartH := cartHandler.NewCartHandler(addItemCart, getItemCart, updateItemCart, removeItemCart)
+	locationH := locationHandler.NewLocationHandler(listLocations)
 
 	mux := http.NewServeMux()
 
@@ -117,6 +123,11 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	mux.HandleFunc("/locations/provinces", locationH.Province)
+	mux.HandleFunc("/locations/cities/", locationH.City)
+	mux.HandleFunc("/locations/districts/", locationH.District)
+	mux.HandleFunc("/locations/villages/", locationH.Village)
 
 	log.Println("service-core running on :8000")
 	log.Fatal(http.ListenAndServe(":8000", mux))

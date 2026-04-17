@@ -1,9 +1,10 @@
 package repository
 
-import "github.com/google/uuid"
+import "service-core/internal/modules/location/domain"
 
 type LocationRepository interface {
-	GetProvinces() error
-	GetCitiesByProvince(provinceID uuid.UUID) error
-	GetDistrictsByCity(cityID uuid.UUID) error
+	ListProvinces() ([]domain.Province, error)
+	ListCitiesByProvince(provinceID string) ([]domain.City, error)
+	ListDistrictsByCity(cityID string) ([]domain.District, error)
+	ListVillagesByDistrict(districtID string) ([]domain.Village, error)
 }

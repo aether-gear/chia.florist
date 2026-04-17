@@ -1,7 +1,7 @@
 package domain
 
-type City struct {
+type Village struct {
 	ID         string
-	ProvinceID string
+	DistrictID string
 	Name       string
 }
