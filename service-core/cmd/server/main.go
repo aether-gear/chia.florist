@@ -9,6 +9,7 @@ import (
 	cU "service-core/internal/modules/cart/usecase"
 	lU "service-core/internal/modules/location/usecase"
 	pU "service-core/internal/modules/product/usecase"
+	uU "service-core/internal/modules/user/usecase"
 	"service-core/internal/shared/config"
 
 	// uU "service-core/internal/modules/user/usecase"
@@ -17,6 +18,7 @@ import (
 	cR "service-core/internal/modules/cart/infra/persistence"
 	lR "service-core/internal/modules/location/infra/persistence"
 	pR "service-core/internal/modules/product/infra/persistence"
+	uR "service-core/internal/modules/user/infra/persistence"
 
 	services "service-core/internal/modules/auth/infra/service"
 
@@ -27,6 +29,7 @@ import (
 	locationHandler "service-core/internal/modules/location/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
 	transactionHandler "service-core/internal/modules/transaction/handler"
+	userHandler "service-core/internal/modules/user/delivery/http"
 
 	transactionInfra "service-core/internal/modules/transaction/infra"
 
@@ -48,6 +51,7 @@ func main() {
 	transactionRepo := transactionInfra.NewTransactionRepository()
 	cartRepo := cR.NewCartRepositoryImpl(db)
 	locationRepo := lR.NewLocationRepositoryImpl(db)
+	userRepo := uR.NewUserRepositoryImpl(db)
 
 	tokenSvc := services.NewJWTService(
 		config.MustGetEnv("JWT_SECRET"),
@@ -76,6 +80,7 @@ func main() {
 	updateItemCart := cU.NewUpdateItemUsecase(cartRepo, productRepo)
 	removeItemCart := cU.NewRemoveItemUsecase(cartRepo)
 	listLocations := lU.NewListLocationUsecase(locationRepo)
+	getUser := uU.NewGetUserUsecase(userRepo)
 
 	// findUsers := uU.NewUser
 
@@ -92,6 +97,7 @@ func main() {
 	)
 	cartH := cartHandler.NewCartHandler(addItemCart, getItemCart, updateItemCart, removeItemCart)
 	locationH := locationHandler.NewLocationHandler(listLocations)
+	userH := userHandler.NewUserHandler(getUser)
 
 	mux := http.NewServeMux()
 
@@ -128,6 +134,8 @@ func main() {
 	mux.HandleFunc("/locations/cities/", locationH.City)
 	mux.HandleFunc("/locations/districts/", locationH.District)
 	mux.HandleFunc("/locations/villages/", locationH.Village)
+
+	mux.HandleFunc("/user/", userH.GetUserByID)
 
 	log.Println("service-core running on :8000")
 	log.Fatal(http.ListenAndServe(":8000", mux))
