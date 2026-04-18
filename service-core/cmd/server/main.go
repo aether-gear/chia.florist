@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	adU "service-core/internal/modules/address/usecase"
 	aU "service-core/internal/modules/auth/usecase"
 	cU "service-core/internal/modules/cart/usecase"
 	lU "service-core/internal/modules/location/usecase"
@@ -14,6 +15,7 @@ import (
 
 	// uU "service-core/internal/modules/user/usecase"
 
+	adR "service-core/internal/modules/address/infra/persistence"
 	aR "service-core/internal/modules/auth/infra/persistence"
 	cR "service-core/internal/modules/cart/infra/persistence"
 	lR "service-core/internal/modules/location/infra/persistence"
@@ -24,6 +26,7 @@ import (
 
 	database "service-core/internal/infra/db"
 
+	addressHandler "service-core/internal/modules/address/delivery/http"
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
 	locationHandler "service-core/internal/modules/location/delivery/http"
@@ -52,6 +55,7 @@ func main() {
 	cartRepo := cR.NewCartRepositoryImpl(db)
 	locationRepo := lR.NewLocationRepositoryImpl(db)
 	userRepo := uR.NewUserRepositoryImpl(db)
+	addressRepo := adR.NewAddressRepositoryImpl(db)
 
 	tokenSvc := services.NewJWTService(
 		config.MustGetEnv("JWT_SECRET"),
@@ -81,6 +85,8 @@ func main() {
 	removeItemCart := cU.NewRemoveItemUsecase(cartRepo)
 	listLocations := lU.NewListLocationUsecase(locationRepo)
 	getUser := uU.NewGetUserUsecase(userRepo)
+	getAddress := adU.NewGetAddressUsecase(addressRepo)
+	createAddress := adU.NewCreateAddressUsecase(addressRepo)
 
 	// findUsers := uU.NewUser
 
@@ -98,6 +104,10 @@ func main() {
 	cartH := cartHandler.NewCartHandler(addItemCart, getItemCart, updateItemCart, removeItemCart)
 	locationH := locationHandler.NewLocationHandler(listLocations)
 	userH := userHandler.NewUserHandler(getUser)
+	addressH := addressHandler.NewAddressHandler(
+		getAddress,
+		createAddress,
+	)
 
 	mux := http.NewServeMux()
 
@@ -136,6 +146,17 @@ func main() {
 	mux.HandleFunc("/locations/villages/", locationH.Village)
 
 	mux.HandleFunc("/user/", userH.GetUserByID)
+	mux.HandleFunc("/user/addresses/", addressH.GetAddresses)
+	mux.HandleFunc("/user/address", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			addressH.CreateAddress(w, r)
+		case http.MethodPut:
+		case http.MethodDelete:
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	log.Println("service-core running on :8000")
 	log.Fatal(http.ListenAndServe(":8000", mux))

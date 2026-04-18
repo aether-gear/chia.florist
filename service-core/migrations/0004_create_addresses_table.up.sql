@@ -5,15 +5,15 @@ CREATE TABLE addresses (
 
     recipient_name TEXT NOT NULL,
     phone TEXT NOT NULL,
+    
+    is_default bool NOT NULL,
 
-    full_address TEXT NOT NULL,
-    district TEXT NOT NULL,
-    city TEXT NOT NULL,
     province TEXT NOT NULL,
+    city TEXT NOT NULL,
+    district TEXT NOT NULL,
+    village TEXT NOT NULL,
+    full_address TEXT NOT NULL,
     postal_code TEXT NOT NULL,
-    country TEXT NOT NULL DEFAULT 'Indonesia',
-
-    is_default BOOLEAN DEFAULT FALSE,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
@@ -24,3 +24,7 @@ CREATE TABLE addresses (
         REFERENCES users(id)
         ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX uq_idx_one_default_address_per_user
+ON addresses(user_id)
+WHERE is_default = true;
