@@ -19,8 +19,10 @@ type productRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewProductRepository(conn *database.Connection) *productRepositoryImpl {
-	return &productRepositoryImpl{db: conn.Pool}
+func NewProductRepository(conn *database.Connection) repository.ProductRepository {
+	return &productRepositoryImpl{
+		db: conn.Pool,
+	}
 }
 
 func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]repository.ProductWithInventory, int, error) {

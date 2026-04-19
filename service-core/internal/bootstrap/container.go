@@ -10,13 +10,6 @@ import (
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
 
-	adRepo "service-core/internal/modules/address/repository"
-	aRepo "service-core/internal/modules/auth/repository"
-	cRepo "service-core/internal/modules/cart/repository"
-	lRepo "service-core/internal/modules/location/repository"
-	pRepo "service-core/internal/modules/product/repository"
-	uRepo "service-core/internal/modules/user/repository"
-
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
 	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
@@ -35,14 +28,6 @@ import (
 type Container struct {
 	DB     *database.Connection
 	Logger logger.Logger
-
-	ProductRepo     pRepo.ProductRepository
-	AuthRepo        aRepo.AuthRepository
-	CartRepo        cRepo.CartRepository
-	LocationRepo    lRepo.LocationRepository
-	UserRepo        uRepo.UserRepository
-	AddressRepo     adRepo.AddressRepository
-	TransactionRepo adRepo.AddressRepository
 
 	TokenService authDomain.TokenService
 	Hasher       authDomain.PasswordHasher
@@ -89,13 +74,6 @@ func NewContainer() *Container {
 	return &Container{
 		DB:     db,
 		Logger: log,
-
-		ProductRepo:  productRepo,
-		AuthRepo:     authRepo,
-		CartRepo:     cartRepo,
-		LocationRepo: locationRepo,
-		UserRepo:     userRepo,
-		AddressRepo:  addressRepo,
 
 		TokenService: tokenSvc,
 		Hasher:       hasher,

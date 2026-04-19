@@ -5,6 +5,7 @@ import (
 	"fmt"
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
+	"service-core/internal/modules/address/repository"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +16,7 @@ type addressRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewAddressRepositoryImpl(conn *database.Connection) *addressRepositoryImpl {
+func NewAddressRepositoryImpl(conn *database.Connection) repository.AddressRepository {
 	return &addressRepositoryImpl{
 		db: conn.Pool,
 	}

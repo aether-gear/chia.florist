@@ -5,6 +5,7 @@ import (
 	"errors"
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/cart/domain"
+	"service-core/internal/modules/cart/repository"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,7 +17,7 @@ type cartRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewCartRepositoryImpl(conn *database.Connection) *cartRepositoryImpl {
+func NewCartRepositoryImpl(conn *database.Connection) repository.CartRepository {
 	return &cartRepositoryImpl{
 		db: conn.Pool,
 	}

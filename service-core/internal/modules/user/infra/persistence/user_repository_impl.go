@@ -17,8 +17,10 @@ type userRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewUserRepositoryImpl(conn *database.Connection) *userRepositoryImpl {
-	return &userRepositoryImpl{db: conn.Pool}
+func NewUserRepositoryImpl(conn *database.Connection) repository.UserRepository {
+	return &userRepositoryImpl{
+		db: conn.Pool,
+	}
 }
 
 func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]domain.User, int, error) {

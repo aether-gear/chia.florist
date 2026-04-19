@@ -17,8 +17,10 @@ type authRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewAuthRepository(conn *database.Connection) *authRepositoryImpl {
-	return &authRepositoryImpl{db: conn.Pool}
+func NewAuthRepository(conn *database.Connection) repository.AuthRepository {
+	return &authRepositoryImpl{
+		db: conn.Pool,
+	}
 }
 
 func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/location/domain"
+	"service-core/internal/modules/location/repository"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,7 +14,7 @@ type locationRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewLocationRepositoryImpl(conn *database.Connection) *locationRepositoryImpl {
+func NewLocationRepositoryImpl(conn *database.Connection) repository.LocationRepository {
 	return &locationRepositoryImpl{
 		db: conn.Pool,
 	}
