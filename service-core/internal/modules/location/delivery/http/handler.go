@@ -1,9 +1,12 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
+
 	"service-core/internal/modules/location/usecase"
+
+	"service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
 )
 
 type LocationHandler struct {
@@ -16,11 +19,10 @@ func NewLocationHandler(listUC *usecase.ListLocationUsecase) *LocationHandler {
 	}
 }
 
-func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) {
+func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) error {
 	result, err := h.listUC.Province()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	res := make([]ProvinceResponse, 0, len(result))
@@ -33,20 +35,19 @@ func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) {
 		res = append(res, province)
 	}
 
-	writeJSON(w, http.StatusOK, res)
+	apphttp.WriteJSON(w, http.StatusOK, res)
+	return nil
 }
 
-func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) {
+func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) error {
 	provinceID := r.URL.Query().Get("province_id")
 	if provinceID == "" {
-		http.Error(w, "province_id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	result, err := h.listUC.City(provinceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	res := make([]CityResponse, 0, len(result))
@@ -60,20 +61,19 @@ func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) {
 		res = append(res, city)
 	}
 
-	writeJSON(w, http.StatusOK, res)
+	apphttp.WriteJSON(w, http.StatusOK, res)
+	return nil
 }
 
-func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) {
+func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) error {
 	cityID := r.URL.Query().Get("city_id")
 	if cityID == "" {
-		http.Error(w, "city_id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	result, err := h.listUC.District(cityID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	res := make([]DistrictResponse, 0, len(result))
@@ -87,20 +87,19 @@ func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) {
 		res = append(res, district)
 	}
 
-	writeJSON(w, http.StatusOK, res)
+	apphttp.WriteJSON(w, http.StatusOK, res)
+	return nil
 }
 
-func (h *LocationHandler) Village(w http.ResponseWriter, r *http.Request) {
+func (h *LocationHandler) Village(w http.ResponseWriter, r *http.Request) error {
 	districtID := r.URL.Query().Get("district_id")
 	if districtID == "" {
-		http.Error(w, "district_id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	result, err := h.listUC.Village(districtID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	res := make([]VillageResponse, 0, len(result))
@@ -114,11 +113,6 @@ func (h *LocationHandler) Village(w http.ResponseWriter, r *http.Request) {
 		res = append(res, village)
 	}
 
-	writeJSON(w, http.StatusOK, res)
-}
-
-func writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	apphttp.WriteJSON(w, http.StatusOK, res)
+	return nil
 }

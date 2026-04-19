@@ -1,10 +1,13 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
-	"service-core/internal/modules/user/usecase"
 	"strings"
+
+	"service-core/internal/modules/user/usecase"
+
+	"service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
 
 	"github.com/google/uuid"
 )
@@ -19,33 +22,28 @@ func NewUserHandler(getUser *usecase.GetUserUsecase) *UserHandler {
 	}
 }
 
-func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) error {
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 3 || parts[2] == "" {
-		http.Error(w, "id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	id := parts[2]
 	if id == "" {
-		http.Error(w, "id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	result, err := h.getUser.ByID(parsedID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	if result == nil {
-		http.Error(w, "user not found", http.StatusNotFound)
-		return
+		return errors.ErrNotFound
 	}
 
 	response := UserResponse{
@@ -56,5 +54,6 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		LastLoginAt: result.LastLoginAt,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }

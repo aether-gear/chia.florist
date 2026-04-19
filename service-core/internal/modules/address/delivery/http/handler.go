@@ -1,13 +1,15 @@
 package http
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
-	"service-core/internal/modules/address/usecase"
 	"strconv"
 	"strings"
+
+	"service-core/internal/modules/address/usecase"
+
+	"service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
 
 	"github.com/google/uuid"
 )
@@ -27,29 +29,25 @@ func NewAddressHandler(
 	}
 }
 
-func (h *AddressHandler) GetAddresses(w http.ResponseWriter, r *http.Request) {
+func (h *AddressHandler) GetAddresses(w http.ResponseWriter, r *http.Request) error {
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 || parts[3] == "" {
-		http.Error(w, "id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	id := parts[3]
 	if id == "" {
-		http.Error(w, "id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	result, err := h.getAddress.GetByUserID(parsedID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	response := make([]AddressResponse, 0, len(result))
@@ -72,46 +70,34 @@ func (h *AddressHandler) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		response = append(response, address)
 	}
 
-	json.NewEncoder(w).Encode(response)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *AddressHandler) CreateAddress(w http.ResponseWriter, r *http.Request) {
+func (h *AddressHandler) CreateAddress(w http.ResponseWriter, r *http.Request) error {
 	var req CreateAddressRequest
 
-	body, _ := io.ReadAll(r.Body)
-
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if req.ProvinceID == "" || req.CityID == "" || req.DistrictID == "" || req.VillageID == "" {
-		http.Error(w, "missing some locations", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
-	if req.FullAddress == "" {
-		http.Error(w, "missing full address", http.StatusBadRequest)
-		return
-	}
-
-	if req.PostalCode == "" {
-		http.Error(w, "missing postal code", http.StatusBadRequest)
-		return
+	if req.FullAddress == "" || req.PostalCode == "" {
+		return errors.ErrBadRequest
 	}
 
 	parsedID, err := uuid.Parse(req.UserID)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	var parsedBool bool
 	parsedBool, err = strconv.ParseBool(*req.IsDefault)
 	if err != nil {
-		http.Error(w, "invalid is default value", http.StatusBadRequest)
+		return errors.ErrBadRequest
 	}
 
 	inputCreateAddress := usecase.CreateAddressInput{
@@ -129,11 +115,13 @@ func (h *AddressHandler) CreateAddress(w http.ResponseWriter, r *http.Request) {
 
 	err = h.createAddress.Execute(inputCreateAddress)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
+	response := map[string]string{
 		"message": "address successfully created",
-	})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
