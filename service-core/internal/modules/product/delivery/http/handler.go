@@ -1,15 +1,17 @@
 package http
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
+	"strconv"
+	"strings"
+
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 	"service-core/internal/modules/product/usecase"
-	"strconv"
-	"strings"
+
+	"service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
 
 	"github.com/google/uuid"
 )
@@ -32,7 +34,7 @@ func NewProductHandler(
 	}
 }
 
-func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) {
+func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) error {
 	query := r.URL.Query()
 
 	page, _ := strconv.Atoi(query.Get("page"))
@@ -62,92 +64,73 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) {
 
 	products, total, err := h.findUsecase.Execute(params)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	responses := make([]ProductOverviewResponse, 0, len(products))
+	results := make([]ProductOverviewResponse, 0, len(products))
 	for _, p := range products {
-		responses = append(responses, ToListResponse(p))
+		results = append(results, ToListResponse(p))
 	}
 
 	response := map[string]interface{}{
-		"products": responses,
+		"products": results,
 		"page":     page,
 		"limit":    limit,
 		"total":    total,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
+func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) error {
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 3 || parts[2] == "" {
-		http.Error(w, "id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	id := parts[2]
 	if id == "" {
-		http.Error(w, "id is required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	product, err := h.getUsecase.Execute(parsedID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	if product == nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		return errors.ErrNotFound
 	}
 
-	result := ToDetailResponse(*product)
+	response := ToDetailResponse(*product)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
+func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) error {
 	var req CreateProductRequest
 
-	body, _ := io.ReadAll(r.Body)
-
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
-	if req.Name == "" {
-		http.Error(w, "missing name", http.StatusBadRequest)
-		return
+	if req.Name == "" || req.SKU == "" {
+		return errors.ErrBadRequest
 	}
-	if req.SKU == "" {
-		http.Error(w, "missing sku", http.StatusBadRequest)
-		return
+
+	if req.Price < 0 || req.InitialStock < 0 {
+		return errors.ErrBadRequest
 	}
-	if req.Price < 0 {
-		http.Error(w, "price cannot be negative", http.StatusBadRequest)
-		return
-	}
-	if req.InitialStock < 0 {
-		http.Error(w, "stock cannot be negative", http.StatusBadRequest)
-		return
-	}
+
 	if !req.Status.isStatusValid() {
-		http.Error(w, "invalid status", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	err := h.createUsecase.Execute(usecase.CreateProductInput{
@@ -160,14 +143,15 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		InitialStock: req.InitialStock,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	response := map[string]string{
 		"message": "product successfully created",
-	})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
 func (s ProductStatusDTO) isStatusValid() bool {

@@ -1,11 +1,13 @@
 package http
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
+
 	"service-core/internal/modules/auth/usecase"
+
+	"service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
 
 	"github.com/google/uuid"
 )
@@ -28,81 +30,70 @@ func NewAuthHandler(
 	}
 }
 
-func (h *authHandler) GetAccountByID(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) GetAccountByID(w http.ResponseWriter, r *http.Request) error {
 	UserId, ok := r.Context().Value("user_id").(string)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
+		return errors.ErrUnauthorized
 	}
 
 	parsedID, err := uuid.Parse(UserId)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	acc, err := h.me.ById(parsedID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	if acc == nil {
-		http.Error(w, "account not found", http.StatusNotFound)
-		return
+		return errors.ErrNotFound
 	}
 
-	resp := map[string]interface{}{
+	response := map[string]interface{}{
 		"id":            acc.ID,
 		"email":         acc.Email,
 		"last_login_at": acc.LastLoginAt,
 	}
 
-	json.NewEncoder(w).Encode(resp)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *authHandler) SignInByEmail(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) SignInByEmail(w http.ResponseWriter, r *http.Request) error {
 	var req SignInEmailParams
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if req.Email == "" || req.Password == "" {
-		http.Error(w, "email and password required", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	token, exp, err := h.signIn.ByEmail(req.Email, req.Password)
 	if err != nil {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
+		return errors.ErrUnauthorized
 	}
 
-	resp := map[string]interface{}{
+	response := map[string]interface{}{
 		"access_token": token,
 		"expires_in":   exp,
 	}
 
-	json.NewEncoder(w).Encode(resp)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *authHandler) SignUp(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) SignUp(w http.ResponseWriter, r *http.Request) error {
 	var req SignUpParams
 
-	body, _ := io.ReadAll(r.Body)
-
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if req.Email == "" || req.Password == "" || req.Username == "" {
-		http.Error(w, "missing required fields", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	err := h.signUp.Register(usecase.SignUpParams{
@@ -113,12 +104,13 @@ func (h *authHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 		Phone:    req.Phone,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	response := map[string]string{
 		"message": "account successfully created",
-	})
+	}
+
+	apphttp.WriteJSON(w, http.StatusCreated, response)
+	return nil
 }

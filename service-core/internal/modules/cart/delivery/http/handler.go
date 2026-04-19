@@ -3,7 +3,11 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+
 	"service-core/internal/modules/cart/usecase"
+
+	"service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
 
 	"github.com/google/uuid"
 )
@@ -29,23 +33,19 @@ func NewCartHandler(
 	}
 }
 
-func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.URL.Query().Get("user_id")
-
-	userID, err := uuid.Parse(userIDStr)
+func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
+	userID := r.URL.Query().Get("user_id")
+	parsedUserID, err := uuid.Parse(userID)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
-	result, err := h.getCart.Execute(userID)
+	result, err := h.getCart.Execute(parsedUserID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	if result == nil || result.Cart == nil {
-		http.Error(w, "cart not found", http.StatusNotFound)
-		return
+		return errors.ErrNotFound
 	}
 
 	var total int64
@@ -82,101 +82,99 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) {
 		Total:  total,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
+func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 	var req addItemRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	userID, err := uuid.Parse(req.UserID)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	productID, err := uuid.Parse(req.ProductID)
 	if err != nil {
-		http.Error(w, "invalid product_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if req.Quantity <= 0 {
-		http.Error(w, "quantity must be greater than 0", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if err := h.addItem.Execute(userID, productID, req.Quantity); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
+	response := map[string]string{
 		"message": "item added",
-	})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
+func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 	var req updateItemRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	userID, err := uuid.Parse(req.UserID)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	productID, err := uuid.Parse(req.ProductID)
 	if err != nil {
-		http.Error(w, "invalid product_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if req.Quantity < 0 {
-		http.Error(w, "quantity cannot be negative", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
 	if err := h.updateItem.Execute(userID, productID, req.Quantity); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
+	response := map[string]string{
 		"message": "item updated",
-	})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
-func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.URL.Query().Get("user_id")
-	productIDStr := r.URL.Query().Get("product_id")
+func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
+	userID := r.URL.Query().Get("user_id")
+	productID := r.URL.Query().Get("product_id")
 
-	userID, err := uuid.Parse(userIDStr)
+	parsedUserID, err := uuid.Parse(userID)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
-	productID, err := uuid.Parse(productIDStr)
+	parsedProductID, err := uuid.Parse(productID)
 	if err != nil {
-		http.Error(w, "invalid product_id", http.StatusBadRequest)
-		return
+		return errors.ErrBadRequest
 	}
 
-	if err := h.removeItem.Execute(userID, productID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := h.removeItem.Execute(parsedUserID, parsedProductID); err != nil {
+		return err
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
+	response := map[string]string{
 		"message": "item removed",
-	})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
