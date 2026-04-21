@@ -4,7 +4,9 @@ import (
 	"net/http"
 
 	apphttp "service-core/internal/common/http"
+	"service-core/internal/common/logger"
 	"service-core/internal/common/middleware"
+
 	addressHandler "service-core/internal/modules/address/delivery/http"
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
@@ -48,142 +50,91 @@ func NewRouter(c *Container) *http.ServeMux {
 		&c.CreateAddress,
 	)
 
-	chain := middleware.Chain
 	log := c.Logger
+	core := buildChain(log)
 
 	mux.HandleFunc(
-		"/product",
-		chain(
-			apphttp.HandleMethods(apphttp.MethodHandler{
-				http.MethodGet:  productH.FindProducts,
-				http.MethodPost: productH.CreateProduct,
-			}),
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		"/products",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet:  productH.FindProducts,
+			http.MethodPost: productH.CreateProduct,
+		})),
 	)
-
 	mux.HandleFunc(
-		"/product/",
-		chain(
-			productH.GetProduct,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		"/products/",
+		core(productH.GetProduct),
 	)
 
 	mux.HandleFunc(
 		"/auth/signin",
-		chain(
-			authH.SignInByEmail,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		core(authH.SignInByEmail),
 	)
-
 	mux.HandleFunc(
 		"/auth/signup",
-		chain(
-			authH.SignUp,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		core(authH.SignUp),
 	)
 
 	mux.HandleFunc(
 		"/cart",
-		chain(
-			cartH.GetCart,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		core(cartH.GetCart),
+	)
+	mux.HandleFunc(
+		"/cart/items",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost:   cartH.AddItem,
+			http.MethodPut:    cartH.UpdateItem,
+			http.MethodDelete: cartH.RemoveItem,
+		})),
 	)
 
 	mux.HandleFunc(
-		"/cart/items",
-		chain(
-			apphttp.HandleMethods(apphttp.MethodHandler{
-				http.MethodPost:   cartH.AddItem,
-				http.MethodPut:    cartH.UpdateItem,
-				http.MethodDelete: cartH.RemoveItem,
-			}),
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		"/locations/provinces",
+		core(locationH.Province),
 	)
-
-	mux.HandleFunc("/locations/provinces",
-		chain(locationH.Province,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+	mux.HandleFunc(
+		"/locations/cities/",
+		core(locationH.City),
 	)
-
-	mux.HandleFunc("/locations/cities/",
-		chain(locationH.City,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+	mux.HandleFunc(
+		"/locations/districts/",
+		core(locationH.District),
 	)
-
-	mux.HandleFunc("/locations/districts/",
-		chain(locationH.District,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
-	)
-
-	mux.HandleFunc("/locations/villages/",
-		chain(locationH.Village,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+	mux.HandleFunc(
+		"/locations/villages/",
+		core(locationH.Village),
 	)
 
 	mux.HandleFunc(
 		"/user/",
-		chain(
-			userH.GetUserByID,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		core(userH.GetUserByID),
 	)
-
+	mux.HandleFunc(
+		"/user/addresses",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: addressH.CreateAddress,
+			// future todo:
+			// http.MethodPut: addressH.UpdateAddress,
+			// http.MethodDelete: addressH.DeleteAddress,
+		})),
+	)
 	mux.HandleFunc(
 		"/user/addresses/",
-		chain(
-			addressH.GetAddresses,
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
-	)
-
-	mux.HandleFunc(
-		"/user/address",
-		chain(
-			apphttp.HandleMethods(apphttp.MethodHandler{
-				http.MethodPost: addressH.CreateAddress,
-				// future todo:
-				// http.MethodPut: addressH.UpdateAddress,
-				// http.MethodDelete: addressH.DeleteAddress,
-			}),
-			middleware.Recovery(log),
-			middleware.Logging(log),
-			middleware.Response(),
-		),
+		core(addressH.CreateAddress),
 	)
 
 	return mux
+}
+
+func buildChain(log logger.Logger, extra ...middleware.Middleware) func(apphttp.AppHandler) http.HandlerFunc {
+	base := []middleware.Middleware{
+		middleware.Recovery(log),
+		middleware.Logging(log),
+		middleware.Response(),
+	}
+
+	mws := append(base, extra...)
+
+	return func(h apphttp.AppHandler) http.HandlerFunc {
+		return middleware.Chain(h, mws...)
+	}
 }

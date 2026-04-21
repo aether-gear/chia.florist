@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"service-core/internal/common/logger"
-	database "service-core/internal/infra/db"
 	"service-core/internal/shared/config"
 
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
+
+	database "service-core/internal/infra/db"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
 	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
@@ -52,7 +53,7 @@ type Container struct {
 }
 
 func NewContainer() *Container {
-	log := logger.New()
+	log := logger.NewSlogLogger(config.MustGetEnv("APP_ENV"))
 
 	cfg := database.LoadConfig()
 	db := database.NewConnection(cfg)
