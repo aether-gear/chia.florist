@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Home page
 useHead({
-  title: 'Chia Florist - Beautiful Flower Boards',
+  title: 'Chia Florist - Flower Boards',
   meta: [
     { name: 'description', content: 'We provide customized flower boards for weddings, condolences, graduations, and corporate events.' }
   ]
@@ -12,7 +12,7 @@ useHead({
   <div class="relative min-h-screen flex items-center justify-center overflow-hidden">
     <!-- Background Image -->
     <div class="absolute inset-0 z-0">
-      <img src="/hero-bg.png" alt="Flower Background" class="w-full h-full object-cover" />
+      <img src="/florist.jpg" alt="Florist Background" class="w-full h-full object-cover" />
       <!-- Dark overlay for better text readability -->
       <div class="absolute inset-0 bg-black/40"></div>
     </div>
