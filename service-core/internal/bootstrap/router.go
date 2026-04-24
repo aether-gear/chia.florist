@@ -11,6 +11,7 @@ import (
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
 	locationHandler "service-core/internal/modules/location/delivery/http"
+	paymentHandler "service-core/internal/modules/payment/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
 	userHandler "service-core/internal/modules/user/delivery/http"
 )
@@ -48,6 +49,13 @@ func NewRouter(c *Container) *http.ServeMux {
 	addressH := addressHandler.NewAddressHandler(
 		&c.GetAddress,
 		&c.CreateAddress,
+	)
+
+	paymentH := paymentHandler.NewPaymentHandler(
+		&c.CreatePaymentAccount,
+		&c.ListPaymentAccount,
+		&c.CreatePaymentMethod,
+		&c.ListPaymentMethod,
 	)
 
 	log := c.Logger
@@ -112,14 +120,26 @@ func NewRouter(c *Container) *http.ServeMux {
 		"/user/addresses",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodPost: addressH.CreateAddress,
-			// future todo:
-			// http.MethodPut: addressH.UpdateAddress,
-			// http.MethodDelete: addressH.DeleteAddress,
 		})),
 	)
 	mux.HandleFunc(
 		"/user/addresses/",
 		core(addressH.CreateAddress),
+	)
+
+	mux.HandleFunc(
+		"/payment/account",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet:  paymentH.ListPaymentAccount,
+			http.MethodPost: paymentH.CreatePaymentAccount,
+		})),
+	)
+	mux.HandleFunc(
+		"/payment/method",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet:  paymentH.ListPaymentMethod,
+			http.MethodPost: paymentH.CreatePaymentMethod,
+		})),
 	)
 
 	return mux

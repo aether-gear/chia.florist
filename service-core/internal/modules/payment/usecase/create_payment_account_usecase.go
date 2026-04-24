@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	"time"
@@ -15,16 +16,17 @@ type CreatePaymentAccount struct {
 }
 
 func NewCreatePaymentAccount(
-	paymentMethodRepo repository.PaymentMethodRepository,
-	paymentAccountRepo repository.PaymentAccountRepository,
+	pAR repository.PaymentAccountRepository,
+	pMR repository.PaymentMethodRepository,
 ) *CreatePaymentAccount {
 	return &CreatePaymentAccount{
-		paymentMethodRepo:  paymentMethodRepo,
-		paymentAccountRepo: paymentAccountRepo,
+		paymentMethodRepo:  pMR,
+		paymentAccountRepo: pAR,
 	}
 }
 
 func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
+	fmt.Println("kdlneaopdeadpaedpiay")
 	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
 	if err != nil {
 		return err
@@ -32,10 +34,11 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	if method == nil {
 		return errors.New("payment method not found")
 	}
+	fmt.Println("kdlneaopdeadpaedpiay")
 
 	switch method.Type {
 
-	case string(domain.TypeBankTransfer):
+	case domain.TypeBankTransfer:
 		if input.AccountNumber == nil || *input.AccountNumber == "" {
 			return errors.New("account number required")
 		}
@@ -43,12 +46,12 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 			return errors.New("account name required")
 		}
 
-	case string(domain.TypeEWallet):
+	case domain.TypeEWallet:
 		if input.PhoneNumber == "" {
 			return errors.New("phone number required")
 		}
 
-	case string(domain.TypeQRCode):
+	case domain.TypeQRCode:
 		if input.QRString == nil || *input.QRString == "" {
 			return errors.New("qr string required")
 		}
@@ -65,6 +68,7 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 		PhoneNumber:   input.PhoneNumber,
 		QRString:      input.QRString,
 		IsActive:      input.IsActive,
+		CurrentLoad:   0,
 		CreatedAt:     time.Now(),
 	}
 

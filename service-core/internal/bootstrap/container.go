@@ -15,6 +15,7 @@ import (
 	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
 	lRepoImpl "service-core/internal/modules/location/infra/persistence"
+	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
 
@@ -22,6 +23,7 @@ import (
 	aUC "service-core/internal/modules/auth/usecase"
 	cUC "service-core/internal/modules/cart/usecase"
 	lUC "service-core/internal/modules/location/usecase"
+	payUC "service-core/internal/modules/payment/usecase"
 	pUC "service-core/internal/modules/product/usecase"
 	uUC "service-core/internal/modules/user/usecase"
 )
@@ -50,6 +52,11 @@ type Container struct {
 	GetUser       uUC.GetUserUsecase
 	GetAddress    adUC.GetAddressUsecase
 	CreateAddress adUC.CreateAddressUsecase
+
+	CreatePaymentAccount payUC.CreatePaymentAccount
+	ListPaymentAccount   payUC.ListPaymentAccount
+	CreatePaymentMethod  payUC.CreatePaymentMethod
+	ListPaymentMethod    payUC.ListPaymentMethod
 }
 
 func NewContainer() *Container {
@@ -64,6 +71,8 @@ func NewContainer() *Container {
 	locationRepo := lRepoImpl.NewLocationRepositoryImpl(db)
 	userRepo := uRepoImpl.NewUserRepositoryImpl(db)
 	addressRepo := adRepoImpl.NewAddressRepositoryImpl(db)
+	paymentAccRepo := payRepoImpl.NewPaymentAccountRepository(db)
+	paymentMethodRepo := payRepoImpl.NewPaymentMethodRepository(db)
 
 	tokenSvc := authService.NewJWTService(
 		config.MustGetEnv("JWT_SECRET"),
@@ -96,5 +105,10 @@ func NewContainer() *Container {
 		GetUser:       *uUC.NewGetUserUsecase(userRepo),
 		GetAddress:    *adUC.NewGetAddressUsecase(addressRepo),
 		CreateAddress: *adUC.NewCreateAddressUsecase(addressRepo),
+
+		CreatePaymentAccount: *payUC.NewCreatePaymentAccount(paymentAccRepo, paymentMethodRepo),
+		ListPaymentAccount:   *payUC.NewListPaymentAccount(paymentAccRepo),
+		CreatePaymentMethod:  *payUC.NewCreatePaymentMethod(paymentMethodRepo),
+		ListPaymentMethod:    *payUC.NewListPaymentMethod(paymentMethodRepo),
 	}
 }
