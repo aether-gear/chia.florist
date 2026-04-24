@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"errors"
-	"fmt"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	"time"
@@ -26,7 +25,6 @@ func NewCreatePaymentAccount(
 }
 
 func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
-	fmt.Println("kdlneaopdeadpaedpiay")
 	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
 	if err != nil {
 		return err
@@ -34,7 +32,6 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	if method == nil {
 		return errors.New("payment method not found")
 	}
-	fmt.Println("kdlneaopdeadpaedpiay")
 
 	switch method.Type {
 

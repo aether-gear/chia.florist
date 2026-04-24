@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -64,7 +63,6 @@ func (h *PaymentHandler) CreatePaymentAccount(w http.ResponseWriter, r *http.Req
 		IsActive:      isActive,
 	}
 
-	fmt.Println("kdlneaopdeadpaedpiay")
 	err = h.createPaymentAccount.Execute(input)
 	if err != nil {
 		return err
@@ -160,8 +158,6 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 		FeeFixed:      feeFixed,
 		FeePercentage: feePercentage,
 	}
-
-	fmt.Println("ajodjeaiponoai1")
 
 	err = h.createPaymentMethod.Execute(input)
 	if err != nil {
