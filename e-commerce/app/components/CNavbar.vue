@@ -6,9 +6,11 @@
   <header class="absolute top-0 left-0 w-full z-50 px-8 py-6 flex items-center justify-between">
     <!-- Logo -->
     <div class="flex items-center gap-2 text-white">
-      <!-- Simple SVG as placeholder for the flower logo -->
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-400"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <span class="text-2xl font-bold font-serif tracking-wide text-black drop-shadow-md">Chia Florist</span>
+      <img 
+    src="/images/logo.png" 
+    alt="Chia Florist Logo" 
+    class="h-20 w-auto" 
+  />
     </div>
 
     <!-- Navigation Links -->
