@@ -19,7 +19,7 @@ func Response() Middleware {
 					"error": appErr.Message,
 				})
 
-				return nil
+				return err
 			}
 
 			return nil

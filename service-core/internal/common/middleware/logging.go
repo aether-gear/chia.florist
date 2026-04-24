@@ -14,24 +14,20 @@ func Logging(log logger.Logger) Middleware {
 
 			err := next(w, r)
 
-			log.Info(r.Context(), "request",
-				logger.Field{
-					Key:   "method",
-					Value: r.Method,
-				},
-				logger.Field{
-					Key:   "path",
-					Value: r.URL.Path,
-				},
-				logger.Field{
-					Key:   "duration_ms",
-					Value: time.Since(start).Milliseconds(),
-				},
-				logger.Field{
-					Key:   "error",
-					Value: err,
-				},
-			)
+			fields := []logger.Field{
+				{Key: "method", Value: r.Method},
+				{Key: "path", Value: r.URL.Path},
+				{Key: "duration_ms", Value: time.Since(start).Milliseconds()},
+			}
+
+			if err != nil {
+				fields = append(fields,
+					logger.Field{Key: "error", Value: err.Error()},
+				)
+				log.Error(r.Context(), "request failed", fields...)
+			} else {
+				log.Info(r.Context(), "request success", fields...)
+			}
 
 			return err
 		}
