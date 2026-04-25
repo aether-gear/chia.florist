@@ -3,10 +3,12 @@ package persistence
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/repository"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -49,7 +51,7 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(userID uuid.UUID) (*domain.Car
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query cart with items by user id failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -68,11 +70,16 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(userID uuid.UUID) (*domain.Car
 		)
 
 		err := rows.Scan(
-			&cID, &uID, &createdAt, &updatedAt,
-			&itemID, &productID, &quantity,
+			&cID,
+			&uID,
+			&createdAt,
+			&updatedAt,
+			&itemID,
+			&productID,
+			&quantity,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping cart with items model to domain failed: %w", err)
 		}
 
 		if cart == nil {
@@ -113,10 +120,14 @@ func (r *cartRepositoryImpl) NewCart(userID uuid.UUID) (*domain.Cart, error) {
 
 	var cartRow CartModel
 
-	err := r.db.QueryRow(ctx, query, userID).
-		Scan(&cartRow.ID, &cartRow.UserID, &cartRow.CreatedAt, &cartRow.UpdatedAt)
+	err := r.db.QueryRow(ctx, query, userID).Scan(
+		&cartRow.ID,
+		&cartRow.UserID,
+		&cartRow.CreatedAt,
+		&cartRow.UpdatedAt,
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("insert cart failed: %w", err)
 	}
 
 	cart := &domain.Cart{
@@ -136,46 +147,71 @@ func (r *cartRepositoryImpl) Save(cart *domain.Cart) error {
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("begin tx save cart failed: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	updateItemQuery := `
+		UPDATE cart_items
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE cart_id = $1 AND product_id = $2 AND deleted_at IS NULL
+	`
+
+	insertItemQuery := `
+		INSERT INTO cart_items (
+			cart_id,
+			product_id,
+			quantity
+		)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (
+			cart_id,
+			product_id
+		) 
+		WHERE deleted_at IS NULL
+		DO UPDATE 
+		SET 
+			quantity = EXCLUDED.quantity,
+			updated_at = NOW()
+	`
 
 	for _, item := range cart.Items {
 
 		if item.DeletedAt != nil {
-			_, err := tx.Exec(ctx, `
-				UPDATE cart_items
-				SET deleted_at = NOW(), updated_at = NOW()
-				WHERE cart_id = $1 AND product_id = $2 AND deleted_at IS NULL
-			`, cart.ID, item.ProductID)
+			_, err := tx.Exec(ctx, updateItemQuery,
+				cart.ID,
+				item.ProductID,
+			)
 			if err != nil {
-				return err
+				return fmt.Errorf("update cart items failed: %w", err)
 			}
 			continue
 		}
 
-		_, err := tx.Exec(ctx, `
-			INSERT INTO cart_items (cart_id, product_id, quantity)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (cart_id, product_id) 
-			WHERE deleted_at IS NULL
-			DO UPDATE 
-			SET 
-				quantity = EXCLUDED.quantity,
-				updated_at = NOW()
-		`, cart.ID, item.ProductID, item.Quantity)
-
+		_, err := tx.Exec(ctx, insertItemQuery,
+			cart.ID,
+			item.ProductID,
+			item.Quantity,
+		)
 		if err != nil {
-			return err
+			return fmt.Errorf("insert cart failed: %w", err)
 		}
 	}
 
-	_, err = tx.Exec(ctx, `
-		UPDATE carts SET updated_at = NOW() WHERE id = $1
-	`, cart.ID)
+	updateCartQuery := `
+		UPDATE carts
+		SET updated_at = NOW()
+		WHERE id = $1
+	`
+
+	_, err = tx.Exec(ctx, updateCartQuery, cart.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("update cart failed: %w", err)
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tx save cart failed: %w", err)
+	}
+
+	return nil
 }

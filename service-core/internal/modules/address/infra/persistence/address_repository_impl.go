@@ -3,10 +3,11 @@ package persistence
 import (
 	"context"
 	"fmt"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -48,7 +49,7 @@ func (r *addressRepositoryImpl) GetByUserID(userID uuid.UUID) ([]domain.Address,
 
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query addresses by user id failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -73,14 +74,14 @@ func (r *addressRepositoryImpl) GetByUserID(userID uuid.UUID) ([]domain.Address,
 			&a.DeletedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping address model to domain failed: %w", err)
 		}
 
 		addresses = append(addresses, a)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate addresses failed: %w", err)
 	}
 
 	return addresses, nil
@@ -92,7 +93,7 @@ func (r *addressRepositoryImpl) Save(address domain.Address) error {
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("begin tx save address failed: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -106,9 +107,8 @@ func (r *addressRepositoryImpl) Save(address domain.Address) error {
 		`
 		res, err := tx.Exec(ctx, query, address.ID)
 		if err != nil {
-			return err
+			return fmt.Errorf("update address failed: %w", err)
 		}
-
 		if res.RowsAffected() == 0 {
 			return fmt.Errorf("address not found or already deleted")
 		}
@@ -139,9 +139,14 @@ func (r *addressRepositoryImpl) Save(address domain.Address) error {
 			address.UpdatedAt,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("insert address failed: %w", err)
 		}
 	}
 
-	return tx.Commit(ctx)
+	err = tx.Commit(ctx)
+	if err != nil {
+		return fmt.Errorf("commit tx save address failed: %w", err)
+	}
+
+	return nil
 }

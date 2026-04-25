@@ -3,10 +3,12 @@ package persistence
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -58,7 +60,7 @@ func (r *paymentAccountRepositoryImpl) Save(acc domain.PaymentAccount) error {
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("insert payment account failed: %w", err)
 	}
 
 	return nil
@@ -104,7 +106,7 @@ func (r *paymentAccountRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Pay
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query payment account by id failed: %w", err)
 	}
 
 	return &acc, nil
@@ -116,7 +118,7 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("begin tx acquire least loaded payment account failed: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -151,7 +153,7 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query payment account least loaded failed: %w", err)
 	}
 
 	updateQuery := `
@@ -172,11 +174,11 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("udpate payment account current load failed: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("commit tx acquire least loaded payment account failed: %w", err)
 	}
 
 	return &acc, nil
@@ -195,7 +197,7 @@ func (r *paymentAccountRepositoryImpl) IncrementLoad(accountID uuid.UUID) error 
 
 	_, err := r.db.Exec(ctx, query, accountID)
 	if err != nil {
-		return err
+		return fmt.Errorf("update payment account current load failed: %w", err)
 	}
 
 	return nil
@@ -213,7 +215,7 @@ func (r *paymentAccountRepositoryImpl) DecrementLoad(accountID uuid.UUID) error 
 
 	_, err := r.db.Exec(ctx, query, accountID)
 	if err != nil {
-		return err
+		return fmt.Errorf("update payment account current load failed: %w", err)
 	}
 
 	return nil
@@ -234,7 +236,7 @@ func (r *paymentAccountRepositoryImpl) ListByMethodID(methodID uuid.UUID) ([]dom
 
 	rows, err := r.db.Query(ctx, query, methodID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query payment accounts by method id failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -256,10 +258,14 @@ func (r *paymentAccountRepositoryImpl) ListByMethodID(methodID uuid.UUID) ([]dom
 			&acc.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping payment account model to domain failed: %w", err)
 		}
 
 		result = append(result, acc)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate payment accounts failed: %w", err)
 	}
 
 	return result, nil
@@ -280,7 +286,7 @@ func (r *paymentAccountRepositoryImpl) ListAll() ([]domain.PaymentAccount, error
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query payment accounts failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -302,10 +308,14 @@ func (r *paymentAccountRepositoryImpl) ListAll() ([]domain.PaymentAccount, error
 			&acc.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping payment account model to domain failed: %w", err)
 		}
 
 		result = append(result, acc)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate payment accounts failed: %w", err)
 	}
 
 	return result, nil

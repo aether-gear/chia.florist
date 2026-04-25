@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -81,7 +82,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	var total int
 	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("query count products failed: %w", err)
 	}
 
 	limit := params.Limit
@@ -103,7 +104,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("query products failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -128,10 +129,14 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 			&item.Inventory.ReservedStock,
 		)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, fmt.Errorf("mapping product model to domain failed: %w", err)
 		}
 
 		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate products failed: %w", err)
 	}
 
 	return results, total, nil
@@ -184,7 +189,7 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithIn
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query product by id failed: %w", err)
 	}
 
 	return &result, nil
@@ -220,7 +225,7 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 
 	rows, err := r.db.Query(ctx, query, ids)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query products by many ids failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -246,10 +251,14 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping product model to domain failed: %w", err)
 		}
 
 		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate products failed: %w", err)
 	}
 
 	return results, nil
@@ -284,7 +293,11 @@ func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
 		product.CreatedAt,
 	)
 
-	return err
+	if err != nil {
+		return fmt.Errorf("insert product failed: %w", err)
+	}
+
+	return nil
 }
 
 func (r *productRepositoryImpl) CreateInventory(inventory *domain.Inventory) error {
@@ -310,5 +323,9 @@ func (r *productRepositoryImpl) CreateInventory(inventory *domain.Inventory) err
 		inventory.CreatedAt,
 	)
 
-	return err
+	if err != nil {
+		return fmt.Errorf("insert inventory failed: %w", err)
+	}
+
+	return nil
 }

@@ -2,14 +2,16 @@ package persistence
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"fmt"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/auth/domain"
 	"service-core/internal/modules/auth/repository"
-	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -28,7 +30,11 @@ func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
 	defer cancel()
 
 	query := `
-		SELECT id, email, password, last_login_at
+		SELECT
+			id,
+			email,
+			password,
+			last_login_at
 		FROM users
 		WHERE email = $1
 		LIMIT 1
@@ -44,15 +50,15 @@ func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query user by email failed: %w", err)
 	}
 
 	d, err := m.ToDomain()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mapping account model to domain failed: %w", err)
 	}
 
 	return d, nil
@@ -63,7 +69,10 @@ func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	defer cancel()
 
 	query := `
-		SELECT id, email, password,
+		SELECT
+			id,
+			email,
+			password,
 			last_login_at
 		FROM users
 		WHERE id = $1
@@ -80,15 +89,15 @@ func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query user by id failed: %w", err)
 	}
 
 	d, err := m.ToDomain()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mapping account model to domain failed: %w", err)
 	}
 
 	return d, nil
@@ -121,5 +130,9 @@ func (r *authRepositoryImpl) Create(acc repository.CreateAccountProps) error {
 		acc.CreatedAt,
 	)
 
-	return err
+	if err != nil {
+		return fmt.Errorf("insert user failed: %w", err)
+	}
+
+	return nil
 }

@@ -3,10 +3,12 @@ package persistence
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -51,7 +53,7 @@ func (r *paymentMethodRepositoryImpl) Save(method domain.PaymentMethod) error {
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("insert payment method failed: %w", err)
 	}
 
 	return nil
@@ -84,7 +86,7 @@ func (r *paymentMethodRepositoryImpl) FindByName(name string) (*domain.PaymentMe
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query payment method by name failed: %w", err)
 	}
 
 	return &method, nil
@@ -124,7 +126,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Paym
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("query payment method by id failed: %w", err)
 	}
 
 	return &method, nil
@@ -149,7 +151,7 @@ func (r *paymentMethodRepositoryImpl) ListAll() ([]domain.PaymentMethod, error) 
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query payment methods failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -168,11 +170,14 @@ func (r *paymentMethodRepositoryImpl) ListAll() ([]domain.PaymentMethod, error) 
 			&row.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping payment method model to domain failed: %w", err)
 		}
 
 		result = append(result, row)
+	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate payment methods failed: %w", err)
 	}
 
 	return result, nil
