@@ -9,16 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreateProductInput struct {
-	SKU          string
-	Name         string
-	Description  *string
-	Status       domain.ProductStatus
-	Price        int64
-	Weight       *float64
-	InitialStock int
-}
-
 type CreateProductUsecase struct {
 	productRepo repository.ProductRepository
 }
@@ -30,17 +20,8 @@ func NewCreateProductUsecase(pR repository.ProductRepository) *CreateProductUsec
 }
 
 func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
-	if input.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if input.Price <= 0 {
-		return fmt.Errorf("price must be greater than 0")
-	}
-	if input.InitialStock < 0 {
-		return fmt.Errorf("stock cannot be negative")
-	}
-
 	now := time.Now()
+
 	product := &domain.Product{
 		ID:          uuid.New(),
 		SKU:         input.SKU,
@@ -51,6 +32,9 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		Weight:      input.Weight,
 		CreatedAt:   now,
 	}
+	if err := product.Validate(); err != nil {
+		return fmt.Errorf("failed to create product: %w", err)
+	}
 
 	inventory := &domain.Inventory{
 		ID:            uuid.New(),
@@ -59,14 +43,27 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		ReservedStock: 0,
 		CreatedAt:     now,
 	}
+	if err := inventory.Validate(); err != nil {
+		return fmt.Errorf("failed to create inventory: %w", err)
+	}
 
 	if err := u.productRepo.CreateProduct(product); err != nil {
-		return err
+		return fmt.Errorf("failed to save product: %w", err)
 	}
 
 	if err := u.productRepo.CreateInventory(inventory); err != nil {
-		return err
+		return fmt.Errorf("failed to save inventory: %w", err)
 	}
 
 	return nil
+}
+
+type CreateProductInput struct {
+	SKU          string
+	Name         string
+	Description  *string
+	Status       domain.ProductStatus
+	Price        int64
+	Weight       *float64
+	InitialStock int
 }

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -40,7 +40,7 @@ func (j *JWTService) Generate(userID uuid.UUID) (string, time.Time, error) {
 
 	signed, err := token.SignedString(j.secretKey)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, fmt.Errorf("sign jwt token failed: %w", err)
 	}
 
 	return signed, exp, nil
@@ -51,17 +51,17 @@ func (j *JWTService) Validate(tokenStr string) (uuid.UUID, error) {
 		return j.secretKey, nil
 	})
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, fmt.Errorf("parse jwt token failed: %w", err)
 	}
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		return uuid.Nil, errors.New("invalid token")
+		return uuid.Nil, fmt.Errorf("invalid jwt token claims")
 	}
 
 	userID, err := uuid.Parse(claims.UserID)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, fmt.Errorf("invalid user id in claims: %w", err)
 	}
 
 	return userID, nil

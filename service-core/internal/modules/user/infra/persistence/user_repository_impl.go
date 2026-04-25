@@ -3,11 +3,12 @@ package persistence
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/user/domain"
 	"service-core/internal/modules/user/repository"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -84,12 +85,12 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 	var total int
 	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("query count users failed: %w", err)
 	}
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("query users failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -109,10 +110,14 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 			&m.LastLoginAt,
 		)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, fmt.Errorf("mapping user model to domain failed: %w", err)
 		}
 
 		results = append(results, m)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate users failed: %w", err)
 	}
 
 	return results, total, nil
@@ -150,7 +155,7 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 		&m.LastLoginAt,
 	)
 	if err != nil {
-		return &domain.User{}, err
+		return &domain.User{}, fmt.Errorf("query user by id failed: %w", err)
 	}
 
 	return &m, nil
@@ -190,7 +195,7 @@ func (r *userRepositoryImpl) GetUserWithAccount(id uuid.UUID) (*repository.UserW
 		&m.LastLoginAt,
 	)
 	if err != nil {
-		return &repository.UserWithAccount{}, err
+		return &repository.UserWithAccount{}, fmt.Errorf("query user with account by id failed: %w", err)
 	}
 
 	return &m, nil

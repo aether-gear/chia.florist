@@ -10,10 +10,15 @@ type slogLogger struct {
 	log *slog.Logger
 }
 
-func New() Logger {
-	handler := slog.NewJSONHandler(os.Stdout, nil)
+func NewSlogLogger(env string) Logger {
+	if env == "development" {
+		return &slogLogger{
+			log: slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		}
+	}
+
 	return &slogLogger{
-		log: slog.New(handler),
+		log: slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 	}
 }
 

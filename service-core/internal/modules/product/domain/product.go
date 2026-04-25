@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,4 +29,16 @@ type Product struct {
 	UpdatedAt  *time.Time
 	ArchivedAt *time.Time
 	DeletedAt  *time.Time
+}
+
+func (p *Product) Validate() error {
+	if p.Name == "" {
+		return fmt.Errorf("invalid product: name is required")
+	}
+
+	if p.Price <= 0 {
+		return fmt.Errorf("invalid product: price must be greater than 0")
+	}
+
+	return nil
 }

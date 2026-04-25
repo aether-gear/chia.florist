@@ -1,6 +1,10 @@
 package service
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"fmt"
+
+	"golang.org/x/crypto/bcrypt"
+)
 
 type BcryptHasher struct{}
 
@@ -10,7 +14,11 @@ func NewBcryptHasher() *BcryptHasher {
 
 func (b *BcryptHasher) Hash(password string) (string, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(hashed), err
+	if err != nil {
+		return "", fmt.Errorf("hash password failed: %w", err)
+	}
+
+	return string(hashed), nil
 }
 
 func (b *BcryptHasher) Compare(hash string, password string) error {

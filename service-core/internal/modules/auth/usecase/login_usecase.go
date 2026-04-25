@@ -1,10 +1,11 @@
 package usecase
 
 import (
-	"errors"
+	"fmt"
+	"time"
+
 	"service-core/internal/modules/auth/domain"
 	"service-core/internal/modules/auth/repository"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +16,11 @@ type LoginUsecase struct {
 	tokenSvc domain.TokenService
 }
 
-func NewLoginUsecase(repo repository.AuthRepository, hasher domain.PasswordHasher, tokenSvc domain.TokenService) *LoginUsecase {
+func NewLoginUsecase(
+	repo repository.AuthRepository,
+	hasher domain.PasswordHasher,
+	tokenSvc domain.TokenService,
+) *LoginUsecase {
 	return &LoginUsecase{
 		repo:     repo,
 		hasher:   hasher,
@@ -26,20 +31,19 @@ func NewLoginUsecase(repo repository.AuthRepository, hasher domain.PasswordHashe
 func (u *LoginUsecase) ByEmail(email string, password string) (*string, time.Time, error) {
 	existing, err := u.repo.GetByEmail(email)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: %w", err)
 	}
-
 	if existing == nil {
-		return nil, time.Time{}, errors.New("invalid credentials")
+		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: invalid credentials")
 	}
 
 	if err := u.hasher.Compare(existing.Password, password); err != nil {
-		return nil, time.Time{}, errors.New("invalid credentials")
+		return nil, time.Time{}, fmt.Errorf("failed to login: invalid credentials")
 	}
 
 	token, expiry, err := u.tokenSvc.Generate(existing.ID)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, fmt.Errorf("failed to generate session: %w", err)
 	}
 
 	return &token, expiry, nil
@@ -48,20 +52,19 @@ func (u *LoginUsecase) ByEmail(email string, password string) (*string, time.Tim
 func (u *LoginUsecase) ById(id uuid.UUID, password string) (*string, time.Time, error) {
 	existing, err := u.repo.GetByID(id)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: %w", err)
 	}
-
 	if existing == nil {
-		return nil, time.Time{}, errors.New("invalid credentials")
+		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: invalid credentials")
 	}
 
 	if err := u.hasher.Compare(existing.Password, password); err != nil {
-		return nil, time.Time{}, errors.New("invalid credentials")
+		return nil, time.Time{}, fmt.Errorf("failed to login: invalid credentials")
 	}
 
 	token, expiry, err := u.tokenSvc.Generate(existing.ID)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, fmt.Errorf("failed to generate session: %w", err)
 	}
 
 	return &token, expiry, nil
