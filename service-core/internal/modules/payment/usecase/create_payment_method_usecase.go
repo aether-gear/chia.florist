@@ -1,7 +1,8 @@
 package usecase
 
 import (
-	"errors"
+	"fmt"
+
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 
@@ -21,44 +22,24 @@ func NewCreatePaymentMethod(
 }
 
 func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
-	validMethodTypes := map[string]domain.PaymentMethodType{
-		string(domain.TypeBankTransfer): domain.TypeBankTransfer,
-		string(domain.TypeEWallet):      domain.TypeEWallet,
-		string(domain.TypeQRCode):       domain.TypeQRCode,
-	}
-	methodType, ok := validMethodTypes[input.Type]
-	if !ok {
-		return errors.New("invalid payment type")
-	}
-
-	validFeeTypes := map[string]domain.PaymentFeeType{
-		string(domain.FeeTypeFlat):       domain.FeeTypeFlat,
-		string(domain.FeeTypePercentage): domain.FeeTypePercentage,
-		string(domain.FeeTypeMixed):      domain.FeeTypeMixed,
-	}
-	feeType, ok := validFeeTypes[input.FeeType]
-	if !ok {
-		return errors.New("invalid payment type")
-	}
-
-	if input.FeeFixed < 0 || input.FeePercentage > 1 || input.FeePercentage < 0 {
-		return errors.New("Invalid fee amount")
-	}
-
 	paymentMethod := domain.PaymentMethod{
 		ID:            uuid.New(),
 		Name:          input.Name,
-		Type:          methodType,
+		Type:          domain.PaymentMethodType(input.Type),
 		IsActive:      input.IsActive,
-		FeeType:       feeType,
+		FeeType:       domain.PaymentFeeType(input.FeeType),
 		FeeFixed:      input.FeeFixed,
 		FeePercentage: input.FeePercentage,
 		Description:   input.Description,
 	}
 
+	if err := paymentMethod.Validate(); err != nil {
+		return fmt.Errorf("failed to create payment method: %w", err)
+	}
+
 	err := u.paymentMethodRepo.Save(paymentMethod)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save payment method: %w", err)
 	}
 
 	return nil

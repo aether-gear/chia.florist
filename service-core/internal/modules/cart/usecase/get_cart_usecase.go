@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"fmt"
+
 	cartD "service-core/internal/modules/cart/domain"
 	cartR "service-core/internal/modules/cart/repository"
 	productR "service-core/internal/modules/product/repository"
@@ -8,17 +10,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type GetCartResult struct {
-	Cart     *cartD.Cart
-	Products map[uuid.UUID]productR.ProductWithInventory
-}
-
 type GetCartUsecase struct {
 	cartRepo    cartR.CartRepository
 	productRepo productR.ProductRepository
 }
 
-func NewGetCartUsecase(cR cartR.CartRepository, pR productR.ProductRepository) *GetCartUsecase {
+func NewGetCartUsecase(
+	cR cartR.CartRepository,
+	pR productR.ProductRepository,
+) *GetCartUsecase {
 	return &GetCartUsecase{
 		cartRepo:    cR,
 		productRepo: pR,
@@ -28,13 +28,13 @@ func NewGetCartUsecase(cR cartR.CartRepository, pR productR.ProductRepository) *
 func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve cart: %w", err)
 	}
 
 	if cart == nil {
 		cart, err = u.cartRepo.NewCart(userID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create cart: %w", err)
 		}
 	}
 
@@ -52,7 +52,7 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 
 	products, err := u.productRepo.FindByIDs(productIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load cart with products: %w", err)
 	}
 
 	productMap := make(map[uuid.UUID]productR.ProductWithInventory)
@@ -64,4 +64,9 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		Cart:     cart,
 		Products: productMap,
 	}, nil
+}
+
+type GetCartResult struct {
+	Cart     *cartD.Cart
+	Products map[uuid.UUID]productR.ProductWithInventory
 }

@@ -1,10 +1,11 @@
 package usecase
 
 import (
-	"errors"
+	"fmt"
+	"time"
+
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -27,34 +28,10 @@ func NewCreatePaymentAccount(
 func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve payment account: %w", err)
 	}
 	if method == nil {
-		return errors.New("payment method not found")
-	}
-
-	switch method.Type {
-
-	case domain.TypeBankTransfer:
-		if input.AccountNumber == nil || *input.AccountNumber == "" {
-			return errors.New("account number required")
-		}
-		if input.AccountName == "" {
-			return errors.New("account name required")
-		}
-
-	case domain.TypeEWallet:
-		if input.PhoneNumber == "" {
-			return errors.New("phone number required")
-		}
-
-	case domain.TypeQRCode:
-		if input.QRString == nil || *input.QRString == "" {
-			return errors.New("qr string required")
-		}
-
-	default:
-		return errors.New("unsupported payment type")
+		return fmt.Errorf("failed to create payment account: payment method not found")
 	}
 
 	paymentAccount := domain.PaymentAccount{
@@ -69,9 +46,13 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 		CreatedAt:     time.Now(),
 	}
 
+	if err := paymentAccount.ValidateForMethod(method.Type); err != nil {
+		return fmt.Errorf("failed to create payment account: %w", err)
+	}
+
 	err = u.paymentAccountRepo.Save(paymentAccount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save payment account: %w", err)
 	}
 
 	return nil

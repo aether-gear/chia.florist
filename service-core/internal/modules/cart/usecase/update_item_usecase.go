@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+
 	cartR "service-core/internal/modules/cart/repository"
 	productR "service-core/internal/modules/product/repository"
 
@@ -13,7 +14,10 @@ type UpdateItemUsecase struct {
 	productRepo productR.ProductRepository
 }
 
-func NewUpdateItemUsecase(cR cartR.CartRepository, pR productR.ProductRepository) *UpdateItemUsecase {
+func NewUpdateItemUsecase(
+	cR cartR.CartRepository,
+	pR productR.ProductRepository,
+) *UpdateItemUsecase {
 	return &UpdateItemUsecase{
 		cartRepo:    cR,
 		productRepo: pR,
@@ -22,40 +26,44 @@ func NewUpdateItemUsecase(cR cartR.CartRepository, pR productR.ProductRepository
 
 func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity int) error {
 	if quantity <= 0 {
-		return fmt.Errorf("invalid quantity")
+		return fmt.Errorf("failed to update cart item: invalid quantity")
 	}
 
 	product, err := u.productRepo.GetByID(productID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve product: %w", err)
 	}
 	if product == nil {
-		return fmt.Errorf("product not found")
+		return fmt.Errorf("failed to retrieve product: product not found")
 	}
 
 	if quantity > product.Inventory.Stock {
-		return fmt.Errorf("insufficient stock")
+		return fmt.Errorf("failed to update cart item: insufficient stock")
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 
 	if cart == nil {
 		cart, err = u.cartRepo.NewCart(userID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create cart: %w", err)
 		}
 	}
 
 	if !cart.HasItem(productID) {
-		return fmt.Errorf("item not found")
+		return fmt.Errorf("failed to update cart item: item not found")
 	}
 
 	if err := cart.SetItem(productID, quantity); err != nil {
-		return err
+		return fmt.Errorf("failed to update cart item: %w", err)
 	}
 
-	return u.cartRepo.Save(cart)
+	if err := u.cartRepo.Save(cart); err != nil {
+		return fmt.Errorf("failed to update cart item: %w", err)
+	}
+
+	return nil
 }

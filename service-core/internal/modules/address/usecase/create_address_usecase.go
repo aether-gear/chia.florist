@@ -1,25 +1,14 @@
 package usecase
 
 import (
+	"fmt"
+	"time"
+
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
-	"time"
 
 	"github.com/google/uuid"
 )
-
-type CreateAddressInput struct {
-	UserID       uuid.UUID
-	ReceiverName string
-	Phone        *string
-	IsDefault    *bool
-	ProvinceID   string
-	CityID       string
-	DistrictID   string
-	VillageID    string
-	FullAddress  string
-	PostalCode   string
-}
 
 type CreateAddressUsecase struct {
 	addressRepo repository.AddressRepository
@@ -56,8 +45,21 @@ func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
 
 	err := u.addressRepo.Save(address)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save address: %w", err)
 	}
 
 	return nil
+}
+
+type CreateAddressInput struct {
+	UserID       uuid.UUID
+	ReceiverName string
+	Phone        *string
+	IsDefault    *bool
+	ProvinceID   string
+	CityID       string
+	DistrictID   string
+	VillageID    string
+	FullAddress  string
+	PostalCode   string
 }

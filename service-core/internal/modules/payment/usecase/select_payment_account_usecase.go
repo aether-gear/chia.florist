@@ -1,10 +1,11 @@
 package usecase
 
 import (
-	"errors"
+	"fmt"
+	"time"
+
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -24,10 +25,10 @@ func NewSelectPayment(
 func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, error) {
 	accounts, err := u.paymentAccountRepo.ListByMethodID(methodID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load payment methods: %w", err)
 	}
 	if len(accounts) == 0 {
-		return nil, errors.New("no active payment accounts")
+		return nil, fmt.Errorf("failed to load payment methods: no payment accounts active")
 	}
 
 	selected := accounts[0]
@@ -37,13 +38,12 @@ func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, err
 		}
 	}
 
-	selected.CurrentLoad += 1
 	now := time.Now()
 	selected.LastUsedAt = &now
+	selected.CurrentLoad += 1
 
-	err = u.paymentAccountRepo.Save(selected)
-	if err != nil {
-		return nil, err
+	if err := u.paymentAccountRepo.Save(selected); err != nil {
+		return nil, fmt.Errorf("failed to update payment method: %w", err)
 	}
 
 	return &selected, nil
