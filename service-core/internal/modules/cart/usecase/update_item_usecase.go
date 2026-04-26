@@ -3,6 +3,8 @@ package usecase
 import (
 	"fmt"
 
+	appErr "service-core/internal/common/errors"
+	"service-core/internal/modules/cart/domain"
 	cartR "service-core/internal/modules/cart/repository"
 	productR "service-core/internal/modules/product/repository"
 
@@ -26,7 +28,7 @@ func NewUpdateItemUsecase(
 
 func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity int) error {
 	if quantity <= 0 {
-		return fmt.Errorf("failed to update cart item: invalid quantity")
+		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
 	product, err := u.productRepo.GetByID(productID)
@@ -34,11 +36,11 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quant
 		return fmt.Errorf("failed to retrieve product: %w", err)
 	}
 	if product == nil {
-		return fmt.Errorf("failed to retrieve product: product not found")
+		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
 	if quantity > product.Inventory.Stock {
-		return fmt.Errorf("failed to update cart item: insufficient stock")
+		return appErr.NewConflict(domain.ErrInsufficient.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
@@ -54,11 +56,11 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quant
 	}
 
 	if !cart.HasItem(productID) {
-		return fmt.Errorf("failed to update cart item: item not found")
+		return appErr.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
 	if err := cart.SetItem(productID, quantity); err != nil {
-		return fmt.Errorf("failed to update cart item: %w", err)
+		return appErr.NewInvalidInput(err.Error())
 	}
 
 	if err := u.cartRepo.Save(cart); err != nil {

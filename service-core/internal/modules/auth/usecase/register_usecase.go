@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	appErr "service-core/internal/common/errors"
+	"service-core/internal/modules/auth/domain"
 	authDomain "service-core/internal/modules/auth/domain"
 	authRepo "service-core/internal/modules/auth/repository"
 
@@ -40,7 +42,7 @@ func (u *RegisterUsecase) Register(params SignUpParams) error {
 		return fmt.Errorf("failed to check account: %w", err)
 	}
 	if existing != nil {
-		return fmt.Errorf("failed to register: account already exist")
+		return appErr.NewConflict(domain.ErrAccountAlreadyExists.Error())
 	}
 
 	hash, err := u.hasher.Hash(params.Password)

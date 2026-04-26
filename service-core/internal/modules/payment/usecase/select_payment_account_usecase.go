@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 
@@ -28,7 +29,7 @@ func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, err
 		return nil, fmt.Errorf("failed to load payment methods: %w", err)
 	}
 	if len(accounts) == 0 {
-		return nil, fmt.Errorf("failed to load payment methods: no payment accounts active")
+		return nil, appErr.NewNotFound(domain.ErrNoActivePaymentAccount.Error())
 	}
 
 	selected := accounts[0]
