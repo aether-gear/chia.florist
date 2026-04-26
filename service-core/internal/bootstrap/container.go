@@ -60,10 +60,11 @@ type Container struct {
 }
 
 func NewContainer() *Container {
-	log := logger.NewSlogLogger(config.MustGetEnv("APP_ENV"))
-
+	app := config.MustGetEnv("APP_ENV")
 	cfg := database.LoadConfig()
+
 	db := database.NewConnection(cfg)
+	log := logger.NewZapLogger(app)
 
 	productRepo := pRepoImpl.NewProductRepository(db)
 	authRepo := aRepoImpl.NewAuthRepository(db)
