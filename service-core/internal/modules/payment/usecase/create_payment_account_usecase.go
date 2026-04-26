@@ -1,9 +1,11 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 
@@ -25,13 +27,22 @@ func NewCreatePaymentAccount(
 	}
 }
 
+type CreatePaymentAccountInput struct {
+	MethodID      uuid.UUID
+	AccountName   string
+	AccountNumber *string
+	PhoneNumber   string
+	QRString      *string
+	IsActive      bool
+}
+
 func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve payment account: %w", err)
 	}
 	if method == nil {
-		return fmt.Errorf("failed to create payment account: payment method not found")
+		return appErr.NewNotFound(domain.ErrPaymentMethodNotFound.Error())
 	}
 
 	paymentAccount := domain.PaymentAccount{
@@ -47,7 +58,11 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	}
 
 	if err := paymentAccount.ValidateForMethod(method.Type); err != nil {
-		return fmt.Errorf("failed to create payment account: %w", err)
+		if errors.Is(err, domain.ErrUnsupportedPaymentMethod) {
+			return appErr.NewBadRequest(err.Error())
+		}
+
+		return appErr.NewInvalidInput(err.Error())
 	}
 
 	err = u.paymentAccountRepo.Save(paymentAccount)
@@ -56,13 +71,4 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	}
 
 	return nil
-}
-
-type CreatePaymentAccountInput struct {
-	MethodID      uuid.UUID
-	AccountName   string
-	AccountNumber *string
-	PhoneNumber   string
-	QRString      *string
-	IsActive      bool
 }

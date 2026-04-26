@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,24 +30,24 @@ func (pA *PaymentAccount) ValidateForMethod(methodType PaymentMethodType) error 
 
 	case TypeBankTransfer:
 		if pA.AccountNumber == nil || *pA.AccountNumber == "" {
-			return fmt.Errorf("invalid payment account: account number is required")
+			return ErrInvalidAccountName
 		}
 		if pA.AccountName == "" {
-			return fmt.Errorf("invalid payment account: account name is required")
+			return ErrInvalidAccountNumber
 		}
 
 	case TypeEWallet:
 		if pA.PhoneNumber == "" {
-			return fmt.Errorf("invalid payment account: phone number is required")
+			return ErrInvalidPhoneNumber
 		}
 
 	case TypeQRCode:
 		if pA.QRString == nil || *pA.QRString == "" {
-			return fmt.Errorf("invalid payment account: qr string is required")
+			return ErrInvalidQRString
 		}
 
 	default:
-		return fmt.Errorf("invalid payment account: unsupported payment method type")
+		return ErrUnsupportedPaymentMethod
 	}
 
 	return nil

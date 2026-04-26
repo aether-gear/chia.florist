@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,7 +19,7 @@ type Cart struct {
 
 func (c *Cart) AddItem(productID uuid.UUID, qty int) error {
 	if qty <= 0 {
-		return fmt.Errorf("invalid quantity")
+		return ErrInvalidQuantity
 	}
 
 	for i := range c.Items {
@@ -41,7 +40,7 @@ func (c *Cart) AddItem(productID uuid.UUID, qty int) error {
 
 func (c *Cart) SetItem(productID uuid.UUID, qty int) error {
 	if qty < 0 {
-		return fmt.Errorf("invalid quantity")
+		return ErrInvalidQuantity
 	}
 
 	for i := range c.Items {

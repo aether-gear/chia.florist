@@ -3,6 +3,8 @@ package usecase
 import (
 	"fmt"
 
+	appErr "service-core/internal/common/errors"
+	"service-core/internal/modules/cart/domain"
 	cartR "service-core/internal/modules/cart/repository"
 	productR "service-core/internal/modules/product/repository"
 
@@ -26,7 +28,7 @@ func NewAddItemUsecase(
 
 func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity int) error {
 	if quantity <= 0 {
-		return fmt.Errorf("failed to add item: invalid quantity")
+		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
 	product, err := u.productRepo.GetByID(productID)
@@ -34,11 +36,11 @@ func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
 	if product == nil {
-		return fmt.Errorf("failed to load product with inventory: product not found")
+		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
 	if quantity > product.Inventory.Stock {
-		return fmt.Errorf("failed to add item: insufficient stock")
+		return appErr.NewConflict(domain.ErrInsufficient.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
@@ -53,7 +55,7 @@ func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity
 	}
 
 	if err := cart.AddItem(productID, quantity); err != nil {
-		return fmt.Errorf("failed to add item: %w", err)
+		return appErr.NewInvalidInput(err.Error())
 	}
 
 	if err := u.cartRepo.Save(cart); err != nil {

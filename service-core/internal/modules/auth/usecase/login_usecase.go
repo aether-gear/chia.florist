@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/auth/domain"
 	"service-core/internal/modules/auth/repository"
 
@@ -34,11 +35,11 @@ func (u *LoginUsecase) ByEmail(email string, password string) (*string, time.Tim
 		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 	if existing == nil {
-		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: invalid credentials")
+		return nil, time.Time{}, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	if err := u.hasher.Compare(existing.Password, password); err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to login: invalid credentials")
+		return nil, time.Time{}, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	token, expiry, err := u.tokenSvc.Generate(existing.ID)
@@ -55,11 +56,11 @@ func (u *LoginUsecase) ById(id uuid.UUID, password string) (*string, time.Time, 
 		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 	if existing == nil {
-		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: invalid credentials")
+		return nil, time.Time{}, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	if err := u.hasher.Compare(existing.Password, password); err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to login: invalid credentials")
+		return nil, time.Time{}, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	token, expiry, err := u.tokenSvc.Generate(existing.ID)

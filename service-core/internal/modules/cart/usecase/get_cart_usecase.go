@@ -25,6 +25,11 @@ func NewGetCartUsecase(
 	}
 }
 
+type GetCartResult struct {
+	Cart     *cartD.Cart
+	Products map[uuid.UUID]productR.ProductWithInventory
+}
+
 func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
 	if err != nil {
@@ -64,9 +69,4 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		Cart:     cart,
 		Products: productMap,
 	}, nil
-}
-
-type GetCartResult struct {
-	Cart     *cartD.Cart
-	Products map[uuid.UUID]productR.ProductWithInventory
 }

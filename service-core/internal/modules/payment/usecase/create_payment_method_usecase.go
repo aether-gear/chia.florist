@@ -3,6 +3,7 @@ package usecase
 import (
 	"fmt"
 
+	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 
@@ -21,6 +22,16 @@ func NewCreatePaymentMethod(
 	}
 }
 
+type CreatePaymentMethodInput struct {
+	Name          string
+	Type          string
+	IsActive      bool
+	Description   string
+	FeeType       string
+	FeeFixed      int64
+	FeePercentage float64
+}
+
 func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
 	paymentMethod := domain.PaymentMethod{
 		ID:            uuid.New(),
@@ -34,7 +45,7 @@ func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
 	}
 
 	if err := paymentMethod.Validate(); err != nil {
-		return fmt.Errorf("failed to create payment method: %w", err)
+		return appErr.NewInvalidInput(err.Error())
 	}
 
 	err := u.paymentMethodRepo.Save(paymentMethod)
@@ -43,14 +54,4 @@ func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
 	}
 
 	return nil
-}
-
-type CreatePaymentMethodInput struct {
-	Name          string
-	Type          string
-	IsActive      bool
-	Description   string
-	FeeType       string
-	FeeFixed      int64
-	FeePercentage float64
 }

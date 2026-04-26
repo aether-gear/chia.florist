@@ -1,10 +1,13 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
+	"time"
+
+	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -17,6 +20,16 @@ func NewCreateProductUsecase(pR repository.ProductRepository) *CreateProductUsec
 	return &CreateProductUsecase{
 		productRepo: pR,
 	}
+}
+
+type CreateProductInput struct {
+	SKU          string
+	Name         string
+	Description  *string
+	Status       domain.ProductStatus
+	Price        int64
+	Weight       *float64
+	InitialStock int
 }
 
 func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
@@ -33,7 +46,12 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		CreatedAt:   now,
 	}
 	if err := product.Validate(); err != nil {
-		return fmt.Errorf("failed to create product: %w", err)
+		if errors.Is(err, domain.ErrInvalidProductName) ||
+			errors.Is(err, domain.ErrInvalidProductPrice) {
+			return appErr.NewInvalidInput(err.Error())
+		}
+
+		return err
 	}
 
 	inventory := &domain.Inventory{
@@ -44,7 +62,11 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		CreatedAt:     now,
 	}
 	if err := inventory.Validate(); err != nil {
-		return fmt.Errorf("failed to create inventory: %w", err)
+		if errors.Is(err, domain.ErrInvalidStock) {
+			return appErr.NewInvalidInput(err.Error())
+		}
+
+		return err
 	}
 
 	if err := u.productRepo.CreateProduct(product); err != nil {
@@ -56,14 +78,4 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 	}
 
 	return nil
-}
-
-type CreateProductInput struct {
-	SKU          string
-	Name         string
-	Description  *string
-	Status       domain.ProductStatus
-	Price        int64
-	Weight       *float64
-	InitialStock int
 }

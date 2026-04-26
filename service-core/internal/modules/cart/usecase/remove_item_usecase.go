@@ -3,6 +3,8 @@ package usecase
 import (
 	"fmt"
 
+	appErr "service-core/internal/common/errors"
+	"service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/repository"
 
 	"github.com/google/uuid"
@@ -26,7 +28,7 @@ func (u *RemoveItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID) error
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
-		return fmt.Errorf("failed to load cart with items: cart not found")
+		return appErr.NewNotFound(domain.ErrCartNotFound.Error())
 	}
 
 	cart.RemoveItem(productID)

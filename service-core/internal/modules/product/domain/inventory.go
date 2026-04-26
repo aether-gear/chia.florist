@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,7 +18,7 @@ type Inventory struct {
 
 func (i *Inventory) Validate() error {
 	if i.Stock < 0 {
-		return fmt.Errorf("invalid inventory: stock cannot be negative")
+		return ErrInvalidStock
 	}
 
 	return nil
