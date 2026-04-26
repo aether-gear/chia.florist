@@ -19,6 +19,16 @@ func NewCreateProductUsecase(pR repository.ProductRepository) *CreateProductUsec
 	}
 }
 
+type CreateProductInput struct {
+	SKU          string
+	Name         string
+	Description  *string
+	Status       domain.ProductStatus
+	Price        int64
+	Weight       *float64
+	InitialStock int
+}
+
 func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 	now := time.Now()
 
@@ -56,14 +66,4 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 	}
 
 	return nil
-}
-
-type CreateProductInput struct {
-	SKU          string
-	Name         string
-	Description  *string
-	Status       domain.ProductStatus
-	Price        int64
-	Weight       *float64
-	InitialStock int
 }

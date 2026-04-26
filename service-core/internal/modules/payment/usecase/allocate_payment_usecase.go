@@ -21,10 +21,6 @@ func NewAllocatePaymentByMethod(
 	}
 }
 
-func (u *AllocatePaymentByMethod) Execute(methodID uuid.UUID) error {
-	return nil
-}
-
 type AllocatePaymentByMethodResponse struct {
 	AccountID     uuid.UUID
 	MethodID      uuid.UUID
@@ -32,4 +28,8 @@ type AllocatePaymentByMethodResponse struct {
 	AccountNumber *string
 	PhoneNumber   *string
 	QRString      *string
+}
+
+func (u *AllocatePaymentByMethod) Execute(methodID uuid.UUID) error {
+	return nil
 }

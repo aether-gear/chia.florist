@@ -21,6 +21,16 @@ func NewCreatePaymentMethod(
 	}
 }
 
+type CreatePaymentMethodInput struct {
+	Name          string
+	Type          string
+	IsActive      bool
+	Description   string
+	FeeType       string
+	FeeFixed      int64
+	FeePercentage float64
+}
+
 func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
 	paymentMethod := domain.PaymentMethod{
 		ID:            uuid.New(),
@@ -43,14 +53,4 @@ func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
 	}
 
 	return nil
-}
-
-type CreatePaymentMethodInput struct {
-	Name          string
-	Type          string
-	IsActive      bool
-	Description   string
-	FeeType       string
-	FeeFixed      int64
-	FeePercentage float64
 }

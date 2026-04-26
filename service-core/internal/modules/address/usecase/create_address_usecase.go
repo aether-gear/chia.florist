@@ -20,6 +20,19 @@ func NewCreateAddressUsecase(addressRepo repository.AddressRepository) *CreateAd
 	}
 }
 
+type CreateAddressInput struct {
+	UserID       uuid.UUID
+	ReceiverName string
+	Phone        *string
+	IsDefault    *bool
+	ProvinceID   string
+	CityID       string
+	DistrictID   string
+	VillageID    string
+	FullAddress  string
+	PostalCode   string
+}
+
 func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
 	var isDefault bool
 	if *input.IsDefault {
@@ -49,17 +62,4 @@ func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
 	}
 
 	return nil
-}
-
-type CreateAddressInput struct {
-	UserID       uuid.UUID
-	ReceiverName string
-	Phone        *string
-	IsDefault    *bool
-	ProvinceID   string
-	CityID       string
-	DistrictID   string
-	VillageID    string
-	FullAddress  string
-	PostalCode   string
 }

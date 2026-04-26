@@ -25,6 +25,15 @@ func NewRegisterUsecase(
 	}
 }
 
+type SignUpParams struct {
+	Email    string
+	Password string
+
+	Name     string
+	Username string
+	Phone    *string
+}
+
 func (u *RegisterUsecase) Register(params SignUpParams) error {
 	existing, err := u.authRepo.GetByEmail(params.Email)
 	if err != nil {
@@ -57,13 +66,4 @@ func (u *RegisterUsecase) Register(params SignUpParams) error {
 	}
 
 	return nil
-}
-
-type SignUpParams struct {
-	Email    string
-	Password string
-
-	Name     string
-	Username string
-	Phone    *string
 }

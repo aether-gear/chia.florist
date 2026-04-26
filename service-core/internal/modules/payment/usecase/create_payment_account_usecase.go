@@ -25,6 +25,15 @@ func NewCreatePaymentAccount(
 	}
 }
 
+type CreatePaymentAccountInput struct {
+	MethodID      uuid.UUID
+	AccountName   string
+	AccountNumber *string
+	PhoneNumber   string
+	QRString      *string
+	IsActive      bool
+}
+
 func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
 	if err != nil {
@@ -56,13 +65,4 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 	}
 
 	return nil
-}
-
-type CreatePaymentAccountInput struct {
-	MethodID      uuid.UUID
-	AccountName   string
-	AccountNumber *string
-	PhoneNumber   string
-	QRString      *string
-	IsActive      bool
 }
