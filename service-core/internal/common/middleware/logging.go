@@ -23,7 +23,7 @@ func Logging(log logger.Logger) Middleware {
 			}
 
 			if err != nil {
-				appErr := errors.Map(err)
+				appErr := errors.Resolve(err)
 
 				fields = append(fields,
 					logger.Field{Key: "error", Value: err.Error()},

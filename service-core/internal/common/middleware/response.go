@@ -14,7 +14,7 @@ func Response() Middleware {
 			err := next(w, r)
 
 			if err != nil {
-				appErr := errors.Map(err)
+				appErr := errors.Resolve(err)
 
 				errors := []string{firstMessage(err), lastMessage(err)}
 				messDebug := strings.Join(errors, ": ")
