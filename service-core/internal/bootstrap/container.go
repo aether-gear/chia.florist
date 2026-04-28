@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"net/http"
 	"time"
 
 	"service-core/internal/common/logger"
@@ -8,13 +9,15 @@ import (
 
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
+	lService "service-core/internal/modules/location/infra/service"
 
 	database "service-core/internal/infra/db"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
 	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
-	lRepoImpl "service-core/internal/modules/location/infra/persistence"
+
+	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
 	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
@@ -60,27 +63,44 @@ type Container struct {
 }
 
 func NewContainer() *Container {
-	app := config.MustGetEnv("APP_ENV")
+	var (
+		app                   = config.MustGetEnv("APP_ENV")
+		komerceShipping       = config.MustGetEnv("KOMERCE_SHIPPING")
+		komerceDestinationURL = config.MustGetEnv("KOMERCE_DESTINATION_URL")
+	)
+
 	cfg := database.LoadConfig()
 
 	db := database.NewConnection(cfg)
 	log := logger.NewZapLogger(app)
 
-	productRepo := pRepoImpl.NewProductRepository(db)
-	authRepo := aRepoImpl.NewAuthRepository(db)
-	cartRepo := cRepoImpl.NewCartRepositoryImpl(db)
-	locationRepo := lRepoImpl.NewLocationRepositoryImpl(db)
-	userRepo := uRepoImpl.NewUserRepositoryImpl(db)
-	addressRepo := adRepoImpl.NewAddressRepositoryImpl(db)
-	paymentAccRepo := payRepoImpl.NewPaymentAccountRepository(db)
-	paymentMethodRepo := payRepoImpl.NewPaymentMethodRepository(db)
-
-	tokenSvc := authService.NewJWTService(
-		config.MustGetEnv("JWT_SECRET"),
-		24*time.Minute,
+	var (
+		productRepo = pRepoImpl.NewProductRepository(db)
+		authRepo    = aRepoImpl.NewAuthRepository(db)
+		cartRepo    = cRepoImpl.NewCartRepositoryImpl(db)
+		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
+		userRepo          = uRepoImpl.NewUserRepositoryImpl(db)
+		addressRepo       = adRepoImpl.NewAddressRepositoryImpl(db)
+		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(db)
+		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(db)
 	)
 
-	hasher := authService.NewBcryptHasher()
+	var (
+		tokenSvc = authService.NewJWTService(
+			config.MustGetEnv("JWT_SECRET"),
+			24*time.Minute,
+		)
+
+		hasher = authService.NewBcryptHasher()
+
+		locationService = lService.NewRajaOngkirService(
+			komerceShipping,
+			komerceDestinationURL,
+			&http.Client{
+				Timeout: 10 * time.Second,
+			},
+		)
+	)
 
 	return &Container{
 		DB:     db,
@@ -102,7 +122,7 @@ func NewContainer() *Container {
 		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, productRepo),
 		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),
 
-		ListLocations: *lUC.NewListLocationUsecase(locationRepo),
+		ListLocations: *lUC.NewListLocationUsecase(locationService),
 		GetUser:       *uUC.NewGetUserUsecase(userRepo),
 		GetAddress:    *adUC.NewGetAddressUsecase(addressRepo),
 		CreateAddress: *adUC.NewCreateAddressUsecase(addressRepo),
