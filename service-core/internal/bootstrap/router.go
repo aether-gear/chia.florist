@@ -17,49 +17,53 @@ import (
 )
 
 func NewRouter(c *Container) *http.ServeMux {
+	var (
+		log  = c.Logger
+		core = buildChain(log)
+	)
+
+	var (
+		productH = productHandler.NewProductHandler(
+			&c.FindProducts,
+			&c.GetProduct,
+			&c.CreateProduct,
+		)
+
+		authH = authHandler.NewAuthHandler(
+			&c.LoginAccount,
+			&c.RegisterAccount,
+			&c.GetAccount,
+		)
+
+		cartH = cartHandler.NewCartHandler(
+			&c.AddItem,
+			&c.GetCart,
+			&c.UpdateItem,
+			&c.RemoveItem,
+		)
+
+		locationH = locationHandler.NewLocationHandler(
+			&c.ListLocations,
+		)
+
+		userH = userHandler.NewUserHandler(
+			&c.GetUser,
+		)
+
+		addressH = addressHandler.NewAddressHandler(
+			&c.GetAddress,
+			&c.CreateAddress,
+		)
+
+		paymentH = paymentHandler.NewPaymentHandler(
+			&c.CreatePaymentAccount,
+			&c.ListPaymentAccount,
+			&c.CreatePaymentMethod,
+			&c.ListPaymentMethod,
+		)
+	)
+
 	mux := http.NewServeMux()
-
-	productH := productHandler.NewProductHandler(
-		&c.FindProducts,
-		&c.GetProduct,
-		&c.CreateProduct,
-	)
-
-	authH := authHandler.NewAuthHandler(
-		&c.LoginAccount,
-		&c.RegisterAccount,
-		&c.GetAccount,
-	)
-
-	cartH := cartHandler.NewCartHandler(
-		&c.AddItem,
-		&c.GetCart,
-		&c.UpdateItem,
-		&c.RemoveItem,
-	)
-
-	locationH := locationHandler.NewLocationHandler(
-		&c.ListLocations,
-	)
-
-	userH := userHandler.NewUserHandler(
-		&c.GetUser,
-	)
-
-	addressH := addressHandler.NewAddressHandler(
-		&c.GetAddress,
-		&c.CreateAddress,
-	)
-
-	paymentH := paymentHandler.NewPaymentHandler(
-		&c.CreatePaymentAccount,
-		&c.ListPaymentAccount,
-		&c.CreatePaymentMethod,
-		&c.ListPaymentMethod,
-	)
-
-	log := c.Logger
-	core := buildChain(log)
 
 	mux.HandleFunc(
 		"/products",

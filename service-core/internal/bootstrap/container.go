@@ -2,10 +2,8 @@ package bootstrap
 
 import (
 	"net/http"
-	"time"
 
 	"service-core/internal/common/logger"
-	"service-core/internal/shared/config"
 
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
@@ -64,17 +62,21 @@ type Container struct {
 
 func NewContainer() *Container {
 	var (
-		app                   = config.MustGetEnv("APP_ENV")
-		komerceShipping       = config.MustGetEnv("KOMERCE_SHIPPING")
-		komerceDestinationURL = config.MustGetEnv("KOMERCE_DESTINATION_URL")
+		config = LoadConfig()
+
+		dbCfg                 = config.DB
+		app                   = config.App.Env
+		komerceShipping       = config.Shipping.BaseURL
+		komerceDestinationURL = config.Shipping.DestinationURL
+		komerceTimeout        = config.Shipping.Timeout
+		jwtSecret             = config.JWT.Secret
+		jwtExp                = config.JWT.Exp
 	)
 
-	cfg := database.LoadConfig()
-
-	db := database.NewConnection(cfg)
-	log := logger.NewZapLogger(app)
-
 	var (
+		db  = database.NewConnection(dbCfg)
+		log = logger.NewZapLogger(app)
+
 		productRepo = pRepoImpl.NewProductRepository(db)
 		authRepo    = aRepoImpl.NewAuthRepository(db)
 		cartRepo    = cRepoImpl.NewCartRepositoryImpl(db)
@@ -87,8 +89,8 @@ func NewContainer() *Container {
 
 	var (
 		tokenSvc = authService.NewJWTService(
-			config.MustGetEnv("JWT_SECRET"),
-			24*time.Minute,
+			jwtSecret,
+			jwtExp,
 		)
 
 		hasher = authService.NewBcryptHasher()
@@ -97,7 +99,7 @@ func NewContainer() *Container {
 			komerceShipping,
 			komerceDestinationURL,
 			&http.Client{
-				Timeout: 10 * time.Second,
+				Timeout: komerceTimeout,
 			},
 		)
 	)

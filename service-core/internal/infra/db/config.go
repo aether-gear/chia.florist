@@ -2,7 +2,7 @@ package database
 
 import "service-core/internal/shared/config"
 
-type Config struct {
+type DatabaseConfig struct {
 	Driver   string
 	Host     string
 	Port     string
@@ -12,19 +12,19 @@ type Config struct {
 	SSLMode  string
 }
 
-func LoadConfig() Config {
-	return Config{
-		Driver:   config.MustGetEnv("DB_DRIVER"),
-		Host:     config.MustGetEnv("DB_HOST"),
-		Port:     config.MustGetEnv("DB_PORT"),
-		User:     config.MustGetEnv("DB_USER"),
-		Password: config.MustGetEnv("DB_PASSWORD"),
-		Name:     config.MustGetEnv("DB_NAME"),
-		SSLMode:  config.MustGetEnv("DB_SSLMODE"),
+func LoadConfig() DatabaseConfig {
+	return DatabaseConfig{
+		Driver:   config.GetEnv("DB_DRIVER"),
+		Host:     config.GetEnv("DB_HOST"),
+		Port:     config.GetEnv("DB_PORT"),
+		User:     config.GetEnv("DB_USER"),
+		Password: config.GetEnv("DB_PASSWORD"),
+		Name:     config.GetEnv("DB_NAME"),
+		SSLMode:  config.GetEnv("DB_SSLMODE"),
 	}
 }
 
-func (c Config) DSN() string {
+func (c DatabaseConfig) DSN() string {
 	dsn := "postgresql://" +
 		c.User + ":" +
 		c.Password + "@" +
