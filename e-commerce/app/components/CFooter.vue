@@ -3,39 +3,49 @@
 </script>
 
 <template>
-  <footer class="bg-[#1b4332] text-white py-12 px-8">
-    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div>
-        <h4 class="font-bold mb-4">Site</h4>
-        <ul class="space-y-2 text-sm text-gray-300">
-          <li><NuxtLink to="/" class="hover:text-white transition-colors">Home</NuxtLink></li>
-          <li><NuxtLink to="/blog" class="hover:text-white transition-colors">Blog</NuxtLink></li>
-          <li><NuxtLink to="/products" class="hover:text-white transition-colors">Products</NuxtLink></li>
-          <li><NuxtLink to="/delivery" class="hover:text-white transition-colors">Delivery</NuxtLink></li>
-          <li><NuxtLink to="/about" class="hover:text-white transition-colors">About Us</NuxtLink></li>
-        </ul>
+  <footer class="bg-[#1b4332] text-white py-16 px-8">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 items-start gap-12">
+      
+      <div class="flex gap-16">
+        <div>
+          <h4 class="text-lg font-medium mb-6 opacity-80">Site</h4>
+          <ul class="space-y-4 font-bold">
+            <li><NuxtLink to="/" class="hover:opacity-70 transition">Home</NuxtLink></li>
+            <li><NuxtLink to="/blog" class="hover:opacity-70 transition">Blog</NuxtLink></li>
+            <li><NuxtLink to="/products" class="hover:opacity-70 transition">Products</NuxtLink></li>
+            <li><NuxtLink to="/delivery" class="hover:text-white transition">Delivery</NuxtLink></li>
+            <li><NuxtLink to="/about" class="hover:text-white transition">About Us</NuxtLink></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-lg font-medium mb-6 opacity-80">Social</h4>
+          <ul class="space-y-4 font-bold">
+            <li><NuxtLink to="/instagram" class="hover:opacity-70 transition">Instagram</NuxtLink></li>
+            <li><NuxtLink to="/facebook" class="hover:opacity-70 transition">Facebook</NuxtLink></li>
+          </ul>
+        </div>
       </div>
-      <div>
-        <h4 class="font-bold mb-4">Social</h4>
-        <ul class="space-y-2 text-sm text-gray-300">
-          <li><NuxtLink to="/instagram" class="hover:text-white transition-colors">Instagram</NuxtLink></li>
-          <li><NuxtLink to="/facebook" class="hover:text-white transition-colors">Facebook</NuxtLink></li>
-          <li><NuxtLink to="/whatsapp" class="hover:text-white transition-colors">WhatsApp</NuxtLink></li>
-        </ul>
+
+      <div class="flex justify-center items-center">
+        <img src="/images/footer.png" class="w-90 h-auto" alt="Logo" />
       </div>
-      <div>
-        <form class="flex" @submit.prevent>
-          <button class="bg-yellow-500 text-[#1b4332] px-4 py-2 font-bold hover:bg-yellow-400 transition-colors">Contact Us</button>
-        </form>
-        <ul class="space-y-2 text-sm text-gray-300">
-          <li>chiaflorist@gmail.com</li>
-          <li>+62 817-5234-999</li>
-          <li>Jl. Argotirto No 06 RT 04 RW 02 Kp. Air Terjun Kel. Sungai Daeng, Kota Muntok, Kab. Bangka Barat, Kep. Bangka Belitung, Indonesia 33311</li>
-        </ul>
+
+      <div class="flex flex-col items-end text-right">
+        <NuxtLink 
+          to="/contact" 
+          class="bg-white text-[#1b4332] px-10 py-3 rounded-lg font-bold text-xl mb-8 hover:bg-gray-100 transition-all shadow-lg"
+        >
+          Contact us
+        </NuxtLink>
+        
+        <p class="max-w-[300px] text-sm font-medium leading-relaxed opacity-90">
+          Jl. Argotirto No 06 RT 04 RW 02 Kp. Air Terjun Kel. Sungai Daeng, Kota Muntok, Kab. Bangka Barat, Kep. Bangka Belitung, Indonesia 33311
+        </p>
       </div>
     </div>
-    <div class="max-w-7xl mx-auto mt-12 pt-8 border-t border-white/20 text-center text-sm text-gray-400">
-      &copy; {{ new Date().getFullYear() }} Copyright © 2026 Chia Florist. All rights reserved.
+
+    <div class="max-w-7xl mx-auto mt-20 text-center font-medium opacity-80">
+      Copyright © {{ new Date().getFullYear() }} Chia Florist. All rights reserved.
     </div>
   </footer>
 </template>
