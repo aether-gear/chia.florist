@@ -17,7 +17,7 @@
     <nav class="hidden md:flex items-center gap-8 text-white font-medium drop-shadow-sm">
       <NuxtLink to="/" class="hover:text-yellow-300 transition-colors">Home</NuxtLink>
       <NuxtLink to="/about" class="hover:text-yellow-300 transition-colors">About Us</NuxtLink>
-      <NuxtLink to="/planters" class="hover:text-yellow-300 transition-colors">Planters</NuxtLink>
+      <NuxtLink to="/products" class="hover:text-yellow-300 transition-colors">Products</NuxtLink>
       <NuxtLink to="/contact" class="hover:text-yellow-300 transition-colors">Contact</NuxtLink>
     </nav>
 
