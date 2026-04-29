@@ -40,7 +40,7 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quant
 	}
 
 	if quantity > product.Inventory.Stock {
-		return appErr.NewConflict(domain.ErrInsufficient.Error())
+		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
