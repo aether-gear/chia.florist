@@ -23,7 +23,7 @@
 
     <!-- Action -->
     <div class="flex items-center gap-4">
-      <CButton variant="outline" size="sm" to="/signup">Sign In</CButton>
+      <CButton variant="outline" size="sm" to="/register">Sign In</CButton>
     </div>
   </header>
 </template>
