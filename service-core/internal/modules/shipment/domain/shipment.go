@@ -17,7 +17,7 @@ const (
 	Cancelled ShipmentStatus = "cancelled"
 )
 
-type Delivery struct {
+type Shipment struct {
 	ID uuid.UUID
 
 	OrderID  uuid.UUID
@@ -37,7 +37,7 @@ type Delivery struct {
 	CreatedAt time.Time
 }
 
-func (d *Delivery) Validate() error {
+func (d *Shipment) Validate() error {
 	if d.Cost <= 0 {
 		return ErrInvalidCost
 	}

@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"service-core/internal/modules/delivery/domain"
+	"service-core/internal/modules/shipment/domain"
 
 	"github.com/google/uuid"
 )
@@ -23,7 +23,7 @@ type CostOption struct {
 	Service string
 }
 
-type DeliveryProvider interface {
+type ShipmentProvider interface {
 	CalculateCost(input CalculateCostInput) ([]CostOption, error)
-	Track(trackingNumber string) ([]domain.DeliveryEvent, error)
+	Track(trackingNumber string) ([]domain.ShipmentEvent, error)
 }

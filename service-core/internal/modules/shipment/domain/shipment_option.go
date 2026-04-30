@@ -2,7 +2,7 @@ package domain
 
 import "github.com/google/uuid"
 
-type DeliveryOption struct {
+type ShipmentOption struct {
 	ID uuid.UUID
 
 	IsActive bool
@@ -14,7 +14,7 @@ type DeliveryOption struct {
 	Description string
 }
 
-func (dO *DeliveryOption) Validate() error {
+func (dO *ShipmentOption) Validate() error {
 	if dO.Courier == "" {
 		return ErrInvalidCourier
 	}

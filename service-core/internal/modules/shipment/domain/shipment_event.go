@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type DeliveryEvent struct {
+type ShipmentEvent struct {
 	ID uuid.UUID
 
 	ShipmentID uuid.UUID
@@ -18,7 +18,7 @@ type DeliveryEvent struct {
 	Timestamp time.Time
 }
 
-func (dE *DeliveryEvent) Validate() error {
+func (dE *ShipmentEvent) Validate() error {
 	if dE.Status == "" {
 		return ErrInvalidEventStatus
 	}
