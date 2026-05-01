@@ -46,6 +46,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 			p.id,
 			p.sku,
 			p.name,
+			p.slug,
 			p.description,
 			p.status,
 			p.base_price,
@@ -77,10 +78,11 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	countQuery := "SELECT COUNT(*) " + baseQuery + whereClause
+	countArgs := append([]any{}, args...)
+	countQuery := "SELECT COUNT(DISTINCT p.id) " + baseQuery + whereClause
 
 	var total int
-	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
+	err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query count products failed: %w", err)
 	}
@@ -97,8 +99,11 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	offset := (page - 1) * limit
 
+	limitPos := argPos
+	offsetPos := argPos + 1
+
 	query := selectQuery + baseQuery + whereClause +
-		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", argPos, argPos+1)
+		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
 
 	args = append(args, limit, offset)
 
@@ -117,6 +122,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 			&item.Product.ID,
 			&item.Product.SKU,
 			&item.Product.Name,
+			&item.Product.Slug,
 			&item.Product.Description,
 			&item.Product.Status,
 			&item.Product.Price,
@@ -141,7 +147,6 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	return results, total, nil
 }
-
 func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithInventory, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -151,6 +156,7 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithIn
 			p.id,
 			p.sku,
 			p.name,
+			p.slug,
 			p.description,
 			p.status,
 			p.base_price,
@@ -173,6 +179,7 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithIn
 		&result.Product.ID,
 		&result.Product.SKU,
 		&result.Product.Name,
+		&result.Product.Slug,
 		&result.Product.Description,
 		&result.Product.Status,
 		&result.Product.Price,
@@ -208,6 +215,7 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 			p.id,
 			p.sku,
 			p.name,
+			p.slug,
 			p.description,
 			p.status,
 			p.base_price,
@@ -238,6 +246,7 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 			&item.Product.ID,
 			&item.Product.SKU,
 			&item.Product.Name,
+			&item.Product.Slug,
 			&item.Product.Description,
 			&item.Product.Status,
 			&item.Product.Price,
@@ -273,19 +282,21 @@ func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
 			id,
 			sku,
 			name,
+			slug,
 			description,
 			status,
 			base_price,
 			weight,
 			created_at
 		) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	`
 
-	_, err := r.db.Query(ctx, query,
+	_, err := r.db.Exec(ctx, query,
 		product.ID,
 		product.SKU,
 		product.Name,
+		product.Slug,
 		product.Description,
 		product.Status,
 		product.Price,
@@ -315,7 +326,7 @@ func (r *productRepositoryImpl) CreateInventory(inventory *domain.Inventory) err
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err := r.db.Query(ctx, query,
+	_, err := r.db.Exec(ctx, query,
 		inventory.ID,
 		inventory.ProductID,
 		inventory.Stock,

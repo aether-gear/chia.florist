@@ -66,14 +66,14 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc(
-		"/products",
+		"/product",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodGet:  productH.FindProducts,
 			http.MethodPost: productH.CreateProduct,
 		})),
 	)
 	mux.HandleFunc(
-		"/products/",
+		"/product/",
 		core(productH.GetProduct),
 	)
 

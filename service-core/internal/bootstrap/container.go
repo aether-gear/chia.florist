@@ -8,6 +8,7 @@ import (
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
 	lService "service-core/internal/modules/location/infra/service"
+	sGen "service-core/internal/shared/slug"
 
 	database "service-core/internal/infra/db"
 
@@ -102,6 +103,8 @@ func NewContainer() *Container {
 				Timeout: komerceTimeout,
 			},
 		)
+
+		slogGen = sGen.NewGenerator()
 	)
 
 	return &Container{
@@ -113,7 +116,7 @@ func NewContainer() *Container {
 
 		FindProducts:  *pUC.NewFindProductsUsecase(productRepo),
 		GetProduct:    *pUC.NewGetProductsUsecase(productRepo),
-		CreateProduct: *pUC.NewCreateProductUsecase(productRepo),
+		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slogGen),
 
 		LoginAccount:    *aUC.NewLoginUsecase(authRepo, hasher, tokenSvc),
 		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),

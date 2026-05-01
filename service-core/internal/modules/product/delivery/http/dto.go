@@ -18,6 +18,7 @@ type ProductOverviewResponse struct {
 	ID     uuid.UUID        `json:"id"`
 	SKU    string           `json:"sku"`
 	Name   string           `json:"name"`
+	Slug   string           `json:"slug"`
 	Status ProductStatusDTO `json:"status"`
 
 	Price int64 `json:"price"`
@@ -30,6 +31,7 @@ type ProductDetailResponse struct {
 	ID          uuid.UUID        `json:"id"`
 	SKU         string           `json:"sku"`
 	Name        string           `json:"name"`
+	Slug        string           `json:"slug"`
 	Description *string          `json:"description"`
 	Status      ProductStatusDTO `json:"status"`
 
