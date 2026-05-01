@@ -13,6 +13,7 @@ import (
 	locationHandler "service-core/internal/modules/location/delivery/http"
 	paymentHandler "service-core/internal/modules/payment/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
+	shopHandler "service-core/internal/modules/shop/delivery/http"
 	userHandler "service-core/internal/modules/user/delivery/http"
 )
 
@@ -60,6 +61,10 @@ func NewRouter(c *Container) *http.ServeMux {
 			&c.ListPaymentAccount,
 			&c.CreatePaymentMethod,
 			&c.ListPaymentMethod,
+		)
+
+		shopH = shopHandler.NewAddressHandler(
+			&c.CreateShop,
 		)
 	)
 
@@ -121,14 +126,17 @@ func NewRouter(c *Container) *http.ServeMux {
 		core(userH.GetUserByID),
 	)
 	mux.HandleFunc(
-		"/user/addresses",
+		"/user/address",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodPost: addressH.CreateAddress,
 		})),
 	)
+
 	mux.HandleFunc(
-		"/user/addresses/",
-		core(addressH.CreateAddress),
+		"/shop",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: shopH.CreateShop,
+		})),
 	)
 
 	mux.HandleFunc(

@@ -19,6 +19,7 @@ import (
 	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
 	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
+	sRepoImpl "service-core/internal/modules/shop/infra/persistence"
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
 
 	adUC "service-core/internal/modules/address/usecase"
@@ -27,6 +28,7 @@ import (
 	lUC "service-core/internal/modules/location/usecase"
 	payUC "service-core/internal/modules/payment/usecase"
 	pUC "service-core/internal/modules/product/usecase"
+	sUC "service-core/internal/modules/shop/usecase"
 	uUC "service-core/internal/modules/user/usecase"
 )
 
@@ -54,6 +56,8 @@ type Container struct {
 	GetUser       uUC.GetUserUsecase
 	GetAddress    adUC.GetAddressUsecase
 	CreateAddress adUC.CreateAddressUsecase
+
+	CreateShop sUC.CreateShopUsecase
 
 	CreatePaymentAccount payUC.CreatePaymentAccount
 	ListPaymentAccount   payUC.ListPaymentAccount
@@ -83,9 +87,10 @@ func NewContainer() *Container {
 		cartRepo    = cRepoImpl.NewCartRepositoryImpl(db)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(db)
-		addressRepo       = adRepoImpl.NewAddressRepositoryImpl(db)
+		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(db)
 		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(db)
 		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(db)
+		shopRepo          = sRepoImpl.NewShopRepositoryImpl(db)
 	)
 
 	var (
@@ -104,7 +109,7 @@ func NewContainer() *Container {
 			},
 		)
 
-		slogGen = sGen.NewGenerator()
+		slugGen = sGen.NewGenerator()
 	)
 
 	return &Container{
@@ -116,7 +121,7 @@ func NewContainer() *Container {
 
 		FindProducts:  *pUC.NewFindProductsUsecase(productRepo),
 		GetProduct:    *pUC.NewGetProductsUsecase(productRepo),
-		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slogGen),
+		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
 
 		LoginAccount:    *aUC.NewLoginUsecase(authRepo, hasher, tokenSvc),
 		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),
@@ -131,6 +136,8 @@ func NewContainer() *Container {
 		GetUser:       *uUC.NewGetUserUsecase(userRepo),
 		GetAddress:    *adUC.NewGetAddressUsecase(addressRepo),
 		CreateAddress: *adUC.NewCreateAddressUsecase(addressRepo),
+
+		CreateShop: *sUC.NewCreateShopUsecase(shopRepo, slugGen),
 
 		CreatePaymentAccount: *payUC.NewCreatePaymentAccount(paymentAccRepo, paymentMethodRepo),
 		ListPaymentAccount:   *payUC.NewListPaymentAccount(paymentAccRepo),
