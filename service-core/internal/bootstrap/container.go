@@ -54,8 +54,13 @@ type Container struct {
 
 	ListLocations lUC.ListLocationUsecase
 	GetUser       uUC.GetUserUsecase
+
 	GetAddress    adUC.GetAddressUsecase
 	CreateAddress adUC.CreateAddressUsecase
+
+	GetShopAddress    adUC.GetShopAddressUsecase
+	GetShopAddresses  adUC.FindShopAddressUsecase
+	CreateShopAddress adUC.CreateShopAddressUsecase
 
 	CreateShop sUC.CreateShopUsecase
 
@@ -88,6 +93,7 @@ func NewContainer() *Container {
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(db)
 		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(db)
+		addressShopRepo   = adRepoImpl.NewShopAddressRepositoryImpl(db)
 		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(db)
 		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(db)
 		shopRepo          = sRepoImpl.NewShopRepositoryImpl(db)
@@ -133,9 +139,15 @@ func NewContainer() *Container {
 		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),
 
 		ListLocations: *lUC.NewListLocationUsecase(locationService),
-		GetUser:       *uUC.NewGetUserUsecase(userRepo),
+
+		GetUser: *uUC.NewGetUserUsecase(userRepo),
+
 		GetAddress:    *adUC.NewGetAddressUsecase(addressRepo),
 		CreateAddress: *adUC.NewCreateAddressUsecase(addressRepo),
+
+		GetShopAddress:    *adUC.NewGetShopAddressUsecase(addressShopRepo),
+		GetShopAddresses:  *adUC.NewFindShopAddressUsecase(addressShopRepo),
+		CreateShopAddress: *adUC.NewCreateShopAddressUsecase(addressShopRepo),
 
 		CreateShop: *sUC.NewCreateShopUsecase(shopRepo, slugGen),
 

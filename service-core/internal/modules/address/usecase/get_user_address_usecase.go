@@ -10,11 +10,11 @@ import (
 )
 
 type GetAddressUsecase struct {
-	addressRepo repository.AddressRepository
+	addressRepo repository.UserAddressRepository
 }
 
 func NewGetAddressUsecase(
-	addressRepo repository.AddressRepository,
+	addressRepo repository.UserAddressRepository,
 ) *GetAddressUsecase {
 	return &GetAddressUsecase{
 		addressRepo: addressRepo,

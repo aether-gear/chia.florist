@@ -15,17 +15,26 @@ import (
 )
 
 type AddressHandler struct {
-	getAddress    *usecase.GetAddressUsecase
-	createAddress *usecase.CreateAddressUsecase
+	getAddress        *usecase.GetAddressUsecase
+	getShopAddress    *usecase.GetShopAddressUsecase
+	findShopAddresses *usecase.FindShopAddressUsecase
+	createAddress     *usecase.CreateAddressUsecase
+	createShopAddress *usecase.CreateShopAddressUsecase
 }
 
 func NewAddressHandler(
 	getAddress *usecase.GetAddressUsecase,
+	getShopAddress *usecase.GetShopAddressUsecase,
+	findShopAddresses *usecase.FindShopAddressUsecase,
 	createAddress *usecase.CreateAddressUsecase,
+	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
-		getAddress:    getAddress,
-		createAddress: createAddress,
+		getAddress:        getAddress,
+		getShopAddress:    getShopAddress,
+		findShopAddresses: findShopAddresses,
+		createAddress:     createAddress,
+		createShopAddress: createShopAddress,
 	}
 }
 
@@ -57,12 +66,12 @@ func (h *AddressHandler) GetAddresses(w http.ResponseWriter, r *http.Request) er
 			ReceiverName: r.ReceiverName,
 			Phone:        r.Phone,
 			IsDefault:    r.IsDefault,
-			ProvinceID:   r.ProvinceID,
-			CityID:       r.CityID,
-			DistrictID:   r.DistrictID,
-			VillageID:    r.VillageID,
-			FullAddress:  r.FullAddress,
-			PostalCode:   r.PostalCode,
+			ProvinceID:   r.Detail.ProvinceID,
+			CityID:       r.Detail.CityID,
+			DistrictID:   r.Detail.DistrictID,
+			VillageID:    r.Detail.VillageID,
+			FullAddress:  r.Detail.FullAddress,
+			PostalCode:   r.Detail.PostalCode,
 			CreatedAt:    r.CreatedAt,
 			UpdatedAt:    r.UpdatedAt,
 		}
@@ -114,6 +123,147 @@ func (h *AddressHandler) CreateAddress(w http.ResponseWriter, r *http.Request) e
 	}
 
 	err = h.createAddress.Execute(inputCreateAddress)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "address successfully created",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) GetShopAddress(w http.ResponseWriter, r *http.Request) error {
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 || parts[3] == "" {
+		return errors.ErrBadRequest
+	}
+
+	addressID := parts[3]
+	if addressID == "" {
+		return errors.ErrBadRequest
+	}
+
+	parsedAddressID, err := uuid.Parse(addressID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	result, err := h.getShopAddress.GetByID(parsedAddressID)
+	if err != nil {
+		return err
+	}
+
+	response := ShopAddressResponse{
+		ShopID:      result.ShopID,
+		Label:       result.Label,
+		Phone:       result.Phone,
+		IsActive:    result.IsActive,
+		ProvinceID:  result.Detail.ProvinceID,
+		CityID:      result.Detail.CityID,
+		DistrictID:  result.Detail.DistrictID,
+		VillageID:   result.Detail.VillageID,
+		FullAddress: result.Detail.FullAddress,
+		PostalCode:  result.Detail.PostalCode,
+		CreatedAt:   result.CreatedAt,
+		UpdatedAt:   result.UpdatedAt,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) error {
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 || parts[3] == "" {
+		return errors.ErrBadRequest
+	}
+
+	shopID := parts[3]
+	if shopID == "" {
+		return errors.ErrBadRequest
+	}
+
+	parsedShopID, err := uuid.Parse(shopID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	result, err := h.findShopAddresses.FindByShopID(parsedShopID)
+	if err != nil {
+		return err
+	}
+
+	addresses := make([]ShopAddressResponse, 0, len(result))
+	for _, r := range result {
+		address := ShopAddressResponse{
+			ShopID:      r.ShopID,
+			Label:       r.Label,
+			Phone:       r.Phone,
+			IsActive:    r.IsActive,
+			ProvinceID:  r.Detail.ProvinceID,
+			CityID:      r.Detail.CityID,
+			DistrictID:  r.Detail.DistrictID,
+			VillageID:   r.Detail.VillageID,
+			FullAddress: r.Detail.FullAddress,
+			PostalCode:  r.Detail.PostalCode,
+			CreatedAt:   r.CreatedAt,
+			UpdatedAt:   r.UpdatedAt,
+		}
+
+		addresses = append(addresses, address)
+	}
+
+	response := ShopAddressesResponse{
+		Addresses: addresses,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Request) error {
+	var req CreateShopAddressRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return errors.ErrBadRequest
+	}
+
+	if req.ProvinceID == "" || req.CityID == "" || req.DistrictID == "" || req.VillageID == "" {
+		return errors.ErrBadRequest
+	}
+
+	if req.FullAddress == "" || req.PostalCode == "" {
+		return errors.ErrBadRequest
+	}
+
+	parsedID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	var parsedBool bool
+	parsedBool, err = strconv.ParseBool(req.IsActive)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	inputCreateAddress := usecase.CreateShopAddressInput{
+		ShopID:      parsedID,
+		Label:       req.Label,
+		Phone:       req.Phone,
+		IsActive:    &parsedBool,
+		ProvinceID:  req.ProvinceID,
+		CityID:      req.CityID,
+		DistrictID:  req.DistrictID,
+		VillageID:   req.VillageID,
+		FullAddress: req.FullAddress,
+		PostalCode:  req.PostalCode,
+	}
+
+	err = h.createShopAddress.Execute(inputCreateAddress)
 	if err != nil {
 		return err
 	}

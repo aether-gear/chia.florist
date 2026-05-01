@@ -53,7 +53,10 @@ func NewRouter(c *Container) *http.ServeMux {
 
 		addressH = addressHandler.NewAddressHandler(
 			&c.GetAddress,
+			&c.GetShopAddress,
+			&c.GetShopAddresses,
 			&c.CreateAddress,
+			&c.CreateShopAddress,
 		)
 
 		paymentH = paymentHandler.NewPaymentHandler(
@@ -136,6 +139,24 @@ func NewRouter(c *Container) *http.ServeMux {
 		"/shop",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodPost: shopH.CreateShop,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/address",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: addressH.CreateShopAddress,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/address/",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet: addressH.GetShopAddress,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/addresses/",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet: addressH.GetShopAddresses,
 		})),
 	)
 

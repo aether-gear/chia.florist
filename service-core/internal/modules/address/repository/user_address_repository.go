@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type AddressRepository interface {
+type UserAddressRepository interface {
 	GetByUserID(userID uuid.UUID) ([]domain.Address, error)
-	Save(address domain.Address) error
+	Create(address domain.Address) error
 }

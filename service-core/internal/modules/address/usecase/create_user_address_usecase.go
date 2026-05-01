@@ -11,10 +11,10 @@ import (
 )
 
 type CreateAddressUsecase struct {
-	addressRepo repository.AddressRepository
+	addressRepo repository.UserAddressRepository
 }
 
-func NewCreateAddressUsecase(addressRepo repository.AddressRepository) *CreateAddressUsecase {
+func NewCreateAddressUsecase(addressRepo repository.UserAddressRepository) *CreateAddressUsecase {
 	return &CreateAddressUsecase{
 		addressRepo: addressRepo,
 	}
@@ -47,16 +47,18 @@ func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
 		ReceiverName: input.ReceiverName,
 		Phone:        input.Phone,
 		IsDefault:    isDefault,
-		ProvinceID:   input.ProvinceID,
-		CityID:       input.CityID,
-		DistrictID:   input.DistrictID,
-		VillageID:    input.VillageID,
-		FullAddress:  input.FullAddress,
-		PostalCode:   input.PostalCode,
-		CreatedAt:    time.Now(),
+		Detail: domain.AddressDetail{
+			ProvinceID:  input.ProvinceID,
+			CityID:      input.CityID,
+			DistrictID:  input.DistrictID,
+			VillageID:   input.VillageID,
+			FullAddress: input.FullAddress,
+			PostalCode:  input.PostalCode,
+		},
+		CreatedAt: time.Now(),
 	}
 
-	err := u.addressRepo.Save(address)
+	err := u.addressRepo.Create(address)
 	if err != nil {
 		return fmt.Errorf("failed to save address: %w", err)
 	}

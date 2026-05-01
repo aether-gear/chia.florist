@@ -16,12 +16,7 @@ type Address struct {
 
 	IsDefault bool
 
-	ProvinceID  string
-	CityID      string
-	DistrictID  string
-	VillageID   string
-	FullAddress string
-	PostalCode  string
+	Detail AddressDetail
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
