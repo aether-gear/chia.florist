@@ -1,4 +1,4 @@
-CREATE TABLE addresses (
+CREATE TABLE user_addresses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     user_id UUID NOT NULL,
@@ -26,5 +26,5 @@ CREATE TABLE addresses (
 );
 
 CREATE UNIQUE INDEX uq_idx_one_default_address_per_user
-ON addresses(user_id)
+ON user_addresses(user_id)
 WHERE is_default = true;
