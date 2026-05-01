@@ -10,10 +10,12 @@ type Shop struct {
 	ID uuid.UUID
 
 	Name        string
-	Description string
+	Slug        string
+	Description *string
 
 	IsActive bool
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
+	DeletedAt *time.Time
 }
