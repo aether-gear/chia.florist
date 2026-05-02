@@ -131,7 +131,7 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/user/address",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressH.CreateAddress,
+			http.MethodPost: addressH.CreateUserAddress,
 		})),
 	)
 
@@ -156,7 +156,7 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/shop/addresses/",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressH.GetShopAddresses,
+			http.MethodGet: addressH.ListShopAddresses,
 		})),
 	)
 

@@ -9,19 +9,19 @@ import (
 	"github.com/google/uuid"
 )
 
-type FindShopAddressUsecase struct {
+type ListShopAddressesUsecase struct {
 	shopAddressRepo repository.ShopAddressRepository
 }
 
-func NewFindShopAddressUsecase(
+func NewListShopAddressesUsecase(
 	shopAddressRepo repository.ShopAddressRepository,
-) *FindShopAddressUsecase {
-	return &FindShopAddressUsecase{
+) *ListShopAddressesUsecase {
+	return &ListShopAddressesUsecase{
 		shopAddressRepo: shopAddressRepo,
 	}
 }
 
-func (u *FindShopAddressUsecase) FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error) {
+func (u *ListShopAddressesUsecase) FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error) {
 	res, err := u.shopAddressRepo.FindByShopID(shopID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve address: %w", err)

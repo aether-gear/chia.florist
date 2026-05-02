@@ -17,7 +17,7 @@ import (
 type AddressHandler struct {
 	getAddress        *usecase.GetAddressUsecase
 	getShopAddress    *usecase.GetShopAddressUsecase
-	findShopAddresses *usecase.FindShopAddressUsecase
+	listShopAddresses *usecase.ListShopAddressesUsecase
 	createAddress     *usecase.CreateAddressUsecase
 	createShopAddress *usecase.CreateShopAddressUsecase
 }
@@ -25,20 +25,20 @@ type AddressHandler struct {
 func NewAddressHandler(
 	getAddress *usecase.GetAddressUsecase,
 	getShopAddress *usecase.GetShopAddressUsecase,
-	findShopAddresses *usecase.FindShopAddressUsecase,
+	listShopAddresses *usecase.ListShopAddressesUsecase,
 	createAddress *usecase.CreateAddressUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
 		getAddress:        getAddress,
 		getShopAddress:    getShopAddress,
-		findShopAddresses: findShopAddresses,
+		listShopAddresses: listShopAddresses,
 		createAddress:     createAddress,
 		createShopAddress: createShopAddress,
 	}
 }
 
-func (h *AddressHandler) GetAddresses(w http.ResponseWriter, r *http.Request) error {
+func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Request) error {
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 || parts[3] == "" {
 		return errors.ErrBadRequest
@@ -83,7 +83,7 @@ func (h *AddressHandler) GetAddresses(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
-func (h *AddressHandler) CreateAddress(w http.ResponseWriter, r *http.Request) error {
+func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Request) error {
 	var req CreateAddressRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -175,7 +175,7 @@ func (h *AddressHandler) GetShopAddress(w http.ResponseWriter, r *http.Request) 
 	return nil
 }
 
-func (h *AddressHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) error {
+func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Request) error {
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 || parts[3] == "" {
 		return errors.ErrBadRequest
@@ -191,7 +191,7 @@ func (h *AddressHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request
 		return errors.ErrBadRequest
 	}
 
-	result, err := h.findShopAddresses.FindByShopID(parsedShopID)
+	result, err := h.listShopAddresses.FindByShopID(parsedShopID)
 	if err != nil {
 		return err
 	}

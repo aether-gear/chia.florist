@@ -59,7 +59,7 @@ type Container struct {
 	CreateAddress adUC.CreateAddressUsecase
 
 	GetShopAddress    adUC.GetShopAddressUsecase
-	GetShopAddresses  adUC.FindShopAddressUsecase
+	GetShopAddresses  adUC.ListShopAddressesUsecase
 	CreateShopAddress adUC.CreateShopAddressUsecase
 
 	CreateShop sUC.CreateShopUsecase
@@ -146,7 +146,7 @@ func NewContainer() *Container {
 		CreateAddress: *adUC.NewCreateAddressUsecase(addressRepo),
 
 		GetShopAddress:    *adUC.NewGetShopAddressUsecase(addressShopRepo),
-		GetShopAddresses:  *adUC.NewFindShopAddressUsecase(addressShopRepo),
+		GetShopAddresses:  *adUC.NewListShopAddressesUsecase(addressShopRepo),
 		CreateShopAddress: *adUC.NewCreateShopAddressUsecase(addressShopRepo),
 
 		CreateShop: *sUC.NewCreateShopUsecase(shopRepo, slugGen),
