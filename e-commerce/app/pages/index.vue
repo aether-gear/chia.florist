@@ -258,24 +258,24 @@ const productOfferings = ref([
         
         <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
           <div class="flex items-center gap-4 mb-6">
-            <img src="/images/nepgear.png" alt="Doris" class="w-12 h-12 rounded-full object-cover" />
-            <h4 class="font-bold text-gray-800">Doris Watson</h4>
+            <img src="/images/ilham.jpeg" alt="Ilham" class="w-12 h-12 rounded-full object-cover" />
+            <h4 class="font-bold text-gray-800">Ilham Priambodo</h4>
           </div>
           <p class="text-gray-500 text-sm leading-relaxed">"Highly recommend this website for quality flowers and plants. Great prices, timely delivery and excellent customer service."</p>
         </div>
 
         <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
           <div class="flex items-center gap-4 mb-6">
-            <img src="/images/riutotakato.png" alt="Kate" class="w-12 h-12 rounded-full object-cover" />
-            <h4 class="font-bold text-gray-800">Kate Szu</h4>
+            <img src="/images/rafata.jpeg" alt="Rafata" class="w-12 h-12 rounded-full object-cover" />
+            <h4 class="font-bold text-gray-800">Rafata Alfatih</h4>
           </div>
           <p class="text-gray-500 text-sm leading-relaxed">"Great service, beautiful flowers, timely delivery. Highly recommend."</p>
         </div>
 
         <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
           <div class="flex items-center gap-4 mb-6">
-            <img src="/images/rayhan.jpeg" alt="Dyness" class="w-12 h-12 rounded-full object-cover" />
-            <h4 class="font-bold text-gray-800">Dyness</h4>
+            <img src="/images/rayhan.jpeg" alt="Rayhan" class="w-12 h-12 rounded-full object-cover" />
+            <h4 class="font-bold text-gray-800">Rayhan Shidqi</h4>
           </div>
           <p class="text-gray-500 text-sm leading-relaxed">"I am very happy with my purchase from this website, the plants were healthy and arrived on time."</p>
         </div>

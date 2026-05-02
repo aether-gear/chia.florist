@@ -57,7 +57,7 @@
               type="button" 
               class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all"
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" class="w-5 h-5" alt="Google Icon" />
+              <img src="/images/google.png" class="w-5 h-5" alt="Google Icon" />
               Sign up with Google
             </button>
           </div>

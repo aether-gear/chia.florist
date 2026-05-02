@@ -31,14 +31,6 @@
 
           <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
             <input 
-              type="text" 
-              placeholder="Email or Phone Number" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
-            />
-          </div>
-
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
-            <input 
               type="password" 
               placeholder="Password" 
               class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
@@ -57,7 +49,7 @@
               type="button" 
               class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all"
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" class="w-5 h-5" alt="Google Icon" />
+              <img src="/images/google.png" class="w-5 h-5" alt="Google Icon" />
               Login with Google
             </button>
           </div>
