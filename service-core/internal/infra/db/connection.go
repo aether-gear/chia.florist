@@ -12,7 +12,7 @@ type Connection struct {
 	Pool *pgxpool.Pool
 }
 
-func NewConnection(cfg Config) *Connection {
+func NewConnection(cfg DatabaseConfig) *Connection {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

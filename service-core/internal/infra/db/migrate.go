@@ -8,7 +8,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func RunMigrations(cfg Config) {
+func RunMigrations(cfg DatabaseConfig) {
 	m, err := migrate.New(
 		"file://migrations",
 		cfg.DSN(),
