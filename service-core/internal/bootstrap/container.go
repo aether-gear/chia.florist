@@ -17,6 +17,7 @@ import (
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
 
 	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
+	coRepoImpl "service-core/internal/modules/courier/infra/persistence"
 	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
 	sRepoImpl "service-core/internal/modules/shop/infra/persistence"
@@ -25,6 +26,7 @@ import (
 	adUC "service-core/internal/modules/address/usecase"
 	aUC "service-core/internal/modules/auth/usecase"
 	cUC "service-core/internal/modules/cart/usecase"
+	coUC "service-core/internal/modules/courier/usecase"
 	lUC "service-core/internal/modules/location/usecase"
 	payUC "service-core/internal/modules/payment/usecase"
 	pUC "service-core/internal/modules/product/usecase"
@@ -69,6 +71,8 @@ type Container struct {
 	ListPaymentAccount   payUC.ListPaymentAccount
 	CreatePaymentMethod  payUC.CreatePaymentMethod
 	ListPaymentMethod    payUC.ListPaymentMethod
+
+	ConfigureShopCourier coUC.ConfigureShopCourierUsecase
 }
 
 func NewContainer() *Container {
@@ -98,6 +102,8 @@ func NewContainer() *Container {
 		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(db)
 		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(db)
 		shopRepo          = sRepoImpl.NewShopRepositoryImpl(db)
+		courierRepo       = coRepoImpl.NewCourierRepositoryImpl(db)
+		shopCourierRepo   = coRepoImpl.NewShopCourierRepositoryImpl(db)
 	)
 
 	var (
@@ -157,5 +163,7 @@ func NewContainer() *Container {
 		ListPaymentAccount:   *payUC.NewListPaymentAccount(paymentAccRepo),
 		CreatePaymentMethod:  *payUC.NewCreatePaymentMethod(paymentMethodRepo),
 		ListPaymentMethod:    *payUC.NewListPaymentMethod(paymentMethodRepo),
+
+		ConfigureShopCourier: *coUC.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
 	}
 }

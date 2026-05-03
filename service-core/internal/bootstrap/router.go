@@ -10,6 +10,7 @@ import (
 	addressHandler "service-core/internal/modules/address/delivery/http"
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
+	courierHandler "service-core/internal/modules/courier/delivery/http"
 	locationHandler "service-core/internal/modules/location/delivery/http"
 	paymentHandler "service-core/internal/modules/payment/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
@@ -69,6 +70,10 @@ func NewRouter(c *Container) *http.ServeMux {
 		shopH = shopHandler.NewAddressHandler(
 			&c.GetShop,
 			&c.CreateShop,
+		)
+
+		courierH = courierHandler.NewCourierHandler(
+			&c.ConfigureShopCourier,
 		)
 	)
 
@@ -179,6 +184,13 @@ func NewRouter(c *Container) *http.ServeMux {
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodGet:  paymentH.ListPaymentMethod,
 			http.MethodPost: paymentH.CreatePaymentMethod,
+		})),
+	)
+
+	mux.HandleFunc(
+		"/shops/couriers",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: courierH.ConfigureCourierShop,
 		})),
 	)
 
