@@ -67,6 +67,7 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 
 		shopH = shopHandler.NewAddressHandler(
+			&c.GetShop,
 			&c.CreateShop,
 		)
 	)
@@ -139,6 +140,12 @@ func NewRouter(c *Container) *http.ServeMux {
 		"/shop",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodPost: shopH.CreateShop,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet: shopH.GetShopByID,
 		})),
 	)
 	mux.HandleFunc(

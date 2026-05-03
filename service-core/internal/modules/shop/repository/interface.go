@@ -1,9 +1,13 @@
 package repository
 
-import "service-core/internal/modules/shop/domain"
+import (
+	"service-core/internal/modules/shop/domain"
+
+	"github.com/google/uuid"
+)
 
 type ShopRepository interface {
-	// GetByID(id uuid.UUID) (domain.Shop, error)
+	GetByID(id uuid.UUID) (*domain.Shop, error)
 	// GetByIDs(ids []uuid.UUID) ([]domain.Shop, error)
 	// GetActive() ([]domain.Shop, error)
 
