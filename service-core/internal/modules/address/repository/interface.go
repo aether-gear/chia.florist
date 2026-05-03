@@ -6,6 +6,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type UserAddressRepository interface {
+	GetByUserID(userID uuid.UUID) ([]domain.Address, error)
+	Create(address domain.Address) error
+}
+
 type ShopAddressRepository interface {
 	GetByID(id uuid.UUID) (*domain.ShopAddress, error)
 	FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error)

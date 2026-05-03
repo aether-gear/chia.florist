@@ -6,25 +6,16 @@ import (
 	"github.com/google/uuid"
 )
 
-type FindProductParams struct {
-	Page  int
-	Limit int
-	ID    *string
-	Name  *string
-}
-
-type ProductWithInventory struct {
-	Product   domain.Product
-	Inventory struct {
-		Stock         int
-		ReservedStock int
-	}
-}
-
 type ProductRepository interface {
-	FindProducts(params FindProductParams) ([]ProductWithInventory, int, error)
 	GetByID(id uuid.UUID) (*ProductWithInventory, error)
+
+	FindProducts(params FindProductParams) ([]ProductWithInventory, int, error)
 	FindByIDs(IDs []uuid.UUID) ([]ProductWithInventory, error)
+
 	CreateProduct(product *domain.Product) error
+	CreateInventory(inventory *domain.Inventory) error
+}
+
+type ProductInventoryRepository interface {
 	CreateInventory(inventory *domain.Inventory) error
 }
