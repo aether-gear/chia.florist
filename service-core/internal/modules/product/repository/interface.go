@@ -16,6 +16,11 @@ type ProductRepository interface {
 	CreateInventory(inventory *domain.Inventory) error
 }
 
+// type ProductAvailabilityRepository interface {
+// 	GetAvailableShops(productID uuid.UUID) ([]domain.ProductShopAvailability, error)
+// 	GetProductsByShop(shopID uuid.UUID, productIDs []uuid.UUID) ([]domain.ProductShopAvailability, error)
+// }
+
 type ProductInventoryRepository interface {
 	CreateInventory(inventory *domain.Inventory) error
 }

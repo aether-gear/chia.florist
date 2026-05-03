@@ -8,6 +8,7 @@ import (
 
 type UserAddressRepository interface {
 	GetByUserID(userID uuid.UUID) ([]domain.Address, error)
+	// GetDefault(userID uuid.UUID) (*domain.Address, error)
 	Create(address domain.Address) error
 }
 
