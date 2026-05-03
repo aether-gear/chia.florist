@@ -45,16 +45,16 @@ onUnmounted(() => {
   if (intervalTimer) clearInterval(intervalTimer)
 })
 
-// Data Produk (Disesuaikan dengan Gambar 2 di Figma kamu)
+// Data Produk (Diberikan id agar bisa di-redirect secara dinamis)
 const productOfferings = ref([
-  { name: 'Wedding', image: '/images/wedding.jpeg' },
-  { name: 'Congratulation', image: '/images/congratulations.jpeg' },
-  { name: 'Condolences', image: '/images/condolences.jpeg' },
-  { name: 'Grand Opening', image: '/images/grandop.jpeg' },
-  { name: 'Birthday', image: '/images/birthday.jpeg' },
-  { name: 'Graduate', image: '/images/graduate.jpeg' },
-  { name: 'Anniversary', image: '/images/anniversary.jpeg' },
-  { name: 'Custom', image: '' } // Sesuai desain, ini yang warnanya hijau polos tanda tanya
+  { id: 'wedding', name: 'Wedding', image: '/images/wedding.jpeg' },
+  { id: 'congratulations', name: 'Congratulation', image: '/images/congratulations.jpeg' },
+  { id: 'condolences', name: 'Condolences', image: '/images/condolences.jpeg' },
+  { id: 'grand-opening', name: 'Grand Opening', image: '/images/grandop.jpeg' },
+  { id: 'birthday', name: 'Birthday', image: '/images/birthday.jpeg' },
+  { id: 'graduate', name: 'Graduate', image: '/images/graduate.jpeg' },
+  { id: 'anniversary', name: 'Anniversary', image: '/images/anniversary.jpeg' },
+  { id: 'custom', name: 'Custom', image: '' }
 ])
 </script>
 
@@ -91,7 +91,7 @@ const productOfferings = ref([
             Order Now
           </CButton>
           
-          <CButton variant="outline" size="lg" to="/gallery" class="group">
+          <CButton variant="outline" size="lg" to="/products" class="group">
             <svg class="w-6 h-6 mr-2 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             View Products
           </CButton>
@@ -178,7 +178,7 @@ const productOfferings = ref([
                 <span class="text-gray-400 text-xs line-through">$10</span>
                 <span class="text-[#1b4332] font-bold text-base">$8</span>
               </div>
-              <NuxtLink to="/products" class="bg-[#1b4332] text-white text-xs px-3 py-1.5 rounded hover:bg-[#143326] transition">
+              <NuxtLink :to="`/products/${item.id}`" class="bg-[#1b4332] text-white text-xs px-3 py-1.5 rounded hover:bg-[#143326] transition">
                 Buy Now
               </NuxtLink>
             </div>
@@ -278,68 +278,6 @@ const productOfferings = ref([
             <h4 class="font-bold text-gray-800">Rayhan Shidqi</h4>
           </div>
           <p class="text-gray-500 text-sm leading-relaxed">"I am very happy with my purchase from this website, the plants were healthy and arrived on time."</p>
-        </div>
-
-      </div>
-    </section>
-
-    <section class="max-w-7xl mx-auto px-8 py-20">
-      <div class="relative rounded-3xl overflow-hidden h-[300px] flex items-center">
-        <img src="/images/banner.jpg" alt="Promo trees" class="absolute inset-0 w-full h-full object-cover z-0" />
-        <div class="absolute inset-0 bg-black/40 z-10"></div>
-        
-        <div class="relative z-20 px-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center w-full">
-          <h2 class="text-2xl md:text-3xl font-bold text-white max-w-sm">
-            Enter Your Email Address For Our Mailing Promo Or Other Interesting Things
-          </h2>
-          <form @submit.prevent class="flex items-center bg-white/20 backdrop-blur-md rounded-lg overflow-hidden border border-white/30 max-w-md ml-auto">
-            <input type="email" placeholder="Enter your email" class="bg-transparent text-white placeholder:text-gray-200 px-4 py-3 outline-none flex-grow text-sm w-full" />
-            <button class="bg-[#1b4332] hover:bg-[#143326] text-white px-6 py-3 font-semibold text-sm transition">
-              Submit
-            </button>
-          </form>
-        </div>
-      </div>
-    </section>
-
-    <section class="max-w-7xl mx-auto px-8 py-20">
-      <h2 class="text-3xl md:text-4xl font-bold text-center text-[#1b4332] mb-12">Interesting Blog To Read</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-        
-        <div class="space-y-4">
-          <div class="h-64 rounded-xl overflow-hidden shadow-sm">
-            <img src="/images/congratulations.jpeg" alt="Blog 1" class="w-full h-full object-cover" />
-          </div>
-          <h3 class="font-bold text-lg text-[#1b4332] hover:underline cursor-pointer">More productive with an atmosphere of greenery</h3>
-          <p class="text-gray-500 text-xs leading-relaxed">An atmosphere of greenery can increase productivity in the workplace. Studies show that plants improve air quality and decrease stress.</p>
-          <div class="flex justify-between items-center text-xs text-gray-400">
-            <span>January 20, 2026</span>
-            <span class="font-bold text-[#1b4332] hover:opacity-80 cursor-pointer">Read More -></span>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div class="h-64 rounded-xl overflow-hidden shadow-sm">
-            <img src="/images/grandop.jpeg" alt="Blog 2" class="w-full h-full object-cover" />
-          </div>
-          <h3 class="font-bold text-lg text-[#1b4332] hover:underline cursor-pointer">The benefits of plants in your room</h3>
-          <p class="text-gray-500 text-xs leading-relaxed">Plants in your room can bring numerous benefits, such as improved air quality, reduced stress, and increased feelings of well-being.</p>
-          <div class="flex justify-between items-center text-xs text-gray-400">
-            <span>January 10, 2026</span>
-            <span class="font-bold text-[#1b4332] hover:opacity-80 cursor-pointer">Read More -></span>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div class="h-64 rounded-xl overflow-hidden shadow-sm">
-            <img src="/images/wedding.jpeg" alt="Blog 3" class="w-full h-full object-cover" />
-          </div>
-          <h3 class="font-bold text-lg text-[#1b4332] hover:underline cursor-pointer">Hobbyist plants in the house</h3>
-          <p class="text-gray-500 text-xs leading-relaxed">Having hobbyist plants in the house is a great way to bring nature indoors. Not only do they purify the air, but they also bring freshness.</p>
-          <div class="flex justify-between items-center text-xs text-gray-400">
-            <span>January 15, 2026</span>
-            <span class="font-bold text-[#1b4332] hover:opacity-80 cursor-pointer">Read More -></span>
-          </div>
         </div>
 
       </div>
