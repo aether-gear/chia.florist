@@ -3,6 +3,7 @@ CREATE TABLE transaction_items (
 
     transaction_id UUID NOT NULL,
     product_id UUID NOT NULL,
+    shop_id UUID NOT NULL,
 
     quantity INTEGER NOT NULL CHECK (quantity > 0),
 
@@ -21,8 +22,18 @@ CREATE TABLE transaction_items (
     CONSTRAINT fk_product
         FOREIGN KEY(product_id)
         REFERENCES products(id)
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_transaction_item_shop
+        FOREIGN KEY(shop_id)
+        REFERENCES shops(id)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_transaction_item_single_shop
+        FOREIGN KEY(transaction_id, shop_id)
+        REFERENCES transactions(id, shop_id)
+        ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX unique_product_per_transaction
-    ON transaction_items(transaction_id, product_id);
+CREATE UNIQUE INDEX unique_product_shop_per_transaction
+ON transaction_items(transaction_id, product_id, shop_id);

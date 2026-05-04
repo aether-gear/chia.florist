@@ -19,6 +19,6 @@ create TABLE invoices (
 
     CONSTRAINT fk_address
         FOREIGN KEY(address_id)
-        REFERENCES addresses(id)
+        REFERENCES user_addresses(id)
         ON DELETE CASCADE
 )
