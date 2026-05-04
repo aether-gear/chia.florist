@@ -6,29 +6,45 @@ import (
 	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/cart/domain"
 	cartR "service-core/internal/modules/cart/repository"
+	inventoryR "service-core/internal/modules/inventory/repository"
 	productR "service-core/internal/modules/product/repository"
 
 	"github.com/google/uuid"
 )
 
 type AddItemUsecase struct {
-	cartRepo    cartR.CartRepository
-	productRepo productR.ProductRepository
+	cartRepo      cartR.CartRepository
+	inventoryRepo inventoryR.InventoryRepository
+	productRepo   productR.ProductRepository
 }
 
 func NewAddItemUsecase(
 	cR cartR.CartRepository,
+	iR inventoryR.InventoryRepository,
 	pR productR.ProductRepository,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
-		cartRepo:    cR,
-		productRepo: pR,
+		cartRepo:      cR,
+		inventoryRepo: iR,
+		productRepo:   pR,
 	}
 }
 
-func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity int) error {
+func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopID uuid.UUID, quantity int) error {
+	if shopID == uuid.Nil {
+		return appErr.NewInvalidInput(domain.ErrInvalidShopID.Error())
+	}
+
 	if quantity <= 0 {
 		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
+	}
+
+	inventory, err := u.inventoryRepo.GetByProductAndShop(productID, shopID)
+	if err != nil {
+		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
+	}
+	if inventory == nil {
+		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
 	product, err := u.productRepo.GetByID(productID)
@@ -37,10 +53,6 @@ func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity
 	}
 	if product == nil {
 		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
-	}
-
-	if quantity > product.Inventory.Stock {
-		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
@@ -54,7 +66,19 @@ func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity
 		}
 	}
 
-	if err := cart.AddItem(productID, quantity); err != nil {
+	if cart.HasProductInAnotherShop(productID, shopID) {
+		return appErr.NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
+	}
+
+	targetQuantity := quantity
+	if existingItem := cart.FindItem(productID, shopID); existingItem != nil && existingItem.DeletedAt == nil {
+		targetQuantity += existingItem.Quantity
+	}
+	if targetQuantity > inventory.Available() {
+		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
+	}
+
+	if err := cart.AddItem(productID, shopID, quantity); err != nil {
 		return appErr.NewInvalidInput(err.Error())
 	}
 

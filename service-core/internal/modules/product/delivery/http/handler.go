@@ -69,7 +69,18 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 
 	results := make([]ProductOverviewResponse, 0, len(products))
 	for _, p := range products {
-		results = append(results, ToListResponse(p))
+		result := ProductOverviewResponse{
+			ID:            p.Product.ID,
+			SKU:           p.Product.SKU,
+			Name:          p.Product.Name,
+			Slug:          p.Product.Slug,
+			Status:        ProductStatusDTO(p.Product.Status),
+			Price:         p.Product.Price,
+			Stock:         p.Inventory.Stock,
+			ReservedStock: p.Inventory.ReservedStock,
+		}
+
+		results = append(results, result)
 	}
 
 	response := map[string]interface{}{
@@ -103,12 +114,37 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return err
 	}
-
 	if product == nil {
 		return errors.ErrNotFound
 	}
 
-	response := ToDetailResponse(*product)
+	inventories := make([]ProductInventoryView, 0, len(product.ShopInventories))
+	for _, inventory := range product.ShopInventories {
+		inventories = append(inventories, ProductInventoryView{
+			ID:        inventory.ID,
+			ShopID:    inventory.ShopID,
+			Stock:     inventory.Stock,
+			Reserved:  inventory.Reserved,
+			Available: inventory.Available(),
+		})
+	}
+
+	response := ProductDetailResponse{
+		ID:            product.Product.ID,
+		SKU:           product.Product.SKU,
+		Name:          product.Product.Name,
+		Slug:          product.Product.Slug,
+		Description:   product.Product.Description,
+		Status:        ProductStatusDTO(product.Product.Status),
+		Price:         product.Product.Price,
+		Weight:        product.Product.Weight,
+		Stock:         product.Inventory.Stock,
+		ReservedStock: product.Inventory.ReservedStock,
+		Inventories:   inventories,
+		CreatedAt:     product.Product.CreatedAt,
+		UpdatedAt:     product.Product.UpdatedAt,
+		ArchivedAt:    product.Product.ArchivedAt,
+	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
@@ -125,7 +161,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		return errors.ErrBadRequest
 	}
 
-	if req.Price < 0 || req.InitialStock < 0 {
+	if req.Price < 0 {
 		return errors.ErrBadRequest
 	}
 
@@ -134,13 +170,12 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 	}
 
 	err := h.createUsecase.Execute(usecase.CreateProductInput{
-		SKU:          req.SKU,
-		Name:         req.Name,
-		Description:  req.Description,
-		Status:       domain.ProductStatus(req.Status),
-		Price:        req.Price,
-		Weight:       req.Weight,
-		InitialStock: req.InitialStock,
+		SKU:         req.SKU,
+		Name:        req.Name,
+		Description: req.Description,
+		Status:      domain.ProductStatus(req.Status),
+		Price:       req.Price,
+		Weight:      req.Weight,
 	})
 	if err != nil {
 		return err

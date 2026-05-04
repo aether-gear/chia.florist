@@ -1,6 +1,9 @@
 package repository
 
-import "service-core/internal/modules/product/domain"
+import (
+	inventoryD "service-core/internal/modules/inventory/domain"
+	"service-core/internal/modules/product/domain"
+)
 
 type FindProductParams struct {
 	Page  int
@@ -15,4 +18,5 @@ type ProductWithInventory struct {
 		Stock         int
 		ReservedStock int
 	}
+	ShopInventories []inventoryD.Inventory
 }

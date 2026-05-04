@@ -3,7 +3,10 @@ package domain
 import "errors"
 
 var (
+	ErrInvalidShopID   = errors.New("invalid shop id")
 	ErrInvalidQuantity = errors.New("invalid quantity")
+
+	ErrProductAlreadyAssignedToShop = errors.New("product already exists in cart from another shop")
 
 	ErrInsufficientStock = errors.New("insufficient stock")
 

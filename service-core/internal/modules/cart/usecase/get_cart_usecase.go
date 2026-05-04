@@ -5,23 +5,27 @@ import (
 
 	cartD "service-core/internal/modules/cart/domain"
 	cartR "service-core/internal/modules/cart/repository"
+	inventoryR "service-core/internal/modules/inventory/repository"
 	productR "service-core/internal/modules/product/repository"
 
 	"github.com/google/uuid"
 )
 
 type GetCartUsecase struct {
-	cartRepo    cartR.CartRepository
-	productRepo productR.ProductRepository
+	cartRepo      cartR.CartRepository
+	inventoryRepo inventoryR.InventoryRepository
+	productRepo   productR.ProductRepository
 }
 
 func NewGetCartUsecase(
 	cR cartR.CartRepository,
+	iR inventoryR.InventoryRepository,
 	pR productR.ProductRepository,
 ) *GetCartUsecase {
 	return &GetCartUsecase{
-		cartRepo:    cR,
-		productRepo: pR,
+		cartRepo:      cR,
+		inventoryRepo: iR,
+		productRepo:   pR,
 	}
 }
 
@@ -60,9 +64,26 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		return nil, fmt.Errorf("failed to load cart with products: %w", err)
 	}
 
+	inventoryMap, err := u.inventoryRepo.ListByProducts(productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
+	}
+
 	productMap := make(map[uuid.UUID]productR.ProductWithInventory)
 	for _, p := range products {
-		productMap[p.Product.ID] = p
+		inventories := inventoryMap[p.ID]
+
+		result := productR.ProductWithInventory{
+			Product:         p,
+			ShopInventories: inventories,
+		}
+
+		for _, inventory := range inventories {
+			result.Inventory.Stock += inventory.Stock
+			result.Inventory.ReservedStock += inventory.Reserved
+		}
+
+		productMap[p.ID] = result
 	}
 
 	return &GetCartResult{

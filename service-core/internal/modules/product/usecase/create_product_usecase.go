@@ -29,13 +29,12 @@ func NewCreateProductUsecase(
 }
 
 type CreateProductInput struct {
-	SKU          string
-	Name         string
-	Description  *string
-	Status       domain.ProductStatus
-	Price        int64
-	Weight       *float64
-	InitialStock int
+	SKU         string
+	Name        string
+	Description *string
+	Status      domain.ProductStatus
+	Price       int64
+	Weight      *float64
 }
 
 func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
@@ -61,27 +60,8 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		return err
 	}
 
-	inventory := &domain.Inventory{
-		ID:            uuid.New(),
-		ProductID:     product.ID,
-		Stock:         input.InitialStock,
-		ReservedStock: 0,
-		CreatedAt:     now,
-	}
-	if err := inventory.Validate(); err != nil {
-		if errors.Is(err, domain.ErrInvalidStock) {
-			return appErr.NewInvalidInput(err.Error())
-		}
-
-		return err
-	}
-
 	if err := u.productRepo.CreateProduct(product); err != nil {
 		return fmt.Errorf("failed to save product: %w", err)
-	}
-
-	if err := u.productRepo.CreateInventory(inventory); err != nil {
-		return fmt.Errorf("failed to save inventory: %w", err)
 	}
 
 	return nil

@@ -11,6 +11,7 @@ import (
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
 	courierHandler "service-core/internal/modules/courier/delivery/http"
+	inventoryHandler "service-core/internal/modules/inventory/delivery/http"
 	locationHandler "service-core/internal/modules/location/delivery/http"
 	paymentHandler "service-core/internal/modules/payment/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
@@ -29,6 +30,10 @@ func NewRouter(c *Container) *http.ServeMux {
 			&c.FindProducts,
 			&c.GetProduct,
 			&c.CreateProduct,
+		)
+
+		inventoryH = inventoryHandler.NewInventoryHandler(
+			&c.CreateInventory,
 		)
 
 		authH = authHandler.NewAuthHandler(
@@ -89,6 +94,12 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/product/",
 		core(productH.GetProduct),
+	)
+	mux.HandleFunc(
+		"/inventory",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: inventoryH.CreateInventory,
+		})),
 	)
 
 	mux.HandleFunc(

@@ -18,6 +18,7 @@ import (
 
 	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
 	coRepoImpl "service-core/internal/modules/courier/infra/persistence"
+	iRepoImpl "service-core/internal/modules/inventory/infra/persistence"
 	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
 	sRepoImpl "service-core/internal/modules/shop/infra/persistence"
@@ -27,6 +28,7 @@ import (
 	aUC "service-core/internal/modules/auth/usecase"
 	cUC "service-core/internal/modules/cart/usecase"
 	coUC "service-core/internal/modules/courier/usecase"
+	iUC "service-core/internal/modules/inventory/usecase"
 	lUC "service-core/internal/modules/location/usecase"
 	payUC "service-core/internal/modules/payment/usecase"
 	pUC "service-core/internal/modules/product/usecase"
@@ -41,9 +43,10 @@ type Container struct {
 	TokenService authDomain.TokenService
 	Hasher       authDomain.PasswordHasher
 
-	FindProducts  pUC.FindProductsUsecase
-	GetProduct    pUC.GetProductUsecase
-	CreateProduct pUC.CreateProductUsecase
+	FindProducts    pUC.FindProductsUsecase
+	GetProduct      pUC.GetProductUsecase
+	CreateProduct   pUC.CreateProductUsecase
+	CreateInventory iUC.CreateInventoryUsecase
 
 	LoginAccount    aUC.LoginUsecase
 	RegisterAccount aUC.RegisterUsecase
@@ -92,9 +95,10 @@ func NewContainer() *Container {
 		db  = database.NewConnection(dbCfg)
 		log = logger.NewZapLogger(app)
 
-		productRepo = pRepoImpl.NewProductRepository(db)
-		authRepo    = aRepoImpl.NewAuthRepository(db)
-		cartRepo    = cRepoImpl.NewCartRepositoryImpl(db)
+		productRepo   = pRepoImpl.NewProductRepository(db)
+		inventoryRepo = iRepoImpl.NewInventoryRepository(db)
+		authRepo      = aRepoImpl.NewAuthRepository(db)
+		cartRepo      = cRepoImpl.NewCartRepositoryImpl(db)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(db)
 		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(db)
@@ -132,17 +136,18 @@ func NewContainer() *Container {
 		TokenService: tokenSvc,
 		Hasher:       hasher,
 
-		FindProducts:  *pUC.NewFindProductsUsecase(productRepo),
-		GetProduct:    *pUC.NewGetProductsUsecase(productRepo),
-		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
+		FindProducts:    *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
+		GetProduct:      *pUC.NewGetProductsUsecase(productRepo, inventoryRepo),
+		CreateProduct:   *pUC.NewCreateProductUsecase(productRepo, slugGen),
+		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
 		LoginAccount:    *aUC.NewLoginUsecase(authRepo, hasher, tokenSvc),
 		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),
 		GetAccount:      *aUC.NewGetAccountUsecase(authRepo),
 
-		GetCart:    *cUC.NewGetCartUsecase(cartRepo, productRepo),
-		AddItem:    *cUC.NewAddItemUsecase(cartRepo, productRepo),
-		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, productRepo),
+		GetCart:    *cUC.NewGetCartUsecase(cartRepo, inventoryRepo, productRepo),
+		AddItem:    *cUC.NewAddItemUsecase(cartRepo, inventoryRepo, productRepo),
+		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
 		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),
 
 		ListLocations: *lUC.NewListLocationUsecase(locationService),

@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"service-core/internal/modules/cart/usecase"
-
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	"service-core/internal/modules/cart/usecase"
 
 	"github.com/google/uuid"
 )
@@ -66,7 +65,8 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		subtotal := price * int64(quantity)
 
 		items = append(items, CartItemView{
-			ProductID: item.ID,
+			ProductID: item.ProductID,
+			ShopID:    item.ShopID,
 			Name:      productData.Product.Name,
 			Price:     price,
 			Quantity:  quantity,
@@ -103,11 +103,16 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 		return errors.ErrBadRequest
 	}
 
+	shopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
 	if req.Quantity <= 0 {
 		return errors.ErrBadRequest
 	}
 
-	if err := h.addItem.Execute(userID, productID, req.Quantity); err != nil {
+	if err := h.addItem.Execute(userID, productID, shopID, req.Quantity); err != nil {
 		return err
 	}
 
@@ -137,11 +142,16 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		return errors.ErrBadRequest
 	}
 
+	shopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
 	if req.Quantity < 0 {
 		return errors.ErrBadRequest
 	}
 
-	if err := h.updateItem.Execute(userID, productID, req.Quantity); err != nil {
+	if err := h.updateItem.Execute(userID, productID, shopID, req.Quantity); err != nil {
 		return err
 	}
 
@@ -156,6 +166,7 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 	userID := r.URL.Query().Get("user_id")
 	productID := r.URL.Query().Get("product_id")
+	shopID := r.URL.Query().Get("shop_id")
 
 	parsedUserID, err := uuid.Parse(userID)
 	if err != nil {
@@ -167,7 +178,12 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 		return errors.ErrBadRequest
 	}
 
-	if err := h.removeItem.Execute(parsedUserID, parsedProductID); err != nil {
+	parsedShopID, err := uuid.Parse(shopID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	if err := h.removeItem.Execute(parsedUserID, parsedProductID, parsedShopID); err != nil {
 		return err
 	}
 

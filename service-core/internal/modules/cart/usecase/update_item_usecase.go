@@ -6,41 +6,45 @@ import (
 	appErr "service-core/internal/common/errors"
 	"service-core/internal/modules/cart/domain"
 	cartR "service-core/internal/modules/cart/repository"
+	inventoryR "service-core/internal/modules/inventory/repository"
 	productR "service-core/internal/modules/product/repository"
 
 	"github.com/google/uuid"
 )
 
 type UpdateItemUsecase struct {
-	cartRepo    cartR.CartRepository
-	productRepo productR.ProductRepository
+	cartRepo      cartR.CartRepository
+	inventoryRepo inventoryR.InventoryRepository
+	productRepo   productR.ProductRepository
 }
 
 func NewUpdateItemUsecase(
 	cR cartR.CartRepository,
+	iR inventoryR.InventoryRepository,
 	pR productR.ProductRepository,
 ) *UpdateItemUsecase {
 	return &UpdateItemUsecase{
-		cartRepo:    cR,
-		productRepo: pR,
+		cartRepo:      cR,
+		inventoryRepo: iR,
+		productRepo:   pR,
 	}
 }
 
-func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quantity int) error {
+func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopID uuid.UUID, quantity int) error {
+	if shopID == uuid.Nil {
+		return appErr.NewInvalidInput(domain.ErrInvalidShopID.Error())
+	}
+
 	if quantity <= 0 {
 		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
-	product, err := u.productRepo.GetByID(productID)
+	inventory, err := u.inventoryRepo.GetByProductAndShop(productID, shopID)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve product: %w", err)
+		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}
-	if product == nil {
+	if inventory == nil {
 		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
-	}
-
-	if quantity > product.Inventory.Stock {
-		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
@@ -55,11 +59,23 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, quant
 		}
 	}
 
-	if !cart.HasItem(productID) {
+	if !cart.HasItem(productID, shopID) {
 		return appErr.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
-	if err := cart.SetItem(productID, quantity); err != nil {
+	product, err := u.productRepo.GetByID(productID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve product: %w", err)
+	}
+	if product == nil {
+		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
+	}
+
+	if quantity > inventory.Available() {
+		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
+	}
+
+	if err := cart.SetItem(productID, shopID, quantity); err != nil {
 		return appErr.NewInvalidInput(err.Error())
 	}
 

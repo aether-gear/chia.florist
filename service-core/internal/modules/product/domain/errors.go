@@ -7,4 +7,5 @@ var (
 	ErrInvalidProductName  = errors.New("name is required")
 	ErrInvalidStock        = errors.New("stock cannot be negative")
 	ErrInvalidSlug         = errors.New("slug is required")
+	ErrProductNotFound     = errors.New("product not found")
 )
