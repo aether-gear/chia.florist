@@ -1,11 +1,8 @@
 package database
 
-import (
-	"fmt"
-	"os"
-)
+import "service-core/internal/shared/config"
 
-type Config struct {
+type DatabaseConfig struct {
 	Driver   string
 	Host     string
 	Port     string
@@ -15,19 +12,19 @@ type Config struct {
 	SSLMode  string
 }
 
-func LoadConfig() Config {
-	return Config{
-		Driver:   mustGetEnv("DB_DRIVER"),
-		Host:     mustGetEnv("DB_HOST"),
-		Port:     mustGetEnv("DB_PORT"),
-		User:     mustGetEnv("DB_USER"),
-		Password: mustGetEnv("DB_PASSWORD"),
-		Name:     mustGetEnv("DB_NAME"),
-		SSLMode:  mustGetEnv("DB_SSLMODE"),
+func LoadConfig() DatabaseConfig {
+	return DatabaseConfig{
+		Driver:   config.GetEnv("DB_DRIVER"),
+		Host:     config.GetEnv("DB_HOST"),
+		Port:     config.GetEnv("DB_PORT"),
+		User:     config.GetEnv("DB_USER"),
+		Password: config.GetEnv("DB_PASSWORD"),
+		Name:     config.GetEnv("DB_NAME"),
+		SSLMode:  config.GetEnv("DB_SSLMODE"),
 	}
 }
 
-func (c Config) DSN() string {
+func (c DatabaseConfig) DSN() string {
 	dsn := "postgresql://" +
 		c.User + ":" +
 		c.Password + "@" +
@@ -40,12 +37,4 @@ func (c Config) DSN() string {
 	}
 
 	return dsn
-}
-
-func mustGetEnv(key string) string {
-	val, ok := os.LookupEnv(key)
-	if !ok || val == "" {
-		panic(fmt.Sprintf("Missing required environment variable: %s", key))
-	}
-	return val
 }

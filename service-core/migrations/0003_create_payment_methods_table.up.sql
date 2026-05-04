@@ -1,17 +1,33 @@
+CREATE TYPE fee_type AS ENUM ('flat', 'percentage', 'mixed');
+
+CREATE TYPE method_type AS ENUM ('bank_transfer', 'ewallet', 'qr_code');
+
 CREATE TABLE payment_methods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    code TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    type method_type NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    description TEXT,
 
-    provider TEXT,
-
-    is_active BOOLEAN DEFAULT TRUE,
-
-    fee_percentage NUMERIC(5,2),
-    fee_flat NUMERIC(15,2),
+    fee_type fee_type NOT NULL,
+    fee_amount NUMERIC(15,2) DEFAULT 0,
+    fee_rate NUMERIC(5,4) DEFAULT 0,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
-    deleted_at TIMESTAMPTZ
+    deleted_at TIMESTAMPTZ,
+
+    CONSTRAINT payment_methods_fee_check
+        CHECK (
+            (fee_type = 'flat' AND fee_rate = 0)
+         OR (fee_type = 'percentage' AND fee_amount = 0)
+         OR (fee_type = 'mixed')
+        ),
+
+    CONSTRAINT payment_methods_fee_amount_non_negative
+        CHECK (fee_amount >= 0),
+
+    CONSTRAINT payment_methods_fee_rate_range
+        CHECK (fee_rate >= 0 AND fee_rate <= 1)
 );
