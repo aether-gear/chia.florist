@@ -19,6 +19,8 @@ profile.cov
 go.work
 go.work.sum
 
+.gocache
+
 .env
 
 # Editor/IDE
