@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 const productId = computed(() => route.params.id as string)
 
-// 1. Definisikan Interface untuk produk agar TypeScript tidak bingung
+// 1. Definisikan Interface untuk data produk agar TypeScript tidak bingung
 interface Product {
   id: string
   name: string
@@ -19,7 +19,7 @@ interface Product {
   sizes: string[]
 }
 
-// 2. Data dummy produk yang sudah di-type secara eksplisit
+// 2. Data dummy produk dengan tipe Product[]
 const productsData = ref<Product[]>([
   {
     id: 'birthday',
@@ -30,7 +30,7 @@ const productsData = ref<Product[]>([
     available: true,
     description: 'This is a beautiful and elegant birthday board, perfect for making your loved ones feel special on their big day!',
     images: [
-      '/images/birthday.jpeg',
+      '/images/birthday.jpeg', 
       '/images/wedding.jpeg',
       '/images/condolences.jpeg',
       '/images/graduate.jpeg'
@@ -57,33 +57,46 @@ const productsData = ref<Product[]>([
   }
 ])
 
-// 3. Mengambil data produk yang aktif sesuai URL (Ditambah ! agar TypeScript yakin datanya ada)
+// 3. Mengambil data produk yang aktif sesuai URL secara aman
 const product = computed<Product>(() => {
   const found = productsData.value.find((p) => p.id === productId.value)
-  return found || productsData.value[0]!
+  if (found) return found
+  
+  // Fallback object agar TypeScript yakin data tidak akan pernah undefined
+  return productsData.value[0] || {
+    id: 'fallback',
+    name: 'Product Not Found',
+    price: 0,
+    rating: 0,
+    reviews: 0,
+    available: false,
+    description: '',
+    images: [''],
+    colors: [''],
+    sizes: ['']
+  }
 })
 
-// 4. State Interaktif Halaman
+// State Interaktif Halaman
 const activeImage = ref('')
 const selectedColor = ref('')
 const selectedSize = ref('')
 const quantity = ref(1)
 
-// Update gambar utama saat thumbnail diklik
-const changeActiveImage = (img: string) => {
-  activeImage.value = img
-}
-
-/// Mengawasi perubahan produk agar state ter-update otomatis tanpa error saat ganti URL
+// Mengawasi perubahan produk agar state ter-update otomatis tanpa error saat ganti URL
 watch(product, (newProduct) => {
-  if (newProduct) {
-    // Tambahkan || '' di ujung baris ini
+  if (newProduct && newProduct.images && newProduct.images.length > 0) {
     activeImage.value = newProduct.images[0] || ''
     selectedColor.value = newProduct.colors[0] || ''
     selectedSize.value = newProduct.sizes[1] || newProduct.sizes[0] || ''
     quantity.value = 1
   }
 }, { immediate: true })
+
+// Update gambar utama saat thumbnail diklik
+const changeActiveImage = (img: string) => {
+  activeImage.value = img
+}
 
 useHead({
   title: computed(() => `Chia Florist - ${product.value.name}`),
