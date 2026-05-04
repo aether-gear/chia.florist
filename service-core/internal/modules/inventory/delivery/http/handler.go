@@ -12,12 +12,14 @@ import (
 )
 
 type InventoryHandler struct {
-	createUsecase *usecase.CreateInventoryUsecase
+	createInventory *usecase.CreateInventoryUsecase
 }
 
-func NewInventoryHandler(create *usecase.CreateInventoryUsecase) *InventoryHandler {
+func NewInventoryHandler(
+	createInventory *usecase.CreateInventoryUsecase,
+) *InventoryHandler {
 	return &InventoryHandler{
-		createUsecase: create,
+		createInventory: createInventory,
 	}
 }
 
@@ -41,7 +43,7 @@ func (h *InventoryHandler) CreateInventory(w http.ResponseWriter, r *http.Reques
 		return errors.ErrBadRequest
 	}
 
-	if err := h.createUsecase.Execute(usecase.CreateInventoryInput{
+	if err := h.createInventory.Execute(usecase.CreateInventoryInput{
 		ProductID: productID,
 		ShopID:    shopID,
 		Stock:     req.Stock,

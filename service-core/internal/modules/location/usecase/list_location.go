@@ -12,10 +12,10 @@ type ListLocationUsecase struct {
 }
 
 func NewListLocationUsecase(
-	lR repository.LocationRepository,
+	locationRepo repository.LocationRepository,
 ) *ListLocationUsecase {
 	return &ListLocationUsecase{
-		locationRepo: lR,
+		locationRepo: locationRepo,
 	}
 }
 

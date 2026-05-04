@@ -6,34 +6,33 @@ import (
 	"strconv"
 	"strings"
 
-	"service-core/internal/modules/address/usecase"
-
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	"service-core/internal/modules/address/usecase"
 
 	"github.com/google/uuid"
 )
 
 type AddressHandler struct {
-	getAddress        *usecase.GetAddressUsecase
 	getShopAddress    *usecase.GetShopAddressUsecase
+	listUserAddresses *usecase.ListUserAddressUsecase
 	listShopAddresses *usecase.ListShopAddressesUsecase
-	createAddress     *usecase.CreateAddressUsecase
+	createUserAddress *usecase.CreateAddressUsecase
 	createShopAddress *usecase.CreateShopAddressUsecase
 }
 
 func NewAddressHandler(
-	getAddress *usecase.GetAddressUsecase,
 	getShopAddress *usecase.GetShopAddressUsecase,
+	listUserAddresses *usecase.ListUserAddressUsecase,
 	listShopAddresses *usecase.ListShopAddressesUsecase,
-	createAddress *usecase.CreateAddressUsecase,
+	createUserAddress *usecase.CreateAddressUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
-		getAddress:        getAddress,
 		getShopAddress:    getShopAddress,
+		listUserAddresses: listUserAddresses,
 		listShopAddresses: listShopAddresses,
-		createAddress:     createAddress,
+		createUserAddress: createUserAddress,
 		createShopAddress: createShopAddress,
 	}
 }
@@ -54,7 +53,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 		return errors.ErrBadRequest
 	}
 
-	result, err := h.getAddress.GetByUserID(parsedID)
+	result, err := h.listUserAddresses.ListByUserID(parsedID)
 	if err != nil {
 		return err
 	}
@@ -122,7 +121,7 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:   req.PostalCode,
 	}
 
-	err = h.createAddress.Execute(inputCreateAddress)
+	err = h.createUserAddress.Execute(inputCreateAddress)
 	if err != nil {
 		return err
 	}

@@ -10,17 +10,19 @@ import (
 )
 
 type GetAccountUsecase struct {
-	repo repository.AuthRepository
+	authRepo repository.AuthRepository
 }
 
 func NewGetAccountUsecase(
-	repo repository.AuthRepository,
+	authRepo repository.AuthRepository,
 ) *GetAccountUsecase {
-	return &GetAccountUsecase{repo: repo}
+	return &GetAccountUsecase{
+		authRepo: authRepo,
+	}
 }
 
-func (u *GetAccountUsecase) ById(id uuid.UUID) (*domain.Account, error) {
-	acc, err := u.repo.GetByID(id)
+func (u *GetAccountUsecase) Execute(id uuid.UUID) (*domain.Account, error) {
+	acc, err := u.authRepo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}

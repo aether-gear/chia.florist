@@ -11,26 +11,26 @@ import (
 	"github.com/google/uuid"
 )
 
-type LoginUsecase struct {
-	repo     repository.AuthRepository
+type LoginEmailUsecase struct {
+	authRepo repository.AuthRepository
 	hasher   domain.PasswordHasher
 	tokenSvc domain.TokenService
 }
 
-func NewLoginUsecase(
-	repo repository.AuthRepository,
+func NewLoginEmailUsecase(
+	authRepo repository.AuthRepository,
 	hasher domain.PasswordHasher,
 	tokenSvc domain.TokenService,
-) *LoginUsecase {
-	return &LoginUsecase{
-		repo:     repo,
+) *LoginEmailUsecase {
+	return &LoginEmailUsecase{
+		authRepo: authRepo,
 		hasher:   hasher,
 		tokenSvc: tokenSvc,
 	}
 }
 
-func (u *LoginUsecase) ByEmail(email string, password string) (*string, time.Time, error) {
-	existing, err := u.repo.GetByEmail(email)
+func (u *LoginEmailUsecase) Execute(email string, password string) (*string, time.Time, error) {
+	existing, err := u.authRepo.GetByEmail(email)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -50,8 +50,8 @@ func (u *LoginUsecase) ByEmail(email string, password string) (*string, time.Tim
 	return &token, expiry, nil
 }
 
-func (u *LoginUsecase) ById(id uuid.UUID, password string) (*string, time.Time, error) {
-	existing, err := u.repo.GetByID(id)
+func (u *LoginEmailUsecase) ById(id uuid.UUID, password string) (*string, time.Time, error) {
+	existing, err := u.authRepo.GetByID(id)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to retrieve account: %w", err)
 	}

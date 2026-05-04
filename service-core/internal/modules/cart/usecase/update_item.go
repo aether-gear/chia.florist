@@ -19,14 +19,14 @@ type UpdateItemUsecase struct {
 }
 
 func NewUpdateItemUsecase(
-	cR cartR.CartRepository,
-	iR inventoryR.InventoryRepository,
-	pR productR.ProductRepository,
+	cartRepo cartR.CartRepository,
+	inventoryRepo inventoryR.InventoryRepository,
+	productRepo productR.ProductRepository,
 ) *UpdateItemUsecase {
 	return &UpdateItemUsecase{
-		cartRepo:      cR,
-		inventoryRepo: iR,
-		productRepo:   pR,
+		cartRepo:      cartRepo,
+		inventoryRepo: inventoryRepo,
+		productRepo:   productRepo,
 	}
 }
 

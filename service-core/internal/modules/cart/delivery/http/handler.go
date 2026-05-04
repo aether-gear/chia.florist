@@ -19,16 +19,16 @@ type CartHandler struct {
 }
 
 func NewCartHandler(
-	aI *usecase.AddItemUsecase,
-	gC *usecase.GetCartUsecase,
-	uI *usecase.UpdateItemUsecase,
-	rI *usecase.RemoveItemUsecase,
+	addItem *usecase.AddItemUsecase,
+	getCart *usecase.GetCartUsecase,
+	updateItem *usecase.UpdateItemUsecase,
+	removeItem *usecase.RemoveItemUsecase,
 ) *CartHandler {
 	return &CartHandler{
-		addItem:    aI,
-		getCart:    gC,
-		updateItem: uI,
-		removeItem: rI,
+		addItem:    addItem,
+		getCart:    getCart,
+		updateItem: updateItem,
+		removeItem: removeItem,
 	}
 }
 

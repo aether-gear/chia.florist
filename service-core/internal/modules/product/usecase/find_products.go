@@ -10,16 +10,16 @@ import (
 )
 
 type FindProductsUsecase struct {
-	repo          repository.ProductRepository
+	productRepo   repository.ProductRepository
 	inventoryRepo inventoryR.InventoryRepository
 }
 
 func NewFindProductsUsecase(
-	repo repository.ProductRepository,
+	productRepo repository.ProductRepository,
 	inventoryRepo inventoryR.InventoryRepository,
 ) *FindProductsUsecase {
 	return &FindProductsUsecase{
-		repo:          repo,
+		productRepo:   productRepo,
 		inventoryRepo: inventoryRepo,
 	}
 }
@@ -31,7 +31,7 @@ func (u *FindProductsUsecase) Execute(
 	int,
 	error,
 ) {
-	products, total, err := u.repo.FindProducts(params)
+	products, total, err := u.productRepo.FindProducts(params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load products: %w", err)
 	}

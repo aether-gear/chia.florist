@@ -12,19 +12,19 @@ import (
 )
 
 type SelectPayment struct {
-	paymentAccountRepo repository.PaymentAccountRepository
+	paymentAccRepo repository.PaymentAccountRepository
 }
 
 func NewSelectPayment(
-	paymentAccountRepo repository.PaymentAccountRepository,
+	paymentAccRepo repository.PaymentAccountRepository,
 ) *SelectPayment {
 	return &SelectPayment{
-		paymentAccountRepo: paymentAccountRepo,
+		paymentAccRepo: paymentAccRepo,
 	}
 }
 
 func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, error) {
-	accounts, err := u.paymentAccountRepo.ListByMethodID(methodID)
+	accounts, err := u.paymentAccRepo.ListByMethodID(methodID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load payment methods: %w", err)
 	}
@@ -43,7 +43,7 @@ func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, err
 	selected.LastUsedAt = &now
 	selected.CurrentLoad += 1
 
-	if err := u.paymentAccountRepo.Save(selected); err != nil {
+	if err := u.paymentAccRepo.Save(selected); err != nil {
 		return nil, fmt.Errorf("failed to update payment method: %w", err)
 	}
 

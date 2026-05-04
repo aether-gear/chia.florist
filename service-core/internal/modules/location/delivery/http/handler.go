@@ -10,17 +10,19 @@ import (
 )
 
 type LocationHandler struct {
-	listUC *usecase.ListLocationUsecase
+	listLocation *usecase.ListLocationUsecase
 }
 
-func NewLocationHandler(listUC *usecase.ListLocationUsecase) *LocationHandler {
+func NewLocationHandler(
+	listLocation *usecase.ListLocationUsecase,
+) *LocationHandler {
 	return &LocationHandler{
-		listUC: listUC,
+		listLocation: listLocation,
 	}
 }
 
 func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) error {
-	result, err := h.listUC.Province()
+	result, err := h.listLocation.Province()
 	if err != nil {
 		return err
 	}
@@ -45,7 +47,7 @@ func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) error {
 		return errors.ErrBadRequest
 	}
 
-	result, err := h.listUC.City(provinceID)
+	result, err := h.listLocation.City(provinceID)
 	if err != nil {
 		return err
 	}
@@ -71,7 +73,7 @@ func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) error
 		return errors.ErrBadRequest
 	}
 
-	result, err := h.listUC.District(cityID)
+	result, err := h.listLocation.District(cityID)
 	if err != nil {
 		return err
 	}
@@ -97,7 +99,7 @@ func (h *LocationHandler) Village(w http.ResponseWriter, r *http.Request) error 
 		return errors.ErrBadRequest
 	}
 
-	result, err := h.listUC.Village(districtID)
+	result, err := h.listLocation.Village(districtID)
 	if err != nil {
 		return err
 	}

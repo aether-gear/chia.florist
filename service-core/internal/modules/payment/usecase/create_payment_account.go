@@ -12,18 +12,18 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreatePaymentAccount struct {
-	paymentMethodRepo  repository.PaymentMethodRepository
-	paymentAccountRepo repository.PaymentAccountRepository
+type CreatePaymentAccountUsecase struct {
+	paymentMethodRepo repository.PaymentMethodRepository
+	paymentAccRepo    repository.PaymentAccountRepository
 }
 
-func NewCreatePaymentAccount(
-	pAR repository.PaymentAccountRepository,
-	pMR repository.PaymentMethodRepository,
-) *CreatePaymentAccount {
-	return &CreatePaymentAccount{
-		paymentMethodRepo:  pMR,
-		paymentAccountRepo: pAR,
+func NewCreatePaymentAccountUsecase(
+	paymentAccRepo repository.PaymentAccountRepository,
+	paymentMethodRepo repository.PaymentMethodRepository,
+) *CreatePaymentAccountUsecase {
+	return &CreatePaymentAccountUsecase{
+		paymentAccRepo:    paymentAccRepo,
+		paymentMethodRepo: paymentMethodRepo,
 	}
 }
 
@@ -36,7 +36,7 @@ type CreatePaymentAccountInput struct {
 	IsActive      bool
 }
 
-func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
+func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) error {
 	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve payment account: %w", err)
@@ -65,7 +65,7 @@ func (u *CreatePaymentAccount) Execute(input CreatePaymentAccountInput) error {
 		return appErr.NewInvalidInput(err.Error())
 	}
 
-	err = u.paymentAccountRepo.Save(paymentAccount)
+	err = u.paymentAccRepo.Save(paymentAccount)
 	if err != nil {
 		return fmt.Errorf("failed to save payment account: %w", err)
 	}

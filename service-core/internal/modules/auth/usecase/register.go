@@ -36,7 +36,7 @@ type SignUpParams struct {
 	Phone    *string
 }
 
-func (u *RegisterUsecase) Register(params SignUpParams) error {
+func (u *RegisterUsecase) Execute(params SignUpParams) error {
 	existing, err := u.authRepo.GetByEmail(params.Email)
 	if err != nil {
 		return fmt.Errorf("failed to check account: %w", err)

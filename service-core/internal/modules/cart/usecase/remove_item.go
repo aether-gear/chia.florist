@@ -15,10 +15,10 @@ type RemoveItemUsecase struct {
 }
 
 func NewRemoveItemUsecase(
-	cR repository.CartRepository,
+	cartRepo repository.CartRepository,
 ) *RemoveItemUsecase {
 	return &RemoveItemUsecase{
-		cartRepo: cR,
+		cartRepo: cartRepo,
 	}
 }
 

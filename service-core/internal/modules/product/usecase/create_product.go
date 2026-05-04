@@ -19,12 +19,12 @@ type CreateProductUsecase struct {
 }
 
 func NewCreateProductUsecase(
-	pR repository.ProductRepository,
-	sG slug.Generator,
+	productRepo repository.ProductRepository,
+	slugGen slug.Generator,
 ) *CreateProductUsecase {
 	return &CreateProductUsecase{
-		productRepo: pR,
-		slugGen:     sG,
+		productRepo: productRepo,
+		slugGen:     slugGen,
 	}
 }
 

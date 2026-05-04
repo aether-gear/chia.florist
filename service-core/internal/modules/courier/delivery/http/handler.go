@@ -6,21 +6,20 @@ import (
 
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-
 	"service-core/internal/modules/courier/usecase"
 
 	"github.com/google/uuid"
 )
 
 type CourierHandler struct {
-	configureCourierShop *usecase.ConfigureShopCourierUsecase
+	configureShopCourier *usecase.ConfigureShopCourierUsecase
 }
 
 func NewCourierHandler(
-	configureCourierShop *usecase.ConfigureShopCourierUsecase,
+	configureShopCourier *usecase.ConfigureShopCourierUsecase,
 ) *CourierHandler {
 	return &CourierHandler{
-		configureCourierShop: configureCourierShop,
+		configureShopCourier: configureShopCourier,
 	}
 }
 
@@ -45,7 +44,7 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	err = h.configureCourierShop.Execute(shopID, inputs)
+	err = h.configureShopCourier.Execute(shopID, inputs)
 	if err != nil {
 		return err
 	}

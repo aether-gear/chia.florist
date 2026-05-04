@@ -19,14 +19,14 @@ type AddItemUsecase struct {
 }
 
 func NewAddItemUsecase(
-	cR cartR.CartRepository,
-	iR inventoryR.InventoryRepository,
-	pR productR.ProductRepository,
+	cartRepo cartR.CartRepository,
+	inventoryRepo inventoryR.InventoryRepository,
+	productRepo productR.ProductRepository,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
-		cartRepo:      cR,
-		inventoryRepo: iR,
-		productRepo:   pR,
+		cartRepo:      cartRepo,
+		inventoryRepo: inventoryRepo,
+		productRepo:   productRepo,
 	}
 }
 

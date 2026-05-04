@@ -58,9 +58,9 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 
 		addressH = addressHandler.NewAddressHandler(
-			&c.GetAddress,
 			&c.GetShopAddress,
-			&c.GetShopAddresses,
+			&c.ListUserAddresses,
+			&c.ListShopAddresses,
 			&c.CreateAddress,
 			&c.CreateShopAddress,
 		)
@@ -104,11 +104,11 @@ func NewRouter(c *Container) *http.ServeMux {
 
 	mux.HandleFunc(
 		"/auth/signin",
-		core(authH.SignInByEmail),
+		core(authH.SignInEmail),
 	)
 	mux.HandleFunc(
 		"/auth/signup",
-		core(authH.SignUp),
+		core(authH.SignUpAccount),
 	)
 
 	mux.HandleFunc(

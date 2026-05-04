@@ -10,22 +10,22 @@ import (
 )
 
 type GetProductUsecase struct {
-	repo          repository.ProductRepository
+	productRepo   repository.ProductRepository
 	inventoryRepo inventoryR.InventoryRepository
 }
 
-func NewGetProductsUsecase(
-	repo repository.ProductRepository,
+func NewGetProductUsecase(
+	productRepo repository.ProductRepository,
 	inventoryRepo inventoryR.InventoryRepository,
 ) *GetProductUsecase {
 	return &GetProductUsecase{
-		repo:          repo,
+		productRepo:   productRepo,
 		inventoryRepo: inventoryRepo,
 	}
 }
 
 func (u *GetProductUsecase) Execute(id uuid.UUID) (*repository.ProductWithInventory, error) {
-	product, err := u.repo.GetByID(id)
+	product, err := u.productRepo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products with inventory: %w", err)
 	}

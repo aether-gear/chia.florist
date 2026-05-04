@@ -48,7 +48,7 @@ type Container struct {
 	CreateProduct   pUC.CreateProductUsecase
 	CreateInventory iUC.CreateInventoryUsecase
 
-	LoginAccount    aUC.LoginUsecase
+	LoginAccount    aUC.LoginEmailUsecase
 	RegisterAccount aUC.RegisterUsecase
 	GetAccount      aUC.GetAccountUsecase
 
@@ -60,20 +60,20 @@ type Container struct {
 	ListLocations lUC.ListLocationUsecase
 	GetUser       uUC.GetUserUsecase
 
-	GetAddress    adUC.GetAddressUsecase
-	CreateAddress adUC.CreateAddressUsecase
+	ListUserAddresses adUC.ListUserAddressUsecase
+	CreateAddress     adUC.CreateAddressUsecase
 
 	GetShopAddress    adUC.GetShopAddressUsecase
-	GetShopAddresses  adUC.ListShopAddressesUsecase
+	ListShopAddresses adUC.ListShopAddressesUsecase
 	CreateShopAddress adUC.CreateShopAddressUsecase
 
 	GetShop    sUC.GetShopUsecase
 	CreateShop sUC.CreateShopUsecase
 
-	CreatePaymentAccount payUC.CreatePaymentAccount
-	ListPaymentAccount   payUC.ListPaymentAccount
-	CreatePaymentMethod  payUC.CreatePaymentMethod
-	ListPaymentMethod    payUC.ListPaymentMethod
+	CreatePaymentAccount payUC.CreatePaymentAccountUsecase
+	ListPaymentAccount   payUC.ListPaymentAccountUsecase
+	CreatePaymentMethod  payUC.CreatePaymentMethodUsecase
+	ListPaymentMethod    payUC.ListPaymentMethodUsecase
 
 	ConfigureShopCourier coUC.ConfigureShopCourierUsecase
 }
@@ -137,11 +137,11 @@ func NewContainer() *Container {
 		Hasher:       hasher,
 
 		FindProducts:    *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
-		GetProduct:      *pUC.NewGetProductsUsecase(productRepo, inventoryRepo),
+		GetProduct:      *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
 		CreateProduct:   *pUC.NewCreateProductUsecase(productRepo, slugGen),
 		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
-		LoginAccount:    *aUC.NewLoginUsecase(authRepo, hasher, tokenSvc),
+		LoginAccount:    *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),
 		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),
 		GetAccount:      *aUC.NewGetAccountUsecase(authRepo),
 
@@ -154,20 +154,20 @@ func NewContainer() *Container {
 
 		GetUser: *uUC.NewGetUserUsecase(userRepo),
 
-		GetAddress:    *adUC.NewGetAddressUsecase(addressRepo),
-		CreateAddress: *adUC.NewCreateAddressUsecase(addressRepo),
+		ListUserAddresses: *adUC.NewListUserAddressUsecase(addressRepo),
+		CreateAddress:     *adUC.NewCreateAddressUsecase(addressRepo),
 
 		GetShopAddress:    *adUC.NewGetShopAddressUsecase(addressShopRepo),
-		GetShopAddresses:  *adUC.NewListShopAddressesUsecase(addressShopRepo),
+		ListShopAddresses: *adUC.NewListShopAddressesUsecase(addressShopRepo),
 		CreateShopAddress: *adUC.NewCreateShopAddressUsecase(addressShopRepo),
 
 		GetShop:    *sUC.NewGetShopUsecase(shopRepo),
 		CreateShop: *sUC.NewCreateShopUsecase(shopRepo, slugGen),
 
-		CreatePaymentAccount: *payUC.NewCreatePaymentAccount(paymentAccRepo, paymentMethodRepo),
-		ListPaymentAccount:   *payUC.NewListPaymentAccount(paymentAccRepo),
-		CreatePaymentMethod:  *payUC.NewCreatePaymentMethod(paymentMethodRepo),
-		ListPaymentMethod:    *payUC.NewListPaymentMethod(paymentMethodRepo),
+		CreatePaymentAccount: *payUC.NewCreatePaymentAccountUsecase(paymentAccRepo, paymentMethodRepo),
+		ListPaymentAccount:   *payUC.NewListPaymentAccountUsecase(paymentAccRepo),
+		CreatePaymentMethod:  *payUC.NewCreatePaymentMethodUsecase(paymentMethodRepo),
+		ListPaymentMethod:    *payUC.NewListPaymentMethodUsecase(paymentMethodRepo),
 
 		ConfigureShopCourier: *coUC.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
 	}

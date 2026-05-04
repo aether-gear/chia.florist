@@ -17,20 +17,20 @@ import (
 )
 
 type ProductHandler struct {
-	findUsecase   *usecase.FindProductsUsecase
-	getUsecase    *usecase.GetProductUsecase
-	createUsecase *usecase.CreateProductUsecase
+	findProducts  *usecase.FindProductsUsecase
+	getProduct    *usecase.GetProductUsecase
+	createProduct *usecase.CreateProductUsecase
 }
 
 func NewProductHandler(
-	find *usecase.FindProductsUsecase,
-	get *usecase.GetProductUsecase,
-	create *usecase.CreateProductUsecase,
+	findProducts *usecase.FindProductsUsecase,
+	getProduct *usecase.GetProductUsecase,
+	createProduct *usecase.CreateProductUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
-		findUsecase:   find,
-		getUsecase:    get,
-		createUsecase: create,
+		findProducts:  findProducts,
+		getProduct:    getProduct,
+		createProduct: createProduct,
 	}
 }
 
@@ -62,7 +62,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		params.ID = &id
 	}
 
-	products, total, err := h.findUsecase.Execute(params)
+	products, total, err := h.findProducts.Execute(params)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		return errors.ErrBadRequest
 	}
 
-	product, err := h.getUsecase.Execute(parsedID)
+	product, err := h.getProduct.Execute(parsedID)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		return errors.ErrBadRequest
 	}
 
-	err := h.createUsecase.Execute(usecase.CreateProductInput{
+	err := h.createProduct.Execute(usecase.CreateProductInput{
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,

@@ -10,15 +10,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreatePaymentMethod struct {
+type CreatePaymentMethodUsecase struct {
 	paymentMethodRepo repository.PaymentMethodRepository
 }
 
-func NewCreatePaymentMethod(
-	pMR repository.PaymentMethodRepository,
-) *CreatePaymentMethod {
-	return &CreatePaymentMethod{
-		paymentMethodRepo: pMR,
+func NewCreatePaymentMethodUsecase(
+	paymentMethodRepo repository.PaymentMethodRepository,
+) *CreatePaymentMethodUsecase {
+	return &CreatePaymentMethodUsecase{
+		paymentMethodRepo: paymentMethodRepo,
 	}
 }
 
@@ -32,7 +32,7 @@ type CreatePaymentMethodInput struct {
 	FeePercentage float64
 }
 
-func (u *CreatePaymentMethod) Execute(input CreatePaymentMethodInput) error {
+func (u *CreatePaymentMethodUsecase) Execute(input CreatePaymentMethodInput) error {
 	paymentMethod := domain.PaymentMethod{
 		ID:            uuid.New(),
 		Name:          input.Name,
