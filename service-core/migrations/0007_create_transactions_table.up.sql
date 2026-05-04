@@ -11,6 +11,7 @@ CREATE TABLE transactions (
 
     user_id UUID NOT NULL,
     address_id UUID NOT NULL,
+    shop_id UUID NOT NULL,
 
     status transaction_status_enum NOT NULL DEFAULT 'pending',
 
@@ -29,6 +30,14 @@ CREATE TABLE transactions (
 
     CONSTRAINT fk_address
         FOREIGN KEY(address_id)
-        REFERENCES addresses(id)
-        ON DELETE CASCADE
+        REFERENCES user_addresses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_transaction_shop
+        FOREIGN KEY(shop_id)
+        REFERENCES shops(id)
+        ON DELETE RESTRICT
 );
+
+CREATE UNIQUE INDEX idx_transactions_id_shop_id
+ON transactions(id, shop_id);

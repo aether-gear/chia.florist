@@ -13,35 +13,35 @@ import (
 )
 
 type authHandler struct {
-	signIn *usecase.LoginUsecase
-	signUp *usecase.RegisterUsecase
-	me     *usecase.GetAccountUsecase
+	signInEmail *usecase.LoginEmailUsecase
+	signUp      *usecase.RegisterUsecase
+	getAccount  *usecase.GetAccountUsecase
 }
 
 func NewAuthHandler(
-	signIn *usecase.LoginUsecase,
+	signInEmail *usecase.LoginEmailUsecase,
 	signUp *usecase.RegisterUsecase,
-	me *usecase.GetAccountUsecase,
+	getAccount *usecase.GetAccountUsecase,
 ) *authHandler {
 	return &authHandler{
-		signIn: signIn,
-		signUp: signUp,
-		me:     me,
+		signInEmail: signInEmail,
+		signUp:      signUp,
+		getAccount:  getAccount,
 	}
 }
 
-func (h *authHandler) GetAccountByID(w http.ResponseWriter, r *http.Request) error {
+func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 	UserId, ok := r.Context().Value("user_id").(string)
 	if !ok {
 		return errors.ErrUnauthorized
 	}
 
-	parsedID, err := uuid.Parse(UserId)
+	userID, err := uuid.Parse(UserId)
 	if err != nil {
 		return errors.ErrBadRequest
 	}
 
-	acc, err := h.me.ById(parsedID)
+	acc, err := h.getAccount.Execute(userID)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (h *authHandler) GetAccountByID(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
-func (h *authHandler) SignInByEmail(w http.ResponseWriter, r *http.Request) error {
+func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error {
 	var req SignInEmailParams
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -71,7 +71,7 @@ func (h *authHandler) SignInByEmail(w http.ResponseWriter, r *http.Request) erro
 		return errors.ErrBadRequest
 	}
 
-	token, exp, err := h.signIn.ByEmail(req.Email, req.Password)
+	token, exp, err := h.signInEmail.Execute(req.Email, req.Password)
 	if err != nil {
 		return errors.ErrUnauthorized
 	}
@@ -85,7 +85,7 @@ func (h *authHandler) SignInByEmail(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (h *authHandler) SignUp(w http.ResponseWriter, r *http.Request) error {
+func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) error {
 	var req SignUpParams
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -96,7 +96,7 @@ func (h *authHandler) SignUp(w http.ResponseWriter, r *http.Request) error {
 		return errors.ErrBadRequest
 	}
 
-	err := h.signUp.Register(usecase.SignUpParams{
+	err := h.signUp.Execute(usecase.SignUpParams{
 		Email:    req.Email,
 		Password: req.Password,
 		Name:     req.Name,

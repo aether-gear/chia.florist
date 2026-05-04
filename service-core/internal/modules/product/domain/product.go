@@ -18,6 +18,7 @@ type Product struct {
 	ID          uuid.UUID
 	SKU         string
 	Name        string
+	Slug        string
 	Description *string
 	Status      ProductStatus
 
@@ -33,6 +34,10 @@ type Product struct {
 func (p *Product) Validate() error {
 	if p.Name == "" {
 		return ErrInvalidProductName
+	}
+
+	if p.Slug == "" {
+		return ErrInvalidSlug
 	}
 
 	if p.Price <= 0 {

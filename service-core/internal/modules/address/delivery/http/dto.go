@@ -33,3 +33,35 @@ type AddressResponse struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    *time.Time `json:"updated_at"`
 }
+
+type ShopAddressResponse struct {
+	ShopID      uuid.UUID  `json:"shop_id"`
+	Label       string     `json:"label"`
+	Phone       *string    `json:"phone"`
+	IsActive    bool       `json:"is_active"`
+	ProvinceID  string     `json:"province_id"`
+	CityID      string     `json:"city_id"`
+	DistrictID  string     `json:"district_id"`
+	VillageID   string     `json:"village_id"`
+	FullAddress string     `json:"full_address"`
+	PostalCode  string     `json:"postal_code"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at"`
+}
+
+type ShopAddressesResponse struct {
+	Addresses []ShopAddressResponse `json:"addresses"`
+}
+
+type CreateShopAddressRequest struct {
+	ShopID      string  `json:"shop_id"`
+	Label       string  `json:"label"`
+	Phone       *string `json:"phone"`
+	IsActive    string  `json:"is_active"`
+	ProvinceID  string  `json:"province_id"`
+	CityID      string  `json:"city_id"`
+	DistrictID  string  `json:"district_id"`
+	VillageID   string  `json:"village_id"`
+	FullAddress string  `json:"full_address"`
+	PostalCode  string  `json:"postal_code"`
+}

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log"
+	"service-core/internal/seed/courier"
 	"service-core/internal/seed/location"
 )
 
@@ -15,5 +16,7 @@ func RunSeed(conn *Connection) {
 		log.Fatal(err)
 	}
 
-	log.Println("seed completed successfully")
+	if err := courier.SeedAll(ctx, conn.Pool); err != nil {
+		log.Fatal(err)
+	}
 }

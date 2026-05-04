@@ -13,23 +13,23 @@ import (
 )
 
 type PaymentHandler struct {
-	createPaymentAccount *usecase.CreatePaymentAccount
-	listPaymentAccount   *usecase.ListPaymentAccount
-	createPaymentMethod  *usecase.CreatePaymentMethod
-	listPaymentMethod    *usecase.ListPaymentMethod
+	createPaymentAccount *usecase.CreatePaymentAccountUsecase
+	listPaymentAccount   *usecase.ListPaymentAccountUsecase
+	createPaymentMethod  *usecase.CreatePaymentMethodUsecase
+	listPaymentMethod    *usecase.ListPaymentMethodUsecase
 }
 
 func NewPaymentHandler(
-	cPA *usecase.CreatePaymentAccount,
-	lPA *usecase.ListPaymentAccount,
-	cPM *usecase.CreatePaymentMethod,
-	lPM *usecase.ListPaymentMethod,
+	createPaymentAccount *usecase.CreatePaymentAccountUsecase,
+	listPaymentAccount *usecase.ListPaymentAccountUsecase,
+	createPaymentMethod *usecase.CreatePaymentMethodUsecase,
+	listPaymentMethod *usecase.ListPaymentMethodUsecase,
 ) *PaymentHandler {
 	return &PaymentHandler{
-		createPaymentAccount: cPA,
-		listPaymentAccount:   lPA,
-		createPaymentMethod:  cPM,
-		listPaymentMethod:    lPM,
+		createPaymentAccount: createPaymentAccount,
+		listPaymentAccount:   listPaymentAccount,
+		createPaymentMethod:  createPaymentMethod,
+		listPaymentMethod:    listPaymentMethod,
 	}
 }
 

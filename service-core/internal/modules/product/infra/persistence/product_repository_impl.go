@@ -26,7 +26,7 @@ func NewProductRepository(conn *database.Connection) repository.ProductRepositor
 	}
 }
 
-func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]repository.ProductWithInventory, int, error) {
+func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]domain.Product, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -38,7 +38,6 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	baseQuery := `
 		FROM products p
-		LEFT JOIN inventory i ON i.product_id = p.id
 	`
 
 	selectQuery := `
@@ -46,6 +45,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 			p.id,
 			p.sku,
 			p.name,
+			p.slug,
 			p.description,
 			p.status,
 			p.base_price,
@@ -53,9 +53,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 			p.created_at,
 			p.updated_at,
 			p.archived_at,
-			p.deleted_at,
-			COALESCE(i.stock, 0) AS stock,
-			COALESCE(i.reserved_stock, 0) AS reserved_stock
+			p.deleted_at
 	`
 
 	conditions = append(conditions, "p.deleted_at IS NULL")
@@ -77,10 +75,11 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	countQuery := "SELECT COUNT(*) " + baseQuery + whereClause
+	countArgs := append([]any{}, args...)
+	countQuery := "SELECT COUNT(DISTINCT p.id) " + baseQuery + whereClause
 
 	var total int
-	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
+	err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query count products failed: %w", err)
 	}
@@ -97,8 +96,11 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	offset := (page - 1) * limit
 
+	limitPos := argPos
+	offsetPos := argPos + 1
+
 	query := selectQuery + baseQuery + whereClause +
-		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", argPos, argPos+1)
+		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
 
 	args = append(args, limit, offset)
 
@@ -108,25 +110,24 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	}
 	defer rows.Close()
 
-	var results []repository.ProductWithInventory
+	var results []domain.Product
 
 	for rows.Next() {
-		var item repository.ProductWithInventory
+		var item domain.Product
 
 		err := rows.Scan(
-			&item.Product.ID,
-			&item.Product.SKU,
-			&item.Product.Name,
-			&item.Product.Description,
-			&item.Product.Status,
-			&item.Product.Price,
-			&item.Product.Weight,
-			&item.Product.CreatedAt,
-			&item.Product.UpdatedAt,
-			&item.Product.ArchivedAt,
-			&item.Product.DeletedAt,
-			&item.Inventory.Stock,
-			&item.Inventory.ReservedStock,
+			&item.ID,
+			&item.SKU,
+			&item.Name,
+			&item.Slug,
+			&item.Description,
+			&item.Status,
+			&item.Price,
+			&item.Weight,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.ArchivedAt,
+			&item.DeletedAt,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("mapping product model to domain failed: %w", err)
@@ -141,8 +142,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	return results, total, nil
 }
-
-func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithInventory, error) {
+func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -151,6 +151,7 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithIn
 			p.id,
 			p.sku,
 			p.name,
+			p.slug,
 			p.description,
 			p.status,
 			p.base_price,
@@ -158,31 +159,27 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithIn
 			p.created_at,
 			p.updated_at,
 			p.archived_at,
-			p.deleted_at,
-			COALESCE(i.stock, 0) AS stock,
-			COALESCE(i.reserved_stock, 0) AS reserved_stock
+			p.deleted_at
 		FROM products p
-		LEFT JOIN inventory i on i.product_id = p.id
 		WHERE p.id = $1
 		LIMIT 1
 	`
 
-	var result repository.ProductWithInventory
+	var result domain.Product
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
-		&result.Product.ID,
-		&result.Product.SKU,
-		&result.Product.Name,
-		&result.Product.Description,
-		&result.Product.Status,
-		&result.Product.Price,
-		&result.Product.Weight,
-		&result.Product.CreatedAt,
-		&result.Product.UpdatedAt,
-		&result.Product.ArchivedAt,
-		&result.Product.DeletedAt,
-		&result.Inventory.Stock,
-		&result.Inventory.ReservedStock,
+		&result.ID,
+		&result.SKU,
+		&result.Name,
+		&result.Slug,
+		&result.Description,
+		&result.Status,
+		&result.Price,
+		&result.Weight,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+		&result.ArchivedAt,
+		&result.DeletedAt,
 	)
 
 	if err != nil {
@@ -195,9 +192,9 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*repository.ProductWithIn
 	return &result, nil
 }
 
-func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.ProductWithInventory, error) {
+func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, error) {
 	if len(ids) == 0 {
-		return []repository.ProductWithInventory{}, nil
+		return []domain.Product{}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -208,6 +205,7 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 			p.id,
 			p.sku,
 			p.name,
+			p.slug,
 			p.description,
 			p.status,
 			p.base_price,
@@ -215,11 +213,8 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 			p.created_at,
 			p.updated_at,
 			p.archived_at,
-			p.deleted_at,
-			COALESCE(i.stock, 0) AS stock,
-			COALESCE(i.reserved_stock, 0) AS reserved_stock
+			p.deleted_at
 		FROM products p
-		LEFT JOIN inventory i on i.product_id = p.id
 		WHERE p.id = ANY($1)
 	`
 
@@ -229,25 +224,24 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]repository.Product
 	}
 	defer rows.Close()
 
-	var results []repository.ProductWithInventory
+	var results []domain.Product
 
 	for rows.Next() {
-		var item repository.ProductWithInventory
+		var item domain.Product
 
 		err := rows.Scan(
-			&item.Product.ID,
-			&item.Product.SKU,
-			&item.Product.Name,
-			&item.Product.Description,
-			&item.Product.Status,
-			&item.Product.Price,
-			&item.Product.Weight,
-			&item.Product.CreatedAt,
-			&item.Product.UpdatedAt,
-			&item.Product.ArchivedAt,
-			&item.Product.DeletedAt,
-			&item.Inventory.Stock,
-			&item.Inventory.ReservedStock,
+			&item.ID,
+			&item.SKU,
+			&item.Name,
+			&item.Slug,
+			&item.Description,
+			&item.Status,
+			&item.Price,
+			&item.Weight,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.ArchivedAt,
+			&item.DeletedAt,
 		)
 
 		if err != nil {
@@ -273,19 +267,21 @@ func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
 			id,
 			sku,
 			name,
+			slug,
 			description,
 			status,
 			base_price,
 			weight,
 			created_at
 		) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	`
 
-	_, err := r.db.Query(ctx, query,
+	_, err := r.db.Exec(ctx, query,
 		product.ID,
 		product.SKU,
 		product.Name,
+		product.Slug,
 		product.Description,
 		product.Status,
 		product.Price,
@@ -295,36 +291,6 @@ func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
 
 	if err != nil {
 		return fmt.Errorf("insert product failed: %w", err)
-	}
-
-	return nil
-}
-
-func (r *productRepositoryImpl) CreateInventory(inventory *domain.Inventory) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	query := `
-		INSERT INTO inventory (
-			id,
-			product_id,
-			stock,
-			reserved_stock,
-			created_at
-		)
-		VALUES ($1, $2, $3, $4, $5)
-	`
-
-	_, err := r.db.Query(ctx, query,
-		inventory.ID,
-		inventory.ProductID,
-		inventory.Stock,
-		inventory.ReservedStock,
-		inventory.CreatedAt,
-	)
-
-	if err != nil {
-		return fmt.Errorf("insert inventory failed: %w", err)
 	}
 
 	return nil

@@ -2,6 +2,10 @@ package domain
 
 import "errors"
 
-var ErrInvalidStock = errors.New("stock cannot be negative")
-var ErrInvalidProductName = errors.New("name is required")
-var ErrInvalidProductPrice = errors.New("price must be greater than 0")
+var (
+	ErrInvalidProductPrice = errors.New("price must be greater than 0")
+	ErrInvalidProductName  = errors.New("name is required")
+	ErrInvalidStock        = errors.New("stock cannot be negative")
+	ErrInvalidSlug         = errors.New("slug is required")
+	ErrProductNotFound     = errors.New("product not found")
+)

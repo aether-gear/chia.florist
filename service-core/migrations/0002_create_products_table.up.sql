@@ -5,6 +5,7 @@ CREATE TABLE products (
 
     sku TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
     description TEXT,
     status product_status DEFAULT 'active',
 

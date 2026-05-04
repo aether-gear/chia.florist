@@ -37,6 +37,7 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(userID uuid.UUID) (*domain.Car
 			c.updated_at,
 			ci.id,
 			ci.product_id,
+			ci.shop_id,
 			ci.quantity
 		FROM carts c
 		LEFT JOIN cart_items ci 
@@ -63,9 +64,9 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(userID uuid.UUID) (*domain.Car
 			uID       uuid.UUID
 			createdAt time.Time
 			updatedAt *time.Time
-
 			itemID    *uuid.UUID
 			productID *uuid.UUID
+			shopID    *uuid.UUID
 			quantity  *int
 		)
 
@@ -76,6 +77,7 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(userID uuid.UUID) (*domain.Car
 			&updatedAt,
 			&itemID,
 			&productID,
+			&shopID,
 			&quantity,
 		)
 		if err != nil {
@@ -96,6 +98,7 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(userID uuid.UUID) (*domain.Car
 			cart.Items = append(cart.Items, domain.CartItem{
 				ID:        *itemID,
 				ProductID: *productID,
+				ShopID:    *shopID,
 				Quantity:  *quantity,
 			})
 		}
@@ -118,27 +121,21 @@ func (r *cartRepositoryImpl) NewCart(userID uuid.UUID) (*domain.Cart, error) {
 		RETURNING id, user_id, created_at, updated_at
 	`
 
-	var cartRow CartModel
+	var cart domain.Cart
 
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&cartRow.ID,
-		&cartRow.UserID,
-		&cartRow.CreatedAt,
-		&cartRow.UpdatedAt,
+		&cart.ID,
+		&cart.UserID,
+		&cart.CreatedAt,
+		&cart.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert cart failed: %w", err)
 	}
 
-	cart := &domain.Cart{
-		ID:        cartRow.ID,
-		UserID:    cartRow.UserID,
-		Items:     []domain.CartItem{},
-		CreatedAt: cartRow.CreatedAt,
-		UpdatedAt: cartRow.UpdatedAt,
-	}
+	cart.Items = []domain.CartItem{}
 
-	return cart, nil
+	return &cart, nil
 }
 
 func (r *cartRepositoryImpl) Save(cart *domain.Cart) error {
@@ -154,16 +151,17 @@ func (r *cartRepositoryImpl) Save(cart *domain.Cart) error {
 	updateItemQuery := `
 		UPDATE cart_items
 		SET deleted_at = NOW(), updated_at = NOW()
-		WHERE cart_id = $1 AND product_id = $2 AND deleted_at IS NULL
+		WHERE cart_id = $1 AND product_id = $2 AND shop_id = $3 AND deleted_at IS NULL
 	`
 
 	insertItemQuery := `
 		INSERT INTO cart_items (
 			cart_id,
 			product_id,
+			shop_id,
 			quantity
 		)
-		VALUES ($1, $2, $3)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (
 			cart_id,
 			product_id
@@ -176,11 +174,11 @@ func (r *cartRepositoryImpl) Save(cart *domain.Cart) error {
 	`
 
 	for _, item := range cart.Items {
-
 		if item.DeletedAt != nil {
 			_, err := tx.Exec(ctx, updateItemQuery,
 				cart.ID,
 				item.ProductID,
+				item.ShopID,
 			)
 			if err != nil {
 				return fmt.Errorf("update cart items failed: %w", err)
@@ -191,6 +189,7 @@ func (r *cartRepositoryImpl) Save(cart *domain.Cart) error {
 		_, err := tx.Exec(ctx, insertItemQuery,
 			cart.ID,
 			item.ProductID,
+			item.ShopID,
 			item.Quantity,
 		)
 		if err != nil {

@@ -10,9 +10,12 @@ import (
 	addressHandler "service-core/internal/modules/address/delivery/http"
 	authHandler "service-core/internal/modules/auth/delivery/http"
 	cartHandler "service-core/internal/modules/cart/delivery/http"
+	courierHandler "service-core/internal/modules/courier/delivery/http"
+	inventoryHandler "service-core/internal/modules/inventory/delivery/http"
 	locationHandler "service-core/internal/modules/location/delivery/http"
 	paymentHandler "service-core/internal/modules/payment/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
+	shopHandler "service-core/internal/modules/shop/delivery/http"
 	userHandler "service-core/internal/modules/user/delivery/http"
 )
 
@@ -27,6 +30,10 @@ func NewRouter(c *Container) *http.ServeMux {
 			&c.FindProducts,
 			&c.GetProduct,
 			&c.CreateProduct,
+		)
+
+		inventoryH = inventoryHandler.NewInventoryHandler(
+			&c.CreateInventory,
 		)
 
 		authH = authHandler.NewAuthHandler(
@@ -51,8 +58,11 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 
 		addressH = addressHandler.NewAddressHandler(
-			&c.GetAddress,
+			&c.GetShopAddress,
+			&c.ListUserAddresses,
+			&c.ListShopAddresses,
 			&c.CreateAddress,
+			&c.CreateShopAddress,
 		)
 
 		paymentH = paymentHandler.NewPaymentHandler(
@@ -61,29 +71,44 @@ func NewRouter(c *Container) *http.ServeMux {
 			&c.CreatePaymentMethod,
 			&c.ListPaymentMethod,
 		)
+
+		shopH = shopHandler.NewAddressHandler(
+			&c.GetShop,
+			&c.CreateShop,
+		)
+
+		courierH = courierHandler.NewCourierHandler(
+			&c.ConfigureShopCourier,
+		)
 	)
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc(
-		"/products",
+		"/product",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodGet:  productH.FindProducts,
 			http.MethodPost: productH.CreateProduct,
 		})),
 	)
 	mux.HandleFunc(
-		"/products/",
+		"/product/",
 		core(productH.GetProduct),
+	)
+	mux.HandleFunc(
+		"/inventory",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: inventoryH.CreateInventory,
+		})),
 	)
 
 	mux.HandleFunc(
 		"/auth/signin",
-		core(authH.SignInByEmail),
+		core(authH.SignInEmail),
 	)
 	mux.HandleFunc(
 		"/auth/signup",
-		core(authH.SignUp),
+		core(authH.SignUpAccount),
 	)
 
 	mux.HandleFunc(
@@ -121,14 +146,41 @@ func NewRouter(c *Container) *http.ServeMux {
 		core(userH.GetUserByID),
 	)
 	mux.HandleFunc(
-		"/user/addresses",
+		"/user/address",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressH.CreateAddress,
+			http.MethodPost: addressH.CreateUserAddress,
+		})),
+	)
+
+	mux.HandleFunc(
+		"/shop",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: shopH.CreateShop,
 		})),
 	)
 	mux.HandleFunc(
-		"/user/addresses/",
-		core(addressH.CreateAddress),
+		"/shop/",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet: shopH.GetShopByID,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/address",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: addressH.CreateShopAddress,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/address/",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet: addressH.GetShopAddress,
+		})),
+	)
+	mux.HandleFunc(
+		"/shop/addresses/",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodGet: addressH.ListShopAddresses,
+		})),
 	)
 
 	mux.HandleFunc(
@@ -143,6 +195,13 @@ func NewRouter(c *Container) *http.ServeMux {
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodGet:  paymentH.ListPaymentMethod,
 			http.MethodPost: paymentH.CreatePaymentMethod,
+		})),
+	)
+
+	mux.HandleFunc(
+		"/shops/couriers",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: courierH.ConfigureCourierShop,
 		})),
 	)
 
