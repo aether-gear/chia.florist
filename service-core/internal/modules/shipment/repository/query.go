@@ -1,20 +1,18 @@
 package repository
 
-import "github.com/google/uuid"
-
 type CalculateCostInput struct {
-	OriginID      string
-	DestinationID string
+	OriginID      int
+	DestinationID int
 	Weight        int
-	Courier       string
+	Couriers      []string
+	Price         *string
 }
 
 type CostOption struct {
-	ID uuid.UUID
-
-	Cost int64
-	ETD  string
-
-	Courier string
-	Service string
+	Name        string
+	Code        string
+	Service     string
+	Description string
+	Cost        int64
+	Etd         string
 }
