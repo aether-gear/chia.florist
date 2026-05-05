@@ -5,7 +5,7 @@ type CalculateCostInput struct {
 	DestinationID int
 	Weight        int
 	Couriers      []string
-	Price         *string
+	PriceFilter   *string
 }
 
 type CostOption struct {

@@ -3,14 +3,16 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"service-core/internal/modules/shipment/repository"
 	"strconv"
 	"strings"
 	"time"
+
+	"service-core/internal/modules/shipment/repository"
 )
 
 type rajaOngkirCostEstimation struct {
@@ -61,16 +63,16 @@ func (s *rajaOngkirCostEstimation) CalculateCost(input repository.CalculateCostI
 
 	body, err := s.doRequest(ctx, http.MethodPost, input)
 	if err != nil {
-		return nil, fmt.Errorf("request cost estimation failed: %w", err)
+		return nil, err
 	}
 
 	var resp rajaOngkirResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("decode cost estimation response: %w", err)
+		return nil, fmt.Errorf("decode provider response: %w", err)
 	}
 
 	if resp.Meta.Code != 200 {
-		return nil, fmt.Errorf("cost estimation rejected: %s", resp.Meta.Message)
+		return nil, errors.New(resp.Meta.Message)
 	}
 
 	var costOptions []repository.CostOption
@@ -102,6 +104,9 @@ func (s *rajaOngkirCostEstimation) doRequest(
 	form.Set("destination", strconv.Itoa(input.DestinationID))
 	form.Set("weight", strconv.Itoa(input.Weight))
 	form.Set("courier", strings.Join(input.Couriers, ":"))
+	if input.PriceFilter != nil {
+		form.Set("price", *input.PriceFilter)
+	}
 
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -125,10 +130,6 @@ func (s *rajaOngkirCostEstimation) doRequest(
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read body: %w", err)
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("rajaongkir error (%d): %s", resp.StatusCode, string(body))
 	}
 
 	return body, nil

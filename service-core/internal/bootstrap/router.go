@@ -15,6 +15,7 @@ import (
 	locationHandler "service-core/internal/modules/location/delivery/http"
 	paymentHandler "service-core/internal/modules/payment/delivery/http"
 	productHandler "service-core/internal/modules/product/delivery/http"
+	shipmentHandler "service-core/internal/modules/shipment/delivery/http"
 	shopHandler "service-core/internal/modules/shop/delivery/http"
 	userHandler "service-core/internal/modules/user/delivery/http"
 )
@@ -79,6 +80,10 @@ func NewRouter(c *Container) *http.ServeMux {
 
 		courierH = courierHandler.NewCourierHandler(
 			&c.ConfigureShopCourier,
+		)
+
+		shipmentH = shipmentHandler.NewShipmentHandler(
+			&c.EstimateShippingCost,
 		)
 	)
 
@@ -202,6 +207,13 @@ func NewRouter(c *Container) *http.ServeMux {
 		"/shops/couriers",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
 			http.MethodPost: courierH.ConfigureCourierShop,
+		})),
+	)
+
+	mux.HandleFunc(
+		"/shipping/cost",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: shipmentH.EstimateShippingCost,
 		})),
 	)
 
