@@ -22,7 +22,10 @@ type ShipmentMethodRepository interface {
 	GetByID(uuid.UUID) (*domain.ShipmentOption, error)
 }
 
-type ShipmentProvider interface {
+type ShippingCostProvider interface {
 	CalculateCost(input CalculateCostInput) ([]CostOption, error)
+}
+
+type ShipmentTracker interface {
 	Track(trackingNumber string) ([]domain.ShipmentEvent, error)
 }
