@@ -13,18 +13,18 @@ import (
 	"service-core/internal/modules/location/repository"
 )
 
-type rajaOngkirService struct {
+type rajaOngkirLocation struct {
 	apiKey  string
 	baseURL string
 	client  *http.Client
 }
 
-func NewRajaOngkirService(
+func NewRajaOngkirLocation(
 	apiKey string,
 	baseURL string,
 	client *http.Client,
 ) repository.LocationRepository {
-	return &rajaOngkirService{
+	return &rajaOngkirLocation{
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		client:  client,
@@ -43,22 +43,22 @@ type rajaOngkirResponse struct {
 	} `json:"data"`
 }
 
-func (s *rajaOngkirService) ListProvinces() ([]domain.Province, error) {
+func (s *rajaOngkirLocation) ListProvinces() ([]domain.Province, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	body, err := s.doRequest(ctx, http.MethodGet, "/province", nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load provinces: %w", err)
+		return nil, fmt.Errorf("request for provinces: %w", err)
 	}
 
 	var resp rajaOngkirResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("mapping province response failed: %w", err)
+		return nil, fmt.Errorf("decode province response failed: %w", err)
 	}
 
 	if resp.Meta.Code != 200 {
-		return nil, fmt.Errorf("failed to load provinces: %s", resp.Meta.Message)
+		return nil, fmt.Errorf("provinces rejected: %s", resp.Meta.Message)
 	}
 
 	var provinces []domain.Province
@@ -72,23 +72,23 @@ func (s *rajaOngkirService) ListProvinces() ([]domain.Province, error) {
 	return provinces, nil
 }
 
-func (s *rajaOngkirService) ListCitiesByProvince(provinceID string) ([]domain.City, error) {
+func (s *rajaOngkirLocation) ListCitiesByProvince(provinceID string) ([]domain.City, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	path := fmt.Sprintf("/city/%s", provinceID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load cities: %w", err)
+		return nil, fmt.Errorf("request for cities: %w", err)
 	}
 
 	var resp rajaOngkirResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("mapping city response failed: %w", err)
+		return nil, fmt.Errorf("decode city response failed: %w", err)
 	}
 
 	if resp.Meta.Code != 200 {
-		return nil, fmt.Errorf("failed to load cities: %s", resp.Meta.Message)
+		return nil, fmt.Errorf("cities rejected: %s", resp.Meta.Message)
 	}
 
 	var cities []domain.City
@@ -102,23 +102,23 @@ func (s *rajaOngkirService) ListCitiesByProvince(provinceID string) ([]domain.Ci
 	return cities, nil
 }
 
-func (s *rajaOngkirService) ListDistrictsByCity(cityID string) ([]domain.District, error) {
+func (s *rajaOngkirLocation) ListDistrictsByCity(cityID string) ([]domain.District, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	path := fmt.Sprintf("/district/%s", cityID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load districts: %w", err)
+		return nil, fmt.Errorf("request for districts: %w", err)
 	}
 
 	var resp rajaOngkirResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("mapping district response failed: %w", err)
+		return nil, fmt.Errorf("decode district response failed: %w", err)
 	}
 
 	if resp.Meta.Code != 200 {
-		return nil, fmt.Errorf("failed to load districts: %s", resp.Meta.Message)
+		return nil, fmt.Errorf("districts rejected: %s", resp.Meta.Message)
 	}
 
 	var districts []domain.District
@@ -132,23 +132,23 @@ func (s *rajaOngkirService) ListDistrictsByCity(cityID string) ([]domain.Distric
 	return districts, nil
 }
 
-func (s *rajaOngkirService) ListVillagesByDistrict(districtID string) ([]domain.Village, error) {
+func (s *rajaOngkirLocation) ListVillagesByDistrict(districtID string) ([]domain.Village, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	path := fmt.Sprintf("/sub-district/%s", districtID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load villages: %w", err)
+		return nil, fmt.Errorf("request for villages: %w", err)
 	}
 
 	var resp rajaOngkirResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("mapping village response failed: %w", err)
+		return nil, fmt.Errorf("decode village response failed: %w", err)
 	}
 
 	if resp.Meta.Code != 200 {
-		return nil, fmt.Errorf("failed to load villages: %s", resp.Meta.Message)
+		return nil, fmt.Errorf("villages rejected: %s", resp.Meta.Message)
 	}
 
 	var villages []domain.Village
@@ -162,7 +162,7 @@ func (s *rajaOngkirService) ListVillagesByDistrict(districtID string) ([]domain.
 	return villages, nil
 }
 
-func (s *rajaOngkirService) doRequest(
+func (s *rajaOngkirLocation) doRequest(
 	ctx context.Context,
 	method string,
 	path string,

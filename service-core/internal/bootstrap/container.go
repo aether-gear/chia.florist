@@ -8,6 +8,7 @@ import (
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
 	lService "service-core/internal/modules/location/infra/service"
+	sCostService "service-core/internal/modules/shipment/infra/service"
 	sGen "service-core/internal/shared/slug"
 
 	database "service-core/internal/infra/db"
@@ -32,6 +33,7 @@ import (
 	lUC "service-core/internal/modules/location/usecase"
 	payUC "service-core/internal/modules/payment/usecase"
 	pUC "service-core/internal/modules/product/usecase"
+	shUC "service-core/internal/modules/shipment/usecase"
 	sUC "service-core/internal/modules/shop/usecase"
 	uUC "service-core/internal/modules/user/usecase"
 )
@@ -76,6 +78,8 @@ type Container struct {
 	ListPaymentMethod    payUC.ListPaymentMethodUsecase
 
 	ConfigureShopCourier coUC.ConfigureShopCourierUsecase
+
+	EstimateShippingCost shUC.EstimateShippingCostUsecase
 }
 
 func NewContainer() *Container {
@@ -84,8 +88,10 @@ func NewContainer() *Container {
 
 		dbCfg                 = config.DB
 		app                   = config.App.Env
-		komerceShipping       = config.Shipping.BaseURL
+		komerceShipping       = config.Shipping.DestinationKey
 		komerceDestinationURL = config.Shipping.DestinationURL
+		komerceCalculate      = config.Shipping.CalculateKEY
+		komerceCalculateURL   = config.Shipping.CalculateURL
 		komerceTimeout        = config.Shipping.Timeout
 		jwtSecret             = config.JWT.Secret
 		jwtExp                = config.JWT.Exp
@@ -118,9 +124,17 @@ func NewContainer() *Container {
 
 		hasher = authService.NewBcryptHasher()
 
-		locationService = lService.NewRajaOngkirService(
+		locationService = lService.NewRajaOngkirLocation(
 			komerceShipping,
 			komerceDestinationURL,
+			&http.Client{
+				Timeout: komerceTimeout,
+			},
+		)
+
+		shippingCostProvider = sCostService.NewRajaOngkirCostEstimation(
+			komerceCalculate,
+			komerceCalculateURL,
 			&http.Client{
 				Timeout: komerceTimeout,
 			},
@@ -170,5 +184,7 @@ func NewContainer() *Container {
 		ListPaymentMethod:    *payUC.NewListPaymentMethodUsecase(paymentMethodRepo),
 
 		ConfigureShopCourier: *coUC.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
+
+		EstimateShippingCost: *shUC.NewEstimateShippingCostUsecase(shippingCostProvider),
 	}
 }

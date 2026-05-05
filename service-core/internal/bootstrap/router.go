@@ -7,16 +7,17 @@ import (
 	"service-core/internal/common/logger"
 	"service-core/internal/common/middleware"
 
-	addressHandler "service-core/internal/modules/address/delivery/http"
-	authHandler "service-core/internal/modules/auth/delivery/http"
-	cartHandler "service-core/internal/modules/cart/delivery/http"
-	courierHandler "service-core/internal/modules/courier/delivery/http"
-	inventoryHandler "service-core/internal/modules/inventory/delivery/http"
-	locationHandler "service-core/internal/modules/location/delivery/http"
-	paymentHandler "service-core/internal/modules/payment/delivery/http"
-	productHandler "service-core/internal/modules/product/delivery/http"
-	shopHandler "service-core/internal/modules/shop/delivery/http"
-	userHandler "service-core/internal/modules/user/delivery/http"
+	addressH "service-core/internal/modules/address/delivery/http"
+	authH "service-core/internal/modules/auth/delivery/http"
+	cartH "service-core/internal/modules/cart/delivery/http"
+	courierH "service-core/internal/modules/courier/delivery/http"
+	inventoryH "service-core/internal/modules/inventory/delivery/http"
+	locationH "service-core/internal/modules/location/delivery/http"
+	paymentH "service-core/internal/modules/payment/delivery/http"
+	productH "service-core/internal/modules/product/delivery/http"
+	shipmentH "service-core/internal/modules/shipment/delivery/http"
+	shopH "service-core/internal/modules/shop/delivery/http"
+	userH "service-core/internal/modules/user/delivery/http"
 )
 
 func NewRouter(c *Container) *http.ServeMux {
@@ -26,38 +27,38 @@ func NewRouter(c *Container) *http.ServeMux {
 	)
 
 	var (
-		productH = productHandler.NewProductHandler(
+		productHandler = productH.NewProductHandler(
 			&c.FindProducts,
 			&c.GetProduct,
 			&c.CreateProduct,
 		)
 
-		inventoryH = inventoryHandler.NewInventoryHandler(
+		inventoryHandler = inventoryH.NewInventoryHandler(
 			&c.CreateInventory,
 		)
 
-		authH = authHandler.NewAuthHandler(
+		authHandler = authH.NewAuthHandler(
 			&c.LoginAccount,
 			&c.RegisterAccount,
 			&c.GetAccount,
 		)
 
-		cartH = cartHandler.NewCartHandler(
+		cartHandler = cartH.NewCartHandler(
 			&c.AddItem,
 			&c.GetCart,
 			&c.UpdateItem,
 			&c.RemoveItem,
 		)
 
-		locationH = locationHandler.NewLocationHandler(
+		locationHandler = locationH.NewLocationHandler(
 			&c.ListLocations,
 		)
 
-		userH = userHandler.NewUserHandler(
+		userHandler = userH.NewUserHandler(
 			&c.GetUser,
 		)
 
-		addressH = addressHandler.NewAddressHandler(
+		addressHandler = addressH.NewAddressHandler(
 			&c.GetShopAddress,
 			&c.ListUserAddresses,
 			&c.ListShopAddresses,
@@ -65,20 +66,24 @@ func NewRouter(c *Container) *http.ServeMux {
 			&c.CreateShopAddress,
 		)
 
-		paymentH = paymentHandler.NewPaymentHandler(
+		paymentHandler = paymentH.NewPaymentHandler(
 			&c.CreatePaymentAccount,
 			&c.ListPaymentAccount,
 			&c.CreatePaymentMethod,
 			&c.ListPaymentMethod,
 		)
 
-		shopH = shopHandler.NewAddressHandler(
+		shopHandler = shopH.NewAddressHandler(
 			&c.GetShop,
 			&c.CreateShop,
 		)
 
-		courierH = courierHandler.NewCourierHandler(
+		courierHandler = courierH.NewCourierHandler(
 			&c.ConfigureShopCourier,
+		)
+
+		shipmentHandler = shipmentH.NewShipmentHandler(
+			&c.EstimateShippingCost,
 		)
 	)
 
@@ -87,121 +92,128 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/product",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  productH.FindProducts,
-			http.MethodPost: productH.CreateProduct,
+			http.MethodGet:  productHandler.FindProducts,
+			http.MethodPost: productHandler.CreateProduct,
 		})),
 	)
 	mux.HandleFunc(
 		"/product/",
-		core(productH.GetProduct),
+		core(productHandler.GetProduct),
 	)
 	mux.HandleFunc(
 		"/inventory",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: inventoryH.CreateInventory,
+			http.MethodPost: inventoryHandler.CreateInventory,
 		})),
 	)
 
 	mux.HandleFunc(
 		"/auth/signin",
-		core(authH.SignInEmail),
+		core(authHandler.SignInEmail),
 	)
 	mux.HandleFunc(
 		"/auth/signup",
-		core(authH.SignUpAccount),
+		core(authHandler.SignUpAccount),
 	)
 
 	mux.HandleFunc(
 		"/cart",
-		core(cartH.GetCart),
+		core(cartHandler.GetCart),
 	)
 	mux.HandleFunc(
 		"/cart/items",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost:   cartH.AddItem,
-			http.MethodPut:    cartH.UpdateItem,
-			http.MethodDelete: cartH.RemoveItem,
+			http.MethodPost:   cartHandler.AddItem,
+			http.MethodPut:    cartHandler.UpdateItem,
+			http.MethodDelete: cartHandler.RemoveItem,
 		})),
 	)
 
 	mux.HandleFunc(
 		"/locations/provinces",
-		core(locationH.Province),
+		core(locationHandler.Province),
 	)
 	mux.HandleFunc(
 		"/locations/cities/",
-		core(locationH.City),
+		core(locationHandler.City),
 	)
 	mux.HandleFunc(
 		"/locations/districts/",
-		core(locationH.District),
+		core(locationHandler.District),
 	)
 	mux.HandleFunc(
 		"/locations/villages/",
-		core(locationH.Village),
+		core(locationHandler.Village),
 	)
 
 	mux.HandleFunc(
 		"/user/",
-		core(userH.GetUserByID),
+		core(userHandler.GetUserByID),
 	)
 	mux.HandleFunc(
 		"/user/address",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressH.CreateUserAddress,
+			http.MethodPost: addressHandler.CreateUserAddress,
 		})),
 	)
 
 	mux.HandleFunc(
 		"/shop",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: shopH.CreateShop,
+			http.MethodPost: shopHandler.CreateShop,
 		})),
 	)
 	mux.HandleFunc(
 		"/shop/",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: shopH.GetShopByID,
+			http.MethodGet: shopHandler.GetShopByID,
 		})),
 	)
 	mux.HandleFunc(
 		"/shop/address",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressH.CreateShopAddress,
+			http.MethodPost: addressHandler.CreateShopAddress,
 		})),
 	)
 	mux.HandleFunc(
 		"/shop/address/",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressH.GetShopAddress,
+			http.MethodGet: addressHandler.GetShopAddress,
 		})),
 	)
 	mux.HandleFunc(
 		"/shop/addresses/",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressH.ListShopAddresses,
+			http.MethodGet: addressHandler.ListShopAddresses,
 		})),
 	)
 
 	mux.HandleFunc(
 		"/payment/account",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  paymentH.ListPaymentAccount,
-			http.MethodPost: paymentH.CreatePaymentAccount,
+			http.MethodGet:  paymentHandler.ListPaymentAccount,
+			http.MethodPost: paymentHandler.CreatePaymentAccount,
 		})),
 	)
 	mux.HandleFunc(
 		"/payment/method",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  paymentH.ListPaymentMethod,
-			http.MethodPost: paymentH.CreatePaymentMethod,
+			http.MethodGet:  paymentHandler.ListPaymentMethod,
+			http.MethodPost: paymentHandler.CreatePaymentMethod,
 		})),
 	)
 
 	mux.HandleFunc(
 		"/shops/couriers",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: courierH.ConfigureCourierShop,
+			http.MethodPost: courierHandler.ConfigureCourierShop,
+		})),
+	)
+
+	mux.HandleFunc(
+		"/shipping/cost",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: shipmentHandler.EstimateShippingCost,
 		})),
 	)
 
