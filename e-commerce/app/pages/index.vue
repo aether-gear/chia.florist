@@ -179,7 +179,7 @@ const productOfferings = ref([
                 <span class="text-[#1b4332] font-bold text-base">$8</span>
               </div>
               <NuxtLink :to="`/products/${item.id}`" class="bg-[#1b4332] text-white text-xs px-3 py-1.5 rounded hover:bg-[#143326] transition">
-                Buy Now
+                Buy
               </NuxtLink>
             </div>
           </div>
