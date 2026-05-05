@@ -118,7 +118,7 @@ func NewContainer() *Container {
 
 		hasher = authService.NewBcryptHasher()
 
-		locationService = lService.NewRajaOngkirService(
+		locationService = lService.NewRajaOngkirLocation(
 			komerceShipping,
 			komerceDestinationURL,
 			&http.Client{
