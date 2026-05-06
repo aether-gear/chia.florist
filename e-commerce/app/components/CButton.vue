@@ -21,7 +21,7 @@ const variantClasses = computed(() => {
   switch (props.variant) {
     case 'outline': return 'border-2 border-white/80 text-white hover:bg-white hover:text-black'
     case 'text': return 'text-white/80 hover:text-white hover:underline'
-    default: return 'bg-[#1b4332] text-white hover:bg-[#081c15] shadow-lg hover:shadow-xl'
+    default: return 'bg-accent text-white-base hover-bg-accent-deep shadow-lg hover:shadow-xl'
   }
 })
 </script>

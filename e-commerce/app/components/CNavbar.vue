@@ -70,7 +70,7 @@ const closeSearch = () => {
       </button>
 
       <!-- Akun -->
-      <NuxtLink to="/login" class="p-2 text-gray-700 hover:text-[#1b4332] hover:bg-gray-50 rounded-full transition-all group relative">
+      <NuxtLink to="/login" class="p-2 text-gray-700 hover-text-accent hover:bg-gray-50 rounded-full transition-all group relative">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
           <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
@@ -110,7 +110,7 @@ const closeSearch = () => {
                   v-model="searchQuery"
                   type="text" 
                   placeholder="Type to search flowers..." 
-                  class="w-full bg-[#f5f5f5] text-sm text-gray-800 px-6 py-4 pr-12 rounded-full outline-none border border-transparent focus:border-[#1b4332] focus:bg-white transition-all shadow-inner"
+                  class="w-full bg-surface text-sm text-gray-800 px-6 py-4 pr-12 rounded-full outline-none border border-transparent focus-border-accent focus-bg-white transition-all shadow-inner"
                 />
               </div>
             </div>
@@ -135,7 +135,7 @@ const closeSearch = () => {
                     <img :src="product.image" :alt="product.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   </div>
                   <div class="flex flex-col justify-center">
-                    <h4 class="text-xs font-bold text-gray-900 group-hover:text-[#1b4332] transition-colors leading-tight">
+                    <h4 class="text-xs font-bold text-gray-900 group-hover-text-accent transition-colors leading-tight">
                       {{ product.name }}
                     </h4>
                     <p class="text-[11px] font-semibold text-emerald-600 mt-1">From ${{ product.price }}</p>
@@ -184,7 +184,7 @@ const closeSearch = () => {
   width: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e5e7eb;
+  background: var(--color-border-soft);
   border-radius: 10px;
 }
 </style>

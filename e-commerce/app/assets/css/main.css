@@ -1,1 +1,129 @@
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter_18pt-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter_18pt-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter_18pt-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter_18pt-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-brand: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-bg: #fff;
+  --color-white: #fff;
+  --color-accent: #1b4332;
+  --color-accent-strong: #143326;
+  --color-accent-deep: #081c15;
+  --color-surface: #f5f5f5;
+  --color-border-soft: #e5e7eb;
+  --color-text: #1f2937;
+  --color-text-strong: #111827;
+  --color-text-muted: #6b7280;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-brand);
+}
+
+.bg-brand {
+  background-color: var(--color-bg);
+}
+
+.bg-white-base {
+  background-color: var(--color-white);
+}
+
+.bg-surface {
+  background-color: var(--color-surface);
+}
+
+.bg-accent {
+  background-color: var(--color-accent);
+}
+
+.text-brand {
+  color: var(--color-text);
+}
+
+.text-strong {
+  color: var(--color-text-strong);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-accent {
+  color: var(--color-accent);
+}
+
+.text-white-base {
+  color: var(--color-white);
+}
+
+.border-soft {
+  border-color: var(--color-border-soft);
+}
+
+.border-accent {
+  border-color: var(--color-accent);
+}
+
+.font-brand {
+  font-family: var(--font-brand);
+}
+
+.hover-bg-accent-strong:hover {
+  background-color: var(--color-accent-strong);
+}
+
+.hover-bg-accent-deep:hover {
+  background-color: var(--color-accent-deep);
+}
+
+.hover-text-accent:hover {
+  color: var(--color-accent);
+}
+
+.focus-border-accent:focus,
+.focus-within-accent:focus-within {
+  border-color: var(--color-accent);
+}
+
+.focus-bg-white:focus {
+  background-color: var(--color-white);
+}
+
+.group:hover .group-hover-text-accent {
+  color: var(--color-accent);
+}
+
+/* Layout helpers can live here later when we settle on shared spacing and container rules. */

@@ -46,9 +46,9 @@
           </div>
 
           <div class="pt-4 space-y-4">
-            <button 
-              type="submit" 
-              class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] transition-all shadow-md"
+            <button
+              type="submit"
+              class="w-full bg-accent text-white-base py-4 rounded-md font-medium hover-bg-accent-strong transition-all shadow-md"
             >
               Create Account
             </button>
@@ -65,7 +65,7 @@
 
         <div class="text-center pt-4 text-gray-600">
           Already have account? 
-          <NuxtLink to="/login" class="font-medium text-black border-b border-gray-500 pb-0.5 ml-2 hover:text-[#1b4332] transition-colors">
+          <NuxtLink to="/login" class="font-medium text-black border-b border-gray-500 pb-0.5 ml-2 hover-text-accent transition-colors">
             Log in
           </NuxtLink>
         </div>
