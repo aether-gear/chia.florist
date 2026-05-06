@@ -79,7 +79,7 @@ type Container struct {
 
 	ConfigureShopCourier coUC.ConfigureShopCourierUsecase
 
-	EstimateShippingCost shUC.EstimateShippingCostUsecase
+	EstimateShippingOptions shUC.EstimateShippingOptionsUsecase
 }
 
 func NewContainer() *Container {
@@ -185,6 +185,6 @@ func NewContainer() *Container {
 
 		ConfigureShopCourier: *coUC.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
 
-		EstimateShippingCost: *shUC.NewEstimateShippingCostUsecase(shippingCostProvider),
+		EstimateShippingOptions: *shUC.NewEstimateShippingOptionsUsecase(shippingCostProvider),
 	}
 }

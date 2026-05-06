@@ -10,19 +10,19 @@ import (
 	"service-core/internal/modules/shipment/repository"
 )
 
-type EstimateShippingCostUsecase struct {
+type EstimateShippingOptionsUsecase struct {
 	shippingCostProvider repository.ShippingCostProvider
 }
 
-func NewEstimateShippingCostUsecase(
+func NewEstimateShippingOptionsUsecase(
 	shippingCostProvider repository.ShippingCostProvider,
-) *EstimateShippingCostUsecase {
-	return &EstimateShippingCostUsecase{
+) *EstimateShippingOptionsUsecase {
+	return &EstimateShippingOptionsUsecase{
 		shippingCostProvider: shippingCostProvider,
 	}
 }
 
-type EstimateShippingCostInput struct {
+type EstimateShippingOptionsInput struct {
 	Origin      int
 	Destination int
 	Weight      int
@@ -30,8 +30,8 @@ type EstimateShippingCostInput struct {
 	PriceFilter *string
 }
 
-func (u *EstimateShippingCostUsecase) Execute(
-	input EstimateShippingCostInput,
+func (u *EstimateShippingOptionsUsecase) Execute(
+	input EstimateShippingOptionsInput,
 ) ([]repository.CostOption, error) {
 	if input.Origin == input.Destination {
 		return nil, appErr.NewInvalidInput(domain.ErrInvalidRoute.Error())
