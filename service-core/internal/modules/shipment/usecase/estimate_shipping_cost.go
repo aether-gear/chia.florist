@@ -40,10 +40,21 @@ func (u *EstimateShippingCostUsecase) Execute(
 	if len(input.Couriers) == 0 {
 		return nil, appErr.NewInvalidInput(domain.ErrNoCourierSelected.Error())
 	}
+
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(input.Couriers))
 	for _, courier := range input.Couriers {
-		if strings.TrimSpace(courier) == "" {
+		c := strings.TrimSpace(courier)
+		if c == "" {
 			return nil, appErr.NewInvalidInput(domain.ErrInvalidCourier.Error())
 		}
+
+		if _, exist := seen[c]; exist {
+			continue
+		}
+
+		seen[c] = struct{}{}
+		result = append(result, c)
 	}
 
 	if input.Weight <= 0 {
@@ -54,7 +65,7 @@ func (u *EstimateShippingCostUsecase) Execute(
 		OriginID:      input.Origin,
 		DestinationID: input.Destination,
 		Weight:        input.Weight,
-		Couriers:      input.Couriers,
+		Couriers:      result,
 		PriceFilter:   input.PriceFilter,
 	}
 
