@@ -76,7 +76,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 			Slug:          p.Product.Slug,
 			Status:        ProductStatusDTO(p.Product.Status),
 			Price:         p.Product.Price,
-			Stock:         p.Inventory.Stock,
+			TotalStock:    p.Inventory.TotalStock,
 			ReservedStock: p.Inventory.ReservedStock,
 		}
 
@@ -121,11 +121,11 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 	inventories := make([]ProductInventoryView, 0, len(product.ShopInventories))
 	for _, inventory := range product.ShopInventories {
 		inventories = append(inventories, ProductInventoryView{
-			ID:        inventory.ID,
-			ShopID:    inventory.ShopID,
-			Stock:     inventory.Stock,
-			Reserved:  inventory.Reserved,
-			Available: inventory.Available(),
+			ID:            inventory.ID,
+			ShopID:        inventory.ShopID,
+			TotalStock:    inventory.TotalStock,
+			ReservedStock: inventory.ReservedStock,
+			Available:     inventory.Available(),
 		})
 	}
 
@@ -138,7 +138,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		Status:        ProductStatusDTO(product.Product.Status),
 		Price:         product.Product.Price,
 		Weight:        product.Product.Weight,
-		Stock:         product.Inventory.Stock,
+		TotalStock:    product.Inventory.TotalStock,
 		ReservedStock: product.Inventory.ReservedStock,
 		Inventories:   inventories,
 		CreatedAt:     product.Product.CreatedAt,

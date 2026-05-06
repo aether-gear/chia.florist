@@ -21,7 +21,7 @@ type ProductOverviewResponse struct {
 	Slug          string           `json:"slug"`
 	Status        ProductStatusDTO `json:"status"`
 	Price         int64            `json:"price"`
-	Stock         int              `json:"stock"`
+	TotalStock    int              `json:"stock"`
 	ReservedStock int              `json:"reserved_stock"`
 }
 
@@ -34,7 +34,7 @@ type ProductDetailResponse struct {
 	Status        ProductStatusDTO       `json:"status"`
 	Price         int64                  `json:"price"`
 	Weight        *float64               `json:"weight"`
-	Stock         int                    `json:"stock"`
+	TotalStock    int                    `json:"stock"`
 	ReservedStock int                    `json:"reserved_stock"`
 	Inventories   []ProductInventoryView `json:"inventories"`
 	CreatedAt     time.Time              `json:"created_at"`
@@ -43,11 +43,11 @@ type ProductDetailResponse struct {
 }
 
 type ProductInventoryView struct {
-	ID        uuid.UUID `json:"id"`
-	ShopID    uuid.UUID `json:"shop_id"`
-	Stock     int       `json:"stock"`
-	Reserved  int       `json:"reserved"`
-	Available int       `json:"available"`
+	ID            uuid.UUID `json:"id"`
+	ShopID        uuid.UUID `json:"shop_id"`
+	TotalStock    int       `json:"stock"`
+	ReservedStock int       `json:"reserved_stock"`
+	Available     int       `json:"available"`
 }
 
 type CreateProductRequest struct {
