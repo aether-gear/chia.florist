@@ -79,8 +79,8 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		}
 
 		for _, inventory := range inventories {
-			result.Inventory.Stock += inventory.Stock
-			result.Inventory.ReservedStock += inventory.Reserved
+			result.Inventory.TotalStock += inventory.TotalStock
+			result.Inventory.ReservedStock += inventory.ReservedStock
 		}
 
 		productMap[p.ID] = result

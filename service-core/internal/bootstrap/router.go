@@ -83,7 +83,7 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 
 		shipmentHandler = shipmentH.NewShipmentHandler(
-			&c.EstimateShippingCost,
+			&c.EstimateShippingOptions,
 		)
 	)
 
@@ -213,7 +213,7 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/shipping/cost",
 		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: shipmentHandler.EstimateShippingCost,
+			http.MethodPost: shipmentHandler.EstimateShippingOptions,
 		})),
 	)
 

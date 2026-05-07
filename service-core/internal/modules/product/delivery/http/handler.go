@@ -70,15 +70,17 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 	results := make([]ProductOverviewResponse, 0, len(products))
 	for _, p := range products {
 		result := ProductOverviewResponse{
-			ID:            p.Product.ID,
-			SKU:           p.Product.SKU,
-			Name:          p.Product.Name,
-			Slug:          p.Product.Slug,
-			Status:        ProductStatusDTO(p.Product.Status),
-			Price:         p.Product.Price,
-			Stock:         p.Inventory.Stock,
-			ReservedStock: p.Inventory.ReservedStock,
+			ID:         p.Product.ID,
+			SKU:        p.Product.SKU,
+			Name:       p.Product.Name,
+			Slug:       p.Product.Slug,
+			Status:     ProductStatusDTO(p.Product.Status),
+			Price:      p.Product.Price,
+			TotalStock: p.Inventory.TotalStock,
 		}
+		result.IsAvailable =
+			p.Product.Status == domain.ProductStatusActive &&
+				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0
 
 		results = append(results, result)
 	}
@@ -118,33 +120,33 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		return errors.ErrNotFound
 	}
 
+	var available int
 	inventories := make([]ProductInventoryView, 0, len(product.ShopInventories))
 	for _, inventory := range product.ShopInventories {
+		available += inventory.Available()
+
 		inventories = append(inventories, ProductInventoryView{
-			ID:        inventory.ID,
-			ShopID:    inventory.ShopID,
-			Stock:     inventory.Stock,
-			Reserved:  inventory.Reserved,
-			Available: inventory.Available(),
+			ID:         inventory.ID,
+			ShopID:     inventory.ShopID,
+			TotalStock: inventory.TotalStock,
+			Available:  inventory.Available(),
 		})
 	}
 
 	response := ProductDetailResponse{
-		ID:            product.Product.ID,
-		SKU:           product.Product.SKU,
-		Name:          product.Product.Name,
-		Slug:          product.Product.Slug,
-		Description:   product.Product.Description,
-		Status:        ProductStatusDTO(product.Product.Status),
-		Price:         product.Product.Price,
-		Weight:        product.Product.Weight,
-		Stock:         product.Inventory.Stock,
-		ReservedStock: product.Inventory.ReservedStock,
-		Inventories:   inventories,
-		CreatedAt:     product.Product.CreatedAt,
-		UpdatedAt:     product.Product.UpdatedAt,
-		ArchivedAt:    product.Product.ArchivedAt,
+		ID:          product.Product.ID,
+		SKU:         product.Product.SKU,
+		Name:        product.Product.Name,
+		Slug:        product.Product.Slug,
+		Description: product.Product.Description,
+		Price:       product.Product.Price,
+		Weight:      product.Product.Weight,
+		TotalStock:  available,
+		UpdatedAt:   product.Product.UpdatedAt,
 	}
+	response.IsAvailable =
+		product.Product.Status == domain.ProductStatusActive &&
+			available > 0
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil

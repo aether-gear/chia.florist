@@ -44,8 +44,8 @@ func (u *GetProductUsecase) Execute(id uuid.UUID) (*repository.ProductWithInvent
 	}
 
 	for _, inventory := range inventories {
-		result.Inventory.Stock += inventory.Stock
-		result.Inventory.ReservedStock += inventory.Reserved
+		result.Inventory.TotalStock += inventory.TotalStock
+		result.Inventory.ReservedStock += inventory.ReservedStock
 	}
 
 	return &result, nil
