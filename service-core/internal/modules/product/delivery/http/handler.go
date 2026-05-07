@@ -74,7 +74,6 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 			SKU:        p.Product.SKU,
 			Name:       p.Product.Name,
 			Slug:       p.Product.Slug,
-			Status:     ProductStatusDTO(p.Product.Status),
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
 		}

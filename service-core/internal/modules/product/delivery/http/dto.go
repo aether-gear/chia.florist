@@ -15,14 +15,13 @@ const (
 )
 
 type ProductOverviewResponse struct {
-	ID          uuid.UUID        `json:"id"`
-	SKU         string           `json:"sku"`
-	Name        string           `json:"name"`
-	Slug        string           `json:"slug"`
-	IsAvailable bool             `json:"is_available"`
-	Status      ProductStatusDTO `json:"status"`
-	Price       int64            `json:"price"`
-	TotalStock  int              `json:"stock"`
+	ID          uuid.UUID `json:"id"`
+	SKU         string    `json:"sku"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`
+	IsAvailable bool      `json:"is_available"`
+	Price       int64     `json:"price"`
+	TotalStock  int       `json:"stock"`
 }
 
 type ProductDetailResponse struct {
