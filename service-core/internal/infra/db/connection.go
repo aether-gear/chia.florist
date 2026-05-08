@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	"service-core/internal/shared/config"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -12,11 +14,11 @@ type Connection struct {
 	Pool *pgxpool.Pool
 }
 
-func NewConnection(cfg DatabaseConfig) *Connection {
+func NewConnection(cfg config.DatabaseConfig) *Connection {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, cfg.DSN())
+	pool, err := pgxpool.New(ctx, *cfg.DSN)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}

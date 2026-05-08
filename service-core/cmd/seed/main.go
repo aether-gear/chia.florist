@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+
 	database "service-core/internal/infra/db"
+	"service-core/internal/shared/config"
 
 	"github.com/joho/godotenv"
 )
@@ -12,8 +14,16 @@ func main() {
 		log.Println("No .env file found, fallback to system env")
 	}
 
-	cfg := database.LoadConfig()
-
+	supabaseCfg := config.LoadSupabaseConfig()
+	cfg := config.LoadDBConfig(
+		supabaseCfg.Host,
+		supabaseCfg.Port,
+		supabaseCfg.User,
+		supabaseCfg.Password,
+		supabaseCfg.Name,
+		supabaseCfg.SSLMode,
+		&supabaseCfg.DSN,
+	)
 	conn := database.NewConnection(cfg)
 	defer conn.Close()
 
