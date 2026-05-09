@@ -4,6 +4,11 @@ import (
 	"io"
 )
 
+type Bucket struct {
+	Name   string
+	Public bool
+}
+
 type UploadInput struct {
 	Key           string
 	File          io.Reader
@@ -23,12 +28,13 @@ type ObjectStorage interface {
 }
 
 type URLResolver interface {
-	PublicURL(key string) string
+	PublicURL(key string, bucket string) string
 	SignedURL(key string) (string, error)
 }
 
 type BucketManager interface {
-	EnsureBucket() error
+	EnsureBucket(name string) (bool, error)
+	CreateBucket(name string, public bool) error
 }
 
 type Provider interface {

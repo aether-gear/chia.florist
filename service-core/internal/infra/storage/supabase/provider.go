@@ -40,9 +40,6 @@ func NewSupabaseProvider(
 	if strings.TrimSpace(SupabaseConfig.ServiceRoleKey) == "" {
 		return nil, fmt.Errorf("supabase service role key is required")
 	}
-	if strings.TrimSpace(StorageConfig.BucketName) == "" {
-		return nil, fmt.Errorf("supabase bucket name is required")
-	}
 	if Client == nil {
 		Client = http.DefaultClient
 	}

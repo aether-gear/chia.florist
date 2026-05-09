@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log"
 
 	"service-core/internal/shared/config"
 
@@ -11,6 +12,8 @@ import (
 )
 
 func RunMigration(cfg config.DatabaseConfig) error {
+	log.Printf("database: running migration")
+
 	m, err := migrate.New(
 		"file://migrations",
 		*cfg.DSN,
@@ -19,9 +22,16 @@ func RunMigration(cfg config.DatabaseConfig) error {
 		return fmt.Errorf("failed to init migration: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	err = m.Up()
+	if err != nil {
+		if err == migrate.ErrNoChange {
+			log.Printf("database: already up to date")
+			return nil
+		}
+
 		return fmt.Errorf("migration failed: %w", err)
 	}
 
+	log.Println("database: migration applied")
 	return nil
 }

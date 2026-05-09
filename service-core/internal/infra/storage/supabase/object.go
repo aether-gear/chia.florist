@@ -7,8 +7,9 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"service-core/internal/infra/storage"
 	"strings"
+
+	"service-core/internal/infra/storage"
 )
 
 func (p *SupabaseProvider) Upload(input storage.UploadInput) (*storage.ObjectResponse, error) {
@@ -125,11 +126,11 @@ func (p *SupabaseProvider) Exists(key string) (bool, error) {
 	return true, nil
 }
 
-func (p *SupabaseProvider) PublicURL(key string) string {
+func (p *SupabaseProvider) PublicURL(key string, bucket string) string {
 	return fmt.Sprintf(
 		"%s/storage/v1/object/public/%s/%s",
 		strings.TrimRight(p.SupabaseConfig.ProjectURL, "/"),
-		p.StorageConfig.BucketName,
+		bucket,
 		key,
 	)
 }
