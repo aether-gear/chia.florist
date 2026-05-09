@@ -22,7 +22,6 @@ type SupabaseConfig struct {
 
 	ProjectURL     string
 	ServiceRoleKey string
-	PublicBaseURL  string
 
 	DBVersion      *string
 	StorageVersion *string
@@ -30,15 +29,14 @@ type SupabaseConfig struct {
 
 func LoadSupabaseConfig() SupabaseConfig {
 	var (
-		host           = GetEnv("DB_HOST", "")
-		port           = GetEnv("DB_PORT", "")
-		name           = GetEnv("DB_NAME", "")
-		user           = GetEnv("DB_USER", "")
-		password       = GetEnv("DB_PASSWORD", "")
-		sslMode        = GetEnv("DB_SSLMODE", "")
+		host           = GetEnv("SUPABASE_DB_HOST", "")
+		port           = GetEnv("SUPABASE_DB_PORT", "")
+		name           = GetEnv("SUPABASE_DB_NAME", "")
+		user           = GetEnv("SUPABASE_DB_USER", "")
+		password       = GetEnv("SUPABASE_DB_PASSWORD", "")
+		sslMode        = GetEnv("SUPABASE_DB_SSLMODE", "")
 		projectURL     = GetEnv("SUPABASE_PROJECT_URL", "")
 		serviceRoleKey = GetEnv("SUPABASE_SERVICE_ROLE_KEY", "")
-		publicBaseURL  = GetEnv("SUPABASE_PUBLIC_BASE_URL", "")
 		dbVersion      = GetEnv("", "")
 		storageVersion = GetEnv("", "")
 	)
@@ -64,7 +62,6 @@ func LoadSupabaseConfig() SupabaseConfig {
 		DSN:            dsn,
 		ProjectURL:     projectURL,
 		ServiceRoleKey: serviceRoleKey,
-		PublicBaseURL:  publicBaseURL,
 		DBVersion:      &dbVersion,
 		StorageVersion: &storageVersion,
 	}
