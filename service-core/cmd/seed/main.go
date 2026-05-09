@@ -10,6 +10,8 @@ import (
 )
 
 func main() {
+	log.Println("\x1b[0;94;49mseed start\x1b[0;39;49m")
+
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, fallback to system env")
 	}
@@ -25,5 +27,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("seed completed")
+	log.Println("\x1b[0;94;49mseed complete\x1b[0;39;49m")
 }

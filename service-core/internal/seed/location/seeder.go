@@ -17,11 +17,11 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	if seeded {
-		log.Println("location already seeded, skipping...")
+		log.Println("database: location already seeded")
 		return nil
 	}
 
-	log.Println("seeding provinces...")
+	log.Println("database: seeding provinces")
 	if err := seedLocation(ctx,
 		pool,
 		"internal/seed/location/source/provinces.csv",
@@ -32,7 +32,7 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
-	log.Println("seeding cities...")
+	log.Println("database: seeding cities")
 	if err := seedLocation(ctx,
 		pool,
 		"internal/seed/location/source/regencies.csv",
@@ -44,7 +44,7 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
-	log.Println("seeding districts...")
+	log.Println("database: seeding districts")
 	if err := seedLocation(ctx,
 		pool,
 		"internal/seed/location/source/districts.csv",
@@ -56,7 +56,7 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
-	log.Println("seeding villages...")
+	log.Println("database: seeding villages")
 	if err := seedLocation(ctx,
 		pool,
 		"internal/seed/location/source/villages.csv",
