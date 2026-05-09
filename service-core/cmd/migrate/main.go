@@ -3,8 +3,9 @@ package main
 import (
 	"log"
 
+	"service-core/internal/bootstrap"
 	database "service-core/internal/infra/db"
-	"service-core/internal/shared/config"
+	"service-core/internal/infra/storage"
 
 	"github.com/joho/godotenv"
 )
@@ -14,18 +15,23 @@ func main() {
 		log.Println("No .env file found, fallback to system env")
 	}
 
-	supabaseCfg := config.LoadSupabaseConfig()
-	cfg := config.LoadDBConfig(
-		supabaseCfg.Host,
-		supabaseCfg.Port,
-		supabaseCfg.User,
-		supabaseCfg.Password,
-		supabaseCfg.Name,
-		supabaseCfg.SSLMode,
-		&supabaseCfg.DSN,
-	)
+	cfg := bootstrap.LoadConfig()
 
-	database.RunMigrations(cfg)
+	infra, err := bootstrap.NewInfra(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer infra.Close()
 
-	log.Println("migration completed")
+	if err := database.RunMigration(cfg.DB); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("database migration complete")
+
+	if err := storage.RunMigration(infra.StorageProvider); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("storage migration complete")
+
+	log.Println("migration complete")
 }

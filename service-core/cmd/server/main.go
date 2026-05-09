@@ -13,6 +13,14 @@ func main() {
 		log.Println("No .env file found, fallback to system env")
 	}
 
-	app := bootstrap.NewApp()
-	app.Run()
+	cfg := bootstrap.LoadConfig()
+	app, err := bootstrap.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer app.Close()
+
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
