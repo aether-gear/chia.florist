@@ -59,8 +59,8 @@ func (u *FindProductsUsecase) Execute(
 		}
 
 		for _, inventory := range inventories {
-			result.Inventory.Stock += inventory.Stock
-			result.Inventory.ReservedStock += inventory.Reserved
+			result.Inventory.TotalStock += inventory.TotalStock
+			result.Inventory.ReservedStock += inventory.ReservedStock
 		}
 
 		results = append(results, result)

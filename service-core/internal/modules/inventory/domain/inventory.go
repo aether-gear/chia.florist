@@ -7,33 +7,75 @@ import (
 )
 
 type Inventory struct {
-	ID        uuid.UUID
-	ProductID uuid.UUID
-	ShopID    uuid.UUID
-	Stock     int
-	Reserved  int
+	ID            uuid.UUID
+	ProductID     uuid.UUID
+	ShopID        uuid.UUID
+	TotalStock    int
+	ReservedStock int
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
 }
 
 func (i *Inventory) Validate() error {
-	if i.Stock < 0 {
+	if i.TotalStock < 0 {
 		return ErrInvalidStock
 	}
 
-	if i.Reserved < 0 {
+	if i.ReservedStock < 0 {
 		return ErrInvalidReserved
+	}
+
+	if i.ReservedStock > i.TotalStock {
+		return ErrReservedExceedsStock
 	}
 
 	return nil
 }
 
 func (i Inventory) Available() int {
-	available := i.Stock - i.Reserved
-	if available < 0 {
-		return 0
+	return i.TotalStock - i.ReservedStock
+}
+
+func (i *Inventory) Reserve(qty int) error {
+	if qty <= 0 {
+		return ErrInvalidStock
 	}
 
-	return available
+	if i.Available() < qty {
+		return ErrInsufficientStock
+	}
+
+	i.ReservedStock += qty
+
+	return i.Validate()
+}
+
+func (i *Inventory) Release(qty int) error {
+	if qty <= 0 {
+		return ErrInvalidReserved
+	}
+
+	if i.ReservedStock < qty {
+		return ErrInsufficientReserved
+	}
+
+	i.ReservedStock -= qty
+
+	return i.Validate()
+}
+
+func (i *Inventory) Commit(qty int) error {
+	if qty <= 0 {
+		return ErrInvalidReserved
+	}
+
+	if i.ReservedStock < qty {
+		return ErrInsufficientReserved
+	}
+
+	i.TotalStock -= qty
+	i.ReservedStock -= qty
+
+	return i.Validate()
 }

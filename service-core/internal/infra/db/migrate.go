@@ -1,25 +1,27 @@
 package database
 
 import (
-	"log"
+	"fmt"
+
+	"service-core/internal/shared/config"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func RunMigrations(cfg DatabaseConfig) {
+func RunMigration(cfg config.DatabaseConfig) error {
 	m, err := migrate.New(
 		"file://migrations",
-		cfg.DSN(),
+		*cfg.DSN,
 	)
 	if err != nil {
-		log.Fatalf("failed to init migration: %v", err)
+		return fmt.Errorf("failed to init migration: %w", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatalf("migration failed: %v", err)
+		return fmt.Errorf("migration failed: %w", err)
 	}
 
-	log.Println("migrations applied successfully")
+	return nil
 }

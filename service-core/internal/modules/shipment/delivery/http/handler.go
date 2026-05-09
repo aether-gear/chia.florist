@@ -11,19 +11,19 @@ import (
 )
 
 type ShipmentHandler struct {
-	estimateShippingCost *usecase.EstimateShippingCostUsecase
+	estimateShippOpts *usecase.EstimateShippingOptionsUsecase
 }
 
 func NewShipmentHandler(
-	estimateShippingCost *usecase.EstimateShippingCostUsecase,
+	estimateShippOpts *usecase.EstimateShippingOptionsUsecase,
 ) *ShipmentHandler {
 	return &ShipmentHandler{
-		estimateShippingCost: estimateShippingCost,
+		estimateShippOpts: estimateShippOpts,
 	}
 }
 
-func (h *ShipmentHandler) EstimateShippingCost(w http.ResponseWriter, r *http.Request) error {
-	var req EstimateShippingCostRequest
+func (h *ShipmentHandler) EstimateShippingOptions(w http.ResponseWriter, r *http.Request) error {
+	var req EstimateShippingOptionsRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return errors.ErrBadRequest
@@ -37,7 +37,7 @@ func (h *ShipmentHandler) EstimateShippingCost(w http.ResponseWriter, r *http.Re
 		return errors.ErrBadRequest
 	}
 
-	input := usecase.EstimateShippingCostInput{
+	input := usecase.EstimateShippingOptionsInput{
 		Origin:      req.Origin,
 		Destination: req.Destination,
 		Weight:      req.Weight,
@@ -45,15 +45,15 @@ func (h *ShipmentHandler) EstimateShippingCost(w http.ResponseWriter, r *http.Re
 		PriceFilter: req.PriceFilter,
 	}
 
-	results, err := h.estimateShippingCost.Execute(input)
+	results, err := h.estimateShippOpts.Execute(input)
 	if err != nil {
 		return err
 	}
 
-	couriers := make([]EstimateShippingCostResponse, 0, len(results))
+	couriers := make([]EstimateShippingOptionsResponse, 0, len(results))
 
 	for _, result := range results {
-		option := EstimateShippingCostResponse{
+		option := EstimateShippingOptionsResponse{
 			Name:        result.Name,
 			Code:        result.Code,
 			Service:     result.Service,

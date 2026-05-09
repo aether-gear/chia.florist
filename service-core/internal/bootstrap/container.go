@@ -1,17 +1,13 @@
 package bootstrap
 
 import (
-	"net/http"
-
 	"service-core/internal/common/logger"
 
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
-	lService "service-core/internal/modules/location/infra/service"
-	sCostService "service-core/internal/modules/shipment/infra/service"
-	sGen "service-core/internal/shared/slug"
+	pRepo "service-core/internal/modules/product/repository"
 
-	database "service-core/internal/infra/db"
+	sGen "service-core/internal/shared/slug"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
 	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
@@ -39,11 +35,11 @@ import (
 )
 
 type Container struct {
-	DB     *database.Connection
 	Logger logger.Logger
 
-	TokenService authDomain.TokenService
-	Hasher       authDomain.PasswordHasher
+	TokenService        authDomain.TokenService
+	Hasher              authDomain.PasswordHasher
+	ProductImageStorage pRepo.ImageStorage
 
 	FindProducts    pUC.FindProductsUsecase
 	GetProduct      pUC.GetProductUsecase
@@ -79,72 +75,40 @@ type Container struct {
 
 	ConfigureShopCourier coUC.ConfigureShopCourierUsecase
 
-	EstimateShippingCost shUC.EstimateShippingCostUsecase
+	EstimateShippingOptions shUC.EstimateShippingOptionsUsecase
 }
 
-func NewContainer() *Container {
+func NewContainer(cfg Config, infra *Infra) *Container {
 	var (
-		config = LoadConfig()
+		log = logger.NewZapLogger(cfg.App.Env)
 
-		dbCfg                 = config.DB
-		app                   = config.App.Env
-		komerceShipping       = config.Shipping.DestinationKey
-		komerceDestinationURL = config.Shipping.DestinationURL
-		komerceCalculate      = config.Shipping.CalculateKEY
-		komerceCalculateURL   = config.Shipping.CalculateURL
-		komerceTimeout        = config.Shipping.Timeout
-		jwtSecret             = config.JWT.Secret
-		jwtExp                = config.JWT.Exp
-	)
-
-	var (
-		db  = database.NewConnection(dbCfg)
-		log = logger.NewZapLogger(app)
-
-		productRepo   = pRepoImpl.NewProductRepository(db)
-		inventoryRepo = iRepoImpl.NewInventoryRepository(db)
-		authRepo      = aRepoImpl.NewAuthRepository(db)
-		cartRepo      = cRepoImpl.NewCartRepositoryImpl(db)
+		productRepo   = pRepoImpl.NewProductRepository(infra.DB)
+		inventoryRepo = iRepoImpl.NewInventoryRepository(infra.DB)
+		authRepo      = aRepoImpl.NewAuthRepository(infra.DB)
+		cartRepo      = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
-		userRepo          = uRepoImpl.NewUserRepositoryImpl(db)
-		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(db)
-		addressShopRepo   = adRepoImpl.NewShopAddressRepositoryImpl(db)
-		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(db)
-		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(db)
-		shopRepo          = sRepoImpl.NewShopRepositoryImpl(db)
-		courierRepo       = coRepoImpl.NewCourierRepositoryImpl(db)
-		shopCourierRepo   = coRepoImpl.NewShopCourierRepositoryImpl(db)
+		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
+		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(infra.DB)
+		addressShopRepo   = adRepoImpl.NewShopAddressRepositoryImpl(infra.DB)
+		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(infra.DB)
+		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(infra.DB)
+		shopRepo          = sRepoImpl.NewShopRepositoryImpl(infra.DB)
+		courierRepo       = coRepoImpl.NewCourierRepositoryImpl(infra.DB)
+		shopCourierRepo   = coRepoImpl.NewShopCourierRepositoryImpl(infra.DB)
 	)
 
 	var (
 		tokenSvc = authService.NewJWTService(
-			jwtSecret,
-			jwtExp,
+			cfg.JWT.Secret,
+			cfg.JWT.Exp,
 		)
 
 		hasher = authService.NewBcryptHasher()
-
-		locationService = lService.NewRajaOngkirLocation(
-			komerceShipping,
-			komerceDestinationURL,
-			&http.Client{
-				Timeout: komerceTimeout,
-			},
-		)
-
-		shippingCostProvider = sCostService.NewRajaOngkirCostEstimation(
-			komerceCalculate,
-			komerceCalculateURL,
-			&http.Client{
-				Timeout: komerceTimeout,
-			},
-		)
 
 		slugGen = sGen.NewGenerator()
 	)
 
 	return &Container{
-		DB:     db,
 		Logger: log,
 
 		TokenService: tokenSvc,
@@ -164,7 +128,7 @@ func NewContainer() *Container {
 		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
 		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),
 
-		ListLocations: *lUC.NewListLocationUsecase(locationService),
+		ListLocations: *lUC.NewListLocationUsecase(infra.LocationRepository),
 
 		GetUser: *uUC.NewGetUserUsecase(userRepo),
 
@@ -185,6 +149,6 @@ func NewContainer() *Container {
 
 		ConfigureShopCourier: *coUC.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
 
-		EstimateShippingCost: *shUC.NewEstimateShippingCostUsecase(shippingCostProvider),
+		EstimateShippingOptions: *shUC.NewEstimateShippingOptionsUsecase(infra.ShippingCostProvider),
 	}
 }

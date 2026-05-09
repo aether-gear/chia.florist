@@ -48,8 +48,8 @@ func (r *inventoryRepositoryImpl) GetByProductAndShop(productID uuid.UUID, shopI
 		&inventory.ID,
 		&inventory.ProductID,
 		&inventory.ShopID,
-		&inventory.Stock,
-		&inventory.Reserved,
+		&inventory.TotalStock,
+		&inventory.ReservedStock,
 		&inventory.CreatedAt,
 		&inventory.UpdatedAt,
 	)
@@ -95,8 +95,8 @@ func (r *inventoryRepositoryImpl) ListByProduct(productID uuid.UUID) ([]domain.I
 			&inventory.ID,
 			&inventory.ProductID,
 			&inventory.ShopID,
-			&inventory.Stock,
-			&inventory.Reserved,
+			&inventory.TotalStock,
+			&inventory.ReservedStock,
 			&inventory.CreatedAt,
 			&inventory.UpdatedAt,
 		); err != nil {
@@ -150,8 +150,8 @@ func (r *inventoryRepositoryImpl) ListByProducts(productIDs []uuid.UUID) (map[uu
 			&inventory.ID,
 			&inventory.ProductID,
 			&inventory.ShopID,
-			&inventory.Stock,
-			&inventory.Reserved,
+			&inventory.TotalStock,
+			&inventory.ReservedStock,
 			&inventory.CreatedAt,
 			&inventory.UpdatedAt,
 		); err != nil {
@@ -204,8 +204,8 @@ func (r *inventoryRepositoryImpl) ListByShop(shopID uuid.UUID) ([]domain.Invento
 			&inventory.ID,
 			&inventory.ProductID,
 			&inventory.ShopID,
-			&inventory.Stock,
-			&inventory.Reserved,
+			&inventory.TotalStock,
+			&inventory.ReservedStock,
 			&inventory.CreatedAt,
 			&inventory.UpdatedAt,
 		); err != nil {
@@ -242,8 +242,8 @@ func (r *inventoryRepositoryImpl) Create(inventory *domain.Inventory) error {
 		inventory.ID,
 		inventory.ProductID,
 		inventory.ShopID,
-		inventory.Stock,
-		inventory.Reserved,
+		inventory.TotalStock,
+		inventory.ReservedStock,
 		inventory.CreatedAt,
 	)
 	if err != nil {

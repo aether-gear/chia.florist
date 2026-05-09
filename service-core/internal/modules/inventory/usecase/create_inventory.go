@@ -65,12 +65,12 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 	}
 
 	inventory := &inventoryD.Inventory{
-		ID:        uuid.New(),
-		ProductID: input.ProductID,
-		ShopID:    input.ShopID,
-		Stock:     input.Stock,
-		Reserved:  0,
-		CreatedAt: time.Now(),
+		ID:            uuid.New(),
+		ProductID:     input.ProductID,
+		ShopID:        input.ShopID,
+		TotalStock:    input.Stock,
+		ReservedStock: 0,
+		CreatedAt:     time.Now(),
 	}
 	if err := inventory.Validate(); err != nil {
 		if errors.Is(err, inventoryD.ErrInvalidStock) || errors.Is(err, inventoryD.ErrInvalidReserved) {

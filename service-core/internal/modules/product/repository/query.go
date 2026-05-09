@@ -15,7 +15,7 @@ type FindProductParams struct {
 type ProductWithInventory struct {
 	Product   domain.Product
 	Inventory struct {
-		Stock         int
+		TotalStock    int
 		ReservedStock int
 	}
 	ShopInventories []inventoryD.Inventory

@@ -15,45 +15,40 @@ const (
 )
 
 type ProductOverviewResponse struct {
-	ID            uuid.UUID        `json:"id"`
-	SKU           string           `json:"sku"`
-	Name          string           `json:"name"`
-	Slug          string           `json:"slug"`
-	Status        ProductStatusDTO `json:"status"`
-	Price         int64            `json:"price"`
-	Stock         int              `json:"stock"`
-	ReservedStock int              `json:"reserved_stock"`
+	ID          uuid.UUID `json:"id"`
+	SKU         string    `json:"sku"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`
+	IsAvailable bool      `json:"is_available"`
+	Price       int64     `json:"price"`
+	TotalStock  int       `json:"stock"`
 }
 
 type ProductDetailResponse struct {
-	ID            uuid.UUID              `json:"id"`
-	SKU           string                 `json:"sku"`
-	Name          string                 `json:"name"`
-	Slug          string                 `json:"slug"`
-	Description   *string                `json:"description"`
-	Status        ProductStatusDTO       `json:"status"`
-	Price         int64                  `json:"price"`
-	Weight        *float64               `json:"weight"`
-	Stock         int                    `json:"stock"`
-	ReservedStock int                    `json:"reserved_stock"`
-	Inventories   []ProductInventoryView `json:"inventories"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     *time.Time             `json:"updated_at"`
-	ArchivedAt    *time.Time             `json:"archived_at"`
+	ID          uuid.UUID  `json:"id"`
+	SKU         string     `json:"sku"`
+	Name        string     `json:"name"`
+	Slug        string     `json:"slug"`
+	Description *string    `json:"description"`
+	IsAvailable bool       `json:"is_available"`
+	Price       int64      `json:"price"`
+	Weight      *float64   `json:"weight"`
+	TotalStock  int        `json:"stock"`
+	UpdatedAt   *time.Time `json:"updated_at"`
 }
 
 type ProductInventoryView struct {
-	ID        uuid.UUID `json:"id"`
-	ShopID    uuid.UUID `json:"shop_id"`
-	Stock     int       `json:"stock"`
-	Reserved  int       `json:"reserved"`
-	Available int       `json:"available"`
+	ID         uuid.UUID `json:"id"`
+	ShopID     uuid.UUID `json:"shop_id"`
+	TotalStock int       `json:"stock"`
+	Available  int       `json:"available"`
 }
 
 type CreateProductRequest struct {
 	SKU         string           `json:"sku"`
 	Name        string           `json:"name"`
 	Description *string          `json:"description"`
+	IsAvailable bool             `json:"is_available"`
 	Status      ProductStatusDTO `json:"status"`
 	Price       int64            `json:"price"`
 	Weight      *float64         `json:"weight"`

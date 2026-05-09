@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+
+	"service-core/internal/bootstrap"
 	database "service-core/internal/infra/db"
 
 	"github.com/joho/godotenv"
@@ -12,12 +14,16 @@ func main() {
 		log.Println("No .env file found, fallback to system env")
 	}
 
-	cfg := database.LoadConfig()
+	cfg := bootstrap.LoadConfig()
+	infra, err := bootstrap.NewInfra(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer infra.Close()
 
-	conn := database.NewConnection(cfg)
-	defer conn.Close()
-
-	database.RunSeed(conn)
+	if err := database.RunSeed(infra.DB); err != nil {
+		log.Fatal(err)
+	}
 
 	log.Println("seed completed")
 }
