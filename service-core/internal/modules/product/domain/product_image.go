@@ -9,13 +9,28 @@ import (
 	"github.com/google/uuid"
 )
 
-type MIME string
+type (
+	MIME           string
+	ResolutionType string
+)
 
 const (
 	MIMEJPEG MIME = "image/jpeg"
 	MIMEPNG  MIME = "image/png"
 	MIMEWEBP MIME = "image/webp"
 )
+
+const (
+	ResolutionCatalog ResolutionType = "catalog"
+	ResolutionCart    ResolutionType = "cart"
+	ResolutionDetail  ResolutionType = "detail"
+)
+
+var ResolutionWidths = map[ResolutionType]int{
+	ResolutionCatalog: 600,
+	ResolutionCart:    150,
+	ResolutionDetail:  1200,
+}
 
 const (
 	DirPrefix   = "products"
