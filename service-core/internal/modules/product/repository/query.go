@@ -1,8 +1,11 @@
 package repository
 
 import (
+	"io"
 	inventoryD "service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/product/domain"
+
+	"github.com/google/uuid"
 )
 
 type FindProductParams struct {
@@ -10,6 +13,12 @@ type FindProductParams struct {
 	Limit int
 	ID    *string
 	Name  *string
+}
+
+type UploadProductImageParams struct {
+	ProductID uuid.UUID
+	Metadata  domain.ProductImageMetadata
+	File      io.Reader
 }
 
 type ProductWithInventory struct {
