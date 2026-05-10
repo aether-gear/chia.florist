@@ -7,6 +7,7 @@ import (
 	authService "service-core/internal/modules/auth/infra/service"
 	pRepo "service-core/internal/modules/product/repository"
 
+	// sharedImage "service-core/internal/shared/image"
 	sGen "service-core/internal/shared/slug"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
@@ -37,9 +38,10 @@ import (
 type Container struct {
 	Logger logger.Logger
 
-	TokenService        authDomain.TokenService
-	Hasher              authDomain.PasswordHasher
-	ProductImageStorage pRepo.ImageStorage
+	TokenService                 authDomain.TokenService
+	Hasher                       authDomain.PasswordHasher
+	ProductImageRepository       pRepo.ProductImageRepository
+	ProductImageUploadRepository pRepo.ProductImageUploadService
 
 	FindProducts    pUC.FindProductsUsecase
 	GetProduct      pUC.GetProductUsecase
@@ -95,6 +97,7 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		shopRepo          = sRepoImpl.NewShopRepositoryImpl(infra.DB)
 		courierRepo       = coRepoImpl.NewCourierRepositoryImpl(infra.DB)
 		shopCourierRepo   = coRepoImpl.NewShopCourierRepositoryImpl(infra.DB)
+		// productImageRepo  = pRepoImpl.NewProductImageRepository(infra.DB)
 	)
 
 	var (
@@ -106,6 +109,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		hasher = authService.NewBcryptHasher()
 
 		slugGen = sGen.NewGenerator()
+
+		// imageProcessor = sharedImage.NewImageTransformer()
+		// imageGenerator = sharedImage.NewResolutionGenerator(imageProcessor)
 	)
 
 	return &Container{
@@ -113,6 +119,8 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 
 		TokenService: tokenSvc,
 		Hasher:       hasher,
+		// ProductImageRepository:       productImageRepo,
+		// ProductImageUploadRepository: pService.NewProductImageUploadRepository(infra.StorageProvider, imageGenerator),
 
 		FindProducts:    *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
 		GetProduct:      *pUC.NewGetProductUsecase(productRepo, inventoryRepo),

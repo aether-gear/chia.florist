@@ -21,6 +21,13 @@ const (
 )
 
 const (
+	DirPrefix   = "products"
+	KeyPattern  = "products/{product_id}/{image_id}.{ext}"
+	MaxFileSize = 5 << 20
+	MaxFileMB   = MaxFileSize / (1 << 20)
+)
+
+const (
 	ResolutionCatalog ResolutionType = "catalog"
 	ResolutionCart    ResolutionType = "cart"
 	ResolutionDetail  ResolutionType = "detail"
@@ -32,29 +39,24 @@ var ResolutionWidths = map[ResolutionType]int{
 	ResolutionDetail:  1200,
 }
 
-const (
-	DirPrefix   = "products"
-	KeyPattern  = "products/{product_id}/{image_id}.{ext}"
-	MaxFileSize = 5 << 20
-	MaxFileMB   = MaxFileSize / (1 << 20)
-)
-
-type ProductImage struct {
-	ID           uuid.UUID
-	ProductID    uuid.UUID
-	CatalogURL   string
-	CartURL      string
-	IsPrimary    bool
-	DisplayOrder int
-	DetailImages []ProductDetailImage
-	CreatedAt    time.Time
+type ImageVariant struct {
+	URL string
+	Key string
 }
 
-type ProductDetailImage struct {
-	ID             uuid.UUID
-	ProductImageID uuid.UUID
-	URL            string
-	DisplayOrder   int
+type ProductImage struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+
+	Thumbnail ImageVariant
+	Preview   ImageVariant
+	Detail    ImageVariant
+
+	IsPrimary    bool
+	DisplayOrder int
+
+	CreatedAt time.Time
+	DeletedAt *time.Time
 }
 
 type ProductImageMetadata struct {

@@ -16,18 +16,14 @@ type ProductRepository interface {
 }
 
 type ProductImageRepository interface {
-	CreateProductImage(image *domain.ProductImage) error
-	CreateDetailImages(images []domain.ProductDetailImage) error
+	Create(images []domain.ProductImage) error
 
-	GetByProductID(productID uuid.UUID) ([]domain.ProductImage, error)
+	FindByProductID(productID uuid.UUID) ([]domain.ProductImage, error)
 
-	DeleteByProductID(productID uuid.UUID) error
+	SoftDeleteByProductID(productID uuid.UUID) error
 }
 
-type ProductImageUploadRepository interface {
-	UploadCatalogImage(params UploadProductImageParams) (string, error)
-	UploadCartImage(params UploadProductImageParams) (string, error)
-	UploadDetailImage(params UploadProductImageParams) (string, error)
-
-	DeleteUploadedImages(urls []string) error
+type ProductImageUploadService interface {
+	Upload(params UploadProductImagesParams) ([]UploadedProductImage, error)
+	Delete(assetKeys []string) error
 }
