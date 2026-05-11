@@ -5,12 +5,20 @@ import (
 	"io"
 )
 
+type VariantSpec struct {
+	Type  ResolutionType
+	Width int
+}
+
+type GeneratedVariant struct {
+	Type      ResolutionType
+	Data      []byte
+	SizeBytes int64
+	MIMEType  MIME
+}
+
 type VariantCreator interface {
-	GenerateVariant(
-		r io.Reader,
-		contentType string,
-		resolution int,
-	) (io.Reader, int64, error)
+	GenerateVariants(data []byte, mime MIME, specs []VariantSpec) ([]GeneratedVariant, error)
 }
 
 type ImageTransformer interface {

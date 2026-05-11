@@ -3,7 +3,6 @@ package image
 import (
 	"bytes"
 	"fmt"
-	"io"
 )
 
 type resolutionGenerator struct {
@@ -16,30 +15,40 @@ func NewResolutionGenerator(processor ImageTransformer) VariantCreator {
 	}
 }
 
-func (rG *resolutionGenerator) GenerateVariant(
-	r io.Reader,
-	contentType string,
-	targetWidth int,
-) (io.Reader, int64, error) {
-	// Read the input into memory because image decoding consumes the reader.
-	// Callers generating multiple variants must provide a fresh reader for each decode.
+func (rG *resolutionGenerator) GenerateVariants(
+	data []byte,
+	mime MIME,
+	specs []VariantSpec,
+) ([]GeneratedVariant, error) {
+	var variants []GeneratedVariant
 
-	img, err := rG.processor.Decode(r, contentType)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to decode image for variant: %w", err)
+	for _, spec := range specs {
+		reader := bytes.NewReader(data)
+
+		img, err := rG.processor.Decode(reader, string(mime))
+		if err != nil {
+			return nil, fmt.Errorf("decode %s: %w", spec.Type, err)
+		}
+
+		resized := rG.processor.Resize(img, spec.Width)
+
+		finalMIME := mime
+		if mime == MIMEWEBP {
+			finalMIME = MIMEJPEG
+		}
+
+		encoded, err := rG.processor.Encode(resized, string(finalMIME))
+		if err != nil {
+			return nil, fmt.Errorf("encode %s: %w", spec.Type, err)
+		}
+
+		variants = append(variants, GeneratedVariant{
+			Type:      spec.Type,
+			Data:      encoded,
+			SizeBytes: int64(len(encoded)),
+			MIMEType:  finalMIME,
+		})
 	}
 
-	resizedImg := rG.processor.Resize(img, targetWidth)
-
-	// Since we fallback webp to jpeg in processor, we should make sure contentType is jpeg if we did
-	if contentType == "image/webp" {
-		contentType = "image/jpeg"
-	}
-
-	encodedBytes, err := rG.processor.Encode(resizedImg, contentType)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to encode resized image: %w", err)
-	}
-
-	return bytes.NewReader(encodedBytes), int64(len(encodedBytes)), nil
+	return variants, nil
 }
