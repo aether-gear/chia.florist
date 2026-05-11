@@ -2,31 +2,27 @@ package supabase
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"path"
 	"strings"
+	"sync"
+	"time"
 
 	"service-core/internal/infra/storage"
+
+	"golang.org/x/sync/errgroup"
 )
 
-func (p *SupabaseProvider) Upload(input storage.UploadInput) (*storage.ObjectResponse, error) {
-	key := p.normalizeObjectKey(input.Key)
-	if key == "" {
-		return nil, fmt.Errorf("storage key is required")
-	}
-
-	body, err := io.ReadAll(input.File)
-	if err != nil {
-		return nil, fmt.Errorf("read upload body: %w", err)
-	}
-
+func (p *SupabaseProvider) Upload(
+	input storage.UploadInput,
+) (*storage.ObjectResponse, error) {
 	req, err := http.NewRequest(
 		http.MethodPost,
 		p.ObjectURL,
-		bytes.NewReader(body),
+		input.File,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build upload request: %w", err)
@@ -50,10 +46,52 @@ func (p *SupabaseProvider) Upload(input storage.UploadInput) (*storage.ObjectRes
 		return nil, p.newResponseError("upload object to supabase", resp)
 	}
 
+	key := p.normalizeObjectKey(input.Key)
+	if key == "" {
+		return nil, fmt.Errorf("storage key is required")
+	}
+
 	return &storage.ObjectResponse{
 		Key:         key,
 		ContentType: input.ContentType,
 	}, nil
+}
+
+func (p *SupabaseProvider) UploadMany(
+	inputs []storage.UploadInput,
+) ([]*storage.ObjectResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+
+	results := make([]*storage.ObjectResponse, len(inputs))
+	var mu sync.Mutex
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i, input := range inputs {
+		g.Go(func() error {
+			resp, err := p.Upload(input)
+			if err != nil {
+				return err
+			}
+
+			mu.Lock()
+			results[i] = resp
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 func (p *SupabaseProvider) Delete(key string) error {

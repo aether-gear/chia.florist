@@ -23,6 +23,7 @@ type ObjectResponse struct {
 
 type ObjectStorage interface {
 	Upload(input UploadInput) (*ObjectResponse, error)
+	UploadMany(inputs []UploadInput) ([]*ObjectResponse, error)
 	Delete(key string) error
 	Exists(key string) (bool, error)
 }
