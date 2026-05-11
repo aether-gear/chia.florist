@@ -132,11 +132,16 @@ func (r *inventoryRepositoryImpl) ListByProducts(productIDs []uuid.UUID) (map[uu
 			created_at,
 			updated_at
 		FROM inventory
-		WHERE product_id = ANY($1)
+		WHERE product_id = ANY($1::uuid[])
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, productIDs)
+	productIDStrings := make([]string, len(productIDs))
+	for i, id := range productIDs {
+		productIDStrings[i] = id.String()
+	}
+
+	rows, err := r.db.Query(ctx, query, productIDStrings)
 	if err != nil {
 		return nil, fmt.Errorf("query inventory by products failed: %w", err)
 	}
