@@ -158,6 +158,7 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 			}
 
 			uploadImages = append(uploadImages, storage.UploadInput{
+				Bucket:      "public-assets",
 				Key:         key,
 				File:        bytes.NewReader(variant.Data),
 				ContentType: string(variant.MIMEType),

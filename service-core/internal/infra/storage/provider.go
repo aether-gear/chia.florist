@@ -10,6 +10,7 @@ type Bucket struct {
 }
 
 type UploadInput struct {
+	Bucket        string
 	Key           string
 	File          io.Reader
 	ContentType   string

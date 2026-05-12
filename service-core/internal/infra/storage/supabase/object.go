@@ -19,9 +19,14 @@ import (
 func (p *SupabaseProvider) Upload(
 	input storage.UploadInput,
 ) (*storage.ObjectResponse, error) {
+	endpoint := fmt.Sprintf("%s/%s/%s",
+		p.ObjectURL,
+		strings.TrimRight(input.Bucket, "/"),
+		strings.TrimRight(input.Key, "/"),
+	)
 	req, err := http.NewRequest(
 		http.MethodPost,
-		p.ObjectURL,
+		endpoint,
 		input.File,
 	)
 	if err != nil {
