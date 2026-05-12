@@ -1,7 +1,7 @@
 package http
 
 import (
-	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +12,9 @@ import (
 
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	appMultipart "service-core/internal/common/http/multipart"
+
+	"service-core/internal/shared/conversion"
 
 	"github.com/google/uuid"
 )
@@ -151,14 +154,43 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) error {
-	var req CreateProductRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+func (h *ProductHandler) CreateProduct(
+	w http.ResponseWriter,
+	r *http.Request,
+) error {
+	err := r.ParseMultipartForm(16 << 20)
+	if err != nil {
 		return errors.ErrBadRequest
 	}
 
-	if req.Name == "" || req.SKU == "" {
+	price, err := conversion.ParsePriceToInt64(
+		r.FormValue("price"),
+	)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	var weightReq = r.FormValue("weight")
+	weight, err := conversion.ParseStringToFloat(&weightReq)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	desc := r.FormValue("description")
+	req := CreateProductRequest{
+		Name:        r.FormValue("name"),
+		SKU:         r.FormValue("sku"),
+		Description: &desc,
+		Price:       price,
+		Status:      ProductStatusDTO(r.FormValue("status")),
+		Weight:      weight,
+	}
+
+	if req.Name == "" {
+		return errors.ErrBadRequest
+	}
+
+	if req.SKU == "" {
 		return errors.ErrBadRequest
 	}
 
@@ -170,13 +202,46 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		return errors.ErrBadRequest
 	}
 
-	err := h.createProduct.Execute(usecase.CreateProductInput{
+	files, err := appMultipart.ParseMultiple(
+		r,
+		"image",
+		16<<20,
+	)
+	if err != nil {
+		return err
+	}
+
+	images := make([]usecase.CreateProductImageInput, 0, len(files))
+
+	for i, file := range files {
+		data, err := io.ReadAll(file.File)
+		if err != nil {
+			return errors.ErrBadRequest
+		}
+
+		err = file.File.Close()
+		if err != nil {
+			return errors.ErrBadRequest
+		}
+
+		images = append(images, usecase.CreateProductImageInput{
+			Data:         data,
+			OriginalName: file.Filename,
+			MIMEType:     file.ContentType,
+			SizeBytes:    file.Size,
+			IsPrimary:    i == 0,
+			DisplayOrder: i,
+		})
+	}
+
+	err = h.createProduct.Execute(usecase.CreateProductInput{
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
 		Status:      domain.ProductStatus(req.Status),
 		Price:       req.Price,
 		Weight:      req.Weight,
+		Images:      images,
 	})
 	if err != nil {
 		return err
