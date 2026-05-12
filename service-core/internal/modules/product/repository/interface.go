@@ -18,6 +18,8 @@ type ProductRepository interface {
 type ProductImageRepository interface {
 	Create(images []domain.ProductImage) error
 
+	ListByProducts(productIDs []uuid.UUID) (map[uuid.UUID][]domain.ProductImage, error)
+
 	FindByProductID(productID uuid.UUID) ([]domain.ProductImage, error)
 
 	SoftDeleteByProductID(productID uuid.UUID) error

@@ -24,6 +24,103 @@ func NewProductImageRepository(conn *database.Connection) repository.ProductImag
 	}
 }
 
+func (r *productImageRepositoryImpl) ListByProducts(
+	productIDs []uuid.UUID,
+) (map[uuid.UUID][]domain.ProductImage, error) {
+	result := make(map[uuid.UUID][]domain.ProductImage)
+	if len(productIDs) == 0 {
+		return result, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT
+			id,
+			product_id,
+			thumbnail_url,
+			preview_url,
+			detail_url,
+			thumbnail_key,
+			preview_key,
+			detail_key,
+			is_primary,
+			display_order,
+			created_at,
+			deleted_at
+		FROM product_images
+		WHERE product_id = ANY($1::uuid[])
+		ORDER BY display_order ASC
+	`
+
+	productIDStrings := make([]string, len(productIDs))
+	for i, id := range productIDs {
+		productIDStrings[i] = id.String()
+	}
+
+	rows, err := r.db.Query(ctx, query, productIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query product images failed: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var r productImageRow
+
+		err := rows.Scan(
+			&r.ID,
+			&r.ProductID,
+			&r.ThumbURL,
+			&r.PreviewURL,
+			&r.DetailURL,
+			&r.ThumbKey,
+			&r.PreviewKey,
+			&r.DetailKey,
+			&r.IsPrimary,
+			&r.DisplayOrder,
+			&r.CreatedAt,
+			&r.DeletedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan product image: %w", err)
+		}
+
+		img := domain.ProductImage{
+			ID:        r.ID,
+			ProductID: r.ProductID,
+
+			Variants: map[image.ResolutionType]domain.ImageVariant{
+				domain.ResolutionThumbnail: {
+					Type: domain.ResolutionThumbnail,
+					Key:  r.ThumbKey,
+				},
+				domain.ResolutionPreview: {
+					Type: domain.ResolutionPreview,
+					Key:  r.PreviewKey,
+				},
+				domain.ResolutionDetail: {
+					Type: domain.ResolutionDetail,
+					Key:  r.DetailKey,
+				},
+			},
+
+			IsPrimary:    r.IsPrimary,
+			DisplayOrder: r.DisplayOrder,
+			Metadata:     domain.ProductImageMetadata{},
+			CreatedAt:    r.CreatedAt,
+		}
+
+		result[img.ProductID] = append(result[img.ProductID], img)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate product image failed: %w", err)
+	}
+
+	return result, nil
+}
+
 func (r *productImageRepositoryImpl) FindByProductID(productID uuid.UUID) ([]domain.ProductImage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
