@@ -43,10 +43,11 @@ type Container struct {
 	ImageVariantProvider imgService.VariantCreator
 	ImageTransformer     imgService.ImageTransformer
 
-	FindProducts    pUC.FindProductsUsecase
-	GetProduct      pUC.GetProductUsecase
-	CreateProduct   pUC.CreateProductUsecase
-	CreateInventory iUC.CreateInventoryUsecase
+	FindProducts     pUC.FindProductsUsecase
+	GetProduct       pUC.GetProductUsecase
+	CreateProduct    pUC.CreateProductUsecase
+	AddProductImages pUC.AddProductImagesUsecase
+	CreateInventory  iUC.CreateInventoryUsecase
 
 	LoginAccount    aUC.LoginEmailUsecase
 	RegisterAccount aUC.RegisterUsecase
@@ -120,9 +121,10 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		TokenService: tokenSvc,
 		Hasher:       hasher,
 
-		FindProducts: *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
-		GetProduct:   *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
-		CreateProduct: *pUC.NewCreateProductUsecase(
+		FindProducts:  *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
+		GetProduct:    *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
+		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
+		AddProductImages: *pUC.NewAddProductImagesUsecase(
 			productRepo, productImageRepo, slugGen, imageVariantProvider, infra.StorageProvider,
 		),
 		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
