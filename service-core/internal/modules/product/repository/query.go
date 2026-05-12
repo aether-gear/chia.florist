@@ -33,6 +33,7 @@ type ProductWithInventory struct {
 		ReservedStock int
 	}
 	ShopInventories []inventoryD.Inventory
+	Images          []domain.ProductImage
 }
 
 type UploadedProductImage struct {

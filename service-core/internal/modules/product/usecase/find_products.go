@@ -3,31 +3,50 @@ package usecase
 import (
 	"fmt"
 
+	"service-core/internal/infra/storage"
+	inventoryD "service-core/internal/modules/inventory/domain"
 	inventoryR "service-core/internal/modules/inventory/repository"
+	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 
 	"github.com/google/uuid"
 )
 
 type FindProductsUsecase struct {
-	productRepo   repository.ProductRepository
-	inventoryRepo inventoryR.InventoryRepository
+	productRepo    repository.ProductRepository
+	inventoryRepo  inventoryR.InventoryRepository
+	productImgRepo repository.ProductImageRepository
+	fileStore      storage.Provider
 }
 
 func NewFindProductsUsecase(
 	productRepo repository.ProductRepository,
 	inventoryRepo inventoryR.InventoryRepository,
+	productImgRepo repository.ProductImageRepository,
+	fileStore storage.Provider,
 ) *FindProductsUsecase {
 	return &FindProductsUsecase{
-		productRepo:   productRepo,
-		inventoryRepo: inventoryRepo,
+		productRepo:    productRepo,
+		inventoryRepo:  inventoryRepo,
+		productImgRepo: productImgRepo,
+		fileStore:      fileStore,
 	}
+}
+
+type ProductCatalogResponse struct {
+	Product   domain.Product
+	Inventory struct {
+		TotalStock    int
+		ReservedStock int
+	}
+	ShopInventories []inventoryD.Inventory
+	Thumbnail       string
 }
 
 func (u *FindProductsUsecase) Execute(
 	params repository.FindProductParams,
 ) (
-	[]repository.ProductWithInventory,
+	[]ProductCatalogResponse,
 	int,
 	error,
 ) {
@@ -36,7 +55,7 @@ func (u *FindProductsUsecase) Execute(
 		return nil, 0, fmt.Errorf("failed to load products: %w", err)
 	}
 	if len(products) == 0 {
-		return []repository.ProductWithInventory{}, total, nil
+		return []ProductCatalogResponse{}, total, nil
 	}
 
 	productIDs := make([]uuid.UUID, 0, len(products))
@@ -49,13 +68,24 @@ func (u *FindProductsUsecase) Execute(
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
 	}
 
-	results := make([]repository.ProductWithInventory, 0, len(products))
+	imagesMap, err := u.productImgRepo.ListByProducts(productIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load images for products: %w", err)
+	}
+
+	results := make([]ProductCatalogResponse, 0, len(products))
 	for _, product := range products {
 		inventories := inventoryMap[product.ID]
+		images := imagesMap[product.ID]
 
-		result := repository.ProductWithInventory{
+		result := ProductCatalogResponse{
 			Product:         product,
 			ShopInventories: inventories,
+		}
+
+		if len(images) > 0 {
+			key := images[0].Variants[domain.ResolutionThumbnail].Key
+			result.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
 		}
 
 		for _, inventory := range inventories {

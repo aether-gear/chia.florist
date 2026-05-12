@@ -121,7 +121,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		TokenService: tokenSvc,
 		Hasher:       hasher,
 
-		FindProducts:  *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
+		FindProducts: *pUC.NewFindProductsUsecase(
+			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
+		),
 		GetProduct:    *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
 		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
 		AddProductImages: *pUC.NewAddProductImagesUsecase(

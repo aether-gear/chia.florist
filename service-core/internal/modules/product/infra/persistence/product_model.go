@@ -38,4 +38,5 @@ type productImageRow struct {
 	IsPrimary    bool
 	DisplayOrder int
 	CreatedAt    time.Time
+	DeletedAt    *time.Time
 }

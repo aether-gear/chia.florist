@@ -3,7 +3,6 @@ package http
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -73,16 +72,20 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 
-	results := make([]ProductOverviewResponse, 0, len(products))
+	results := make([]ProductCatalogResponse, 0, len(products))
 	for _, p := range products {
-		result := ProductOverviewResponse{
+		result := ProductCatalogResponse{
 			ID:         p.Product.ID,
 			SKU:        p.Product.SKU,
 			Name:       p.Product.Name,
 			Slug:       p.Product.Slug,
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
+			Image: ProductImageResponse{
+				Thumbnail: &p.Thumbnail,
+			},
 		}
+
 		result.IsAvailable =
 			p.Product.Status == domain.ProductStatusActive &&
 				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0
@@ -207,8 +210,6 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return errors.ErrBadRequest
 	}
-
-	log.Println("aldebdabu")
 
 	files, err := appMultipart.ParseMultiple(
 		r,
