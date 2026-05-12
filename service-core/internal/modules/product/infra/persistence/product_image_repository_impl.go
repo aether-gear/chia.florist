@@ -8,6 +8,7 @@ import (
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	"service-core/internal/shared/image"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -52,31 +53,63 @@ func (r *productImageRepositoryImpl) FindByProductID(productID uuid.UUID) ([]dom
 	}
 	defer rows.Close()
 
-	var images []domain.ProductImage
+	var rowsData []productImageRow
 	for rows.Next() {
-		var img domain.ProductImage
+		var r productImageRow
+
 		err := rows.Scan(
-			&img.ID,
-			&img.ProductID,
-			&img.Thumbnail.URL,
-			&img.Preview.URL,
-			&img.Detail.URL,
-			&img.Thumbnail.Key,
-			&img.Preview.Key,
-			&img.Detail.Key,
-			&img.IsPrimary,
-			&img.DisplayOrder,
-			&img.CreatedAt,
+			&r.ID,
+			&r.ProductID,
+			&r.ThumbURL,
+			&r.ThumbKey,
+			&r.PreviewURL,
+			&r.PreviewKey,
+			&r.DetailURL,
+			&r.DetailKey,
+			&r.IsPrimary,
+			&r.DisplayOrder,
+			&r.CreatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("mapping product image model to domain failed: %w", err)
+			return nil, fmt.Errorf("scan product image: %w", err)
+		}
+
+		rowsData = append(rowsData, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate product image failed: %w", err)
+	}
+
+	images := make([]domain.ProductImage, 0, len(rowsData))
+
+	for _, r := range rowsData {
+		img := domain.ProductImage{
+			ID:        r.ID,
+			ProductID: r.ProductID,
+
+			Variants: map[image.ResolutionType]domain.ImageVariant{
+				domain.ResolutionThumbnail: {
+					Type: domain.ResolutionThumbnail,
+					Key:  r.ThumbKey,
+				},
+				domain.ResolutionPreview: {
+					Type: domain.ResolutionPreview,
+					Key:  r.PreviewKey,
+				},
+				domain.ResolutionDetail: {
+					Type: domain.ResolutionDetail,
+					Key:  r.DetailKey,
+				},
+			},
+
+			IsPrimary:    r.IsPrimary,
+			DisplayOrder: r.DisplayOrder,
+
+			Metadata:  domain.ProductImageMetadata{},
+			CreatedAt: r.CreatedAt,
 		}
 
 		images = append(images, img)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate product image failed: %w", err)
 	}
 
 	return images, nil
@@ -112,12 +145,12 @@ func (r *productImageRepositoryImpl) Create(images []domain.ProductImage) error 
 		_, err := r.db.Exec(ctx, query,
 			image.ID,
 			image.ProductID,
-			image.Thumbnail.URL,
-			image.Preview.URL,
-			image.Detail.URL,
-			image.Thumbnail.Key,
-			image.Preview.Key,
-			image.Detail.Key,
+			image.Variants[domain.ResolutionThumbnail].Key,
+			image.Variants[domain.ResolutionPreview].Key,
+			image.Variants[domain.ResolutionDetail].Key,
+			image.Variants[domain.ResolutionThumbnail].Key,
+			image.Variants[domain.ResolutionPreview].Key,
+			image.Variants[domain.ResolutionDetail].Key,
 			image.IsPrimary,
 			image.DisplayOrder,
 			image.CreatedAt,
