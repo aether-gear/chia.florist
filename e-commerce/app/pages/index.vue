@@ -11,7 +11,7 @@ useHead({
 // 1. Array gambar background Hero (Sesuaikan dengan file yang kamu punya di folder public)
 const backgrounds = [
   '/florist.jpg',          // Gambar 01
-  '/nepgear.png',          // Gambar 02
+  '/flowerist.jpg',          // Gambar 02
   '/flower.jpg'            // Gambar 03
 ]
 
