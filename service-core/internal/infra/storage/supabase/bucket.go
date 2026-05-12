@@ -5,13 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 )
 
-func (p *SupabaseProvider) EnsureBucket() error {
-	log.Println("validate existing bucket...")
+func (p *SupabaseProvider) EnsureBucket(name string) (bool, error) {
 
 	req, err := http.NewRequest(
 		http.MethodGet,
@@ -19,7 +17,7 @@ func (p *SupabaseProvider) EnsureBucket() error {
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("build bucket validation request: %w", err)
+		return true, fmt.Errorf("build bucket validation request: %w", err)
 	}
 
 	token := p.SupabaseConfig.ServiceRoleKey
@@ -28,7 +26,7 @@ func (p *SupabaseProvider) EnsureBucket() error {
 
 	resp, err := p.Client.Do(req)
 	if err != nil {
-		return fmt.Errorf("validate supabase bucket: %w", err)
+		return true, fmt.Errorf("validate supabase bucket: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -37,32 +35,27 @@ func (p *SupabaseProvider) EnsureBucket() error {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&buckets); err != nil {
-		return fmt.Errorf("decode bucket response: %w", err)
+		return true, fmt.Errorf("decode bucket response: %w", err)
 	}
 
-	for _, bucket := range buckets {
-		if bucket.ID == p.StorageConfig.BucketName {
-			log.Println("bucket already exists")
-			return nil
+	bucketName := name
+	for _, b := range buckets {
+		if b.ID == bucketName {
+			return true, nil
 		}
 	}
-	log.Println("bucket not found, creating...")
 
-	if err := p.createBucket(); err != nil {
-		return fmt.Errorf("failed to create bucket: %w", err)
-	}
-
-	return nil
+	return false, nil
 }
 
-func (p *SupabaseProvider) createBucket() error {
+func (p *SupabaseProvider) CreateBucket(name string, public bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	payload := map[string]any{
-		"id":     p.StorageConfig.BucketName,
-		"name":   p.StorageConfig.BucketName,
-		"public": true,
+		"id":     name,
+		"name":   name,
+		"public": public,
 	}
 
 	body, err := json.Marshal(payload)

@@ -5,8 +5,8 @@ import (
 
 	authDomain "service-core/internal/modules/auth/domain"
 	authService "service-core/internal/modules/auth/infra/service"
-	pRepo "service-core/internal/modules/product/repository"
 
+	imgService "service-core/internal/shared/image"
 	sGen "service-core/internal/shared/slug"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
@@ -37,14 +37,17 @@ import (
 type Container struct {
 	Logger logger.Logger
 
-	TokenService        authDomain.TokenService
-	Hasher              authDomain.PasswordHasher
-	ProductImageStorage pRepo.ImageStorage
+	TokenService authDomain.TokenService
+	Hasher       authDomain.PasswordHasher
 
-	FindProducts    pUC.FindProductsUsecase
-	GetProduct      pUC.GetProductUsecase
-	CreateProduct   pUC.CreateProductUsecase
-	CreateInventory iUC.CreateInventoryUsecase
+	ImageVariantProvider imgService.VariantCreator
+	ImageTransformer     imgService.ImageTransformer
+
+	FindProducts     pUC.FindProductsUsecase
+	GetProduct       pUC.GetProductUsecase
+	CreateProduct    pUC.CreateProductUsecase
+	AddProductImages pUC.AddProductImagesUsecase
+	CreateInventory  iUC.CreateInventoryUsecase
 
 	LoginAccount    aUC.LoginEmailUsecase
 	RegisterAccount aUC.RegisterUsecase
@@ -82,10 +85,11 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 	var (
 		log = logger.NewZapLogger(cfg.App.Env)
 
-		productRepo   = pRepoImpl.NewProductRepository(infra.DB)
-		inventoryRepo = iRepoImpl.NewInventoryRepository(infra.DB)
-		authRepo      = aRepoImpl.NewAuthRepository(infra.DB)
-		cartRepo      = cRepoImpl.NewCartRepositoryImpl(infra.DB)
+		productRepo      = pRepoImpl.NewProductRepository(infra.DB)
+		productImageRepo = pRepoImpl.NewProductImageRepository(infra.DB)
+		inventoryRepo    = iRepoImpl.NewInventoryRepository(infra.DB)
+		authRepo         = aRepoImpl.NewAuthRepository(infra.DB)
+		cartRepo         = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
 		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(infra.DB)
@@ -106,6 +110,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		hasher = authService.NewBcryptHasher()
 
 		slugGen = sGen.NewGenerator()
+
+		imageTransformer     = imgService.NewImageTransformer()
+		imageVariantProvider = imgService.NewResolutionGenerator(imageTransformer)
 	)
 
 	return &Container{
@@ -114,9 +121,14 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		TokenService: tokenSvc,
 		Hasher:       hasher,
 
-		FindProducts:    *pUC.NewFindProductsUsecase(productRepo, inventoryRepo),
-		GetProduct:      *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
-		CreateProduct:   *pUC.NewCreateProductUsecase(productRepo, slugGen),
+		FindProducts: *pUC.NewFindProductsUsecase(
+			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
+		),
+		GetProduct:    *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
+		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
+		AddProductImages: *pUC.NewAddProductImagesUsecase(
+			productRepo, productImageRepo, slugGen, imageVariantProvider, infra.StorageProvider,
+		),
 		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
 		LoginAccount:    *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),

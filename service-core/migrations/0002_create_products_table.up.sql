@@ -9,7 +9,7 @@ CREATE TABLE products (
     description TEXT,
     status product_status DEFAULT 'active',
 
-    base_price NUMERIC(15, 2) NOT NULL,
+    base_price BIGINT NOT NULL,
     weight NUMERIC(10, 2),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

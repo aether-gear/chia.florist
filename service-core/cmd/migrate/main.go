@@ -11,6 +11,8 @@ import (
 )
 
 func main() {
+	log.Println("\x1b[0;94;49mmigration start\x1b[0;39;49m")
+
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, fallback to system env")
 	}
@@ -26,12 +28,10 @@ func main() {
 	if err := database.RunMigration(cfg.DB); err != nil {
 		log.Fatal(err)
 	}
-	log.Println("database migration complete")
 
 	if err := storage.RunMigration(infra.StorageProvider); err != nil {
 		log.Fatal(err)
 	}
-	log.Println("storage migration complete")
 
-	log.Println("migration complete")
+	log.Println("\x1b[0;94;49mmigration complete\x1b[0;39;49m")
 }

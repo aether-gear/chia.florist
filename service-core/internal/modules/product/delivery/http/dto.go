@@ -14,14 +14,21 @@ const (
 	ProductStatusArchived ProductStatusDTO = "archived"
 )
 
-type ProductOverviewResponse struct {
-	ID          uuid.UUID `json:"id"`
-	SKU         string    `json:"sku"`
-	Name        string    `json:"name"`
-	Slug        string    `json:"slug"`
-	IsAvailable bool      `json:"is_available"`
-	Price       int64     `json:"price"`
-	TotalStock  int       `json:"stock"`
+type ProductImageResponse struct {
+	Thumbnail *string `json:"thumbnail,omitempty"`
+	Preview   *string `json:"preview,omitempty"`
+	Detail    *string `json:"detail,omitempty"`
+}
+
+type ProductCatalogResponse struct {
+	ID          uuid.UUID            `json:"id"`
+	SKU         string               `json:"sku"`
+	Name        string               `json:"name"`
+	Slug        string               `json:"slug"`
+	IsAvailable bool                 `json:"is_available"`
+	Price       int64                `json:"price"`
+	TotalStock  int                  `json:"stock"`
+	Image       ProductImageResponse `json:"images"`
 }
 
 type ProductDetailResponse struct {

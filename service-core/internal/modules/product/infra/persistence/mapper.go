@@ -5,7 +5,7 @@ import (
 	"service-core/internal/shared/conversion"
 )
 
-func (m *ProductModel) ToDomain() (*domain.Product, error) {
+func (m *productModel) ToDomain() (*domain.Product, error) {
 	price, err := conversion.ParsePriceToInt64(m.BasePrice)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (m *ProductModel) ToDomain() (*domain.Product, error) {
 	}, nil
 }
 
-func FromDomain(p *domain.Product) *ProductModel {
+func FromDomain(p *domain.Product) *productModel {
 	basePrice := conversion.FormatInt64ToPrice(p.Price)
 
 	var weight *string
@@ -46,7 +46,7 @@ func FromDomain(p *domain.Product) *ProductModel {
 		weight = &w
 	}
 
-	return &ProductModel{
+	return &productModel{
 		ID:          p.ID,
 		SKU:         p.SKU,
 		Name:        p.Name,

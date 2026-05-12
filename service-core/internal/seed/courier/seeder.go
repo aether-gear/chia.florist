@@ -15,11 +15,11 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	if seeded {
-		log.Println("couriers already seeded, skipping...")
+		log.Println("database: couriers already seeded, skipping")
 		return nil
 	}
 
-	log.Println("seeding couriers...")
+	log.Println("database: seeding couriers")
 
 	query := `
 		INSERT INTO couriers (id, code, name, is_active)
@@ -45,8 +45,6 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := markSeeded(ctx, pool); err != nil {
 		return fmt.Errorf("failed to mark courier seed: %w", err)
 	}
-
-	log.Println("couriers seeded successfully")
 
 	return nil
 }

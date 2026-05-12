@@ -10,11 +10,13 @@ type Config struct {
 	JWT      config.JWTConfig
 	Storage  config.StorageConfig
 	Supabase config.SupabaseConfig
+	Postgres config.PostgresConfig
 	DB       config.DatabaseConfig
 }
 
 func LoadConfig() Config {
 	supabaseCfg := config.LoadSupabaseConfig()
+	postgresCfg := config.LoadPostgresConfig()
 
 	return Config{
 		App:      config.LoadAppConfig(),
@@ -22,6 +24,7 @@ func LoadConfig() Config {
 		JWT:      config.LoadJWTConfig(),
 		Storage:  config.LoadStorageConfig(),
 		Supabase: supabaseCfg,
+		Postgres: postgresCfg,
 		DB: config.LoadDBConfig(
 			supabaseCfg.Host,
 			supabaseCfg.Port,
@@ -31,5 +34,14 @@ func LoadConfig() Config {
 			supabaseCfg.SSLMode,
 			&supabaseCfg.DSN,
 		),
+		// DB: config.LoadDBConfig(
+		// 	postgresCfg.Host,
+		// 	postgresCfg.Port,
+		// 	postgresCfg.User,
+		// 	postgresCfg.Password,
+		// 	postgresCfg.Name,
+		// 	postgresCfg.SSLMode,
+		// 	&postgresCfg.DSN,
+		// ),
 	}
 }

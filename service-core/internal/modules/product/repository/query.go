@@ -1,8 +1,12 @@
 package repository
 
 import (
+	"io"
+
 	inventoryD "service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/product/domain"
+
+	"github.com/google/uuid"
 )
 
 type FindProductParams struct {
@@ -12,6 +16,16 @@ type FindProductParams struct {
 	Name  *string
 }
 
+type UploadProductImagesParams struct {
+	ProductID uuid.UUID
+	Files     []ImageFile
+}
+
+type ImageFile struct {
+	File io.Reader
+	domain.ProductImageMetadata
+}
+
 type ProductWithInventory struct {
 	Product   domain.Product
 	Inventory struct {
@@ -19,4 +33,15 @@ type ProductWithInventory struct {
 		ReservedStock int
 	}
 	ShopInventories []inventoryD.Inventory
+	Images          []domain.ProductImage
+}
+
+type UploadedProductImage struct {
+	Sequence int
+
+	CatalogURL string
+	CartURL    string
+	DetailURL  string
+
+	IsPrimary bool
 }

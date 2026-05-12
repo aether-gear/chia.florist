@@ -215,10 +215,15 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, er
 			p.archived_at,
 			p.deleted_at
 		FROM products p
-		WHERE p.id = ANY($1)
+		WHERE p.id = ANY($1::uuid[])
 	`
 
-	rows, err := r.db.Query(ctx, query, ids)
+	productIDStrings := make([]string, len(ids))
+	for i, id := range ids {
+		productIDStrings[i] = id.String()
+	}
+
+	rows, err := r.db.Query(ctx, query, productIDStrings)
 	if err != nil {
 		return nil, fmt.Errorf("query products by many ids failed: %w", err)
 	}

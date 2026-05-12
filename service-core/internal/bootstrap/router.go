@@ -31,6 +31,7 @@ func NewRouter(c *Container) *http.ServeMux {
 			&c.FindProducts,
 			&c.GetProduct,
 			&c.CreateProduct,
+			&c.AddProductImages,
 		)
 
 		inventoryHandler = inventoryH.NewInventoryHandler(
@@ -99,6 +100,12 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/product/",
 		core(productHandler.GetProduct),
+	)
+	mux.HandleFunc(
+		"/product/images",
+		core(apphttp.HandleMethods(apphttp.MethodHandler{
+			http.MethodPost: productHandler.AddProductImages,
+		})),
 	)
 	mux.HandleFunc(
 		"/inventory",

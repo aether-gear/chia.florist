@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type ProductModel struct {
+type productModel struct {
 	ID          uuid.UUID `db:"id"`
 	SKU         string    `db:"sku"`
 	Name        string    `db:"name"`
@@ -20,4 +20,23 @@ type ProductModel struct {
 	UpdatedAt  *time.Time `db:"updated_at"`
 	ArchivedAt *time.Time `db:"archived_at"`
 	DeletedAt  *time.Time `db:"deleted_at"`
+}
+
+type productImageRow struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+
+	ThumbURL string
+	ThumbKey string
+
+	PreviewURL string
+	PreviewKey string
+
+	DetailURL string
+	DetailKey string
+
+	IsPrimary    bool
+	DisplayOrder int
+	CreatedAt    time.Time
+	DeletedAt    *time.Time
 }

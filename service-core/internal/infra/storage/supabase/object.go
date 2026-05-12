@@ -1,31 +1,31 @@
 package supabase
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"path"
-	"service-core/internal/infra/storage"
 	"strings"
+	"sync"
+	"time"
+
+	"service-core/internal/infra/storage"
+
+	"golang.org/x/sync/errgroup"
 )
 
-func (p *SupabaseProvider) Upload(input storage.UploadInput) (*storage.ObjectResponse, error) {
-	key := p.normalizeObjectKey(input.Key)
-	if key == "" {
-		return nil, fmt.Errorf("storage key is required")
-	}
-
-	body, err := io.ReadAll(input.File)
-	if err != nil {
-		return nil, fmt.Errorf("read upload body: %w", err)
-	}
-
+func (p *SupabaseProvider) Upload(
+	input storage.UploadInput,
+) (*storage.ObjectResponse, error) {
+	endpoint := fmt.Sprintf("%s/%s/%s",
+		p.ObjectURL,
+		strings.TrimRight(input.Bucket, "/"),
+		strings.TrimRight(input.Key, "/"),
+	)
 	req, err := http.NewRequest(
 		http.MethodPost,
-		p.ObjectURL,
-		bytes.NewReader(body),
+		endpoint,
+		input.File,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build upload request: %w", err)
@@ -49,10 +49,52 @@ func (p *SupabaseProvider) Upload(input storage.UploadInput) (*storage.ObjectRes
 		return nil, p.newResponseError("upload object to supabase", resp)
 	}
 
+	key := p.normalizeObjectKey(input.Key)
+	if key == "" {
+		return nil, fmt.Errorf("storage key is required")
+	}
+
 	return &storage.ObjectResponse{
 		Key:         key,
 		ContentType: input.ContentType,
 	}, nil
+}
+
+func (p *SupabaseProvider) UploadMany(
+	inputs []storage.UploadInput,
+) ([]*storage.ObjectResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+
+	results := make([]*storage.ObjectResponse, len(inputs))
+	var mu sync.Mutex
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i, input := range inputs {
+		g.Go(func() error {
+			resp, err := p.Upload(input)
+			if err != nil {
+				return err
+			}
+
+			mu.Lock()
+			results[i] = resp
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 func (p *SupabaseProvider) Delete(key string) error {
@@ -123,58 +165,6 @@ func (p *SupabaseProvider) Exists(key string) (bool, error) {
 	}
 
 	return true, nil
-}
-
-func (p *SupabaseProvider) PublicURL(key string) string {
-	return fmt.Sprintf(
-		"%s/storage/v1/object/public/%s/%s",
-		strings.TrimRight(p.SupabaseConfig.ProjectURL, "/"),
-		p.StorageConfig.BucketName,
-		key,
-	)
-}
-
-func (p *SupabaseProvider) SignedURL(key string) (string, error) {
-	payload, err := json.Marshal(map[string]int64{
-		"expiresIn": int64(p.StorageConfig.SignedURLExpiry.Seconds()),
-	})
-	if err != nil {
-		return "", fmt.Errorf("encode signed url request: %w", err)
-	}
-
-	req, err := http.NewRequest(
-		http.MethodPost,
-		p.ObjectURL,
-		bytes.NewReader(payload),
-	)
-	if err != nil {
-		return "", fmt.Errorf("build signed url request: %w", err)
-	}
-
-	token := p.SupabaseConfig.ServiceRoleKey
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("apikey", token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := p.Client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("generate signed url from supabase: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return "", p.newResponseError("generate signed url from supabase", resp)
-	}
-
-	var data supabaseSignedURLResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", fmt.Errorf("decode signed url response: %w", err)
-	}
-	if strings.TrimSpace(data.SignedURL) == "" {
-		return "", fmt.Errorf("supabase signed url response is empty")
-	}
-
-	return strings.TrimPrefix(data.SignedURL, "/"), nil
 }
 
 func (p *SupabaseProvider) normalizeObjectKey(key string) string {

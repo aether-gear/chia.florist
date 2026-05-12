@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,25 +13,29 @@ import (
 
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	appMultipart "service-core/internal/common/http/multipart"
 
 	"github.com/google/uuid"
 )
 
 type ProductHandler struct {
-	findProducts  *usecase.FindProductsUsecase
-	getProduct    *usecase.GetProductUsecase
-	createProduct *usecase.CreateProductUsecase
+	findProducts    *usecase.FindProductsUsecase
+	getProduct      *usecase.GetProductUsecase
+	createProduct   *usecase.CreateProductUsecase
+	addProductImage *usecase.AddProductImagesUsecase
 }
 
 func NewProductHandler(
 	findProducts *usecase.FindProductsUsecase,
 	getProduct *usecase.GetProductUsecase,
 	createProduct *usecase.CreateProductUsecase,
+	addProductImage *usecase.AddProductImagesUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
-		findProducts:  findProducts,
-		getProduct:    getProduct,
-		createProduct: createProduct,
+		findProducts:    findProducts,
+		getProduct:      getProduct,
+		createProduct:   createProduct,
+		addProductImage: addProductImage,
 	}
 }
 
@@ -67,16 +72,20 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 
-	results := make([]ProductOverviewResponse, 0, len(products))
+	results := make([]ProductCatalogResponse, 0, len(products))
 	for _, p := range products {
-		result := ProductOverviewResponse{
+		result := ProductCatalogResponse{
 			ID:         p.Product.ID,
 			SKU:        p.Product.SKU,
 			Name:       p.Product.Name,
 			Slug:       p.Product.Slug,
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
+			Image: ProductImageResponse{
+				Thumbnail: &p.Thumbnail,
+			},
 		}
+
 		result.IsAvailable =
 			p.Product.Status == domain.ProductStatusActive &&
 				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0
@@ -186,6 +195,71 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		"message": "product successfully created",
 	}
 
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request) error {
+	err := r.ParseMultipartForm(16 << 20)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	productID := r.FormValue("product_id")
+	parsedProductID, err := uuid.Parse(productID)
+	if err != nil {
+		return errors.ErrBadRequest
+	}
+
+	files, err := appMultipart.ParseMultiple(
+		r,
+		"image",
+		16<<20,
+	)
+	if err != nil {
+		return err
+	}
+
+	images := make([]usecase.ProductImageInput, 0, len(files))
+	for i, file := range files {
+		data, err := io.ReadAll(file.File)
+		if err != nil {
+			return errors.ErrBadRequest
+		}
+
+		err = file.File.Close()
+		if err != nil {
+			return errors.ErrBadRequest
+		}
+
+		images = append(images, usecase.ProductImageInput{
+			Data:         data,
+			OriginalName: file.Filename,
+			MIMEType:     file.ContentType,
+			SizeBytes:    file.Size,
+			IsPrimary:    i == 0,
+			DisplayOrder: i,
+		})
+	}
+
+	err = h.addProductImage.Execute(usecase.AddProductImageInput{
+		ProductID: parsedProductID,
+		Images:    images,
+	})
+	if err != nil {
+		return err
+	}
+
+	var response map[string]string
+	if len(files) > 1 {
+		response = map[string]string{
+			"message": "product images successfully added",
+		}
+	} else {
+		response = map[string]string{
+			"message": "product image successfully added",
+		}
+	}
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }

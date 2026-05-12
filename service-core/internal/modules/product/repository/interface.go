@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"io"
 	"service-core/internal/modules/product/domain"
 
 	"github.com/google/uuid"
@@ -16,12 +15,17 @@ type ProductRepository interface {
 	CreateProduct(product *domain.Product) error
 }
 
-type ImageStorage interface {
-	Upload(
-		productID uuid.UUID,
-		metadata domain.ProductImageMetadata,
-		file io.Reader,
-	) (*domain.ProductImage, error)
-	Delete(objectKey string) error
-	Exists(objectKey string) (bool, error)
+type ProductImageRepository interface {
+	Create(images []domain.ProductImage) error
+
+	ListByProducts(productIDs []uuid.UUID) (map[uuid.UUID][]domain.ProductImage, error)
+
+	FindByProductID(productID uuid.UUID) ([]domain.ProductImage, error)
+
+	SoftDeleteByProductID(productID uuid.UUID) error
+}
+
+type ProductImageUploadService interface {
+	Upload(params UploadProductImagesParams) ([]UploadedProductImage, error)
+	Delete(assetKeys []string) error
 }
