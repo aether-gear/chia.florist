@@ -3,7 +3,6 @@ package repository
 import (
 	"io"
 
-	inventoryD "service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/product/domain"
 
 	"github.com/google/uuid"
@@ -24,16 +23,6 @@ type UploadProductImagesParams struct {
 type ImageFile struct {
 	File io.Reader
 	domain.ProductImageMetadata
-}
-
-type ProductWithInventory struct {
-	Product   domain.Product
-	Inventory struct {
-		TotalStock    int
-		ReservedStock int
-	}
-	ShopInventories []inventoryD.Inventory
-	Images          []domain.ProductImage
 }
 
 type UploadedProductImage struct {
