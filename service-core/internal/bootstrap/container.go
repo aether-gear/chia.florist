@@ -137,7 +137,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),
 		GetAccount:      *aUC.NewGetAccountUsecase(authRepo),
 
-		GetCart:    *cUC.NewGetCartUsecase(cartRepo, inventoryRepo, productRepo),
+		GetCart: *cUC.NewGetCartUsecase(
+			cartRepo, inventoryRepo, productRepo, productImageRepo, infra.StorageProvider,
+		),
 		AddItem:    *cUC.NewAddItemUsecase(cartRepo, inventoryRepo, productRepo),
 		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
 		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),

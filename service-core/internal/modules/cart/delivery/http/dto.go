@@ -2,6 +2,12 @@ package http
 
 import "github.com/google/uuid"
 
+type ProductImageResponse struct {
+	Thumbnail *string `json:"thumbnail,omitempty"`
+	Preview   *string `json:"preview,omitempty"`
+	Detail    *string `json:"detail,omitempty"`
+}
+
 type addItemRequest struct {
 	UserID    string `json:"user_id"`
 	ProductID string `json:"product_id"`
@@ -23,10 +29,11 @@ type CartResponse struct {
 }
 
 type CartItemView struct {
-	ProductID uuid.UUID `json:"product_id"`
-	ShopID    uuid.UUID `json:"shop_id"`
-	Name      string    `json:"name"`
-	Price     int64     `json:"price"`
-	Subtotal  int64     `json:"subtotal"`
-	Quantity  int       `json:"quantity"`
+	ProductID uuid.UUID            `json:"product_id"`
+	ShopID    uuid.UUID            `json:"shop_id"`
+	Name      string               `json:"name"`
+	Price     int64                `json:"price"`
+	Subtotal  int64                `json:"subtotal"`
+	Quantity  int                  `json:"quantity"`
+	Image     ProductImageResponse `json:"images"`
 }
