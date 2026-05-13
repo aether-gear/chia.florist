@@ -82,7 +82,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
 			Image: ProductImageResponse{
-				Thumbnail: &p.Thumbnail,
+				Thumbnail: &p.Images.Thumbnail,
 			},
 		}
 
