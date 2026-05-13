@@ -24,7 +24,7 @@ func NewProductImageRepository(conn *database.Connection) repository.ProductImag
 	}
 }
 
-func (r *productImageRepositoryImpl) ListByProducts(
+func (r *productImageRepositoryImpl) ListByProductIDs(
 	productIDs []uuid.UUID,
 ) (map[uuid.UUID][]domain.ProductImage, error) {
 	result := make(map[uuid.UUID][]domain.ProductImage)
@@ -121,7 +121,7 @@ func (r *productImageRepositoryImpl) ListByProducts(
 	return result, nil
 }
 
-func (r *productImageRepositoryImpl) FindByProductID(productID uuid.UUID) ([]domain.ProductImage, error) {
+func (r *productImageRepositoryImpl) ListByProductID(productID uuid.UUID) ([]domain.ProductImage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

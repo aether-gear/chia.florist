@@ -63,7 +63,7 @@ func (u *GetProductUsecase) Execute(id uuid.UUID) (*ProductDetailResponse, error
 		return nil, fmt.Errorf("failed to load inventory by product: %w", err)
 	}
 
-	images, err := u.productImgRepo.FindByProductID(id)
+	images, err := u.productImgRepo.ListByProductID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images by product: %w", err)
 	}
