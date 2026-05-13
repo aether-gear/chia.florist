@@ -166,6 +166,7 @@ func (r *productImageRepositoryImpl) FindByProductID(productID uuid.UUID) ([]dom
 			&r.IsPrimary,
 			&r.DisplayOrder,
 			&r.CreatedAt,
+			&r.DeletedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan product image: %w", err)

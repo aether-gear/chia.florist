@@ -39,7 +39,7 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopI
 		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
-	inventory, err := u.inventoryRepo.GetByProductAndShop(productID, shopID)
+	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(productID, shopID)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}

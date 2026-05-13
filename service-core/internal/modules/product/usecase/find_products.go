@@ -63,7 +63,7 @@ func (u *FindProductsUsecase) Execute(
 		productIDs = append(productIDs, product.ID)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProducts(productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
 	}

@@ -64,7 +64,7 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		return nil, fmt.Errorf("failed to load cart with products: %w", err)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProducts(productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
 	}

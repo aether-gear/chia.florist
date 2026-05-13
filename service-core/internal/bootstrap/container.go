@@ -124,7 +124,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		FindProducts: *pUC.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
 		),
-		GetProduct:    *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
+		GetProduct: *pUC.NewGetProductUsecase(
+			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
+		),
 		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
 		AddProductImages: *pUC.NewAddProductImagesUsecase(
 			productRepo, productImageRepo, slugGen, imageVariantProvider, infra.StorageProvider,
