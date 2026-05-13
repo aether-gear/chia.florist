@@ -64,6 +64,11 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		quantity := item.Quantity
 		subtotal := price * int64(quantity)
 
+		image := ProductImageResponse{}
+		if productData.Images.Thumbnail != "" {
+			image.Thumbnail = &productData.Images.Thumbnail
+		}
+
 		items = append(items, CartItemView{
 			ProductID: item.ProductID,
 			ShopID:    item.ShopID,
@@ -71,6 +76,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 			Price:     price,
 			Quantity:  quantity,
 			Subtotal:  subtotal,
+			Image:     image,
 		})
 
 		total += subtotal

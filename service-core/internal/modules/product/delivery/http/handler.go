@@ -82,7 +82,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
 			Image: ProductImageResponse{
-				Thumbnail: &p.Thumbnail,
+				Thumbnail: &p.Images.Thumbnail,
 			},
 		}
 
@@ -141,6 +141,25 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		})
 	}
 
+	images := make([]ProductImageResponse, 0, len(product.Images))
+	for _, img := range product.Images {
+		image := ProductImageResponse{}
+
+		if img.Thumbnail != "" {
+			image.Thumbnail = &img.Thumbnail
+		}
+
+		if img.Preview != "" {
+			image.Preview = &img.Preview
+		}
+
+		if img.Detail != "" {
+			image.Detail = &img.Detail
+		}
+
+		images = append(images, image)
+	}
+
 	response := ProductDetailResponse{
 		ID:          product.Product.ID,
 		SKU:         product.Product.SKU,
@@ -151,6 +170,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		Weight:      product.Product.Weight,
 		TotalStock:  available,
 		UpdatedAt:   product.Product.UpdatedAt,
+		Images:      images,
 	}
 	response.IsAvailable =
 		product.Product.Status == domain.ProductStatusActive &&

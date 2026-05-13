@@ -32,16 +32,17 @@ type ProductCatalogResponse struct {
 }
 
 type ProductDetailResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	SKU         string     `json:"sku"`
-	Name        string     `json:"name"`
-	Slug        string     `json:"slug"`
-	Description *string    `json:"description"`
-	IsAvailable bool       `json:"is_available"`
-	Price       int64      `json:"price"`
-	Weight      *float64   `json:"weight"`
-	TotalStock  int        `json:"stock"`
-	UpdatedAt   *time.Time `json:"updated_at"`
+	ID          uuid.UUID              `json:"id"`
+	SKU         string                 `json:"sku"`
+	Name        string                 `json:"name"`
+	Slug        string                 `json:"slug"`
+	Description *string                `json:"description"`
+	IsAvailable bool                   `json:"is_available"`
+	Price       int64                  `json:"price"`
+	Weight      *float64               `json:"weight"`
+	TotalStock  int                    `json:"stock"`
+	UpdatedAt   *time.Time             `json:"updated_at"`
+	Images      []ProductImageResponse `json:"images"`
 }
 
 type ProductInventoryView struct {

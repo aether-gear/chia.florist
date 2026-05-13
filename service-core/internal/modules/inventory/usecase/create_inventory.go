@@ -56,7 +56,7 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return appErr.NewNotFound("shop not found")
 	}
 
-	existing, err := u.inventoryRepo.GetByProductAndShop(input.ProductID, input.ShopID)
+	existing, err := u.inventoryRepo.GetByProductIDAndShopID(input.ProductID, input.ShopID)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory: %w", err)
 	}

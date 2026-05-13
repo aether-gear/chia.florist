@@ -7,11 +7,11 @@ import (
 )
 
 type InventoryRepository interface {
-	GetByProductAndShop(productID uuid.UUID, shopID uuid.UUID) (*domain.Inventory, error)
+	GetByProductIDAndShopID(productID uuid.UUID, shopID uuid.UUID) (*domain.Inventory, error)
 
-	ListByProduct(productID uuid.UUID) ([]domain.Inventory, error)
-	ListByProducts(productIDs []uuid.UUID) (map[uuid.UUID][]domain.Inventory, error)
-	ListByShop(shopID uuid.UUID) ([]domain.Inventory, error)
+	ListByProductID(productID uuid.UUID) ([]domain.Inventory, error)
+	ListByProductIDs(productIDs []uuid.UUID) (map[uuid.UUID][]domain.Inventory, error)
+	ListByShopID(shopID uuid.UUID) ([]domain.Inventory, error)
 
 	Create(inventory *domain.Inventory) error
 }

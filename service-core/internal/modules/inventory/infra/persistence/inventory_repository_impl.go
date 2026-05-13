@@ -25,7 +25,7 @@ func NewInventoryRepository(conn *database.Connection) repository.InventoryRepos
 	}
 }
 
-func (r *inventoryRepositoryImpl) GetByProductAndShop(productID uuid.UUID, shopID uuid.UUID) (*domain.Inventory, error) {
+func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(productID uuid.UUID, shopID uuid.UUID) (*domain.Inventory, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -63,7 +63,7 @@ func (r *inventoryRepositoryImpl) GetByProductAndShop(productID uuid.UUID, shopI
 	return &inventory, nil
 }
 
-func (r *inventoryRepositoryImpl) ListByProduct(productID uuid.UUID) ([]domain.Inventory, error) {
+func (r *inventoryRepositoryImpl) ListByProductID(productID uuid.UUID) ([]domain.Inventory, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -113,7 +113,7 @@ func (r *inventoryRepositoryImpl) ListByProduct(productID uuid.UUID) ([]domain.I
 	return inventories, nil
 }
 
-func (r *inventoryRepositoryImpl) ListByProducts(productIDs []uuid.UUID) (map[uuid.UUID][]domain.Inventory, error) {
+func (r *inventoryRepositoryImpl) ListByProductIDs(productIDs []uuid.UUID) (map[uuid.UUID][]domain.Inventory, error) {
 	result := make(map[uuid.UUID][]domain.Inventory)
 	if len(productIDs) == 0 {
 		return result, nil
@@ -177,7 +177,7 @@ func (r *inventoryRepositoryImpl) ListByProducts(productIDs []uuid.UUID) (map[uu
 	return result, nil
 }
 
-func (r *inventoryRepositoryImpl) ListByShop(shopID uuid.UUID) ([]domain.Inventory, error) {
+func (r *inventoryRepositoryImpl) ListByShopID(shopID uuid.UUID) ([]domain.Inventory, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

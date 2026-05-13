@@ -40,7 +40,9 @@ type ProductCatalogResponse struct {
 		ReservedStock int
 	}
 	ShopInventories []inventoryD.Inventory
-	Thumbnail       string
+	Images          struct {
+		Thumbnail string
+	}
 }
 
 func (u *FindProductsUsecase) Execute(
@@ -63,12 +65,12 @@ func (u *FindProductsUsecase) Execute(
 		productIDs = append(productIDs, product.ID)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProducts(productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProducts(productIDs)
+	imagesMap, err := u.productImgRepo.ListByProductIDs(productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load images for products: %w", err)
 	}
@@ -85,7 +87,7 @@ func (u *FindProductsUsecase) Execute(
 
 		if len(images) > 0 {
 			key := images[0].Variants[domain.ResolutionThumbnail].Key
-			result.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
+			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
 		}
 
 		for _, inventory := range inventories {

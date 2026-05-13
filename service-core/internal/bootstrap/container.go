@@ -124,7 +124,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		FindProducts: *pUC.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
 		),
-		GetProduct:    *pUC.NewGetProductUsecase(productRepo, inventoryRepo),
+		GetProduct: *pUC.NewGetProductUsecase(
+			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
+		),
 		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
 		AddProductImages: *pUC.NewAddProductImagesUsecase(
 			productRepo, productImageRepo, slugGen, imageVariantProvider, infra.StorageProvider,
@@ -135,7 +137,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),
 		GetAccount:      *aUC.NewGetAccountUsecase(authRepo),
 
-		GetCart:    *cUC.NewGetCartUsecase(cartRepo, inventoryRepo, productRepo),
+		GetCart: *cUC.NewGetCartUsecase(
+			cartRepo, inventoryRepo, productRepo, productImageRepo, infra.StorageProvider,
+		),
 		AddItem:    *cUC.NewAddItemUsecase(cartRepo, inventoryRepo, productRepo),
 		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
 		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),
