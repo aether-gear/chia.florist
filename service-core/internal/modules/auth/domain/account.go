@@ -7,9 +7,15 @@ import (
 )
 
 type Account struct {
-	ID       uuid.UUID
+	ID     uuid.UUID
+	UserID uuid.UUID
+
 	Email    string
 	Password string
 
 	LastLoginAt *time.Time
+
+	CreatedAt time.Time
+	UpdatedAt *time.Time
+	DeletedAt *time.Time
 }
