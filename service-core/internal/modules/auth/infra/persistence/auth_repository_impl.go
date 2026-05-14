@@ -35,12 +35,12 @@ func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
 			email,
 			password,
 			last_login_at
-		FROM users
+		FROM accounts
 		WHERE email = $1
 		LIMIT 1
 	`
 
-	var m AccountModel
+	var m domain.Account
 
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&m.ID,
@@ -53,15 +53,10 @@ func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query user by email failed: %w", err)
+		return nil, fmt.Errorf("query account by email failed: %w", err)
 	}
 
-	d, err := m.ToDomain()
-	if err != nil {
-		return nil, fmt.Errorf("mapping account model to domain failed: %w", err)
-	}
-
-	return d, nil
+	return &m, nil
 }
 
 func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
@@ -74,12 +69,12 @@ func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 			email,
 			password,
 			last_login_at
-		FROM users
+		FROM accounts
 		WHERE id = $1
 		LIMIT 1
 	`
 
-	var m AccountModel
+	var m domain.Account
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&m.ID,
@@ -87,20 +82,14 @@ func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 		&m.Password,
 		&m.LastLoginAt,
 	)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query user by id failed: %w", err)
+		return nil, fmt.Errorf("query account by id failed: %w", err)
 	}
 
-	d, err := m.ToDomain()
-	if err != nil {
-		return nil, fmt.Errorf("mapping account model to domain failed: %w", err)
-	}
-
-	return d, nil
+	return &m, nil
 }
 
 func (r *authRepositoryImpl) Create(acc repository.CreateAccountProps) error {
@@ -108,30 +97,25 @@ func (r *authRepositoryImpl) Create(acc repository.CreateAccountProps) error {
 	defer cancel()
 
 	query := `
-		INSERT INTO users (
+		INSERT INTO accounts (
 			id,
-			name,
-			username,
+			user_id,
 			email,
 			password,
-			phone,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5)
 	`
 
 	_, err := r.db.Exec(ctx, query,
 		acc.ID,
-		acc.Name,
-		acc.Username,
+		acc.UserID,
 		acc.Email,
-		acc.PasswordHash,
-		acc.Phone,
+		acc.Password,
 		acc.CreatedAt,
 	)
-
 	if err != nil {
-		return fmt.Errorf("insert user failed: %w", err)
+		return fmt.Errorf("insert account failed: %w", err)
 	}
 
 	return nil

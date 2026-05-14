@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"service-core/internal/modules/user/repository"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -42,8 +44,7 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 			phone,
 			created_at, 
 			updated_at, 
-			deleted_at, 
-			last_login_at
+			deleted_at
 		FROM users
 	`
 
@@ -128,15 +129,14 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 	defer cancel()
 
 	query := `
-		SELECT 
+		SELECT
 			id,
 			name,
 			username,
 			phone,
 			created_at,
 			updated_at,
-			deleted_at,
-			last_login_at
+			deleted_at
 		FROM users
 		WHERE id = $1
 		LIMIT 1
@@ -161,7 +161,7 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 	return &m, nil
 }
 
-func (r *userRepositoryImpl) GetUserWithAccount(id uuid.UUID) (*repository.UserWithAccount, error) {
+func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -170,33 +170,62 @@ func (r *userRepositoryImpl) GetUserWithAccount(id uuid.UUID) (*repository.UserW
 			id,
 			name,
 			username,
-			email,
 			phone,
 			created_at,
 			updated_at,
-			deleted_at,
-			last_login_at
+			deleted_at
 		FROM users
-		WHERE id = $1
+		WHERE username = $1
 		LIMIT 1
 	`
 
-	var m repository.UserWithAccount
+	var m domain.User
 
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, username).Scan(
 		&m.ID,
 		&m.Name,
 		&m.Username,
-		&m.Email,
 		&m.Phone,
 		&m.CreatedAt,
 		&m.UpdatedAt,
 		&m.DeletedAt,
-		&m.LastLoginAt,
 	)
 	if err != nil {
-		return &repository.UserWithAccount{}, fmt.Errorf("query user with account by id failed: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("query user by username failed: %w", err)
 	}
 
 	return &m, nil
+}
+
+func (r *userRepositoryImpl) CreateUser(props repository.CreateUserProps) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		INSERT INTO users (
+			id,
+			name,
+			username,
+			phone,
+			created_at
+		)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+
+	_, err := r.db.Exec(ctx, query,
+		props.ID,
+		props.Name,
+		props.Username,
+		props.Phone,
+		props.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("insert user failed: %w", err)
+	}
+
+	return nil
 }

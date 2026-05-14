@@ -7,11 +7,9 @@ import (
 )
 
 type CreateAccountProps struct {
-	ID           uuid.UUID
-	Name         string
-	Username     string
-	Email        string
-	PasswordHash string
-	Phone        *string
-	CreatedAt    time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Email     string
+	Password  string
+	CreatedAt time.Time
 }

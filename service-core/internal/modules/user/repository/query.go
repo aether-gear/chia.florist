@@ -16,14 +16,21 @@ type FindUserParams struct {
 }
 
 type UserWithAccount struct {
-	ID       uuid.UUID
-	Name     string
-	Username string
-	Email    string
-	Phone    *string
-
+	ID          uuid.UUID
+	Name        string
+	Username    string
+	Email       string
+	Phone       *string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
 	DeletedAt   *time.Time
 	LastLoginAt *time.Time
+}
+
+type CreateUserProps struct {
+	ID        uuid.UUID
+	Name      string
+	Username  string
+	Phone     *string
+	CreatedAt time.Time
 }
