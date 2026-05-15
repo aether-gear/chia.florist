@@ -10,10 +10,10 @@ type AuthRepository interface {
 	GetByEmail(email string) (*domain.Account, error)
 	GetByID(id uuid.UUID) (*domain.Account, error)
 
-	Create(account CreateAccountProps) error
+	Create(account domain.Account) error
 	// UpdateLastLogin(id uuid.UUID) error
 }
 
 type SessionRepository interface {
-	CreateSession(session CreateSessionProps)
+	Create(session domain.Session) error
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	appErr "service-core/internal/common/errors"
+	"service-core/internal/modules/authentication/domain"
 	authDomain "service-core/internal/modules/authentication/domain"
 	authRepo "service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
@@ -69,14 +70,14 @@ func (u *RegisterUsecase) Execute(params SignUpParams) error {
 	if err != nil {
 		return fmt.Errorf("failed to hashed: %w", err)
 	}
-	acc := authRepo.CreateAccountProps{
+	acc := domain.Account{
 		ID:        uuid.New(),
 		UserID:    user.ID,
 		Email:     params.Email,
+		Status:    authDomain.AccountPendingVerification,
 		Password:  hash,
 		CreatedAt: now,
 	}
-
 	if err := u.authRepo.Create(acc); err != nil {
 		return fmt.Errorf("failed to register: %w", err)
 	}

@@ -92,7 +92,7 @@ func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	return &m, nil
 }
 
-func (r *authRepositoryImpl) Create(acc repository.CreateAccountProps) error {
+func (r *authRepositoryImpl) Create(acc domain.Account) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -102,9 +102,10 @@ func (r *authRepositoryImpl) Create(acc repository.CreateAccountProps) error {
 			user_id,
 			email,
 			password,
+			status,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	_, err := r.db.Exec(ctx, query,
@@ -112,6 +113,7 @@ func (r *authRepositoryImpl) Create(acc repository.CreateAccountProps) error {
 		acc.UserID,
 		acc.Email,
 		acc.Password,
+		acc.Status,
 		acc.CreatedAt,
 	)
 	if err != nil {
