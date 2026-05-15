@@ -13,3 +13,13 @@ type CreateAccountProps struct {
 	Password  string
 	CreatedAt time.Time
 }
+
+type CreateSessionProps struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Agent     string
+	IPAddress string
+	ExpiresAt time.Time
+	RevokedAt *time.Time
+	CreatedAt time.Time
+}

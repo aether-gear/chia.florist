@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"service-core/internal/modules/auth/usecase"
+	"service-core/internal/modules/authentication/usecase"
 
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"

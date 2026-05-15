@@ -5,8 +5,8 @@ import (
 	"time"
 
 	appErr "service-core/internal/common/errors"
-	authDomain "service-core/internal/modules/auth/domain"
-	authRepo "service-core/internal/modules/auth/repository"
+	authDomain "service-core/internal/modules/authentication/domain"
+	authRepo "service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
 
 	"github.com/google/uuid"

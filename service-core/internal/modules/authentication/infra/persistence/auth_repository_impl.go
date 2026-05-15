@@ -7,8 +7,8 @@ import (
 	"time"
 
 	database "service-core/internal/infra/db"
-	"service-core/internal/modules/auth/domain"
-	"service-core/internal/modules/auth/repository"
+	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/repository"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

@@ -3,14 +3,14 @@ package bootstrap
 import (
 	"service-core/internal/common/logger"
 
-	authDomain "service-core/internal/modules/auth/domain"
-	authService "service-core/internal/modules/auth/infra/service"
+	authDomain "service-core/internal/modules/authentication/domain"
+	authService "service-core/internal/modules/authentication/infra/service"
 
 	imgService "service-core/internal/shared/image"
 	sGen "service-core/internal/shared/slug"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
-	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
+	aRepoImpl "service-core/internal/modules/authentication/infra/persistence"
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
 
 	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
@@ -22,7 +22,7 @@ import (
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
 
 	adUC "service-core/internal/modules/address/usecase"
-	aUC "service-core/internal/modules/auth/usecase"
+	aUC "service-core/internal/modules/authentication/usecase"
 	cUC "service-core/internal/modules/cart/usecase"
 	coUC "service-core/internal/modules/courier/usecase"
 	iUC "service-core/internal/modules/inventory/usecase"

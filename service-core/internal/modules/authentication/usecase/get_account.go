@@ -3,8 +3,8 @@ package usecase
 import (
 	"fmt"
 
-	"service-core/internal/modules/auth/domain"
-	"service-core/internal/modules/auth/repository"
+	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/repository"
 
 	"github.com/google/uuid"
 )

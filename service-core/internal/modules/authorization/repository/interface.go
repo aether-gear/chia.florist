@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"service-core/internal/modules/role/domain"
+	"service-core/internal/modules/authorization/domain"
 
 	"github.com/google/uuid"
 )

@@ -8,7 +8,7 @@ import (
 	"service-core/internal/common/middleware"
 
 	addressH "service-core/internal/modules/address/delivery/http"
-	authH "service-core/internal/modules/auth/delivery/http"
+	authH "service-core/internal/modules/authentication/delivery/http"
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"

@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"service-core/internal/modules/auth/domain"
+	"service-core/internal/modules/authentication/domain"
 
 	"github.com/google/uuid"
 )
@@ -12,4 +12,8 @@ type AuthRepository interface {
 
 	Create(account CreateAccountProps) error
 	// UpdateLastLogin(id uuid.UUID) error
+}
+
+type SessionRepository interface {
+	CreateSession(session CreateSessionProps)
 }
