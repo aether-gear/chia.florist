@@ -7,6 +7,8 @@ import (
 	authService "service-core/internal/modules/authentication/infra/service"
 
 	imgService "service-core/internal/shared/image"
+	mailer "service-core/internal/shared/mailer"
+	otp "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
@@ -89,6 +91,7 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		productImageRepo = pRepoImpl.NewProductImageRepository(infra.DB)
 		inventoryRepo    = iRepoImpl.NewInventoryRepository(infra.DB)
 		authRepo         = aRepoImpl.NewAccountRepository(infra.DB)
+		challengeRepo    = aRepoImpl.NewChallengeRepository(infra.DB)
 		cartRepo         = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
@@ -109,7 +112,15 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 
 		hasher = authService.NewBcryptHasher()
 
-		slugGen = sGen.NewGenerator()
+		slugGen    = sGen.NewGenerator()
+		mailSender = mailer.NewSMTPSender(
+			cfg.SMTP.Host,
+			cfg.SMTP.Port,
+			cfg.SMTP.Username,
+			cfg.SMTP.Password,
+			cfg.SMTP.From,
+		)
+		otpGen = otp.NewNumericGenerator(6)
 
 		imageTransformer     = imgService.NewImageTransformer()
 		imageVariantProvider = imgService.NewResolutionGenerator(imageTransformer)
@@ -133,9 +144,11 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		),
 		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
-		LoginAccount:    *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),
-		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher, userRepo),
-		GetAccount:      *aUC.NewGetAccountUsecase(authRepo),
+		LoginAccount: *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),
+		RegisterAccount: *aUC.NewRegisterUsecase(
+			authRepo, hasher, userRepo, challengeRepo, otpGen, mailSender,
+		),
+		GetAccount: *aUC.NewGetAccountUsecase(authRepo),
 
 		GetCart: *cUC.NewGetCartUsecase(
 			cartRepo, inventoryRepo, productRepo, productImageRepo, infra.StorageProvider,

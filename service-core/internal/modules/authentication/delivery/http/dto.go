@@ -1,5 +1,7 @@
 package http
 
+import "github.com/google/uuid"
+
 type SignUpParams struct {
 	Name     string  `json:"name"`
 	Username string  `json:"username"`
@@ -16,4 +18,9 @@ type SignInEmailParams struct {
 type SignInUsernameParams struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type SignUpResponse struct {
+	Message     string    `json:"message"`
+	ChallengeID uuid.UUID `json:"challenge_id"`
 }

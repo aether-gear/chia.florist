@@ -96,7 +96,7 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 		return errors.ErrBadRequest
 	}
 
-	err := h.signUp.Execute(usecase.SignUpParams{
+	challengeID, err := h.signUp.Execute(usecase.SignUpParams{
 		Email:    req.Email,
 		Password: req.Password,
 		Name:     req.Name,
@@ -107,8 +107,9 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	response := map[string]string{
-		"message": "account successfully created",
+	response := SignUpResponse{
+		Message:     "Verification code sent",
+		ChallengeID: *challengeID,
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)
