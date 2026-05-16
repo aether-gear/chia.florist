@@ -16,3 +16,7 @@ type AccountRepository interface {
 type SessionRepository interface {
 	Create(session domain.Session) error
 }
+
+type VerificationChallengeRepository interface {
+	Create(challenge domain.VerificationChallenge) error
+}
