@@ -10,11 +10,11 @@ import (
 )
 
 type GetAccountUsecase struct {
-	authRepo repository.AuthRepository
+	authRepo repository.AccountRepository
 }
 
 func NewGetAccountUsecase(
-	authRepo repository.AuthRepository,
+	authRepo repository.AccountRepository,
 ) *GetAccountUsecase {
 	return &GetAccountUsecase{
 		authRepo: authRepo,

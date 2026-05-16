@@ -88,7 +88,7 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		productRepo      = pRepoImpl.NewProductRepository(infra.DB)
 		productImageRepo = pRepoImpl.NewProductImageRepository(infra.DB)
 		inventoryRepo    = iRepoImpl.NewInventoryRepository(infra.DB)
-		authRepo         = aRepoImpl.NewAuthRepository(infra.DB)
+		authRepo         = aRepoImpl.NewAccountRepository(infra.DB)
 		cartRepo         = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)

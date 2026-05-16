@@ -12,13 +12,13 @@ import (
 )
 
 type LoginEmailUsecase struct {
-	authRepo repository.AuthRepository
+	authRepo repository.AccountRepository
 	hasher   domain.PasswordHasher
 	tokenSvc domain.TokenService
 }
 
 func NewLoginEmailUsecase(
-	authRepo repository.AuthRepository,
+	authRepo repository.AccountRepository,
 	hasher domain.PasswordHasher,
 	tokenSvc domain.TokenService,
 ) *LoginEmailUsecase {

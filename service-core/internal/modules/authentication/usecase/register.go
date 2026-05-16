@@ -14,13 +14,13 @@ import (
 )
 
 type RegisterUsecase struct {
-	authRepo authRepo.AuthRepository
+	authRepo authRepo.AccountRepository
 	hasher   authDomain.PasswordHasher
 	userRepo userRepo.UserRepository
 }
 
 func NewRegisterUsecase(
-	authRepo authRepo.AuthRepository,
+	authRepo authRepo.AccountRepository,
 	hasher authDomain.PasswordHasher,
 	userRepo userRepo.UserRepository,
 ) *RegisterUsecase {
@@ -74,7 +74,7 @@ func (u *RegisterUsecase) Execute(params SignUpParams) error {
 		ID:        uuid.New(),
 		UserID:    user.ID,
 		Email:     params.Email,
-		Status:    authDomain.AccountPendingVerification,
+		Status:    authDomain.AccountPending,
 		Password:  hash,
 		CreatedAt: now,
 	}

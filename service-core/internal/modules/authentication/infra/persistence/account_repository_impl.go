@@ -15,17 +15,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type authRepositoryImpl struct {
+type accountRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewAuthRepository(conn *database.Connection) repository.AuthRepository {
-	return &authRepositoryImpl{
+func NewAccountRepository(conn *database.Connection) repository.AccountRepository {
+	return &accountRepositoryImpl{
 		db: conn.Pool,
 	}
 }
 
-func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
+func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -59,7 +59,7 @@ func (r *authRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
 	return &m, nil
 }
 
-func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
+func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -92,7 +92,7 @@ func (r *authRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	return &m, nil
 }
 
-func (r *authRepositoryImpl) Create(acc domain.Account) error {
+func (r *accountRepositoryImpl) Create(acc domain.Account) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

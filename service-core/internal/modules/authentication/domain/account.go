@@ -9,10 +9,10 @@ import (
 type AccountStatus string
 
 const (
-	AccountPendingVerification AccountStatus = "pending_verification"
-	AccountActive              AccountStatus = "active"
-	AccountSuspended           AccountStatus = "suspended"
-	AccountLocked              AccountStatus = "locked"
+	AccountPending   AccountStatus = "pending"
+	AccountActive    AccountStatus = "active"
+	AccountSuspended AccountStatus = "suspended"
+	AccountLocked    AccountStatus = "locked"
 )
 
 type Account struct {

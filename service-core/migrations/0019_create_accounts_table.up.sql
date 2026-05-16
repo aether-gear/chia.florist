@@ -1,5 +1,5 @@
 CREATE TYPE account_status
-    AS ENUM ('pending_verifications', 'active', 'suspended', 'locked');
+    AS ENUM ('pending', 'active', 'suspended', 'locked');
 
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -9,7 +9,7 @@ CREATE TABLE accounts (
     email TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
 
-    status account_status DEFAULT 'pending_verifications',
+    status account_status DEFAULT 'pending',
 
     last_login_at TIMESTAMPTZ,
 
