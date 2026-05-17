@@ -41,6 +41,7 @@ func NewRouter(c *Container) *http.ServeMux {
 		authHandler = authH.NewAuthHandler(
 			&c.LoginAccount,
 			&c.RegisterAccount,
+			&c.VerifyAccount,
 			&c.GetAccount,
 		)
 
@@ -121,6 +122,10 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/auth/signup",
 		core(authHandler.SignUpAccount),
+	)
+	mux.HandleFunc(
+		"/auth/verify",
+		core(authHandler.VerifyAccount),
 	)
 
 	mux.HandleFunc(

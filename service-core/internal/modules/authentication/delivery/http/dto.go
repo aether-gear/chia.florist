@@ -10,6 +10,11 @@ type SignUpParams struct {
 	Phone    *string `json:"phone"`
 }
 
+type VerifyParams struct {
+	ChallengeID string `json:"challenge_id"`
+	OTP         int    `json:"otp"`
+}
+
 type SignInEmailParams struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`

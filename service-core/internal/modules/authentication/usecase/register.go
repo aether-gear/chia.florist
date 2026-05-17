@@ -113,7 +113,7 @@ func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
 	if err := u.accountRepo.Create(acc); err != nil {
 		return nil, fmt.Errorf("failed to register: %w", err)
 	}
-	if err := u.challengeRepo.Create(challenge); err != nil {
+	if err := u.challengeRepo.Save(challenge); err != nil {
 		return nil, err
 	}
 

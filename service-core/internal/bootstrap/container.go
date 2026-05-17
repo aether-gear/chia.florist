@@ -53,6 +53,7 @@ type Container struct {
 
 	LoginAccount    aUC.LoginEmailUsecase
 	RegisterAccount aUC.RegisterUsecase
+	VerifyAccount   aUC.VerifyAccountUsecase
 	GetAccount      aUC.GetAccountUsecase
 
 	GetCart    cUC.GetCartUsecase
@@ -147,6 +148,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		LoginAccount: *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),
 		RegisterAccount: *aUC.NewRegisterUsecase(
 			authRepo, hasher, userRepo, challengeRepo, otpGen, mailSender,
+		),
+		VerifyAccount: *aUC.NewVerifyAccountUsecase(
+			authRepo, hasher, userRepo, challengeRepo, tokenSvc,
 		),
 		GetAccount: *aUC.NewGetAccountUsecase(authRepo),
 
