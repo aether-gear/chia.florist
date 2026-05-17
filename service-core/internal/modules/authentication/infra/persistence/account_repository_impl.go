@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	appErr "service-core/internal/common/errors"
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
@@ -90,6 +91,39 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	}
 
 	return &m, nil
+}
+
+func (r *accountRepositoryImpl) ActivateByUserID(
+	id uuid.UUID,
+) error {
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
+	defer cancel()
+
+	query := `
+		UPDATE accounts
+		SET
+			status = 'active'
+		WHERE user_id = $1
+	`
+
+	result, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf(
+			"query to activate account: %w",
+			err,
+		)
+	}
+
+	if result.RowsAffected() == 0 {
+		return appErr.NewNotFound(
+			domain.ErrNotFoundAccount.Error(),
+		)
+	}
+
+	return nil
 }
 
 func (r *accountRepositoryImpl) Create(acc domain.Account) error {
