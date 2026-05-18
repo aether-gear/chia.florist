@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useCart } from '~/composables/useCart'
 
 const route = useRoute()
 const productId = computed(() => route.params.id as string)
+const { addToCart } = useCart()
 
 // 1. Definisikan Interface untuk data produk agar TypeScript tidak bingung
 interface Product {
@@ -62,7 +64,6 @@ const product = computed<Product>(() => {
   const found = productsData.value.find((p) => p.id === productId.value)
   if (found) return found
   
-  // Fallback object agar TypeScript yakin data tidak akan pernah undefined
   return productsData.value[0] || {
     id: 'fallback',
     name: 'Product Not Found',
@@ -98,6 +99,29 @@ const changeActiveImage = (img: string) => {
   activeImage.value = img
 }
 
+// Logika Add to Cart
+const handleAddToCart = () => {
+  if (!product.value.available) return
+
+  addToCart({
+    id: product.value.id,
+    name: product.value.name,
+    price: product.value.price,
+    image: activeImage.value,
+    size: selectedSize.value,
+    color: selectedColor.value,
+    isCustom: false
+  }, quantity.value)
+
+  navigateTo('/cart')
+}
+
+// Logika Placeholder untuk Buy Now
+const handleBuyNow = () => {
+  if (!product.value.available) return
+  alert('Redirecting to checkout panel... (Payment integration system is coming right up next!)')
+}
+
 useHead({
   title: computed(() => `Chia Florist - ${product.value.name}`),
   meta: [
@@ -120,7 +144,6 @@ useHead({
     <div class="grid grid-cols-1 md:grid-cols-12 gap-12">
       
       <div class="md:col-span-7 flex flex-col-reverse md:flex-row gap-6">
-        
         <div class="flex md:flex-col gap-4 overflow-x-auto md:overflow-visible">
           <button 
             v-for="(img, idx) in product.images" 
@@ -138,7 +161,6 @@ useHead({
         <div class="flex-1 h-[550px] bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
           <img :src="activeImage" :alt="product.name" class="w-full h-full object-cover transition-opacity duration-300" />
         </div>
-
       </div>
 
       <div class="md:col-span-5 space-y-6">
@@ -201,22 +223,32 @@ useHead({
           </div>
         </div>
 
-        <div class="flex items-center gap-4 pt-4 border-t border-gray-100">
-          <div class="flex border border-gray-300 rounded overflow-hidden">
-            <button @click="quantity > 1 ? quantity-- : null" class="px-4 py-2 hover:bg-gray-50 text-gray-600 font-medium">-</button>
-            <span class="px-4 py-2 font-semibold text-gray-800 flex items-center select-none">{{ quantity }}</span>
-            <button @click="quantity++" class="px-4 py-2 hover:bg-gray-50 text-gray-600 font-medium">+</button>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-100">
+          
+          <div class="flex border border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 justify-between items-center w-full sm:w-auto">
+            <button @click="quantity > 1 ? quantity-- : null" class="px-4 py-2.5 hover:bg-gray-200 transition text-gray-600 font-bold">-</button>
+            <span class="px-4 py-2.5 font-semibold text-gray-800 flex items-center select-none text-sm">{{ quantity }}</span>
+            <button @click="product.available ? quantity++ : null" class="px-4 py-2.5 hover:bg-gray-200 transition text-gray-600 font-bold">+</button>
           </div>
 
-          <button class="flex-grow bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 px-6 rounded-lg transition shadow-sm hover:shadow-md">
-            Buy Now
-          </button>
+          <div class="flex-1 flex gap-3 w-full">
+            <button 
+              @click="handleAddToCart"
+              :disabled="!product.available"
+              class="flex-1 border-2 border-[#1b4332] text-[#1b4332] hover:bg-emerald-50/50 disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50 font-bold py-3 px-4 rounded-xl transition text-sm text-center"
+            >
+              Add to Cart
+            </button>
 
-          <button class="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition text-gray-600">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-          </button>
+            <button 
+              @click="handleBuyNow"
+              :disabled="!product.available"
+              class="flex-1 bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-3 px-4 rounded-xl transition shadow-sm hover:shadow-md text-sm text-center"
+            >
+              Buy Now
+            </button>
+          </div>
+
         </div>
 
         <div class="border border-gray-200 rounded-xl divide-y divide-gray-200 mt-8 overflow-hidden bg-white">
