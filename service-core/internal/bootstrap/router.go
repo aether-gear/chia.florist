@@ -8,7 +8,7 @@ import (
 	"service-core/internal/common/middleware"
 
 	addressH "service-core/internal/modules/address/delivery/http"
-	authH "service-core/internal/modules/auth/delivery/http"
+	authH "service-core/internal/modules/authentication/delivery/http"
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
@@ -41,6 +41,7 @@ func NewRouter(c *Container) *http.ServeMux {
 		authHandler = authH.NewAuthHandler(
 			&c.LoginAccount,
 			&c.RegisterAccount,
+			&c.VerifyAccount,
 			&c.GetAccount,
 		)
 
@@ -121,6 +122,10 @@ func NewRouter(c *Container) *http.ServeMux {
 	mux.HandleFunc(
 		"/auth/signup",
 		core(authHandler.SignUpAccount),
+	)
+	mux.HandleFunc(
+		"/auth/verify",
+		core(authHandler.VerifyAccount),
 	)
 
 	mux.HandleFunc(

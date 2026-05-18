@@ -12,6 +12,7 @@ type Config struct {
 	Supabase config.SupabaseConfig
 	Postgres config.PostgresConfig
 	DB       config.DatabaseConfig
+	SMTP     config.SMTPConfig
 }
 
 func LoadConfig() Config {
@@ -43,5 +44,6 @@ func LoadConfig() Config {
 		// 	postgresCfg.SSLMode,
 		// 	&postgresCfg.DSN,
 		// ),
+		SMTP: config.LoadSMTPConfig(),
 	}
 }

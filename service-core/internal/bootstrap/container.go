@@ -3,14 +3,15 @@ package bootstrap
 import (
 	"service-core/internal/common/logger"
 
-	authDomain "service-core/internal/modules/auth/domain"
-	authService "service-core/internal/modules/auth/infra/service"
+	aService "service-core/internal/modules/authentication/infra/service"
 
 	imgService "service-core/internal/shared/image"
+	mailer "service-core/internal/shared/mailer"
+	otp "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
 
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
-	aRepoImpl "service-core/internal/modules/auth/infra/persistence"
+	aRepoImpl "service-core/internal/modules/authentication/infra/persistence"
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
 
 	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
@@ -22,7 +23,7 @@ import (
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
 
 	adUC "service-core/internal/modules/address/usecase"
-	aUC "service-core/internal/modules/auth/usecase"
+	aUC "service-core/internal/modules/authentication/usecase"
 	cUC "service-core/internal/modules/cart/usecase"
 	coUC "service-core/internal/modules/courier/usecase"
 	iUC "service-core/internal/modules/inventory/usecase"
@@ -37,9 +38,6 @@ import (
 type Container struct {
 	Logger logger.Logger
 
-	TokenService authDomain.TokenService
-	Hasher       authDomain.PasswordHasher
-
 	ImageVariantProvider imgService.VariantCreator
 	ImageTransformer     imgService.ImageTransformer
 
@@ -51,6 +49,7 @@ type Container struct {
 
 	LoginAccount    aUC.LoginEmailUsecase
 	RegisterAccount aUC.RegisterUsecase
+	VerifyAccount   aUC.VerifyAccountUsecase
 	GetAccount      aUC.GetAccountUsecase
 
 	GetCart    cUC.GetCartUsecase
@@ -88,7 +87,10 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		productRepo      = pRepoImpl.NewProductRepository(infra.DB)
 		productImageRepo = pRepoImpl.NewProductImageRepository(infra.DB)
 		inventoryRepo    = iRepoImpl.NewInventoryRepository(infra.DB)
-		authRepo         = aRepoImpl.NewAuthRepository(infra.DB)
+		authRepo         = aRepoImpl.NewAccountRepository(infra.DB)
+		challengeRepo    = aRepoImpl.NewChallengeRepository(infra.DB)
+		sessionRepo      = aRepoImpl.NewSessionRepositoryImpl(infra.DB)
+		refreshTokenRepo = aRepoImpl.NewRefreshTokenRepositoryImpl(infra.DB)
 		cartRepo         = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
@@ -102,14 +104,20 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 	)
 
 	var (
-		tokenSvc = authService.NewJWTService(
-			cfg.JWT.Secret,
-			cfg.JWT.Exp,
+		tokenSvc = aService.NewJWTService(cfg.JWT.Secret)
+
+		pwHasher    = aService.NewBcryptHasher()
+		tokenHasher = aService.NewSHATokenHasher()
+
+		slugGen    = sGen.NewGenerator()
+		mailSender = mailer.NewSMTPSender(
+			cfg.SMTP.Host,
+			cfg.SMTP.Port,
+			cfg.SMTP.Username,
+			cfg.SMTP.Password,
+			cfg.SMTP.From,
 		)
-
-		hasher = authService.NewBcryptHasher()
-
-		slugGen = sGen.NewGenerator()
+		otpGen = otp.NewNumericGenerator(6)
 
 		imageTransformer     = imgService.NewImageTransformer()
 		imageVariantProvider = imgService.NewResolutionGenerator(imageTransformer)
@@ -117,9 +125,6 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 
 	return &Container{
 		Logger: log,
-
-		TokenService: tokenSvc,
-		Hasher:       hasher,
 
 		FindProducts: *pUC.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
@@ -133,9 +138,16 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		),
 		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
-		LoginAccount:    *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),
-		RegisterAccount: *aUC.NewRegisterUsecase(authRepo, hasher),
-		GetAccount:      *aUC.NewGetAccountUsecase(authRepo),
+		LoginAccount: *aUC.NewLoginEmailUsecase(
+			authRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo,
+		),
+		RegisterAccount: *aUC.NewRegisterUsecase(
+			authRepo, pwHasher, userRepo, challengeRepo, otpGen, mailSender,
+		),
+		VerifyAccount: *aUC.NewVerifyAccountUsecase(
+			authRepo, pwHasher, tokenHasher, userRepo, challengeRepo, tokenSvc, sessionRepo, refreshTokenRepo,
+		),
+		GetAccount: *aUC.NewGetAccountUsecase(authRepo),
 
 		GetCart: *cUC.NewGetCartUsecase(
 			cartRepo, inventoryRepo, productRepo, productImageRepo, infra.StorageProvider,
