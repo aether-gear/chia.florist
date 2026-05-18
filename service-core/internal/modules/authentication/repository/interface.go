@@ -30,3 +30,22 @@ type VerificationChallengeRepository interface {
 
 	Save(challenge domain.VerificationChallenge) error
 }
+
+type RefreshTokenRepository interface {
+	Save(challenge domain.RefreshToken) error
+}
+
+type TokenService interface {
+	Generate(params GenerateTokenParams) (GeneratedToken, error)
+	Validate(token string) (*domain.TokenClaims, error)
+}
+
+type PasswordHasher interface {
+	Hash(password string) (string, error)
+	Compare(hash string, password string) error
+}
+
+type TokenHasher interface {
+	Hash(token string) string
+	Compare(hash string, token string) bool
+}
