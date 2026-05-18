@@ -16,12 +16,17 @@ type AccountRepository interface {
 }
 
 type SessionRepository interface {
-	Create(session domain.Session) error
+	GetByID(id uuid.UUID) (*domain.Session, error)
+
+	RevokeByID(id uuid.UUID) error
+
+	UpdateLastActivityByID(id uuid.UUID) error
+
+	Save(session domain.Session) error
 }
 
 type VerificationChallengeRepository interface {
 	GetByID(id uuid.UUID) (*domain.VerificationChallenge, error)
 
-	Create(challenge domain.VerificationChallenge) error
 	Save(challenge domain.VerificationChallenge) error
 }
