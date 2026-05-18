@@ -92,7 +92,7 @@ func (r *challengeRepositoryImpl) Create(challenge authDomain.VerificationChalle
 			attempt_count,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 	`
 
 	_, err := r.db.Exec(ctx, query,
