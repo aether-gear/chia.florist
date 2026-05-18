@@ -1,7 +1,7 @@
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    user_id UUID NOT NULL UNIQUE,
+    user_id UUID NOT NULL,
 
     user_agent TEXT,
     ip_address TEXT,

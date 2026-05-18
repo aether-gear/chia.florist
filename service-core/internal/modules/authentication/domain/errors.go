@@ -16,3 +16,7 @@ var (
 	ErrInvalidOTP        = errors.New("invalid otp")
 	ErrMaxAttemptReached = errors.New("max otp attempts reached")
 )
+
+var (
+	ErrNotFoundSession = errors.New("not found session")
+)
