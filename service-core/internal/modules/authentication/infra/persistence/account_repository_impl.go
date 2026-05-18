@@ -33,11 +33,17 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 	query := `
 		SELECT
 			id,
+			user_id,
 			email,
 			password,
-			last_login_at
-		FROM accounts
-		WHERE email = $1
+			status,
+			last_login_at,
+			created_at,
+			updated_at
+		FROM
+			accounts
+		WHERE
+			email = $1
 		LIMIT 1
 	`
 
@@ -45,11 +51,14 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&m.ID,
+		&m.UserID,
 		&m.Email,
 		&m.Password,
+		&m.Status,
 		&m.LastLoginAt,
+		&m.CreatedAt,
+		&m.UpdatedAt,
 	)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -67,11 +76,17 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	query := `
 		SELECT
 			id,
+			user_id,
 			email,
 			password,
-			last_login_at
-		FROM accounts
-		WHERE id = $1
+			status,
+			last_login_at,
+			created_at,
+			updated_at
+		FROM
+			accounts
+		WHERE
+			id = $1
 		LIMIT 1
 	`
 
@@ -79,9 +94,13 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&m.ID,
+		&m.UserID,
 		&m.Email,
 		&m.Password,
+		&m.Status,
 		&m.LastLoginAt,
+		&m.CreatedAt,
+		&m.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
