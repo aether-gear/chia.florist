@@ -2,17 +2,18 @@ package service
 
 import (
 	"fmt"
+	"service-core/internal/modules/authentication/repository"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-type BcryptHasher struct{}
+type bcryptHasher struct{}
 
-func NewBcryptHasher() *BcryptHasher {
-	return &BcryptHasher{}
+func NewBcryptHasher() repository.PasswordHasher {
+	return &bcryptHasher{}
 }
 
-func (b *BcryptHasher) Hash(password string) (string, error) {
+func (bH *bcryptHasher) Hash(password string) (string, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", fmt.Errorf("hash password failed: %w", err)
@@ -21,6 +22,6 @@ func (b *BcryptHasher) Hash(password string) (string, error) {
 	return string(hashed), nil
 }
 
-func (b *BcryptHasher) Compare(hash string, password string) error {
+func (bH *bcryptHasher) Compare(hash string, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }

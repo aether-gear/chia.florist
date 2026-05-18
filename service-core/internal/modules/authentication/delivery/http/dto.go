@@ -11,13 +11,17 @@ type SignUpParams struct {
 }
 
 type VerifyParams struct {
-	ChallengeID string `json:"challenge_id"`
-	OTP         int    `json:"otp"`
+	UserAgent   *string `json:"user_agent"`
+	IPAddress   *string `json:"ip_address"`
+	ChallengeID string  `json:"challenge_id"`
+	OTP         int     `json:"otp"`
 }
 
 type SignInEmailParams struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	UserAgent *string `json:"user_agent"`
+	IPAddress *string `json:"ip_address"`
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
 }
 
 type SignInUsernameParams struct {

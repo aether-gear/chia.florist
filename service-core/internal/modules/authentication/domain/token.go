@@ -1,12 +1,20 @@
 package domain
 
 import (
-	"time"
-
-	"github.com/google/uuid"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-type TokenService interface {
-	Generate(userID uuid.UUID) (string, time.Time, error)
-	Validate(token string) (uuid.UUID, error)
+type TokenType string
+
+const (
+	TokenTypeAccess  TokenType = "access"
+	TokenTypeRefresh TokenType = "refresh"
+)
+
+type TokenClaims struct {
+	UserID    string    `json:"user_id"`
+	SessionID string    `json:"session_id"`
+	Type      TokenType `json:"type"`
+
+	jwt.RegisteredClaims
 }

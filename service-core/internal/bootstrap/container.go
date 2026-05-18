@@ -3,8 +3,7 @@ package bootstrap
 import (
 	"service-core/internal/common/logger"
 
-	authDomain "service-core/internal/modules/authentication/domain"
-	authService "service-core/internal/modules/authentication/infra/service"
+	aService "service-core/internal/modules/authentication/infra/service"
 
 	imgService "service-core/internal/shared/image"
 	mailer "service-core/internal/shared/mailer"
@@ -38,9 +37,6 @@ import (
 
 type Container struct {
 	Logger logger.Logger
-
-	TokenService authDomain.TokenService
-	Hasher       authDomain.PasswordHasher
 
 	ImageVariantProvider imgService.VariantCreator
 	ImageTransformer     imgService.ImageTransformer
@@ -93,6 +89,8 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		inventoryRepo    = iRepoImpl.NewInventoryRepository(infra.DB)
 		authRepo         = aRepoImpl.NewAccountRepository(infra.DB)
 		challengeRepo    = aRepoImpl.NewChallengeRepository(infra.DB)
+		sessionRepo      = aRepoImpl.NewSessionRepositoryImpl(infra.DB)
+		refreshTokenRepo = aRepoImpl.NewRefreshTokenRepositoryImpl(infra.DB)
 		cartRepo         = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
@@ -106,12 +104,10 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 	)
 
 	var (
-		tokenSvc = authService.NewJWTService(
-			cfg.JWT.Secret,
-			cfg.JWT.Exp,
-		)
+		tokenSvc = aService.NewJWTService(cfg.JWT.Secret)
 
-		hasher = authService.NewBcryptHasher()
+		pwHasher    = aService.NewBcryptHasher()
+		tokenHasher = aService.NewSHATokenHasher()
 
 		slugGen    = sGen.NewGenerator()
 		mailSender = mailer.NewSMTPSender(
@@ -130,9 +126,6 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 	return &Container{
 		Logger: log,
 
-		TokenService: tokenSvc,
-		Hasher:       hasher,
-
 		FindProducts: *pUC.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
 		),
@@ -145,12 +138,14 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		),
 		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
-		LoginAccount: *aUC.NewLoginEmailUsecase(authRepo, hasher, tokenSvc),
+		LoginAccount: *aUC.NewLoginEmailUsecase(
+			authRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo,
+		),
 		RegisterAccount: *aUC.NewRegisterUsecase(
-			authRepo, hasher, userRepo, challengeRepo, otpGen, mailSender,
+			authRepo, pwHasher, userRepo, challengeRepo, otpGen, mailSender,
 		),
 		VerifyAccount: *aUC.NewVerifyAccountUsecase(
-			authRepo, hasher, userRepo, challengeRepo, tokenSvc,
+			authRepo, pwHasher, tokenHasher, userRepo, challengeRepo, tokenSvc, sessionRepo, refreshTokenRepo,
 		),
 		GetAccount: *aUC.NewGetAccountUsecase(authRepo),
 

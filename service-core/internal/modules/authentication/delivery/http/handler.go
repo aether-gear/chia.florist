@@ -75,14 +75,28 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		return errors.ErrBadRequest
 	}
 
-	token, exp, err := h.signInEmail.Execute(req.Email, req.Password)
+	tokens, err := h.signInEmail.Execute(usecase.LoginEmailParams{
+		UserAgent: req.UserAgent,
+		IPAddress: req.IPAddress,
+		Email:     req.Email,
+		Password:  req.Password,
+	})
 	if err != nil {
-		return errors.ErrUnauthorized
+		return err
 	}
 
-	response := map[string]interface{}{
-		"access_token": token,
-		"expires_in":   exp,
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    tokens.AccessToken.Token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  tokens.AccessToken.ExpiresAt,
+	})
+
+	response := map[string]string{
+		"message": "login success",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -112,7 +126,7 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	response := SignUpResponse{
-		Message:     "Verification code sent",
+		Message:     "verification code sent",
 		ChallengeID: *challengeID,
 	}
 
@@ -138,7 +152,9 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 		return errors.ErrBadRequest
 	}
 
-	token, exp, err := h.verify.Execute(usecase.VerifyAccountParams{
+	tokens, err := h.verify.Execute(usecase.VerifyAccountParams{
+		UserAgent:   req.UserAgent,
+		IPAddress:   req.IPAddress,
 		ChallengeID: challengeID,
 		OTP:         req.OTP,
 	})
@@ -146,9 +162,18 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	response := map[string]interface{}{
-		"access_token": token,
-		"expires_in":   exp,
+	http.SetCookie(w, &http.Cookie{
+		Name:     "chast",
+		Value:    tokens.AccessToken.Token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  tokens.AccessToken.ExpiresAt,
+	})
+
+	response := map[string]string{
+		"message": "login success",
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)
