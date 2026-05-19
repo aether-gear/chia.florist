@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"service-core/internal/modules/authentication/usecase"
-
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	"service-core/internal/modules/authentication/usecase"
 
 	"github.com/google/uuid"
 )
@@ -37,21 +36,20 @@ func NewAuthHandler(
 func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 	UserId, ok := r.Context().Value("user_id").(string)
 	if !ok {
-		return errors.ErrUnauthorized
+		return apperrors.ErrUnauthorized
 	}
 
 	userID, err := uuid.Parse(UserId)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
 	acc, err := h.getAccount.Execute(userID)
 	if err != nil {
 		return err
 	}
-
 	if acc == nil {
-		return errors.ErrNotFound
+		return apperrors.NewNotFound("account not found")
 	}
 
 	response := map[string]interface{}{
@@ -65,28 +63,33 @@ func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error {
-	var req SignInEmailParams
+	var req signInEmailRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
-	if req.Email == "" || req.Password == "" {
-		return errors.ErrBadRequest
+	if req.Email == "" {
+		return apperrors.NewBadRequest("invalid email")
+	}
+	if req.Password == "" {
+		return apperrors.NewBadRequest("invalid password")
 	}
 
-	tokens, err := h.signInEmail.Execute(usecase.LoginEmailParams{
+	input := usecase.LoginEmailParams{
 		UserAgent: req.UserAgent,
 		IPAddress: req.IPAddress,
 		Email:     req.Email,
 		Password:  req.Password,
-	})
+	}
+
+	tokens, err := h.signInEmail.Execute(input)
 	if err != nil {
 		return err
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
+		Name:     "chast",
 		Value:    tokens.AccessToken.Token,
 		Path:     "/",
 		HttpOnly: true,
@@ -104,28 +107,36 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) error {
-	var req SignUpParams
+	var req signUpRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
-	if req.Email == "" || req.Password == "" || req.Username == "" {
-		return errors.ErrBadRequest
+	if req.Email == "" {
+		return apperrors.NewBadRequest("invalid email")
+	}
+	if req.Password == "" {
+		return apperrors.NewBadRequest("invalid password")
+	}
+	if req.Username == "" {
+		return apperrors.NewBadRequest("invalid user name")
 	}
 
-	challengeID, err := h.signUp.Execute(usecase.SignUpParams{
+	input := usecase.SignUpParams{
 		Email:    req.Email,
 		Password: req.Password,
 		Name:     req.Name,
 		Username: req.Username,
 		Phone:    req.Phone,
-	})
+	}
+
+	challengeID, err := h.signUp.Execute(input)
 	if err != nil {
 		return err
 	}
 
-	response := SignUpResponse{
+	response := signUpResponse{
 		Message:     "verification code sent",
 		ChallengeID: *challengeID,
 	}
@@ -135,29 +146,31 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 }
 
 func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) error {
-	var req VerifyParams
+	var req verifyAccountRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
 	if req.ChallengeID == "" {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid challenge id")
 	}
 	challengeID, err := uuid.Parse(req.ChallengeID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid challenge id")
 	}
 	if len(strconv.Itoa(req.OTP)) != 6 {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid otp")
 	}
 
-	tokens, err := h.verify.Execute(usecase.VerifyAccountParams{
+	input := usecase.VerifyAccountParams{
 		UserAgent:   req.UserAgent,
 		IPAddress:   req.IPAddress,
 		ChallengeID: challengeID,
 		OTP:         req.OTP,
-	})
+	}
+
+	tokens, err := h.verify.Execute(input)
 	if err != nil {
 		return err
 	}

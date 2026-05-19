@@ -30,16 +30,21 @@ func NewUpdateItemUsecase(
 	}
 }
 
-func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopID uuid.UUID, quantity int) error {
-	if shopID == uuid.Nil {
+type UpdateItemInput struct {
+	UserID, ProductID, ShopID uuid.UUID
+	Quantity                  int
+}
+
+func (u *UpdateItemUsecase) Execute(input UpdateItemInput) error {
+	if input.ShopID == uuid.Nil {
 		return appErr.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
-	if quantity <= 0 {
+	if input.Quantity <= 0 {
 		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
-	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(productID, shopID)
+	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(input.ProductID, input.ShopID)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}
@@ -47,23 +52,23 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopI
 		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
+	cart, err := u.cartRepo.GetWithItemsByUserID(input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(userID)
+		cart, err = u.cartRepo.NewCart(input.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to create cart: %w", err)
 		}
 	}
 
-	if !cart.HasItem(productID, shopID) {
+	if !cart.HasItem(input.ProductID, input.ShopID) {
 		return appErr.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
-	product, err := u.productRepo.GetByID(productID)
+	product, err := u.productRepo.GetByID(input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve product: %w", err)
 	}
@@ -71,11 +76,11 @@ func (u *UpdateItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopI
 		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	if quantity > inventory.Available() {
+	if input.Quantity > inventory.Available() {
 		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
-	if err := cart.SetItem(productID, shopID, quantity); err != nil {
+	if err := cart.SetItem(input.ProductID, input.ShopID, input.Quantity); err != nil {
 		return appErr.NewInvalidInput(err.Error())
 	}
 

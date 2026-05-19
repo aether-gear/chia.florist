@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/inventory/usecase"
-
-	"github.com/google/uuid"
 )
 
 type InventoryHandler struct {
@@ -23,24 +21,24 @@ func NewInventoryHandler(
 	}
 }
 
-func (h *InventoryHandler) CreateInventory(w http.ResponseWriter, r *http.Request) error {
-	var req CreateInventoryRequest
+func (h *InventoryHandler) AddInventory(w http.ResponseWriter, r *http.Request) error {
+	var req createInventoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	productID, err := uuid.Parse(req.ProductID)
+	shopID, err := apphttp.ParamUUID(r, "id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	shopID, err := uuid.Parse(req.ShopID)
+	productID, err := apphttp.ParamUUID(r, "productID")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid product id")
 	}
 
 	if req.Stock < 0 {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid stock")
 	}
 
 	if err := h.createInventory.Execute(usecase.CreateInventoryInput{
@@ -52,7 +50,7 @@ func (h *InventoryHandler) CreateInventory(w http.ResponseWriter, r *http.Reques
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, map[string]string{
-		"message": "inventory successfully created",
+		"message": "inventory successfully added",
 	})
 	return nil
 }

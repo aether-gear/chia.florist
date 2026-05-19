@@ -2,17 +2,14 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
-	"strconv"
-	"strings"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-	appMultipart "service-core/internal/common/http/multipart"
+	appmultipart "service-core/internal/common/http/multipart"
 	"service-core/internal/modules/product/usecase"
-
-	"github.com/google/uuid"
 )
 
 type ProductHandler struct {
@@ -37,26 +34,22 @@ func NewProductHandler(
 }
 
 func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) error {
-	query := r.URL.Query()
-
-	page, _ := strconv.Atoi(query.Get("page"))
-	limit, _ := strconv.Atoi(query.Get("limit"))
-
-	name := query.Get("name")
-	id := query.Get("id")
-
+	page := apphttp.QueryIntDefault(r, "page", 1)
 	if page <= 0 {
 		page = 1
 	}
+	limit := apphttp.QueryIntDefault(r, "limit", 10)
 	if limit <= 0 {
 		limit = 10
 	}
+
+	name := apphttp.Query(r, "name")
+	id := apphttp.Query(r, "id")
 
 	input := usecase.FindProductsInput{
 		Page:  page,
 		Limit: limit,
 	}
-
 	if name != "" {
 		input.Name = &name
 	}
@@ -69,22 +62,22 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 
-	results := make([]ProductCatalogResponse, 0, len(products))
+	results := make([]productCatalogResponse, 0, len(products))
 	for _, p := range products {
-		result := ProductCatalogResponse{
+		result := productCatalogResponse{
 			ID:         p.Product.ID,
 			SKU:        p.Product.SKU,
 			Name:       p.Product.Name,
 			Slug:       p.Product.Slug,
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
-			Image: ProductImageResponse{
+			Image: productImageResponse{
 				Thumbnail: &p.Images.Thumbnail,
 			},
 		}
 
 		result.IsAvailable =
-			ProductStatusDTO(p.Product.Status) == ProductStatusActive &&
+			productStatusDTO(p.Product.Status) == ProductStatusActive &&
 				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0
 
 		results = append(results, result)
@@ -102,35 +95,25 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 }
 
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 || parts[2] == "" {
-		return errors.ErrBadRequest
-	}
-
-	id := parts[2]
-	if id == "" {
-		return errors.ErrBadRequest
-	}
-
-	parsedID, err := uuid.Parse(id)
+	productID, err := apphttp.ParamUUID(r, "id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid product id")
 	}
 
-	product, err := h.getProduct.Execute(parsedID)
+	product, err := h.getProduct.Execute(productID)
 	if err != nil {
 		return err
 	}
 	if product == nil {
-		return errors.ErrNotFound
+		return apperrors.NewNotFound("product not found")
 	}
 
 	var available int
-	inventories := make([]ProductInventoryView, 0, len(product.ShopInventories))
+	inventories := make([]productInventoryView, 0, len(product.ShopInventories))
 	for _, inventory := range product.ShopInventories {
 		available += inventory.Available()
 
-		inventories = append(inventories, ProductInventoryView{
+		inventories = append(inventories, productInventoryView{
 			ID:         inventory.ID,
 			ShopID:     inventory.ShopID,
 			TotalStock: inventory.TotalStock,
@@ -138,9 +121,9 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		})
 	}
 
-	images := make([]ProductImageResponse, 0, len(product.Images))
+	images := make([]productImageResponse, 0, len(product.Images))
 	for _, img := range product.Images {
-		image := ProductImageResponse{}
+		image := productImageResponse{}
 
 		if img.Thumbnail != "" {
 			image.Thumbnail = &img.Thumbnail
@@ -157,7 +140,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		images = append(images, image)
 	}
 
-	response := ProductDetailResponse{
+	response := productDetailResponse{
 		ID:          product.Product.ID,
 		SKU:         product.Product.SKU,
 		Name:        product.Product.Name,
@@ -170,7 +153,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		Images:      images,
 	}
 	response.IsAvailable =
-		ProductStatusDTO(product.Product.Status) == ProductStatusActive &&
+		productStatusDTO(product.Product.Status) == ProductStatusActive &&
 			available > 0
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -178,32 +161,35 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 }
 
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) error {
-	var req CreateProductRequest
+	var req createProductRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	if req.Name == "" || req.SKU == "" {
-		return errors.ErrBadRequest
+	if req.Name == "" {
+		return apperrors.NewBadRequest("invalid name")
 	}
-
+	if req.SKU == "" {
+		return apperrors.NewBadRequest("invalid sku")
+	}
 	if req.Price < 0 {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid price")
 	}
-
 	if !req.Status.isStatusValid() {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid status")
 	}
 
-	err := h.createProduct.Execute(usecase.CreateProductInput{
+	input := usecase.CreateProductInput{
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
 		Status:      string(req.Status),
 		Price:       req.Price,
 		Weight:      req.Weight,
-	})
+	}
+
+	err := h.createProduct.Execute(input)
 	if err != nil {
 		return err
 	}
@@ -217,22 +203,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 }
 
 func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request) error {
-	err := r.ParseMultipartForm(16 << 20)
-	if err != nil {
-		return errors.ErrBadRequest
-	}
-
-	productID := r.FormValue("product_id")
-	parsedProductID, err := uuid.Parse(productID)
-	if err != nil {
-		return errors.ErrBadRequest
-	}
-
-	files, err := appMultipart.ParseMultiple(
-		r,
-		"image",
-		16<<20,
-	)
+	files, err := appmultipart.ParseMultiple(r, "image", 16<<20)
 	if err != nil {
 		return err
 	}
@@ -241,12 +212,12 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 	for i, file := range files {
 		data, err := io.ReadAll(file.File)
 		if err != nil {
-			return errors.ErrBadRequest
+			return apperrors.NewInternal(errors.New("failed to read uploaded file"))
 		}
 
 		err = file.File.Close()
 		if err != nil {
-			return errors.ErrBadRequest
+			return apperrors.NewInternal(errors.New("failed to close uploaded file"))
 		}
 
 		images = append(images, usecase.ProductImageInput{
@@ -259,10 +230,17 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	err = h.addProductImage.Execute(usecase.AddProductImageInput{
-		ProductID: parsedProductID,
+	productID, err := apphttp.ParamUUID(r, "id")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid product id")
+	}
+
+	input := usecase.AddProductImageInput{
+		ProductID: productID,
 		Images:    images,
-	})
+	}
+
+	err = h.addProductImage.Execute(input)
 	if err != nil {
 		return err
 	}
@@ -275,7 +253,7 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-func (s ProductStatusDTO) isStatusValid() bool {
+func (s productStatusDTO) isStatusValid() bool {
 	switch s {
 	case ProductStatusActive,
 		ProductStatusInactive,

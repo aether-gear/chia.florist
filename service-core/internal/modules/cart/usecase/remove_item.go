@@ -22,12 +22,16 @@ func NewRemoveItemUsecase(
 	}
 }
 
-func (u *RemoveItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopID uuid.UUID) error {
-	if shopID == uuid.Nil {
+type RemoveItemInput struct {
+	UserID, ProductID, ShopID uuid.UUID
+}
+
+func (u *RemoveItemUsecase) Execute(input RemoveItemInput) error {
+	if input.ShopID == uuid.Nil {
 		return appErr.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
+	cart, err := u.cartRepo.GetWithItemsByUserID(input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
@@ -35,7 +39,7 @@ func (u *RemoveItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopI
 		return appErr.NewNotFound(domain.ErrCartNotFound.Error())
 	}
 
-	cart.RemoveItem(productID, shopID)
+	cart.RemoveItem(input.ProductID, input.ShopID)
 
 	if err := u.cartRepo.Save(cart); err != nil {
 		return fmt.Errorf("failed to update cart: %w", err)

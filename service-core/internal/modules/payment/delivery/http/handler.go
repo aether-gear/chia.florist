@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/payment/usecase"
 
@@ -34,24 +34,22 @@ func NewPaymentHandler(
 }
 
 func (h *PaymentHandler) CreatePaymentAccount(w http.ResponseWriter, r *http.Request) error {
-	var req CreatePaymentAccountRequest
+	var req createPaymentAccountRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
 	methodID, err := uuid.Parse(req.MethodID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid method id")
 	}
-
 	isActive, err := strconv.ParseBool(req.IsActive)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid active status")
 	}
-
 	if req.AccountName == "" {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid account name")
 	}
 
 	input := usecase.CreatePaymentAccountInput{
@@ -82,9 +80,9 @@ func (h *PaymentHandler) ListPaymentAccount(w http.ResponseWriter, r *http.Reque
 		return err
 	}
 
-	result := make([]PaymentAccountResponse, 0, len(payAccs))
+	paymentAccs := make([]paymentAccountResponse, 0, len(payAccs))
 	for _, p := range payAccs {
-		res := PaymentAccountResponse{
+		pA := paymentAccountResponse{
 			ID:            p.ID,
 			MethodID:      p.MethodID,
 			AccountName:   p.AccountName,
@@ -93,11 +91,11 @@ func (h *PaymentHandler) ListPaymentAccount(w http.ResponseWriter, r *http.Reque
 			QRString:      p.QRString,
 		}
 
-		result = append(result, res)
+		paymentAccs = append(paymentAccs, pA)
 	}
 
 	response := map[string]interface{}{
-		"accounts": result,
+		"accounts": paymentAccs,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -105,25 +103,26 @@ func (h *PaymentHandler) ListPaymentAccount(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) error {
-
-	var req CreatePaymentMethodRequest
+	var req createPaymentMethodRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid body request")
 	}
-
 	isActive, err := strconv.ParseBool(req.IsActive)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid active status")
 	}
-
-	if req.Name == "" || req.Type == "" {
-		return errors.ErrBadRequest
+	if req.Name == "" {
+		return apperrors.NewBadRequest("invalid name")
 	}
-
-	if (req.FeeFixed == nil || *req.FeeFixed == "") &&
-		(req.FeePercentage == nil || *req.FeePercentage == "") {
-		return errors.ErrBadRequest
+	if req.Type == "" {
+		return apperrors.NewBadRequest("invalid type")
+	}
+	if req.FeeFixed == nil || *req.FeeFixed == "" {
+		return apperrors.NewBadRequest("invalid fee amount")
+	}
+	if req.FeePercentage == nil || *req.FeePercentage == "" {
+		return apperrors.NewBadRequest("invalid fee percentage")
 	}
 
 	var feeFixed int64
@@ -134,7 +133,7 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 	} else {
 		val, err := strconv.ParseInt(*req.FeeFixed, 10, 64)
 		if err != nil {
-			return errors.ErrBadRequest
+			return apperrors.NewBadRequest("invalid fee amount")
 		}
 		feeFixed = val
 	}
@@ -144,7 +143,7 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 	} else {
 		val, err := strconv.ParseFloat(*req.FeePercentage, 64)
 		if err != nil {
-			return errors.ErrBadRequest
+			return apperrors.NewBadRequest("invalid fee percentage")
 		}
 		feePercentage = val
 	}
@@ -178,9 +177,9 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 		return err
 	}
 
-	result := make([]PaymentMethodResponse, 0, len(payMethods))
+	paymentMthds := make([]paymentMethodResponse, 0, len(payMethods))
 	for _, p := range payMethods {
-		res := PaymentMethodResponse{
+		pM := paymentMethodResponse{
 			ID:            p.ID,
 			Name:          p.Name,
 			Type:          string(p.Type),
@@ -191,11 +190,11 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 			FeePercentage: p.FeePercentage,
 		}
 
-		result = append(result, res)
+		paymentMthds = append(paymentMthds, pM)
 	}
 
 	response := map[string]interface{}{
-		"methods": result,
+		"methods": paymentMthds,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

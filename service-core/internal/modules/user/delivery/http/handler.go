@@ -2,14 +2,10 @@ package http
 
 import (
 	"net/http"
-	"strings"
 
-	"service-core/internal/modules/user/usecase"
-
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-
-	"github.com/google/uuid"
+	"service-core/internal/modules/user/usecase"
 )
 
 type UserHandler struct {
@@ -23,30 +19,20 @@ func NewUserHandler(getUser *usecase.GetUserUsecase) *UserHandler {
 }
 
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 || parts[2] == "" {
-		return errors.ErrBadRequest
-	}
-
-	id := parts[2]
-	if id == "" {
-		return errors.ErrBadRequest
-	}
-
-	parsedID, err := uuid.Parse(id)
+	id, err := apphttp.ParamUUID(r, "id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	result, err := h.getUser.ByID(parsedID)
+	result, err := h.getUser.ByID(id)
 	if err != nil {
 		return err
 	}
 	if result == nil {
-		return errors.ErrNotFound
+		return apperrors.NewNotFound("user not found")
 	}
 
-	response := UserResponse{
+	response := userResponse{
 		ID:          result.ID,
 		Name:        result.Name,
 		Username:    result.Username,

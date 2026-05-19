@@ -6,21 +6,31 @@ import (
 	"github.com/google/uuid"
 )
 
-type ProductStatusDTO string
+type productStatusDTO string
 
 const (
-	ProductStatusActive   ProductStatusDTO = "active"
-	ProductStatusInactive ProductStatusDTO = "inactive"
-	ProductStatusArchived ProductStatusDTO = "archived"
+	ProductStatusActive   productStatusDTO = "active"
+	ProductStatusInactive productStatusDTO = "inactive"
+	ProductStatusArchived productStatusDTO = "archived"
 )
 
-type ProductImageResponse struct {
+type createProductRequest struct {
+	SKU         string           `json:"sku"`
+	Name        string           `json:"name"`
+	Description *string          `json:"description"`
+	IsAvailable bool             `json:"is_available"`
+	Status      productStatusDTO `json:"status"`
+	Price       int64            `json:"price"`
+	Weight      *float64         `json:"weight"`
+}
+
+type productImageResponse struct {
 	Thumbnail *string `json:"thumbnail,omitempty"`
 	Preview   *string `json:"preview,omitempty"`
 	Detail    *string `json:"detail,omitempty"`
 }
 
-type ProductCatalogResponse struct {
+type productCatalogResponse struct {
 	ID          uuid.UUID            `json:"id"`
 	SKU         string               `json:"sku"`
 	Name        string               `json:"name"`
@@ -28,10 +38,10 @@ type ProductCatalogResponse struct {
 	IsAvailable bool                 `json:"is_available"`
 	Price       int64                `json:"price"`
 	TotalStock  int                  `json:"stock"`
-	Image       ProductImageResponse `json:"images"`
+	Image       productImageResponse `json:"images"`
 }
 
-type ProductDetailResponse struct {
+type productDetailResponse struct {
 	ID          uuid.UUID              `json:"id"`
 	SKU         string                 `json:"sku"`
 	Name        string                 `json:"name"`
@@ -42,22 +52,12 @@ type ProductDetailResponse struct {
 	Weight      *float64               `json:"weight"`
 	TotalStock  int                    `json:"stock"`
 	UpdatedAt   *time.Time             `json:"updated_at"`
-	Images      []ProductImageResponse `json:"images"`
+	Images      []productImageResponse `json:"images"`
 }
 
-type ProductInventoryView struct {
+type productInventoryView struct {
 	ID         uuid.UUID `json:"id"`
 	ShopID     uuid.UUID `json:"shop_id"`
 	TotalStock int       `json:"stock"`
 	Available  int       `json:"available"`
-}
-
-type CreateProductRequest struct {
-	SKU         string           `json:"sku"`
-	Name        string           `json:"name"`
-	Description *string          `json:"description"`
-	IsAvailable bool             `json:"is_available"`
-	Status      ProductStatusDTO `json:"status"`
-	Price       int64            `json:"price"`
-	Weight      *float64         `json:"weight"`
 }

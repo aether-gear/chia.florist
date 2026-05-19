@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/cart/usecase"
 
@@ -33,22 +33,21 @@ func NewCartHandler(
 }
 
 func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
-	userID := r.URL.Query().Get("user_id")
-	parsedUserID, err := uuid.Parse(userID)
+	userID, err := apphttp.QueryUUID(r, "user_id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	result, err := h.getCart.Execute(parsedUserID)
+	result, err := h.getCart.Execute(*userID)
 	if err != nil {
 		return err
 	}
 	if result == nil || result.Cart == nil {
-		return errors.ErrNotFound
+		return apperrors.NewNotFound("cart not found")
 	}
 
 	var total int64
-	items := make([]CartItemView, 0, len(result.Cart.Items))
+	items := make([]cartItemView, 0, len(result.Cart.Items))
 
 	for _, item := range result.Cart.Items {
 		if result.Products == nil {
@@ -64,12 +63,12 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		quantity := item.Quantity
 		subtotal := price * int64(quantity)
 
-		image := ProductImageResponse{}
+		image := productImageResponse{}
 		if productData.Images.Thumbnail != "" {
 			image.Thumbnail = &productData.Images.Thumbnail
 		}
 
-		items = append(items, CartItemView{
+		items = append(items, cartItemView{
 			ProductID: item.ProductID,
 			ShopID:    item.ShopID,
 			Name:      productData.Product.Name,
@@ -82,7 +81,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		total += subtotal
 	}
 
-	response := CartResponse{
+	response := cartResponse{
 		CartID: result.Cart.ID,
 		Items:  items,
 		Total:  total,
@@ -96,29 +95,36 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 	var req addItemRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid request body")
 	}
 
 	userID, err := uuid.Parse(req.UserID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
 	productID, err := uuid.Parse(req.ProductID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid product id")
 	}
 
 	shopID, err := uuid.Parse(req.ShopID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	if req.Quantity <= 0 {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid quantity")
 	}
 
-	if err := h.addItem.Execute(userID, productID, shopID, req.Quantity); err != nil {
+	input := usecase.AddItemInput{
+		UserID:    userID,
+		ProductID: productID,
+		ShopID:    shopID,
+		Quantity:  req.Quantity,
+	}
+
+	if err := h.addItem.Execute(input); err != nil {
 		return err
 	}
 
@@ -134,30 +140,36 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 	var req updateItemRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid request body")
 	}
 
 	userID, err := uuid.Parse(req.UserID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
 	productID, err := uuid.Parse(req.ProductID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid product id")
 	}
 
 	shopID, err := uuid.Parse(req.ShopID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	if req.Quantity < 0 {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid quantity")
 	}
 
-	if err := h.updateItem.Execute(userID, productID, shopID, req.Quantity); err != nil {
+	input := usecase.UpdateItemInput{
+		UserID:    userID,
+		ProductID: productID,
+		ShopID:    shopID,
+		Quantity:  req.Quantity,
+	}
+
+	if err := h.updateItem.Execute(input); err != nil {
 		return err
 	}
 
@@ -170,26 +182,28 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
-	userID := r.URL.Query().Get("user_id")
-	productID := r.URL.Query().Get("product_id")
-	shopID := r.URL.Query().Get("shop_id")
-
-	parsedUserID, err := uuid.Parse(userID)
+	userID, err := apphttp.QueryUUID(r, "userID")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	parsedProductID, err := uuid.Parse(productID)
+	productID, err := apphttp.QueryUUID(r, "productID")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	parsedShopID, err := uuid.Parse(shopID)
+	shopID, err := apphttp.QueryUUID(r, "shopID")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	if err := h.removeItem.Execute(parsedUserID, parsedProductID, parsedShopID); err != nil {
+	input := usecase.RemoveItemInput{
+		UserID:    *userID,
+		ProductID: *productID,
+		ShopID:    *shopID,
+	}
+
+	if err := h.removeItem.Execute(input); err != nil {
 		return err
 	}
 
