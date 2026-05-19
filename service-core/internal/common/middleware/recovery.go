@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/common/logger"
 )
@@ -23,7 +23,7 @@ func Recovery(log logger.Logger) Middleware {
 						logger.Field{Key: "method", Value: r.Method},
 					)
 
-					err = errors.ErrInternal
+					err = apperrors.ErrInternal
 				}
 			}()
 

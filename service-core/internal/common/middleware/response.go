@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"strings"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 )
 
 type ErrResponse struct {
-	Type       errors.ErrorType `json:"type"`
-	StatusCode int              `json:"status_code"`
-	Message    string           `json:"message"`
+	Type       apperrors.ErrorType `json:"type"`
+	StatusCode int                 `json:"status_code"`
+	Message    string              `json:"message"`
 }
 
 func Response() Middleware {
@@ -20,7 +20,7 @@ func Response() Middleware {
 			err := next(w, r)
 
 			if err != nil {
-				appErr := errors.Resolve(err)
+				appErr := apperrors.Resolve(err)
 
 				msg := err.Error()
 				parts := strings.Split(msg, ":")
