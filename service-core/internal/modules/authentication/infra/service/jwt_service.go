@@ -21,17 +21,25 @@ func NewJWTService(secret string) repository.TokenService {
 	}
 }
 
+type jwtClaims struct {
+	UserID    string `json:"user_id"`
+	SessionID string `json:"session_id"`
+	Type      string `json:"type"`
+
+	jwt.RegisteredClaims
+}
+
 func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository.GeneratedToken, error) {
 	now := time.Now()
 	exp := now.Add(params.Duration)
 
-	claims := domain.TokenClaims{
+	claims := jwtClaims{
 		UserID:    params.UserID.String(),
 		SessionID: params.SessionID.String(),
-		Type:      params.Type,
+		Type:      string(params.Type),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(exp),
 			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(exp),
 		},
 	}
 
@@ -45,20 +53,23 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 		return repository.GeneratedToken{}, fmt.Errorf("sign jwt token failed: %w", err)
 	}
 
-	result := repository.GeneratedToken{
+	return repository.GeneratedToken{
 		Token:     signed,
 		ExpiresAt: exp,
 		Type:      params.Type,
-	}
-
-	return result, nil
+	}, nil
 }
 
 func (j *JWTService) Validate(tokenStr string) (*domain.TokenClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenStr,
-		&domain.TokenClaims{},
-		func(t *jwt.Token) (interface{}, error) {
+		&jwtClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			_, ok := token.Method.(*jwt.SigningMethodHMAC)
+			if !ok {
+				return nil, fmt.Errorf("unexpected jwt signing method")
+			}
+
 			return j.secretKey, nil
 		},
 	)
@@ -66,23 +77,30 @@ func (j *JWTService) Validate(tokenStr string) (*domain.TokenClaims, error) {
 		return nil, fmt.Errorf("parse jwt token failed: %w", err)
 	}
 
-	claims, ok := token.Claims.(*domain.TokenClaims)
-	if !ok || !token.Valid {
-		return nil, fmt.Errorf("invalid jwt token claims")
+	claims, ok := token.Claims.(*jwtClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid jwt claims type")
+	}
+
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid jwt token")
 	}
 
 	userID, err := uuid.Parse(claims.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid user id in claims: %w", err)
+		return nil, fmt.Errorf("invalid user id claim: %w", err)
 	}
 
 	sessionID, err := uuid.Parse(claims.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid session id in claims: %w", err)
+		return nil, fmt.Errorf("invalid session id claim: %w", err)
 	}
 
 	return &domain.TokenClaims{
-		UserID:    userID.String(),
-		SessionID: sessionID.String(),
+		UserID:    userID,
+		SessionID: sessionID,
+		Type:      domain.TokenType(claims.Type),
+		IssuedAt:  claims.IssuedAt.Time,
+		ExpiresAt: claims.ExpiresAt.Time,
 	}, nil
 }
