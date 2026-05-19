@@ -7,13 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"service-core/internal/modules/product/domain"
-	"service-core/internal/modules/product/repository"
-	"service-core/internal/modules/product/usecase"
-
 	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	appMultipart "service-core/internal/common/http/multipart"
+	"service-core/internal/modules/product/usecase"
 
 	"github.com/google/uuid"
 )
@@ -55,19 +52,19 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		limit = 10
 	}
 
-	params := repository.FindProductParams{
+	input := usecase.FindProductsInput{
 		Page:  page,
 		Limit: limit,
 	}
 
 	if name != "" {
-		params.Name = &name
+		input.Name = &name
 	}
 	if id != "" {
-		params.ID = &id
+		input.ID = &id
 	}
 
-	products, total, err := h.findProducts.Execute(params)
+	products, total, err := h.findProducts.Execute(input)
 	if err != nil {
 		return err
 	}
@@ -87,7 +84,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		}
 
 		result.IsAvailable =
-			p.Product.Status == domain.ProductStatusActive &&
+			ProductStatusDTO(p.Product.Status) == ProductStatusActive &&
 				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0
 
 		results = append(results, result)
@@ -173,7 +170,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		Images:      images,
 	}
 	response.IsAvailable =
-		product.Product.Status == domain.ProductStatusActive &&
+		ProductStatusDTO(product.Product.Status) == ProductStatusActive &&
 			available > 0
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -203,7 +200,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
-		Status:      domain.ProductStatus(req.Status),
+		Status:      string(req.Status),
 		Price:       req.Price,
 		Weight:      req.Weight,
 	})
@@ -270,16 +267,10 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 		return err
 	}
 
-	var response map[string]string
-	if len(files) > 1 {
-		response = map[string]string{
-			"message": "product images successfully added",
-		}
-	} else {
-		response = map[string]string{
-			"message": "product image successfully added",
-		}
+	response := map[string]string{
+		"message": "product image successfully added",
 	}
+
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }

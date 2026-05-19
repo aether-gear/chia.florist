@@ -32,7 +32,7 @@ type CreateProductInput struct {
 	SKU         string
 	Name        string
 	Description *string
-	Status      domain.ProductStatus
+	Status      string
 	Price       int64
 	Weight      *float64
 }
@@ -46,7 +46,7 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		Name:        input.Name,
 		Slug:        u.slugGen.Generate(input.Name),
 		Description: input.Description,
-		Status:      input.Status,
+		Status:      domain.ProductStatus(input.Status),
 		Price:       input.Price,
 		Weight:      input.Weight,
 		CreatedAt:   now,

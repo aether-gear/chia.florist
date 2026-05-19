@@ -45,14 +45,26 @@ type ProductCatalogResponse struct {
 	}
 }
 
+type FindProductsInput struct {
+	Page  int
+	Limit int
+	ID    *string
+	Name  *string
+}
+
 func (u *FindProductsUsecase) Execute(
-	params repository.FindProductParams,
+	input FindProductsInput,
 ) (
 	[]ProductCatalogResponse,
 	int,
 	error,
 ) {
-	products, total, err := u.productRepo.FindProducts(params)
+	products, total, err := u.productRepo.FindProducts(repository.FindProductParams{
+		Page:  input.Page,
+		Limit: input.Limit,
+		ID:    input.ID,
+		Name:  input.Name,
+	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load products: %w", err)
 	}
