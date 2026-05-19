@@ -18,9 +18,11 @@ import (
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
 	shopH "service-core/internal/modules/shop/delivery/http"
 	userH "service-core/internal/modules/user/delivery/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
-func NewRouter(c *Container) *http.ServeMux {
+func NewRouter(c *Container) *chi.Mux {
 	var (
 		log  = c.Logger
 		core = buildChain(log)
@@ -89,147 +91,78 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 	)
 
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
 
-	mux.HandleFunc(
-		"/product",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  productHandler.FindProducts,
-			http.MethodPost: productHandler.CreateProduct,
-		})),
-	)
-	mux.HandleFunc(
-		"/product/",
-		core(productHandler.GetProduct),
-	)
-	mux.HandleFunc(
-		"/product/images",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: productHandler.AddProductImages,
-		})),
-	)
-	mux.HandleFunc(
-		"/inventory",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: inventoryHandler.CreateInventory,
-		})),
-	)
+	r.Route("/", func(r chi.Router) {
 
-	mux.HandleFunc(
-		"/auth/signin",
-		core(authHandler.SignInEmail),
-	)
-	mux.HandleFunc(
-		"/auth/signup",
-		core(authHandler.SignUpAccount),
-	)
-	mux.HandleFunc(
-		"/auth/verify",
-		core(authHandler.VerifyAccount),
-	)
+		r.Route("/products", func(r chi.Router) {
+			r.Get("/", core(productHandler.FindProducts))
+			r.Post("/", core(productHandler.CreateProduct))
+			r.Get("/{id}", core(productHandler.GetProduct))
+			r.Post("/images", core(productHandler.AddProductImages))
+		})
 
-	mux.HandleFunc(
-		"/cart",
-		core(cartHandler.GetCart),
-	)
-	mux.HandleFunc(
-		"/cart/items",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost:   cartHandler.AddItem,
-			http.MethodPut:    cartHandler.UpdateItem,
-			http.MethodDelete: cartHandler.RemoveItem,
-		})),
-	)
+		r.Route("/inventories", func(r chi.Router) {
+			r.Post("/", core(inventoryHandler.CreateInventory))
+		})
 
-	mux.HandleFunc(
-		"/locations/provinces",
-		core(locationHandler.Province),
-	)
-	mux.HandleFunc(
-		"/locations/cities/",
-		core(locationHandler.City),
-	)
-	mux.HandleFunc(
-		"/locations/districts/",
-		core(locationHandler.District),
-	)
-	mux.HandleFunc(
-		"/locations/villages/",
-		core(locationHandler.Village),
-	)
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/signin", core(authHandler.SignInEmail))
+			r.Post("/signup", core(authHandler.SignUpAccount))
+			r.Post("/verify", core(authHandler.VerifyAccount))
+		})
 
-	mux.HandleFunc(
-		"/user/",
-		core(userHandler.GetUserByID),
-	)
-	mux.HandleFunc(
-		"/user/address",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressHandler.CreateUserAddress,
-		})),
-	)
+		r.Route("/carts", func(r chi.Router) {
+			r.Get("/", core(cartHandler.GetCart))
+			r.Route("/items", func(r chi.Router) {
+				r.Post("/", core(cartHandler.AddItem))
+				r.Put("/", core(cartHandler.UpdateItem))
+				r.Delete("/", core(cartHandler.RemoveItem))
+			})
+		})
 
-	mux.HandleFunc(
-		"/shop",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: shopHandler.CreateShop,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: shopHandler.GetShopByID,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/address",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressHandler.CreateShopAddress,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/address/",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressHandler.GetShopAddress,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/addresses/",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressHandler.ListShopAddresses,
-		})),
-	)
+		r.Route("/locations", func(r chi.Router) {
+			r.Get("/provinces", core(locationHandler.Province))
+			r.Get("/cities", core(locationHandler.City))
+			r.Get("/districts", core(locationHandler.District))
+			r.Get("/villages", core(locationHandler.Village))
+		})
 
-	mux.HandleFunc(
-		"/payment/account",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  paymentHandler.ListPaymentAccount,
-			http.MethodPost: paymentHandler.CreatePaymentAccount,
-		})),
-	)
-	mux.HandleFunc(
-		"/payment/method",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  paymentHandler.ListPaymentMethod,
-			http.MethodPost: paymentHandler.CreatePaymentMethod,
-		})),
-	)
+		r.Route("/users", func(r chi.Router) {
+			r.Get("/{id}", core(userHandler.GetUserByID))
+			r.Post("/addresses", core(addressHandler.CreateUserAddress))
+		})
 
-	mux.HandleFunc(
-		"/shops/couriers",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: courierHandler.ConfigureCourierShop,
-		})),
-	)
+		r.Route("/shops", func(r chi.Router) {
+			r.Post("/", core(shopHandler.CreateShop))
+			r.Get("/{id}", core(shopHandler.GetShopByID))
 
-	mux.HandleFunc(
-		"/shipping/cost",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: shipmentHandler.EstimateShippingOptions,
-		})),
-	)
+			r.Route("/addresses", func(r chi.Router) {
+				r.Get("/", core(addressHandler.ListShopAddresses))
+				r.Post("/", core(addressHandler.CreateShopAddress))
+				r.Get("/{id}", core(addressHandler.GetShopAddress))
+			})
+			r.Post("/couriers", core(courierHandler.ConfigureCourierShop))
+		})
 
-	return mux
+		r.Route("/payments", func(r chi.Router) {
+			r.Route("/accounts", func(r chi.Router) {
+				r.Get("/", core(paymentHandler.ListPaymentAccount))
+				r.Post("/", core(paymentHandler.CreatePaymentAccount))
+			})
+			r.Route("/methods", func(r chi.Router) {
+				r.Get("/", core(paymentHandler.ListPaymentMethod))
+				r.Post("/", core(paymentHandler.CreatePaymentMethod))
+			})
+		})
+
+		r.Route("/shipping", func(r chi.Router) {
+			r.Post("/cost", core(shipmentHandler.EstimateShippingOptions))
+		})
+
+	})
+
+	return r
 }
 
 func buildChain(log logger.Logger, extra ...middleware.Middleware) func(apphttp.AppHandler) http.HandlerFunc {

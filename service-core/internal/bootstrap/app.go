@@ -3,12 +3,14 @@ package bootstrap
 import (
 	"log"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type App struct {
 	infra     *Infra
 	container *Container
-	router    *http.ServeMux
+	router    *chi.Mux
 }
 
 func New(cfg Config) (*App, error) {
