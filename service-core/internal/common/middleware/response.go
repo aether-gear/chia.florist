@@ -8,6 +8,12 @@ import (
 	apphttp "service-core/internal/common/http"
 )
 
+type ErrResponse struct {
+	Type       errors.ErrorType `json:"type"`
+	StatusCode int              `json:"status_code"`
+	Message    string           `json:"message"`
+}
+
 func Response() Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
@@ -16,12 +22,15 @@ func Response() Middleware {
 			if err != nil {
 				appErr := errors.Resolve(err)
 
-				errors := []string{firstMessage(err), lastMessage(err)}
-				messDebug := strings.Join(errors, ": ")
+				msg := err.Error()
+				parts := strings.Split(msg, ":")
+				if len(parts) > 0 {
+					msg = strings.TrimSpace(parts[0])
+				}
+
 				errRes := ErrResponse{
 					Type:       appErr.Type,
-					Message:    firstMessage(err),
-					Debug:      &messDebug,
+					Message:    msg,
 					StatusCode: appErr.StatusCode,
 				}
 
@@ -33,33 +42,4 @@ func Response() Middleware {
 			return nil
 		}
 	}
-}
-
-func firstMessage(err error) string {
-	msg := err.Error()
-
-	parts := strings.Split(msg, ":")
-	if len(parts) > 0 {
-		return strings.TrimSpace(parts[0])
-	}
-
-	return msg
-}
-
-func lastMessage(err error) string {
-	msg := err.Error()
-
-	parts := strings.Split(msg, ":")
-	if len(parts) > 0 {
-		return strings.TrimSpace(parts[len(parts)-1])
-	}
-
-	return msg
-}
-
-type ErrResponse struct {
-	Type       errors.ErrorType `json:"type"`
-	StatusCode int              `json:"status_code"`
-	Message    string           `json:"message"`
-	Debug      *string          `json:"debug"`
 }
