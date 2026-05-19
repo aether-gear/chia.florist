@@ -94,16 +94,12 @@ func NewRouter(c *Container) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Route("/", func(r chi.Router) {
-
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", core(productHandler.FindProducts))
 			r.Post("/", core(productHandler.CreateProduct))
 			r.Get("/{id}", core(productHandler.GetProduct))
-			r.Post("/images", core(productHandler.AddProductImages))
-		})
 
-		r.Route("/inventories", func(r chi.Router) {
-			r.Post("/", core(inventoryHandler.CreateInventory))
+			r.Post("/{id}/images", core(productHandler.AddProductImages))
 		})
 
 		r.Route("/auth", func(r chi.Router) {
@@ -114,22 +110,31 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/carts", func(r chi.Router) {
 			r.Get("/", core(cartHandler.GetCart))
+
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", core(cartHandler.AddItem))
-				r.Put("/", core(cartHandler.UpdateItem))
-				r.Delete("/", core(cartHandler.RemoveItem))
+				r.Put("/{itemID}", core(cartHandler.UpdateItem))
+				r.Delete("/{itemID}", core(cartHandler.RemoveItem))
 			})
 		})
 
-		r.Route("/locations", func(r chi.Router) {
-			r.Get("/provinces", core(locationHandler.Province))
-			r.Get("/cities", core(locationHandler.City))
-			r.Get("/districts", core(locationHandler.District))
-			r.Get("/villages", core(locationHandler.Village))
+		r.Route("/provinces", func(r chi.Router) {
+			r.Get("/", core(locationHandler.Province))
+			r.Get("/{id}/cities", core(locationHandler.City))
+		})
+		r.Route("/cities", func(r chi.Router) {
+			r.Get("/{id}/districts", core(locationHandler.District))
+		})
+		r.Route("/districts", func(r chi.Router) {
+			r.Get("/{id}/villages", core(locationHandler.Village))
 		})
 
 		r.Route("/users", func(r chi.Router) {
 			r.Get("/{id}", core(userHandler.GetUserByID))
+		})
+
+		r.Route("/users/me", func(r chi.Router) {
+			r.Get("/", core(userHandler.GetUserByID))
 			r.Post("/addresses", core(addressHandler.CreateUserAddress))
 		})
 
@@ -137,12 +142,20 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Post("/", core(shopHandler.CreateShop))
 			r.Get("/{id}", core(shopHandler.GetShopByID))
 
-			r.Route("/addresses", func(r chi.Router) {
+			r.Route("/{id}/addresses", func(r chi.Router) {
 				r.Get("/", core(addressHandler.ListShopAddresses))
 				r.Post("/", core(addressHandler.CreateShopAddress))
-				r.Get("/{id}", core(addressHandler.GetShopAddress))
+				r.Get("/{addressID}", core(addressHandler.GetShopAddress))
 			})
-			r.Post("/couriers", core(courierHandler.ConfigureCourierShop))
+
+			r.Route("/{id}/couriers", func(r chi.Router) {
+				r.Post("/", core(courierHandler.ConfigureCourierShop))
+			})
+
+			r.Route("/{id}/products", func(r chi.Router) {
+				r.Post("/{productID}/inventories",
+					core(inventoryHandler.AddInventory))
+			})
 		})
 
 		r.Route("/payments", func(r chi.Router) {
@@ -150,6 +163,7 @@ func NewRouter(c *Container) *chi.Mux {
 				r.Get("/", core(paymentHandler.ListPaymentAccount))
 				r.Post("/", core(paymentHandler.CreatePaymentAccount))
 			})
+
 			r.Route("/methods", func(r chi.Router) {
 				r.Get("/", core(paymentHandler.ListPaymentMethod))
 				r.Post("/", core(paymentHandler.CreatePaymentMethod))
@@ -159,7 +173,6 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/shipping", func(r chi.Router) {
 			r.Post("/cost", core(shipmentHandler.EstimateShippingOptions))
 		})
-
 	})
 
 	return r
