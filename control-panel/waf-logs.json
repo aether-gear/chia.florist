@@ -2683,5 +2683,65 @@
     "status": "Allowed",
     "details": "Passed WAF Checks",
     "geo": "UNK"
+  },
+  {
+    "id": "1779278494219876800-1",
+    "timestamp": "2026-05-20T19:01:34.2198768+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1779278494268780300-2",
+    "timestamp": "2026-05-20T19:01:34.2687803+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1779278580741036100-3",
+    "timestamp": "2026-05-20T19:03:00.7410361+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1779278580779403000-4",
+    "timestamp": "2026-05-20T19:03:00.779403+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1779279415724685800-5",
+    "timestamp": "2026-05-20T19:16:55.7246858+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
+  },
+  {
+    "id": "1779279415752541900-6",
+    "timestamp": "2026-05-20T19:16:55.7525419+07:00",
+    "ip": "::1",
+    "method": "GET",
+    "url": "/favicon.ico",
+    "status": "Allowed",
+    "details": "Passed WAF Checks",
+    "geo": "UNK"
   }
 ]
