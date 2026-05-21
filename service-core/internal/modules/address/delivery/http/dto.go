@@ -7,7 +7,6 @@ import (
 )
 
 type createUserAddressRequest struct {
-	UserID       string  `json:"user_id"`
 	ReceiverName string  `json:"receiver_name"`
 	Phone        *string `json:"phone"`
 	IsDefault    *string `json:"is_default"`

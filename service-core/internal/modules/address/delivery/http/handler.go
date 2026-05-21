@@ -8,6 +8,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/address/usecase"
+	authendomain "service-core/internal/modules/authentication/domain"
 
 	"github.com/google/uuid"
 )
@@ -37,12 +38,12 @@ func NewAddressHandler(
 }
 
 func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Request) error {
-	userID, err := apphttp.ParamUUID(r, "userID")
-	if err != nil {
-		return apperrors.NewBadRequest("invallid user id")
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	result, err := h.listUserAddresses.ListByUserID(userID)
+	result, err := h.listUserAddresses.ListByUserID(authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -97,22 +98,25 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewBadRequest("invalid postal code")
 	}
 
-	parsedUserID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	var parsedIsActive bool
-	parsedIsActive, err = strconv.ParseBool(*req.IsDefault)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid active status")
+	var parsedIsDefault = false
+	if req.IsDefault != nil && *req.IsDefault != "" {
+		parsed, err := strconv.ParseBool(*req.IsDefault)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid default status")
+		}
+		parsedIsDefault = parsed
 	}
 
 	input := usecase.CreateAddressInput{
-		UserID:       parsedUserID,
+		UserID:       authCtx.UserID,
 		ReceiverName: req.ReceiverName,
 		Phone:        req.Phone,
-		IsDefault:    &parsedIsActive,
+		IsDefault:    &parsedIsDefault,
 		ProvinceID:   req.ProvinceID,
 		CityID:       req.CityID,
 		DistrictID:   req.DistrictID,
@@ -121,7 +125,7 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:   req.PostalCode,
 	}
 
-	err = h.createUserAddress.Execute(input)
+	err := h.createUserAddress.Execute(input)
 	if err != nil {
 		return err
 	}

@@ -3,14 +3,12 @@ package http
 import "github.com/google/uuid"
 
 type addItemRequest struct {
-	UserID    string `json:"user_id"`
 	ProductID string `json:"product_id"`
 	ShopID    string `json:"shop_id"`
 	Quantity  int    `json:"quantity"`
 }
 
 type updateItemRequest struct {
-	UserID    string `json:"user_id"`
 	ProductID string `json:"product_id"`
 	ShopID    string `json:"shop_id"`
 	Quantity  int    `json:"quantity"`

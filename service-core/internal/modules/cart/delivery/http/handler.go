@@ -6,6 +6,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	authdomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/cart/usecase"
 
 	"github.com/google/uuid"
@@ -33,12 +34,12 @@ func NewCartHandler(
 }
 
 func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
-	userID, err := apphttp.QueryUUID(r, "user_id")
-	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	result, err := h.getCart.Execute(*userID)
+	result, err := h.getCart.Execute(authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -98,9 +99,9 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
 	productID, err := uuid.Parse(req.ProductID)
@@ -118,7 +119,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	input := usecase.AddItemInput{
-		UserID:    userID,
+		UserID:    authCtx.UserID,
 		ProductID: productID,
 		ShopID:    shopID,
 		Quantity:  req.Quantity,
@@ -143,9 +144,9 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
 	productID, err := uuid.Parse(req.ProductID)
@@ -163,7 +164,7 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	input := usecase.UpdateItemInput{
-		UserID:    userID,
+		UserID:    authCtx.UserID,
 		ProductID: productID,
 		ShopID:    shopID,
 		Quantity:  req.Quantity,
@@ -182,23 +183,23 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
-	userID, err := apphttp.QueryUUID(r, "userID")
-	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
 	productID, err := apphttp.QueryUUID(r, "productID")
 	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+		return apperrors.NewBadRequest("invalid product id")
 	}
 
 	shopID, err := apphttp.QueryUUID(r, "shopID")
 	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	input := usecase.RemoveItemInput{
-		UserID:    *userID,
+		UserID:    authCtx.UserID,
 		ProductID: *productID,
 		ShopID:    *shopID,
 	}

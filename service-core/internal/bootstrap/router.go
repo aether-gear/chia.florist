@@ -139,7 +139,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
-			r.Get("/", protected(userHandler.GetUserByID))
+			r.Get("/", protected(userHandler.GetCurrentUser))
 
 			r.Route("/addresses", func(r chi.Router) {
 				r.Get("/", protected(addressHandler.ListUserAddresses))

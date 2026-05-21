@@ -7,6 +7,8 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	appcookie "service-core/internal/common/http/cookie"
+	authdomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/usecase"
 
 	"github.com/google/uuid"
@@ -34,17 +36,12 @@ func NewAuthHandler(
 }
 
 func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
-	UserId, ok := r.Context().Value("user_id").(string)
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
 	if !ok {
-		return apperrors.ErrUnauthorized
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	userID, err := uuid.Parse(UserId)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid user id")
-	}
-
-	acc, err := h.getAccount.Execute(userID)
+	acc, err := h.getAccount.Execute(authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -89,7 +86,7 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "chast",
+		Name:     appcookie.AccessTokenCookieName,
 		Value:    tokens.AccessToken.Token,
 		Path:     "/",
 		HttpOnly: true,
@@ -176,7 +173,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "chast",
+		Name:     appcookie.AccessTokenCookieName,
 		Value:    tokens.AccessToken.Token,
 		Path:     "/",
 		HttpOnly: true,
