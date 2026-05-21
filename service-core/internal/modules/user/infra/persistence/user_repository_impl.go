@@ -38,14 +38,16 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 
 	query := `
 		SELECT 
-			id, 
-			name, 
-			username, 
-			phone,
-			created_at, 
-			updated_at, 
-			deleted_at
-		FROM users
+			u.id, 
+			u.name, 
+			u.username, 
+			u.phone,
+			u.created_at, 
+			u.updated_at, 
+			u.deleted_at,
+			a.last_login_at
+		FROM users u
+		LEFT JOIN accounts a ON a.user_id = u.id
 	`
 
 	if params.ID != nil {
@@ -130,15 +132,17 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 
 	query := `
 		SELECT
-			id,
-			name,
-			username,
-			phone,
-			created_at,
-			updated_at,
-			deleted_at
-		FROM users
-		WHERE id = $1
+			u.id,
+			u.name,
+			u.username,
+			u.phone,
+			u.created_at,
+			u.updated_at,
+			u.deleted_at,
+			a.last_login_at
+		FROM users u
+		LEFT JOIN accounts a ON a.user_id = u.id
+		WHERE u.id = $1
 		LIMIT 1
 	`
 
@@ -155,6 +159,10 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 		&m.LastLoginAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
 		return &domain.User{}, fmt.Errorf("query user by id failed: %w", err)
 	}
 
@@ -167,15 +175,17 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 
 	query := `
 		SELECT 
-			id,
-			name,
-			username,
-			phone,
-			created_at,
-			updated_at,
-			deleted_at
-		FROM users
-		WHERE username = $1
+			u.id,
+			u.name,
+			u.username,
+			u.phone,
+			u.created_at,
+			u.updated_at,
+			u.deleted_at,
+			a.last_login_at
+		FROM users u
+		LEFT JOIN accounts a ON a.user_id = u.id
+		WHERE u.username = $1
 		LIMIT 1
 	`
 
@@ -189,6 +199,7 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 		&m.CreatedAt,
 		&m.UpdatedAt,
 		&m.DeletedAt,
+		&m.LastLoginAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
