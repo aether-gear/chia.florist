@@ -2,8 +2,7 @@ package bootstrap
 
 import (
 	"service-core/internal/common/logger"
-
-	aService "service-core/internal/modules/authentication/infra/service"
+	appmiddleware "service-core/internal/common/middleware"
 
 	imgService "service-core/internal/shared/image"
 	mailer "service-core/internal/shared/mailer"
@@ -13,14 +12,14 @@ import (
 	adRepoImpl "service-core/internal/modules/address/infra/persistence"
 	aRepoImpl "service-core/internal/modules/authentication/infra/persistence"
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
-
-	// lRepoImpl "service-core/internal/modules/location/infra/persistence"
 	coRepoImpl "service-core/internal/modules/courier/infra/persistence"
 	iRepoImpl "service-core/internal/modules/inventory/infra/persistence"
 	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
 	sRepoImpl "service-core/internal/modules/shop/infra/persistence"
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
+
+	aService "service-core/internal/modules/authentication/infra/service"
 
 	adUC "service-core/internal/modules/address/usecase"
 	aUC "service-core/internal/modules/authentication/usecase"
@@ -36,7 +35,9 @@ import (
 )
 
 type Container struct {
-	Logger logger.Logger
+	Logger             logger.Logger
+	CORSAllowedOrigins []string
+	AuthMiddleware     appmiddleware.Middleware
 
 	ImageVariantProvider imgService.VariantCreator
 	ImageTransformer     imgService.ImageTransformer
@@ -83,16 +84,17 @@ type Container struct {
 func NewContainer(cfg Config, infra *Infra) *Container {
 	var (
 		log = logger.NewZapLogger(cfg.App.Env)
+	)
 
-		productRepo      = pRepoImpl.NewProductRepository(infra.DB)
-		productImageRepo = pRepoImpl.NewProductImageRepository(infra.DB)
-		inventoryRepo    = iRepoImpl.NewInventoryRepository(infra.DB)
-		authRepo         = aRepoImpl.NewAccountRepository(infra.DB)
-		challengeRepo    = aRepoImpl.NewChallengeRepository(infra.DB)
-		sessionRepo      = aRepoImpl.NewSessionRepositoryImpl(infra.DB)
-		refreshTokenRepo = aRepoImpl.NewRefreshTokenRepositoryImpl(infra.DB)
-		cartRepo         = cRepoImpl.NewCartRepositoryImpl(infra.DB)
-		// locationRepo = lRepoImpl.NewLocationRepositoryImpl(db)
+	var (
+		productRepo       = pRepoImpl.NewProductRepository(infra.DB)
+		productImageRepo  = pRepoImpl.NewProductImageRepository(infra.DB)
+		inventoryRepo     = iRepoImpl.NewInventoryRepository(infra.DB)
+		authRepo          = aRepoImpl.NewAccountRepository(infra.DB)
+		challengeRepo     = aRepoImpl.NewChallengeRepository(infra.DB)
+		sessionRepo       = aRepoImpl.NewSessionRepositoryImpl(infra.DB)
+		refreshTokenRepo  = aRepoImpl.NewRefreshTokenRepositoryImpl(infra.DB)
+		cartRepo          = cRepoImpl.NewCartRepositoryImpl(infra.DB)
 		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
 		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(infra.DB)
 		addressShopRepo   = adRepoImpl.NewShopAddressRepositoryImpl(infra.DB)
@@ -104,12 +106,15 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 	)
 
 	var (
-		tokenSvc = aService.NewJWTService(cfg.JWT.Secret)
-
+		tokenSvc    = aService.NewJWTService(cfg.JWT.Secret)
 		pwHasher    = aService.NewBcryptHasher()
 		tokenHasher = aService.NewSHATokenHasher()
+		authMidd    = aService.NewAuthMiddleware(tokenSvc, sessionRepo)
+	)
 
-		slugGen    = sGen.NewGenerator()
+	var (
+		slugGen = sGen.NewGenerator()
+
 		mailSender = mailer.NewSMTPSender(
 			cfg.SMTP.Host,
 			cfg.SMTP.Port,
@@ -117,6 +122,7 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 			cfg.SMTP.Password,
 			cfg.SMTP.From,
 		)
+
 		otpGen = otp.NewNumericGenerator(6)
 
 		imageTransformer     = imgService.NewImageTransformer()
@@ -124,7 +130,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 	)
 
 	return &Container{
-		Logger: log,
+		Logger:             log,
+		AuthMiddleware:     authMidd.RequireAuth(),
+		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
 
 		FindProducts: *pUC.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,

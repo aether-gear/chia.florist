@@ -24,8 +24,13 @@ import (
 
 func NewRouter(c *Container) *chi.Mux {
 	var (
-		log  = c.Logger
-		core = buildChain(log)
+		log       = c.Logger
+		core      = buildChain(log, c.CORSAllowedOrigins)
+		protected = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.AuthMiddleware,
+		)
 	)
 
 	var (
@@ -109,12 +114,12 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/carts", func(r chi.Router) {
-			r.Get("/", core(cartHandler.GetCart))
+			r.Get("/", protected(cartHandler.GetCart))
 
 			r.Route("/items", func(r chi.Router) {
-				r.Post("/", core(cartHandler.AddItem))
-				r.Put("/{itemID}", core(cartHandler.UpdateItem))
-				r.Delete("/{itemID}", core(cartHandler.RemoveItem))
+				r.Post("/", protected(cartHandler.AddItem))
+				r.Put("/{itemID}", protected(cartHandler.UpdateItem))
+				r.Delete("/{itemID}", protected(cartHandler.RemoveItem))
 			})
 		})
 
@@ -134,8 +139,12 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
-			r.Get("/", core(userHandler.GetUserByID))
-			r.Post("/addresses", core(addressHandler.CreateUserAddress))
+			r.Get("/", protected(userHandler.GetUserByID))
+
+			r.Route("/addresses", func(r chi.Router) {
+				r.Get("/", protected(addressHandler.ListUserAddresses))
+				r.Post("/", protected(addressHandler.CreateUserAddress))
+			})
 		})
 
 		r.Route("/shops", func(r chi.Router) {
@@ -178,8 +187,13 @@ func NewRouter(c *Container) *chi.Mux {
 	return r
 }
 
-func buildChain(log logger.Logger, extra ...middleware.Middleware) func(apphttp.AppHandler) http.HandlerFunc {
+func buildChain(
+	log logger.Logger,
+	allowedOrigins []string,
+	extra ...middleware.Middleware,
+) func(apphttp.AppHandler) http.HandlerFunc {
 	base := []middleware.Middleware{
+		middleware.CORS(allowedOrigins),
 		middleware.Recovery(log),
 		middleware.Logging(log),
 		middleware.Response(),
