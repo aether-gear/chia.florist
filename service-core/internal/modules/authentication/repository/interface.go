@@ -10,6 +10,7 @@ import (
 type AccountRepository interface {
 	GetByEmail(email string) (*domain.Account, error)
 	GetByID(id uuid.UUID) (*domain.Account, error)
+	GetByUserID(id uuid.UUID) (*domain.Account, error)
 
 	ActivateByUserID(id uuid.UUID) error
 

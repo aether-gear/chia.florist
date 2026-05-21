@@ -112,6 +112,49 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	return &m, nil
 }
 
+func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT
+			id,
+			user_id,
+			email,
+			password,
+			status,
+			last_login_at,
+			created_at,
+			updated_at
+		FROM
+			accounts
+		WHERE
+			user_id = $1
+		LIMIT 1
+	`
+
+	var m domain.Account
+
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&m.ID,
+		&m.UserID,
+		&m.Email,
+		&m.Password,
+		&m.Status,
+		&m.LastLoginAt,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query account by user id failed: %w", err)
+	}
+
+	return &m, nil
+}
+
 func (r *accountRepositoryImpl) ActivateByUserID(
 	id uuid.UUID,
 ) error {
