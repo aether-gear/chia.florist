@@ -1,4 +1,4 @@
-package errors
+package apperrors
 
 import "service-core/internal/common/logger"
 

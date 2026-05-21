@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/common/logger"
 )
@@ -23,7 +23,7 @@ func Logging(log logger.Logger) Middleware {
 			}
 
 			if err != nil {
-				appErr := errors.Resolve(err)
+				appErr := apperrors.Resolve(err)
 
 				fields = append(fields,
 					logger.Field{Key: "error", Value: err.Error()},

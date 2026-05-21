@@ -1,11 +1,11 @@
 package http
 
-type CourierSelectionRequest struct {
+type courierSelectionRequest struct {
 	Code      string `json:"code" validate:"required"`
 	IsEnabled bool   `json:"is_enabled"`
 }
 
-type ConfigureCourierShopRequest struct {
+type configureCourierShopRequest struct {
 	ShopID   string                    `json:"shop_id"`
-	Couriers []CourierSelectionRequest `json:"couriers" validate:"required,min=1,dive"`
+	Couriers []courierSelectionRequest `json:"couriers" validate:"required,min=1,dive"`
 }

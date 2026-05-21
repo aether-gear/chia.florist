@@ -3,6 +3,8 @@ package multipart
 import (
 	"errors"
 	"net/http"
+
+	apperrors "service-core/internal/common/errors"
 )
 
 func ParseSingle(
@@ -37,16 +39,15 @@ func ParseMultiple(
 ) ([]File, error) {
 	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
-		return nil, err
+		return nil, apperrors.NewBadRequest(ErrInvalidMultipartForm.Error())
 	}
 
 	headers := r.MultipartForm.File[field]
 	if len(headers) == 0 {
-		return nil, errors.New("multipart files not found")
+		return nil, apperrors.NewNotFound(ErrNotFoundMultipartFiles.Error())
 	}
 
 	files := make([]File, 0, len(headers))
-
 	for _, h := range headers {
 		src, err := h.Open()
 		if err != nil {

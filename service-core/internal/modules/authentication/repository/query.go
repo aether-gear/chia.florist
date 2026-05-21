@@ -7,11 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type TokenPayload struct {
-	UserID    uuid.UUID
-	SessionID uuid.UUID
-}
-
 type GenerateTokenParams struct {
 	UserID    uuid.UUID
 	SessionID uuid.UUID

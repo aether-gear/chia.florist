@@ -22,7 +22,7 @@ func NewGetAccountUsecase(
 }
 
 func (u *GetAccountUsecase) Execute(id uuid.UUID) (*domain.Account, error) {
-	acc, err := u.authRepo.GetByID(id)
+	acc, err := u.authRepo.GetByUserID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}

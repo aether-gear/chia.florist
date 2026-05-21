@@ -1,6 +1,6 @@
 package http
 
-type EstimateShippingOptionsRequest struct {
+type estimateShippingOptionsRequest struct {
 	Origin      int      `json:"origin"`
 	Destination int      `json:"destination"`
 	Weight      int      `json:"weight"`
@@ -8,7 +8,7 @@ type EstimateShippingOptionsRequest struct {
 	PriceFilter *string  `json:"price_filter"`
 }
 
-type EstimateShippingOptionsResponse struct {
+type estimateShippingOptionsResponse struct {
 	Name        string `json:"name"`
 	Code        string `json:"code"`
 	Service     string `json:"service"`

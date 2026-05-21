@@ -4,7 +4,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreatePaymentAccountRequest struct {
+type createPaymentAccountRequest struct {
 	MethodID      string  `json:"method_id"`
 	AccountName   string  `json:"account_name"`
 	AccountNumber *string `json:"account_number"`
@@ -13,7 +13,7 @@ type CreatePaymentAccountRequest struct {
 	IsActive      string  `json:"is_active"`
 }
 
-type CreatePaymentMethodRequest struct {
+type createPaymentMethodRequest struct {
 	Name          string  `json:"name"`
 	Type          string  `json:"type"`
 	IsActive      string  `json:"is_active"`
@@ -23,7 +23,7 @@ type CreatePaymentMethodRequest struct {
 	FeePercentage *string `json:"fee_percentage"`
 }
 
-type PaymentMethodResponse struct {
+type paymentMethodResponse struct {
 	ID            uuid.UUID `json:"id"`
 	Name          string    `json:"name"`
 	Type          string    `json:"type"`
@@ -34,7 +34,7 @@ type PaymentMethodResponse struct {
 	FeePercentage float64   `json:"fee_percentage"`
 }
 
-type PaymentAccountResponse struct {
+type paymentAccountResponse struct {
 	ID            uuid.UUID `json:"id"`
 	MethodID      uuid.UUID `json:"method_id"`
 	AccountName   string    `json:"account_name"`

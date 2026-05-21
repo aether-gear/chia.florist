@@ -4,14 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"service-core/internal/modules/shop/usecase"
-
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-
-	"github.com/google/uuid"
+	"service-core/internal/modules/shop/usecase"
 )
 
 type ShopHandler struct {
@@ -30,26 +26,17 @@ func NewAddressHandler(
 }
 
 func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 || parts[2] == "" {
-		return errors.ErrBadRequest
-	}
-
-	id := parts[2]
-	if id == "" {
-		return errors.ErrBadRequest
-	}
-	parsedShopID, err := uuid.Parse(id)
+	id, err := apphttp.ParamUUID(r, "id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	result, err := h.getShop.GetByID(parsedShopID)
+	result, err := h.getShop.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	response := map[string]GetShopResponse{
+	response := map[string]getShopResponse{
 		"shop": {
 			ID:          result.ID,
 			Name:        result.Name,
@@ -66,29 +53,29 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
-	var req CreateShopRequest
+	var req createShopRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid request body")
 	}
 
 	if req.Name == "" {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid name")
 	}
 
-	var parsedBool bool
-	parsedBool, err := strconv.ParseBool(req.IsActive)
+	var parsedIsActive bool
+	parsedIsActive, err := strconv.ParseBool(req.IsActive)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid active status")
 	}
 
-	shopInput := usecase.CreateShopInput{
+	input := usecase.CreateShopInput{
 		Name:        req.Name,
 		Description: req.Description,
-		IsActive:    parsedBool,
+		IsActive:    parsedIsActive,
 	}
 
-	err = h.createShop.Execute(shopInput)
+	err = h.createShop.Execute(input)
 	if err != nil {
 		return err
 	}

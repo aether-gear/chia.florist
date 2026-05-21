@@ -1,6 +1,7 @@
 package repository
 
 import (
+	appmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
 
 	"github.com/google/uuid"
@@ -9,6 +10,7 @@ import (
 type AccountRepository interface {
 	GetByEmail(email string) (*domain.Account, error)
 	GetByID(id uuid.UUID) (*domain.Account, error)
+	GetByUserID(id uuid.UUID) (*domain.Account, error)
 
 	ActivateByUserID(id uuid.UUID) error
 
@@ -48,4 +50,8 @@ type PasswordHasher interface {
 type TokenHasher interface {
 	Hash(token string) string
 	Compare(hash string, token string) bool
+}
+
+type Authenticator interface {
+	RequireAuth() appmiddleware.Middleware
 }
