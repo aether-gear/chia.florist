@@ -1,6 +1,7 @@
 package repository
 
 import (
+	appmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
 
 	"github.com/google/uuid"
@@ -48,4 +49,8 @@ type PasswordHasher interface {
 type TokenHasher interface {
 	Hash(token string) string
 	Compare(hash string, token string) bool
+}
+
+type Authenticator interface {
+	RequireAuth() appmiddleware.Middleware
 }

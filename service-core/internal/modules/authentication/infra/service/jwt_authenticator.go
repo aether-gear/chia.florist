@@ -1,4 +1,4 @@
-package middleware
+package service
 
 import (
 	"fmt"
@@ -13,26 +13,38 @@ import (
 	authenrepo "service-core/internal/modules/authentication/repository"
 )
 
-func RequireAuth(
+type authMiddleware struct {
+	tokenSvc    authenrepo.TokenService
+	sessionRepo authenrepo.SessionRepository
+}
+
+func NewAuthMiddleware(
 	tokenSvc authenrepo.TokenService,
 	sessionRepo authenrepo.SessionRepository,
-) commonmiddleware.Middleware {
+) authenrepo.Authenticator {
+	return &authMiddleware{
+		tokenSvc:    tokenSvc,
+		sessionRepo: sessionRepo,
+	}
+}
+
+func (aM *authMiddleware) RequireAuth() commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			token, err := appcookie.CookieValue(r, appcookie.AccessTokenCookieName)
 			if err != nil {
-				return apperrors.NewUnauthorized(ErrAuthenticationRequired.Error())
+				return apperrors.NewUnauthorized(authendomain.ErrAuthenticationRequired.Error())
 			}
 
-			claims, err := tokenSvc.Validate(token)
+			claims, err := aM.tokenSvc.Validate(token)
 			if err != nil {
-				return apperrors.NewUnauthorized(ErrInvalidToken.Error())
+				return apperrors.NewUnauthorized(authendomain.ErrInvalidToken.Error())
 			}
 			if claims.Type != authendomain.TokenTypeAccess {
-				return apperrors.NewUnauthorized(ErrInvalidToken.Error())
+				return apperrors.NewUnauthorized(authendomain.ErrInvalidToken.Error())
 			}
 
-			session, err := sessionRepo.GetByID(claims.SessionID)
+			session, err := aM.sessionRepo.GetByID(claims.SessionID)
 			if err != nil {
 				return fmt.Errorf("failed to load session: %w", err)
 			}
@@ -40,7 +52,7 @@ func RequireAuth(
 				session.UserID != claims.UserID ||
 				session.RevokedAt != nil ||
 				session.ExpiresAt.Before(time.Now()) {
-				return apperrors.NewUnauthorized(ErrInvalidSession.Error())
+				return apperrors.NewUnauthorized(authendomain.ErrInvalidSession.Error())
 			}
 
 			authCtx := authendomain.AuthContext{
