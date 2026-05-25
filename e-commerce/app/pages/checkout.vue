@@ -32,8 +32,8 @@ const handlePlaceOrder = () => {
     return
   }
   
-  // Nanti di sini kita sambungkan ke Payment Gateway
-  alert('Order placed successfully! Proceeding to the payment gateway...')
+  // Amankan data order ke local storage atau state jika diperlukan, lalu pindah ke page payment
+  navigateTo('/payment')
 }
 </script>
 
