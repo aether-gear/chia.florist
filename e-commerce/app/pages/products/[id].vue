@@ -116,10 +116,23 @@ const handleAddToCart = () => {
   navigateTo('/cart')
 }
 
-// Logika Placeholder untuk Buy Now
+// INTEGRASI BUTTON: Logika Buy Now (Langsung Bypass ke Checkout Page)
 const handleBuyNow = () => {
   if (!product.value.available) return
-  alert('Redirecting to checkout panel... (Payment integration system is coming right up next!)')
+
+  // 1. Masukkan ke state keranjang global dulu agar datanya terbaca di checkout
+  addToCart({
+    id: product.value.id,
+    name: product.value.name,
+    price: product.value.price,
+    image: activeImage.value,
+    size: selectedSize.value,
+    color: selectedColor.value,
+    isCustom: false
+  }, quantity.value)
+
+  // 2. Langsung lempar user ke halaman formulir checkout
+  navigateTo('/checkout')
 }
 
 useHead({
