@@ -22,7 +22,7 @@ const { orders } = useCart()
 // Menyediakan fungsi logout lokal
 const handleLogout = () => {
   window.alert('Logging out...')
-  navigateTo('/')
+  navigateTo('/login')
 }
 
 // Memfilter pesanan yang ditampilkan berdasarkan sub-tab status yang aktif

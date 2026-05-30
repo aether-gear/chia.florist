@@ -8,7 +8,7 @@
       
       <div class="hidden md:block h-[600px]">
         <img 
-          src="/images/flower.jpg" 
+          src="/images/florist.jpg"
           alt="Plants Decor" 
           class="w-full h-full object-cover rounded-xl shadow-sm"
         />
