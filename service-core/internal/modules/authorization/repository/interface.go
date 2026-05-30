@@ -6,12 +6,11 @@ import (
 	"github.com/google/uuid"
 )
 
-type RoleRepository interface {
-	ListByUserID(userID uuid.UUID) ([]domain.Role, error)
+type ActorService interface {
+	Load(accountID uuid.UUID) (*domain.Actor, error)
+}
 
-	AssignToUserID(userID, roleID uuid.UUID) error
-
-	RemoveFromUser(userID, roleID uuid.UUID)
-
-	HasRole(userID uuid.UUID, code string) (bool, error)
+type Authorizer interface {
+	IsMerchant(actor *domain.Actor) bool
+	IsCustomer(actor *domain.Actor) bool
 }
