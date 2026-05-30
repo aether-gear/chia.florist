@@ -195,7 +195,7 @@ const productOfferings = ref([
 
     <section class="max-w-7xl mx-auto px-8 py-20 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
       <div class="h-[450px]">
-        <img src="/images/flower.jpg" alt="Gallery preview" class="w-full h-full object-cover rounded-xl shadow-sm" />
+        <img src="/images/florist.jpg" alt="Gallery preview" class="w-full h-full object-cover rounded-xl shadow-sm" />
       </div>
       <div class="grid grid-cols-2 gap-8">
         

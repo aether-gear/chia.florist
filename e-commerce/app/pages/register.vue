@@ -8,7 +8,7 @@
       
       <div class="hidden md:block h-[600px]">
         <img 
-          src="/images/flower.jpg" 
+          src="/images/florist.jpg"
           alt="Plants Decor" 
           class="w-full h-full object-cover rounded-xl shadow-sm"
         />
@@ -39,8 +39,8 @@
 
           <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
             <input 
-              type="password" 
-              placeholder="Password" 
+              type="new password" 
+              placeholder="New Password" 
               class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
             />
           </div>
