@@ -5,28 +5,28 @@ import (
 	"time"
 
 	appErr "service-core/internal/common/errors"
-	authenDomain "service-core/internal/modules/authentication/domain"
-	authenRepo "service-core/internal/modules/authentication/repository"
+	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/repository"
 
 	"github.com/google/uuid"
 )
 
 type LoginEmailUsecase struct {
-	accountRepo      authenRepo.AccountRepository
-	pwHasher         authenRepo.PasswordHasher
-	tokenHasher      authenRepo.TokenHasher
-	tokenSvc         authenRepo.TokenService
-	sessionRepo      authenRepo.SessionRepository
-	refreshTokenRepo authenRepo.RefreshTokenRepository
+	accountRepo      repository.AccountRepository
+	pwHasher         repository.PasswordHasher
+	tokenHasher      repository.TokenHasher
+	tokenSvc         repository.TokenService
+	sessionRepo      repository.SessionRepository
+	refreshTokenRepo repository.RefreshTokenRepository
 }
 
 func NewLoginEmailUsecase(
-	accountRepo authenRepo.AccountRepository,
-	pwHasher authenRepo.PasswordHasher,
-	tokenHasher authenRepo.TokenHasher,
-	tokenSvc authenRepo.TokenService,
-	sessionRepo authenRepo.SessionRepository,
-	refreshTokenRepo authenRepo.RefreshTokenRepository,
+	accountRepo repository.AccountRepository,
+	pwHasher repository.PasswordHasher,
+	tokenHasher repository.TokenHasher,
+	tokenSvc repository.TokenService,
+	sessionRepo repository.SessionRepository,
+	refreshTokenRepo repository.RefreshTokenRepository,
 ) *LoginEmailUsecase {
 	return &LoginEmailUsecase{
 		accountRepo:      accountRepo,
@@ -46,7 +46,7 @@ type LoginEmailParams struct {
 }
 
 type LoginEmailResult struct {
-	AccessToken, RefreshToken authenRepo.GeneratedToken
+	AccessToken, RefreshToken repository.GeneratedToken
 }
 
 func (u *LoginEmailUsecase) Execute(input LoginEmailParams) (*LoginEmailResult, error) {
@@ -54,38 +54,21 @@ func (u *LoginEmailUsecase) Execute(input LoginEmailParams) (*LoginEmailResult, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
+
 	if existing == nil {
-		return nil, appErr.NewUnauthorized(authenDomain.ErrInvalidCredentials.Error())
+		return nil, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
+	}
+	if existing.Status != domain.AccountActive {
+		return nil, appErr.NewForbidden(domain.ErrEmailNotVerified.Error())
 	}
 
 	if err := u.pwHasher.Compare(existing.Password, input.Password); err != nil {
-		return nil, appErr.NewUnauthorized(authenDomain.ErrInvalidCredentials.Error())
-	}
-
-	sessionID := uuid.New()
-	accessTkn, err := u.tokenSvc.Generate(authenRepo.GenerateTokenParams{
-		UserID:    existing.UserID,
-		SessionID: sessionID,
-		Type:      authenDomain.TokenTypeAccess,
-		Duration:  30 * time.Minute,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %w", err)
-	}
-
-	refreshTkn, err := u.tokenSvc.Generate(authenRepo.GenerateTokenParams{
-		UserID:    existing.UserID,
-		SessionID: sessionID,
-		Type:      authenDomain.TokenTypeRefresh,
-		Duration:  7 * 24 * time.Hour,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %w", err)
+		return nil, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	now := time.Now()
-	session := authenDomain.Session{
-		ID:        sessionID,
+	session := domain.Session{
+		ID:        uuid.New(),
 		UserID:    existing.UserID,
 		UserAgent: input.UserAgent,
 		IPAddress: input.IPAddress,
@@ -93,8 +76,28 @@ func (u *LoginEmailUsecase) Execute(input LoginEmailParams) (*LoginEmailResult, 
 		CreatedAt: now,
 	}
 
+	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
+		UserID:    existing.UserID,
+		SessionID: session.ID,
+		Type:      domain.TokenTypeAccess,
+		Duration:  30 * time.Minute,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	refreshTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
+		UserID:    existing.UserID,
+		SessionID: session.ID,
+		Type:      domain.TokenTypeRefresh,
+		Duration:  7 * 24 * time.Hour,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
 	refreshTknHashed := u.tokenHasher.Hash(refreshTkn.Token)
-	refreshToken := authenDomain.RefreshToken{
+	refreshTknDomain := domain.RefreshToken{
 		ID:        uuid.New(),
 		SessionID: session.ID,
 		TokenHash: refreshTknHashed,
@@ -105,7 +108,7 @@ func (u *LoginEmailUsecase) Execute(input LoginEmailParams) (*LoginEmailResult, 
 	if err := u.sessionRepo.Save(session); err != nil {
 		return nil, fmt.Errorf("failed to save session %w", err)
 	}
-	if err := u.refreshTokenRepo.Save(refreshToken); err != nil {
+	if err := u.refreshTokenRepo.Save(refreshTknDomain); err != nil {
 		return nil, fmt.Errorf("failed to save refresh token %w", err)
 	}
 
