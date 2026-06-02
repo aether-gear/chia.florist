@@ -86,16 +86,21 @@ const productOfferings = ref([
           We provide customized flower boards for weddings, condolences, graduations, and corporate events. Designed with care and delivered on time to make every moment memorable.
         </p>
         
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-6">
-          <CButton variant="solid" size="lg" to="/products">
-            Order Now
-          </CButton>
-          
-          <CButton variant="outline" size="lg" to="/products" class="group">
-            <svg class="w-6 h-6 mr-2 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            View Products
-          </CButton>
-        </div>
+        <div class="mt-10 flex flex-wrap justify-center gap-4">
+  <NuxtLink 
+    to="/catalog" 
+    class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 px-8 rounded-xl transition shadow-md text-sm text-center"
+  >
+    Order Now
+  </NuxtLink>
+
+  <NuxtLink 
+    to="/catalog" 
+    class="border-2 border-white hover:bg-white/10 text-white font-bold py-3 px-8 rounded-xl transition text-sm text-center flex items-center justify-center gap-2"
+  >
+    <span>View Products</span>
+  </NuxtLink>
+</div>
       </div>
 
       <div class="absolute right-8 top-1/2 transform -translate-y-1/2 flex flex-col gap-6 z-30 hidden lg:flex">
@@ -190,7 +195,7 @@ const productOfferings = ref([
 
     <section class="max-w-7xl mx-auto px-8 py-20 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
       <div class="h-[450px]">
-        <img src="/images/flower.jpg" alt="Gallery preview" class="w-full h-full object-cover rounded-xl shadow-sm" />
+        <img src="/images/florist.jpg" alt="Gallery preview" class="w-full h-full object-cover rounded-xl shadow-sm" />
       </div>
       <div class="grid grid-cols-2 gap-8">
         

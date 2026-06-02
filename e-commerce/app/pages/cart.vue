@@ -25,6 +25,11 @@ const applyPromo = () => {
     alert('Invalid promo code.')
   }
 }
+
+// INTEGRASI: Fungsi Navigasi ke Halaman Checkout
+const handleCheckout = () => {
+  navigateTo('/checkout')
+}
 </script>
 
 <template>
@@ -122,7 +127,10 @@ const applyPromo = () => {
               </div>
             </div>
 
-            <button class="w-full bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide">
+            <button 
+              @click="handleCheckout"
+              class="w-full bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide"
+            >
               Proceed to Checkout
             </button>
           </div>
@@ -137,3 +145,30 @@ const applyPromo = () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Animasi Slide dari Kanan */
+.slide-enter-active, .slide-leave-active {
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-enter-from, .slide-leave-to {
+  transform: translateX(100%);
+}
+
+/* Animasi Fade Backdrop */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+/* Custom Scrollbar Mini */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-soft);
+  border-radius: 10px;
+}
+</style>
