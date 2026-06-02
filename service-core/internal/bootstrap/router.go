@@ -195,7 +195,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/shipping", func(r chi.Router) {
-			r.Post("/cost", core(shipmentHandler.EstimateShippingOptions))
+			r.Post("/cost", customerOnly(shipmentHandler.EstimateShippingOptions))
 		})
 	})
 
