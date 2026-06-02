@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type LoginEmailUsecase struct {
+type LoginCustomerUsecase struct {
 	accountRepo      repository.AccountRepository
 	pwHasher         repository.PasswordHasher
 	tokenHasher      repository.TokenHasher
@@ -20,15 +20,15 @@ type LoginEmailUsecase struct {
 	refreshTokenRepo repository.RefreshTokenRepository
 }
 
-func NewLoginEmailUsecase(
+func NewLoginCustomerUsecase(
 	accountRepo repository.AccountRepository,
 	pwHasher repository.PasswordHasher,
 	tokenHasher repository.TokenHasher,
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
-) *LoginEmailUsecase {
-	return &LoginEmailUsecase{
+) *LoginCustomerUsecase {
+	return &LoginCustomerUsecase{
 		accountRepo:      accountRepo,
 		pwHasher:         pwHasher,
 		tokenHasher:      tokenHasher,
@@ -38,7 +38,7 @@ func NewLoginEmailUsecase(
 	}
 }
 
-type LoginEmailParams struct {
+type LoginCustomerParams struct {
 	UserAgent *string
 	IPAddress *string
 	Email     string
@@ -49,7 +49,7 @@ type LoginEmailResult struct {
 	AccessToken, RefreshToken repository.GeneratedToken
 }
 
-func (u *LoginEmailUsecase) Execute(input LoginEmailParams) (*LoginEmailResult, error) {
+func (u *LoginCustomerUsecase) Execute(input LoginCustomerParams) (*LoginEmailResult, error) {
 	existing, err := u.accountRepo.GetByEmail(input.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)

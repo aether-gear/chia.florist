@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type RegisterUsecase struct {
+type RegisterCustomerUsecase struct {
 	accountRepo   repository.AccountRepository
 	hasher        domain.PasswordHasher
 	userRepo      userRepo.UserRepository
@@ -23,15 +23,15 @@ type RegisterUsecase struct {
 	mailer        mailer.Sender
 }
 
-func NewRegisterUsecase(
+func NewRegisterCustomerUsecase(
 	accountRepo repository.AccountRepository,
 	hasher domain.PasswordHasher,
 	userRepo userRepo.UserRepository,
 	challengeRepo repository.VerificationChallengeRepository,
 	otpGen otp.Generator,
 	mailer mailer.Sender,
-) *RegisterUsecase {
-	return &RegisterUsecase{
+) *RegisterCustomerUsecase {
+	return &RegisterCustomerUsecase{
 		accountRepo:   accountRepo,
 		hasher:        hasher,
 		userRepo:      userRepo,
@@ -41,7 +41,7 @@ func NewRegisterUsecase(
 	}
 }
 
-type SignUpParams struct {
+type RegisterCustomerParams struct {
 	Name     string
 	Username string
 	Email    string
@@ -49,7 +49,7 @@ type SignUpParams struct {
 	Phone    *string
 }
 
-func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
+func (u *RegisterCustomerUsecase) Execute(params RegisterCustomerParams) (*uuid.UUID, error) {
 	now := time.Now()
 
 	existUsr, err := u.userRepo.GetByUsername(params.Username)

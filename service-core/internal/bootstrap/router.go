@@ -57,8 +57,8 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		authHandler = authH.NewAuthHandler(
-			&c.LoginAccount,
-			&c.RegisterAccount,
+			&c.LoginCustomer,
+			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
 		)

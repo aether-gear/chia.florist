@@ -52,10 +52,10 @@ type Container struct {
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
-	LoginAccount    authenUsecase.LoginEmailUsecase
-	RegisterAccount authenUsecase.RegisterUsecase
-	VerifyAccount   authenUsecase.VerifyAccountUsecase
-	GetAccount      authenUsecase.GetAccountUsecase
+	LoginCustomer    authenUsecase.LoginCustomerUsecase
+	RegisterCustomer authenUsecase.RegisterCustomerUsecase
+	VerifyAccount    authenUsecase.VerifyAccountUsecase
+	GetAccount       authenUsecase.GetAccountUsecase
 
 	GetCart    cartUsecase.GetCartUsecase
 	AddItem    cartUsecase.AddItemUsecase
@@ -156,10 +156,10 @@ func NewContainer(cfg Config, infra *Dependency) *Container {
 		),
 		CreateInventory: *inventoryUsecase.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
-		LoginAccount: *authenUsecase.NewLoginEmailUsecase(
+		LoginCustomer: *authenUsecase.NewLoginCustomerUsecase(
 			accountRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo,
 		),
-		RegisterAccount: *authenUsecase.NewRegisterUsecase(
+		RegisterCustomer: *authenUsecase.NewRegisterCustomerUsecase(
 			accountRepo, pwHasher, userRepo, challengeRepo, otpGen, mailSender,
 		),
 		VerifyAccount: *authenUsecase.NewVerifyAccountUsecase(
