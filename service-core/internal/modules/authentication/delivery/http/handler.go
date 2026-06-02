@@ -183,7 +183,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	})
 
 	response := map[string]string{
-		"message": "login success",
+		"message": "verify success",
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)
