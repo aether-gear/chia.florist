@@ -1,0 +1,69 @@
+package service
+
+import (
+	"context"
+	"net/http"
+
+	apperrors "service-core/internal/common/errors"
+	apphttp "service-core/internal/common/http"
+	appmiddleware "service-core/internal/common/middleware"
+	authendomain "service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authorization/domain"
+	"service-core/internal/modules/authorization/repository"
+)
+
+type actorContextKey struct{}
+
+type AuthorizerService struct {
+	actorSvc repository.ActorService
+}
+
+func NewAuthorizerService(
+	actorSvc repository.ActorService,
+) repository.Authorizer {
+	return &AuthorizerService{
+		actorSvc: actorSvc,
+	}
+}
+
+func (s *AuthorizerService) RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware {
+	return appmiddleware.RequireAccountType(
+		func(ctx context.Context) (authendomain.AccountType, bool) {
+			actor, ok := GetActor(ctx)
+			if !ok {
+				return "", false
+			}
+			return actor.Type, true
+		},
+		allowedTypes...,
+	)
+}
+
+func (s *AuthorizerService) LoadActor() appmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			authCtx, ok := authendomain.GetAuthContext(r.Context())
+			if !ok {
+				return apperrors.NewUnauthorized("authentication required")
+			}
+
+			actor, err := s.actorSvc.Load(authCtx.UserID)
+			if err != nil {
+				return err
+			}
+
+			ctx := context.WithValue(r.Context(), actorContextKey{}, actor)
+
+			return next(w, r.WithContext(ctx))
+		}
+	}
+}
+
+func WithActor(ctx context.Context, actor *domain.Actor) context.Context {
+	return context.WithValue(ctx, actorContextKey{}, actor)
+}
+
+func GetActor(ctx context.Context) (*domain.Actor, bool) {
+	actor, ok := ctx.Value(actorContextKey{}).(*domain.Actor)
+	return actor, ok
+}
