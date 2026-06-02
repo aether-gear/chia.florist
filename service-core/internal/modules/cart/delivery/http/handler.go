@@ -149,14 +149,14 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	productID, err := uuid.Parse(req.ProductID)
+	productID, err := apphttp.ParamUUID(r, "productID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid product id")
 	}
 
-	shopID, err := uuid.Parse(req.ShopID)
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
-		return apperrors.NewBadRequest("invalid shop id")
+		return apperrors.NewBadRequest("invalid product id")
 	}
 
 	if req.Quantity < 0 {
@@ -188,20 +188,20 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	productID, err := apphttp.QueryUUID(r, "productID")
+	productID, err := apphttp.ParamUUID(r, "productID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid product id")
 	}
 
-	shopID, err := apphttp.QueryUUID(r, "shopID")
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	input := usecase.RemoveItemInput{
 		UserID:    authCtx.UserID,
-		ProductID: *productID,
-		ShopID:    *shopID,
+		ProductID: productID,
+		ShopID:    shopID,
 	}
 
 	if err := h.removeItem.Execute(input); err != nil {

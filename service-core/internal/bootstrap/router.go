@@ -25,9 +25,13 @@ import (
 )
 
 func NewRouter(c *Container) *chi.Mux {
+	var log = c.Logger
+
 	var (
-		log          = c.Logger
-		core         = buildChain(log, c.CORSAllowedOrigins)
+		core = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+		)
 		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
@@ -129,8 +133,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", customerOnly(cartHandler.AddItem))
-				r.Put("/{itemID}", customerOnly(cartHandler.UpdateItem))
-				r.Delete("/{itemID}", customerOnly(cartHandler.RemoveItem))
+				r.Put("/{shopID}/{productID}", customerOnly(cartHandler.UpdateItem))
+				r.Delete("/{shopID}/{productID}", customerOnly(cartHandler.RemoveItem))
 			})
 		})
 
@@ -146,7 +150,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users", func(r chi.Router) {
-			r.Get("/{id}", core(userHandler.GetUserByID))
+			r.Get("/{id}", merchantOnly(userHandler.GetUserByID))
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
@@ -180,7 +184,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/payments", func(r chi.Router) {
 			r.Route("/accounts", func(r chi.Router) {
-				r.Get("/", core(paymentHandler.ListPaymentAccount))
+				r.Get("/", customerOnly(paymentHandler.ListPaymentAccount))
 				r.Post("/", merchantOnly(paymentHandler.CreatePaymentAccount))
 			})
 

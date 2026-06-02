@@ -9,9 +9,7 @@ type addItemRequest struct {
 }
 
 type updateItemRequest struct {
-	ProductID string `json:"product_id"`
-	ShopID    string `json:"shop_id"`
-	Quantity  int    `json:"quantity"`
+	Quantity int `json:"quantity"`
 }
 
 type cartResponse struct {
