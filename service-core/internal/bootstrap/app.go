@@ -8,33 +8,33 @@ import (
 )
 
 type App struct {
-	infra     *Infra
-	container *Container
-	router    *chi.Mux
+	dependencies *Dependency
+	container    *Container
+	router       *chi.Mux
 }
 
 func New(cfg Config) (*App, error) {
-	infra, err := NewInfra(cfg)
+	dependencies, err := NewDependency(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	c := NewContainer(cfg, infra)
+	c := NewContainer(cfg, dependencies)
 	r := NewRouter(c)
 
 	return &App{
-		infra:     infra,
-		container: c,
-		router:    r,
+		dependencies: dependencies,
+		container:    c,
+		router:       r,
 	}, nil
 }
 
 func (a *App) Close() {
-	if a == nil || a.infra == nil {
+	if a == nil || a.dependencies == nil {
 		return
 	}
 
-	a.infra.Close()
+	a.dependencies.Close()
 }
 
 func (a *App) Run() error {

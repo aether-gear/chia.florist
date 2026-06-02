@@ -85,7 +85,7 @@ type Container struct {
 	EstimateShippingOptions shUC.EstimateShippingOptionsUsecase
 }
 
-func NewContainer(cfg Config, infra *Infra) *Container {
+func NewContainer(cfg Config, infra *Dependency) *Container {
 	var (
 		log = logger.NewZapLogger(cfg.App.Env)
 	)
