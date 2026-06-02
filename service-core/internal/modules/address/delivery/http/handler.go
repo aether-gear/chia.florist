@@ -43,13 +43,13 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	result, err := h.listUserAddresses.ListByUserID(authCtx.UserID)
+	addresses, err := h.listUserAddresses.ListByUserID(authCtx.UserID)
 	if err != nil {
 		return err
 	}
 
-	response := make([]userAddressResponse, 0, len(result))
-	for _, r := range result {
+	result := make([]userAddressResponse, 0, len(addresses))
+	for _, r := range addresses {
 		address := userAddressResponse{
 			UserID:       r.UserID,
 			ReceiverName: r.ReceiverName,
@@ -61,11 +61,15 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 			VillageID:    r.Detail.VillageID,
 			FullAddress:  r.Detail.FullAddress,
 			PostalCode:   r.Detail.PostalCode,
-			CreatedAt:    r.CreatedAt,
-			UpdatedAt:    r.UpdatedAt,
+			// CreatedAt:    r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
 		}
 
-		response = append(response, address)
+		result = append(result, address)
+	}
+
+	response := map[string][]userAddressResponse{
+		"addresses": result,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
