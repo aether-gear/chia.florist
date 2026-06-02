@@ -4,13 +4,13 @@ import (
 	"net/http"
 
 	apphttp "service-core/internal/common/http"
-	"service-core/internal/common/logger"
-	"service-core/internal/common/middleware"
+	applogger "service-core/internal/common/logger"
+	appmiddleware "service-core/internal/common/middleware"
+
+	authendomain "service-core/internal/modules/authentication/domain"
 
 	addressH "service-core/internal/modules/address/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
-	authendomain "service-core/internal/modules/authentication/domain"
-
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
@@ -31,14 +31,14 @@ func NewRouter(c *Container) *chi.Mux {
 		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.AuthMiddleware,
+			c.Authenticator.RequireAuth(),
 			c.Authorizer.LoadActor(),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
 		)
 		customerOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.AuthMiddleware,
+			c.Authenticator.RequireAuth(),
 			c.Authorizer.LoadActor(),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
 		)
@@ -199,20 +199,20 @@ func NewRouter(c *Container) *chi.Mux {
 }
 
 func buildChain(
-	log logger.Logger,
+	log applogger.Logger,
 	allowedOrigins []string,
-	extra ...middleware.Middleware,
+	extra ...appmiddleware.Middleware,
 ) func(apphttp.AppHandler) http.HandlerFunc {
-	base := []middleware.Middleware{
-		middleware.CORS(allowedOrigins),
-		middleware.Recovery(log),
-		middleware.Logging(log),
-		middleware.Response(),
+	base := []appmiddleware.Middleware{
+		appmiddleware.CORS(allowedOrigins),
+		appmiddleware.Recovery(log),
+		appmiddleware.Logging(log),
+		appmiddleware.Response(),
 	}
 
 	mws := append(base, extra...)
 
 	return func(h apphttp.AppHandler) http.HandlerFunc {
-		return middleware.Chain(h, mws...)
+		return appmiddleware.Chain(h, mws...)
 	}
 }

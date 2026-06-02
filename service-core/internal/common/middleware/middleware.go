@@ -1,4 +1,4 @@
-package middleware
+package appmiddleware
 
 import (
 	apphttp "service-core/internal/common/http"

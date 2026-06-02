@@ -14,19 +14,19 @@ import (
 
 type actorContextKey struct{}
 
-type AuthorizerService struct {
+type authorizer struct {
 	actorSvc repository.ActorService
 }
 
-func NewAuthorizerService(
+func NewAuthorizer(
 	actorSvc repository.ActorService,
 ) repository.Authorizer {
-	return &AuthorizerService{
+	return &authorizer{
 		actorSvc: actorSvc,
 	}
 }
 
-func (s *AuthorizerService) RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware {
+func (s *authorizer) RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware {
 	return appmiddleware.RequireAccountType(
 		func(ctx context.Context) (authendomain.AccountType, bool) {
 			actor, ok := GetActor(ctx)
@@ -39,7 +39,7 @@ func (s *AuthorizerService) RequireAccountType(allowedTypes ...authendomain.Acco
 	)
 }
 
-func (s *AuthorizerService) LoadActor() appmiddleware.Middleware {
+func (s *authorizer) LoadActor() appmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			authCtx, ok := authendomain.GetAuthContext(r.Context())

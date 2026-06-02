@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
-	authDomain "service-core/internal/modules/authentication/domain"
-	authRepo "service-core/internal/modules/authentication/repository"
+	apperrors "service-core/internal/common/errors"
+	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
 	mailer "service-core/internal/shared/mailer"
 	otp "service-core/internal/shared/otp"
@@ -15,19 +15,19 @@ import (
 )
 
 type RegisterUsecase struct {
-	accountRepo   authRepo.AccountRepository
-	hasher        authDomain.PasswordHasher
+	accountRepo   repository.AccountRepository
+	hasher        domain.PasswordHasher
 	userRepo      userRepo.UserRepository
-	challengeRepo authRepo.VerificationChallengeRepository
+	challengeRepo repository.VerificationChallengeRepository
 	otpGen        otp.Generator
 	mailer        mailer.Sender
 }
 
 func NewRegisterUsecase(
-	accountRepo authRepo.AccountRepository,
-	hasher authDomain.PasswordHasher,
+	accountRepo repository.AccountRepository,
+	hasher domain.PasswordHasher,
 	userRepo userRepo.UserRepository,
-	challengeRepo authRepo.VerificationChallengeRepository,
+	challengeRepo repository.VerificationChallengeRepository,
 	otpGen otp.Generator,
 	mailer mailer.Sender,
 ) *RegisterUsecase {
@@ -62,7 +62,7 @@ func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
 	}
 
 	if existAcc != nil || existUsr != nil {
-		return nil, appErr.NewConflict(authDomain.ErrAccountAlreadyExists.Error())
+		return nil, apperrors.NewConflict(domain.ErrAccountAlreadyExists.Error())
 	}
 
 	user := userRepo.CreateUserProps{
@@ -77,12 +77,12 @@ func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to hashed: %w", err)
 	}
-	acc := authDomain.Account{
+	acc := domain.Account{
 		ID:        uuid.New(),
 		UserID:    user.ID,
 		Email:     params.Email,
-		Status:    authDomain.AccountPending,
-		Type:      authDomain.AccountTypeCustomer,
+		Status:    domain.AccountPending,
+		Type:      domain.AccountTypeCustomer,
 		Password:  hash,
 		CreatedAt: now,
 	}
@@ -97,12 +97,12 @@ func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
 		return nil, fmt.Errorf("failed to hash otp: %w", err)
 	}
 
-	challenge := authDomain.VerificationChallenge{
+	challenge := domain.VerificationChallenge{
 		ID:           uuid.New(),
 		UserID:       &user.ID,
-		Type:         authDomain.OTPTypeNumeric,
-		Channel:      authDomain.OTPChannelEmail,
-		Purpose:      authDomain.OTPPurposeRegister,
+		Type:         domain.OTPTypeNumeric,
+		Channel:      domain.OTPChannelEmail,
+		Purpose:      domain.OTPPurposeRegister,
 		Target:       params.Email,
 		CodeHash:     otpHash,
 		ExpiresAt:    now.Add(15 * time.Minute),

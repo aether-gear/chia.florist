@@ -8,8 +8,7 @@ import (
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
-	authDomain "service-core/internal/modules/authentication/domain"
-	authRepo "service-core/internal/modules/authentication/repository"
+	"service-core/internal/modules/authentication/repository"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,7 +19,7 @@ type challengeRepositoryImpl struct {
 	db *pgxpool.Pool
 }
 
-func NewChallengeRepository(conn *database.Connection) authRepo.VerificationChallengeRepository {
+func NewChallengeRepository(conn *database.Connection) repository.VerificationChallengeRepository {
 	return &challengeRepositoryImpl{
 		db: conn.Pool,
 	}
@@ -75,7 +74,7 @@ func (r *challengeRepositoryImpl) GetByID(id uuid.UUID) (*domain.VerificationCha
 	return &vC, nil
 }
 
-func (r *challengeRepositoryImpl) Create(challenge authDomain.VerificationChallenge) error {
+func (r *challengeRepositoryImpl) Create(challenge domain.VerificationChallenge) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -114,7 +113,7 @@ func (r *challengeRepositoryImpl) Create(challenge authDomain.VerificationChalle
 	return nil
 }
 
-func (r *challengeRepositoryImpl) Save(challenge authDomain.VerificationChallenge) error {
+func (r *challengeRepositoryImpl) Save(challenge domain.VerificationChallenge) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

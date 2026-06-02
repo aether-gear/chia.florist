@@ -4,29 +4,29 @@ import (
 	"fmt"
 
 	"service-core/internal/infra/storage"
-	cartD "service-core/internal/modules/cart/domain"
-	cartR "service-core/internal/modules/cart/repository"
-	inventoryD "service-core/internal/modules/inventory/domain"
-	inventoryR "service-core/internal/modules/inventory/repository"
-	productD "service-core/internal/modules/product/domain"
-	productR "service-core/internal/modules/product/repository"
+	"service-core/internal/modules/cart/domain"
+	"service-core/internal/modules/cart/repository"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepo "service-core/internal/modules/product/repository"
 
 	"github.com/google/uuid"
 )
 
 type GetCartUsecase struct {
-	cartRepo       cartR.CartRepository
-	inventoryRepo  inventoryR.InventoryRepository
-	productRepo    productR.ProductRepository
-	productImgRepo productR.ProductImageRepository
+	cartRepo       repository.CartRepository
+	inventoryRepo  inventoryRepo.InventoryRepository
+	productRepo    productRepo.ProductRepository
+	productImgRepo productRepo.ProductImageRepository
 	fileStore      storage.Provider
 }
 
 func NewGetCartUsecase(
-	cartRepo cartR.CartRepository,
-	inventoryRepo inventoryR.InventoryRepository,
-	productRepo productR.ProductRepository,
-	productImgRepo productR.ProductImageRepository,
+	cartRepo repository.CartRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
+	productRepo productRepo.ProductRepository,
+	productImgRepo productRepo.ProductImageRepository,
 	fileStore storage.Provider,
 ) *GetCartUsecase {
 	return &GetCartUsecase{
@@ -39,19 +39,19 @@ func NewGetCartUsecase(
 }
 
 type ProductCartResponse struct {
-	Product   productD.Product
+	Product   productDomain.Product
 	Inventory struct {
 		TotalStock    int
 		ReservedStock int
 	}
-	ShopInventories []inventoryD.Inventory
+	ShopInventories []inventoryDomain.Inventory
 	Images          struct {
 		Thumbnail string
 	}
 }
 
 type GetCartResult struct {
-	Cart     *cartD.Cart
+	Cart     *domain.Cart
 	Products map[uuid.UUID]ProductCartResponse
 }
 
@@ -106,7 +106,7 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		}
 
 		if len(images) > 0 {
-			key := images[0].Variants[productD.ResolutionThumbnail].Key
+			key := images[0].Variants[productDomain.ResolutionThumbnail].Key
 			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
 		}
 

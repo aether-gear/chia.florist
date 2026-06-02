@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 
@@ -56,14 +56,14 @@ func (u *LoginEmailUsecase) Execute(input LoginEmailParams) (*LoginEmailResult, 
 	}
 
 	if existing == nil {
-		return nil, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
+		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 	if existing.Status != domain.AccountActive {
-		return nil, appErr.NewForbidden(domain.ErrEmailNotVerified.Error())
+		return nil, apperrors.NewForbidden(domain.ErrEmailNotVerified.Error())
 	}
 
 	if err := u.pwHasher.Compare(existing.Password, input.Password); err != nil {
-		return nil, appErr.NewUnauthorized(domain.ErrInvalidCredentials.Error())
+		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	now := time.Now()

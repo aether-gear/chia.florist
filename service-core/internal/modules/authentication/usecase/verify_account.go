@@ -5,34 +5,34 @@ import (
 	"strconv"
 	"time"
 
-	appErr "service-core/internal/common/errors"
-	authDomain "service-core/internal/modules/authentication/domain"
-	authRepo "service-core/internal/modules/authentication/repository"
+	apperrors "service-core/internal/common/errors"
+	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
 
 	"github.com/google/uuid"
 )
 
 type VerifyAccountUsecase struct {
-	accountRepo      authRepo.AccountRepository
-	pwHasher         authRepo.PasswordHasher
-	tokenHasher      authRepo.TokenHasher
+	accountRepo      repository.AccountRepository
+	pwHasher         repository.PasswordHasher
+	tokenHasher      repository.TokenHasher
 	userRepo         userRepo.UserRepository
-	challengeRepo    authRepo.VerificationChallengeRepository
-	tokenSvc         authRepo.TokenService
-	sessionRepo      authRepo.SessionRepository
-	refreshTokenRepo authRepo.RefreshTokenRepository
+	challengeRepo    repository.VerificationChallengeRepository
+	tokenSvc         repository.TokenService
+	sessionRepo      repository.SessionRepository
+	refreshTokenRepo repository.RefreshTokenRepository
 }
 
 func NewVerifyAccountUsecase(
-	accountRepo authRepo.AccountRepository,
-	pwHasher authRepo.PasswordHasher,
-	tokenHasher authRepo.TokenHasher,
+	accountRepo repository.AccountRepository,
+	pwHasher repository.PasswordHasher,
+	tokenHasher repository.TokenHasher,
 	userRepo userRepo.UserRepository,
-	challengeRepo authRepo.VerificationChallengeRepository,
-	tokenSvc authRepo.TokenService,
-	sessionRepo authRepo.SessionRepository,
-	refreshTokenRepo authRepo.RefreshTokenRepository,
+	challengeRepo repository.VerificationChallengeRepository,
+	tokenSvc repository.TokenService,
+	sessionRepo repository.SessionRepository,
+	refreshTokenRepo repository.RefreshTokenRepository,
 ) *VerifyAccountUsecase {
 	return &VerifyAccountUsecase{
 		accountRepo:      accountRepo,
@@ -54,7 +54,7 @@ type VerifyAccountParams struct {
 }
 
 type VerifyAccountResult struct {
-	AccessToken, RefreshToken authRepo.GeneratedToken
+	AccessToken, RefreshToken repository.GeneratedToken
 }
 
 func (u *VerifyAccountUsecase) Execute(
@@ -67,20 +67,20 @@ func (u *VerifyAccountUsecase) Execute(
 		return nil, fmt.Errorf("failed to get challenge: %w", err)
 	}
 	if challenge == nil {
-		return nil, appErr.NewNotFound(authDomain.ErrNotFoundChallenge.Error())
+		return nil, apperrors.NewNotFound(domain.ErrNotFoundChallenge.Error())
 	}
 
 	if challenge.ConsumedAt != nil {
-		return nil, appErr.NewConflict(authDomain.ErrConsumedChallenge.Error())
+		return nil, apperrors.NewConflict(domain.ErrConsumedChallenge.Error())
 	}
 	if challenge.VerifiedAt != nil {
-		return nil, appErr.NewConflict(authDomain.ErrVerifiedChallenge.Error())
+		return nil, apperrors.NewConflict(domain.ErrVerifiedChallenge.Error())
 	}
 	if challenge.ExpiresAt.Before(now) {
-		return nil, appErr.NewConflict(authDomain.ErrExpiredChallenge.Error())
+		return nil, apperrors.NewConflict(domain.ErrExpiredChallenge.Error())
 	}
 	if challenge.AttemptCount >= 5 {
-		return nil, appErr.NewConflict(authDomain.ErrMaxAttemptReached.Error())
+		return nil, apperrors.NewConflict(domain.ErrMaxAttemptReached.Error())
 	}
 
 	if err := u.pwHasher.Compare(challenge.CodeHash, strconv.Itoa(input.OTP)); err != nil {
@@ -93,8 +93,8 @@ func (u *VerifyAccountUsecase) Execute(
 			)
 		}
 
-		return nil, appErr.NewUnauthorized(
-			authDomain.ErrInvalidOTP.Error(),
+		return nil, apperrors.NewUnauthorized(
+			domain.ErrInvalidOTP.Error(),
 		)
 	}
 
@@ -109,27 +109,27 @@ func (u *VerifyAccountUsecase) Execute(
 	}
 
 	sessionID := uuid.New()
-	accessTkn, err := u.tokenSvc.Generate(authRepo.GenerateTokenParams{
+	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
 		UserID:    *challenge.UserID,
 		SessionID: sessionID,
-		Type:      authDomain.TokenTypeAccess,
+		Type:      domain.TokenTypeAccess,
 		Duration:  30 * time.Minute,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshTkn, err := u.tokenSvc.Generate(authRepo.GenerateTokenParams{
+	refreshTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
 		UserID:    *challenge.UserID,
 		SessionID: sessionID,
-		Type:      authDomain.TokenTypeRefresh,
+		Type:      domain.TokenTypeRefresh,
 		Duration:  7 * 24 * time.Hour,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	session := authDomain.Session{
+	session := domain.Session{
 		ID:        sessionID,
 		UserID:    *challenge.UserID,
 		UserAgent: input.UserAgent,
@@ -139,7 +139,7 @@ func (u *VerifyAccountUsecase) Execute(
 	}
 
 	refreshTknHashed := u.tokenHasher.Hash(refreshTkn.Token)
-	refreshToken := authDomain.RefreshToken{
+	refreshToken := domain.RefreshToken{
 		ID:        uuid.New(),
 		SessionID: session.ID,
 		TokenHash: refreshTknHashed,

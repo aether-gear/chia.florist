@@ -13,22 +13,22 @@ import (
 	authenrepo "service-core/internal/modules/authentication/repository"
 )
 
-type authMiddleware struct {
+type jwtAuthenticator struct {
 	tokenSvc    authenrepo.TokenService
 	sessionRepo authenrepo.SessionRepository
 }
 
-func NewAuthMiddleware(
+func NewJWTAuthenticator(
 	tokenSvc authenrepo.TokenService,
 	sessionRepo authenrepo.SessionRepository,
 ) authenrepo.Authenticator {
-	return &authMiddleware{
+	return &jwtAuthenticator{
 		tokenSvc:    tokenSvc,
 		sessionRepo: sessionRepo,
 	}
 }
 
-func (aM *authMiddleware) RequireAuth() commonmiddleware.Middleware {
+func (aM *jwtAuthenticator) RequireAuth() commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			token, err := appcookie.CookieValue(r, appcookie.AccessTokenCookieName)
