@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -95,7 +94,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 	var req addItemRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
@@ -140,7 +139,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 	var req updateItemRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 

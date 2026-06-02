@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -79,7 +78,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Request) error {
 	var req createUserAddressRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
 	}
 
@@ -214,7 +213,7 @@ func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Reques
 func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Request) error {
 	var req createShopAddressRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 

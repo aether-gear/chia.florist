@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -23,7 +22,7 @@ func NewInventoryHandler(
 
 func (h *InventoryHandler) AddInventory(w http.ResponseWriter, r *http.Request) error {
 	var req createInventoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 

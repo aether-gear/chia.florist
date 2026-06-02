@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -55,7 +54,7 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 	var req createShopRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 

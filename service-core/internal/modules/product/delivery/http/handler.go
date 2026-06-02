@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -163,7 +162,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) error {
 	var req createProductRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 

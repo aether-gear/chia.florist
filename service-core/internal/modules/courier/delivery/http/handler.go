@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -26,7 +25,7 @@ func NewCourierHandler(
 func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Request) error {
 	var req configureCourierShopRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
 	}
 

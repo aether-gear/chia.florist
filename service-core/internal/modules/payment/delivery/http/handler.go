@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -36,7 +35,7 @@ func NewPaymentHandler(
 func (h *PaymentHandler) CreatePaymentAccount(w http.ResponseWriter, r *http.Request) error {
 	var req createPaymentAccountRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
 	}
 
@@ -105,7 +104,7 @@ func (h *PaymentHandler) ListPaymentAccount(w http.ResponseWriter, r *http.Reque
 func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) error {
 	var req createPaymentMethodRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
 	}
 	isActive, err := strconv.ParseBool(req.IsActive)
