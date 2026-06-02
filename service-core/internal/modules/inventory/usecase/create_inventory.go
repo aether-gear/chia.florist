@@ -5,26 +5,26 @@ import (
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
-	inventoryD "service-core/internal/modules/inventory/domain"
-	inventoryR "service-core/internal/modules/inventory/repository"
-	productD "service-core/internal/modules/product/domain"
-	productR "service-core/internal/modules/product/repository"
-	shopR "service-core/internal/modules/shop/repository"
+	apperrors "service-core/internal/common/errors"
+	"service-core/internal/modules/inventory/domain"
+	"service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepository "service-core/internal/modules/product/repository"
+	shopRepo "service-core/internal/modules/shop/repository"
 
 	"github.com/google/uuid"
 )
 
 type CreateInventoryUsecase struct {
-	inventoryRepo inventoryR.InventoryRepository
-	productRepo   productR.ProductRepository
-	shopRepo      shopR.ShopRepository
+	inventoryRepo repository.InventoryRepository
+	productRepo   productRepository.ProductRepository
+	shopRepo      shopRepo.ShopRepository
 }
 
 func NewCreateInventoryUsecase(
-	inventoryRepo inventoryR.InventoryRepository,
-	productRepo productR.ProductRepository,
-	shopRepo shopR.ShopRepository,
+	inventoryRepo repository.InventoryRepository,
+	productRepo productRepository.ProductRepository,
+	shopRepo shopRepo.ShopRepository,
 ) *CreateInventoryUsecase {
 	return &CreateInventoryUsecase{
 		inventoryRepo: inventoryRepo,
@@ -45,7 +45,7 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return fmt.Errorf("failed to load product: %w", err)
 	}
 	if product == nil {
-		return appErr.NewNotFound(productD.ErrProductNotFound.Error())
+		return apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
 	}
 
 	shop, err := u.shopRepo.GetByID(input.ShopID)
@@ -53,7 +53,7 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return fmt.Errorf("failed to load shop: %w", err)
 	}
 	if shop == nil {
-		return appErr.NewNotFound("shop not found")
+		return apperrors.NewNotFound("shop not found")
 	}
 
 	existing, err := u.inventoryRepo.GetByProductIDAndShopID(input.ProductID, input.ShopID)
@@ -61,10 +61,10 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return fmt.Errorf("failed to load inventory: %w", err)
 	}
 	if existing != nil {
-		return appErr.NewConflict("inventory already exists for product and shop")
+		return apperrors.NewConflict("inventory already exists for product and shop")
 	}
 
-	inventory := &inventoryD.Inventory{
+	inventory := &domain.Inventory{
 		ID:            uuid.New(),
 		ProductID:     input.ProductID,
 		ShopID:        input.ShopID,
@@ -73,8 +73,8 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		CreatedAt:     time.Now(),
 	}
 	if err := inventory.Validate(); err != nil {
-		if errors.Is(err, inventoryD.ErrInvalidStock) || errors.Is(err, inventoryD.ErrInvalidReserved) {
-			return appErr.NewInvalidInput(err.Error())
+		if errors.Is(err, domain.ErrInvalidStock) || errors.Is(err, domain.ErrInvalidReserved) {
+			return apperrors.NewInvalidInput(err.Error())
 		}
 
 		return err

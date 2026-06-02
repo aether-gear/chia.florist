@@ -3,7 +3,7 @@ package apperrors
 import (
 	"errors"
 
-	"service-core/internal/common/logger"
+	applogger "service-core/internal/common/logger"
 )
 
 type ErrorType string
@@ -31,11 +31,11 @@ var (
 )
 
 type AppError struct {
-	Type       ErrorType       `json:"type"`
-	Message    string          `json:"message"`
-	StatusCode int             `json:"status_code"`
-	LogLevel   logger.LogLevel `json:"-"`
-	Err        error           `json:"-"`
+	Type       ErrorType          `json:"type"`
+	Message    string             `json:"message"`
+	StatusCode int                `json:"status_code"`
+	LogLevel   applogger.LogLevel `json:"-"`
+	Err        error              `json:"-"`
 }
 
 func (e *AppError) Error() string {

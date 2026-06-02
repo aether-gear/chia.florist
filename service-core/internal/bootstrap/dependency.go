@@ -13,14 +13,14 @@ import (
 	shipmentRepo "service-core/internal/modules/shipment/repository"
 )
 
-type Infra struct {
+type Dependency struct {
 	DB                   *database.Connection
 	StorageProvider      storage.Provider
 	LocationRepository   locationRepo.LocationRepository
 	ShippingCostProvider shipmentRepo.ShippingCostProvider
 }
 
-func NewInfra(cfg Config) (*Infra, error) {
+func NewDependency(cfg Config) (*Dependency, error) {
 	db, err := database.NewConnection(cfg.DB)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func NewInfra(cfg Config) (*Infra, error) {
 		return nil, err
 	}
 
-	return &Infra{
+	return &Dependency{
 		DB:              db,
 		StorageProvider: storageProvider,
 		LocationRepository: lService.NewRajaOngkirLocation(
@@ -56,7 +56,7 @@ func NewInfra(cfg Config) (*Infra, error) {
 	}, nil
 }
 
-func (i *Infra) Close() {
+func (i *Dependency) Close() {
 	if i == nil || i.DB == nil {
 		return
 	}

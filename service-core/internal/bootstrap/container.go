@@ -1,129 +1,130 @@
 package bootstrap
 
 import (
-	"service-core/internal/common/logger"
-	appmiddleware "service-core/internal/common/middleware"
+	applogger "service-core/internal/common/logger"
 
-	imgService "service-core/internal/shared/image"
-	mailer "service-core/internal/shared/mailer"
-	otp "service-core/internal/shared/otp"
+	imgSvc "service-core/internal/shared/image"
+	mailerSvc "service-core/internal/shared/mailer"
+	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
 
-	adRepoImpl "service-core/internal/modules/address/infra/persistence"
-	aRepoImpl "service-core/internal/modules/authentication/infra/persistence"
-	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
-	coRepoImpl "service-core/internal/modules/courier/infra/persistence"
-	iRepoImpl "service-core/internal/modules/inventory/infra/persistence"
-	mRepoImpl "service-core/internal/modules/merchant/infra/persistence"
-	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
-	pRepoImpl "service-core/internal/modules/product/infra/persistence"
-	sRepoImpl "service-core/internal/modules/shop/infra/persistence"
-	uRepoImpl "service-core/internal/modules/user/infra/persistence"
+	addressPersistence "service-core/internal/modules/address/infra/persistence"
+	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
+	cartPersistence "service-core/internal/modules/cart/infra/persistence"
+	courierPersistence "service-core/internal/modules/courier/infra/persistence"
+	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
+	merchantPersistence "service-core/internal/modules/merchant/infra/persistence"
+	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
+	productPersistence "service-core/internal/modules/product/infra/persistence"
+	shopPersistence "service-core/internal/modules/shop/infra/persistence"
+	userPersistence "service-core/internal/modules/user/infra/persistence"
 
-	aService "service-core/internal/modules/authentication/infra/service"
+	authenSvc "service-core/internal/modules/authentication/infra/service"
+	authenRepo "service-core/internal/modules/authentication/repository"
 	authorSvc "service-core/internal/modules/authorization/infra/service"
 	authorRepo "service-core/internal/modules/authorization/repository"
 
-	adUC "service-core/internal/modules/address/usecase"
-	aUC "service-core/internal/modules/authentication/usecase"
-	cUC "service-core/internal/modules/cart/usecase"
-	coUC "service-core/internal/modules/courier/usecase"
-	iUC "service-core/internal/modules/inventory/usecase"
-	lUC "service-core/internal/modules/location/usecase"
-	payUC "service-core/internal/modules/payment/usecase"
-	pUC "service-core/internal/modules/product/usecase"
-	shUC "service-core/internal/modules/shipment/usecase"
-	sUC "service-core/internal/modules/shop/usecase"
-	uUC "service-core/internal/modules/user/usecase"
+	addressUsecase "service-core/internal/modules/address/usecase"
+	authenUsecase "service-core/internal/modules/authentication/usecase"
+	cartUsecase "service-core/internal/modules/cart/usecase"
+	courierUsecase "service-core/internal/modules/courier/usecase"
+	inventoryUsecase "service-core/internal/modules/inventory/usecase"
+	locationUsecase "service-core/internal/modules/location/usecase"
+	paymentUsecase "service-core/internal/modules/payment/usecase"
+	productUsecase "service-core/internal/modules/product/usecase"
+	shipmentUsecase "service-core/internal/modules/shipment/usecase"
+	shopUsecase "service-core/internal/modules/shop/usecase"
+	userUsecase "service-core/internal/modules/user/usecase"
 )
 
 type Container struct {
-	Logger             logger.Logger
+	Logger             applogger.Logger
 	CORSAllowedOrigins []string
-	AuthMiddleware     appmiddleware.Middleware
+	Authenticator      authenRepo.Authenticator
 	Authorizer         authorRepo.Authorizer
 
-	ImageVariantProvider imgService.VariantCreator
-	ImageTransformer     imgService.ImageTransformer
+	ImageVariantProvider imgSvc.VariantCreator
+	ImageTransformer     imgSvc.ImageTransformer
 
-	FindProducts     pUC.FindProductsUsecase
-	GetProduct       pUC.GetProductUsecase
-	CreateProduct    pUC.CreateProductUsecase
-	AddProductImages pUC.AddProductImagesUsecase
-	CreateInventory  iUC.CreateInventoryUsecase
+	FindProducts     productUsecase.FindProductsUsecase
+	GetProduct       productUsecase.GetProductUsecase
+	CreateProduct    productUsecase.CreateProductUsecase
+	AddProductImages productUsecase.AddProductImagesUsecase
+	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
-	LoginAccount    aUC.LoginEmailUsecase
-	RegisterAccount aUC.RegisterUsecase
-	VerifyAccount   aUC.VerifyAccountUsecase
-	GetAccount      aUC.GetAccountUsecase
+	LoginCustomer    authenUsecase.LoginCustomerUsecase
+	RegisterCustomer authenUsecase.RegisterCustomerUsecase
+	VerifyAccount    authenUsecase.VerifyAccountUsecase
+	GetAccount       authenUsecase.GetAccountUsecase
 
-	GetCart    cUC.GetCartUsecase
-	AddItem    cUC.AddItemUsecase
-	UpdateItem cUC.UpdateItemUsecase
-	RemoveItem cUC.RemoveItemUsecase
+	GetCart    cartUsecase.GetCartUsecase
+	AddItem    cartUsecase.AddItemUsecase
+	UpdateItem cartUsecase.UpdateItemUsecase
+	RemoveItem cartUsecase.RemoveItemUsecase
 
-	ListLocations lUC.ListLocationUsecase
-	GetUser       uUC.GetUserUsecase
+	ListLocations locationUsecase.ListLocationUsecase
 
-	ListUserAddresses adUC.ListUserAddressUsecase
-	CreateAddress     adUC.CreateAddressUsecase
+	GetUser userUsecase.GetUserUsecase
 
-	GetShopAddress    adUC.GetShopAddressUsecase
-	ListShopAddresses adUC.ListShopAddressesUsecase
-	CreateShopAddress adUC.CreateShopAddressUsecase
+	ListUserAddresses addressUsecase.ListUserAddressUsecase
+	CreateAddress     addressUsecase.CreateAddressUsecase
 
-	GetShop    sUC.GetShopUsecase
-	CreateShop sUC.CreateShopUsecase
+	GetShopAddress    addressUsecase.GetShopAddressUsecase
+	ListShopAddresses addressUsecase.ListShopAddressesUsecase
+	CreateShopAddress addressUsecase.CreateShopAddressUsecase
 
-	CreatePaymentAccount payUC.CreatePaymentAccountUsecase
-	ListPaymentAccount   payUC.ListPaymentAccountUsecase
-	CreatePaymentMethod  payUC.CreatePaymentMethodUsecase
-	ListPaymentMethod    payUC.ListPaymentMethodUsecase
+	GetShop    shopUsecase.GetShopUsecase
+	CreateShop shopUsecase.CreateShopUsecase
 
-	ConfigureShopCourier coUC.ConfigureShopCourierUsecase
+	CreatePaymentAccount paymentUsecase.CreatePaymentAccountUsecase
+	ListPaymentAccount   paymentUsecase.ListPaymentAccountUsecase
+	CreatePaymentMethod  paymentUsecase.CreatePaymentMethodUsecase
+	ListPaymentMethod    paymentUsecase.ListPaymentMethodUsecase
 
-	EstimateShippingOptions shUC.EstimateShippingOptionsUsecase
+	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
+
+	EstimateShippingOptions shipmentUsecase.EstimateShippingOptionsUsecase
 }
 
-func NewContainer(cfg Config, infra *Infra) *Container {
+func NewContainer(cfg Config, infra *Dependency) *Container {
 	var (
-		log = logger.NewZapLogger(cfg.App.Env)
+		log = applogger.NewZapLogger(cfg.App.Env)
 	)
 
 	var (
-		productRepo       = pRepoImpl.NewProductRepository(infra.DB)
-		productImageRepo  = pRepoImpl.NewProductImageRepository(infra.DB)
-		inventoryRepo     = iRepoImpl.NewInventoryRepository(infra.DB)
-		authRepo          = aRepoImpl.NewAccountRepository(infra.DB)
-		challengeRepo     = aRepoImpl.NewChallengeRepository(infra.DB)
-		sessionRepo       = aRepoImpl.NewSessionRepositoryImpl(infra.DB)
-		refreshTokenRepo  = aRepoImpl.NewRefreshTokenRepositoryImpl(infra.DB)
-		cartRepo          = cRepoImpl.NewCartRepositoryImpl(infra.DB)
-		userRepo          = uRepoImpl.NewUserRepositoryImpl(infra.DB)
-		addressRepo       = adRepoImpl.NewUserAddressRepositoryImpl(infra.DB)
-		addressShopRepo   = adRepoImpl.NewShopAddressRepositoryImpl(infra.DB)
-		paymentAccRepo    = payRepoImpl.NewPaymentAccountRepository(infra.DB)
-		paymentMethodRepo = payRepoImpl.NewPaymentMethodRepository(infra.DB)
-		shopRepo          = sRepoImpl.NewShopRepositoryImpl(infra.DB)
-		courierRepo       = coRepoImpl.NewCourierRepositoryImpl(infra.DB)
-		shopCourierRepo   = coRepoImpl.NewShopCourierRepositoryImpl(infra.DB)
-		merchantRepo      = mRepoImpl.NewMerchantRepositoryImpl(infra.DB)
+		productRepo       = productPersistence.NewProductRepository(infra.DB)
+		productImageRepo  = productPersistence.NewProductImageRepository(infra.DB)
+		inventoryRepo     = inventoryPersistence.NewInventoryRepository(infra.DB)
+		accountRepo       = authenPersistence.NewAccountRepository(infra.DB)
+		challengeRepo     = authenPersistence.NewChallengeRepository(infra.DB)
+		sessionRepo       = authenPersistence.NewSessionRepositoryImpl(infra.DB)
+		refreshTokenRepo  = authenPersistence.NewRefreshTokenRepositoryImpl(infra.DB)
+		cartRepo          = cartPersistence.NewCartRepositoryImpl(infra.DB)
+		userRepo          = userPersistence.NewUserRepositoryImpl(infra.DB)
+		addressRepo       = addressPersistence.NewUserAddressRepositoryImpl(infra.DB)
+		addressShopRepo   = addressPersistence.NewShopAddressRepositoryImpl(infra.DB)
+		paymentAccRepo    = paymentPersistence.NewPaymentAccountRepository(infra.DB)
+		paymentMethodRepo = paymentPersistence.NewPaymentMethodRepository(infra.DB)
+		shopRepo          = shopPersistence.NewShopRepositoryImpl(infra.DB)
+		courierRepo       = courierPersistence.NewCourierRepositoryImpl(infra.DB)
+		shopCourierRepo   = courierPersistence.NewShopCourierRepositoryImpl(infra.DB)
+		merchantRepo      = merchantPersistence.NewMerchantRepositoryImpl(infra.DB)
 	)
 
 	var (
-		tokenSvc    = aService.NewJWTService(cfg.JWT.Secret)
-		pwHasher    = aService.NewBcryptHasher()
-		tokenHasher = aService.NewSHATokenHasher()
-		authMidd    = aService.NewAuthMiddleware(tokenSvc, sessionRepo)
+		tokenSvc    = authenSvc.NewJWTService(cfg.JWT.Secret)
+		pwHasher    = authenSvc.NewBcryptHasher()
+		tokenHasher = authenSvc.NewSHATokenHasher()
+		authMidd    = authenSvc.NewJWTAuthenticator(tokenSvc, sessionRepo)
 
-		actorSvc   = authorSvc.NewActorService(authRepo, merchantRepo)
-		authorMdwr = authorSvc.NewAuthorizerService(actorSvc)
+		actorSvc   = authorSvc.NewActorService(accountRepo, merchantRepo)
+		authorMdwr = authorSvc.NewAuthorizer(actorSvc)
 	)
 
 	var (
 		slugGen = sGen.NewGenerator()
 
-		mailSender = mailer.NewSMTPSender(
+		mailSender = mailerSvc.NewSMTPSender(
 			cfg.SMTP.Host,
 			cfg.SMTP.Port,
 			cfg.SMTP.Username,
@@ -131,69 +132,69 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 			cfg.SMTP.From,
 		)
 
-		otpGen = otp.NewNumericGenerator(6)
+		otpGen = otpSvc.NewNumericGenerator(6)
 
-		imageTransformer     = imgService.NewImageTransformer()
-		imageVariantProvider = imgService.NewResolutionGenerator(imageTransformer)
+		imageTransformer     = imgSvc.NewImageTransformer()
+		imageVariantProvider = imgSvc.NewResolutionGenerator(imageTransformer)
 	)
 
 	return &Container{
 		Logger:             log,
 		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
-		AuthMiddleware:     authMidd.RequireAuth(),
+		Authenticator:      authMidd,
 		Authorizer:         authorMdwr,
 
-		FindProducts: *pUC.NewFindProductsUsecase(
+		FindProducts: *productUsecase.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
 		),
-		GetProduct: *pUC.NewGetProductUsecase(
+		GetProduct: *productUsecase.NewGetProductUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,
 		),
-		CreateProduct: *pUC.NewCreateProductUsecase(productRepo, slugGen),
-		AddProductImages: *pUC.NewAddProductImagesUsecase(
+		CreateProduct: *productUsecase.NewCreateProductUsecase(productRepo, slugGen),
+		AddProductImages: *productUsecase.NewAddProductImagesUsecase(
 			productRepo, productImageRepo, slugGen, imageVariantProvider, infra.StorageProvider,
 		),
-		CreateInventory: *iUC.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
+		CreateInventory: *inventoryUsecase.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
-		LoginAccount: *aUC.NewLoginEmailUsecase(
-			authRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo,
+		LoginCustomer: *authenUsecase.NewLoginCustomerUsecase(
+			accountRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo,
 		),
-		RegisterAccount: *aUC.NewRegisterUsecase(
-			authRepo, pwHasher, userRepo, challengeRepo, otpGen, mailSender,
+		RegisterCustomer: *authenUsecase.NewRegisterCustomerUsecase(
+			accountRepo, pwHasher, userRepo, challengeRepo, otpGen, mailSender,
 		),
-		VerifyAccount: *aUC.NewVerifyAccountUsecase(
-			authRepo, pwHasher, tokenHasher, userRepo, challengeRepo, tokenSvc, sessionRepo, refreshTokenRepo,
+		VerifyAccount: *authenUsecase.NewVerifyAccountUsecase(
+			accountRepo, pwHasher, tokenHasher, userRepo, challengeRepo, tokenSvc, sessionRepo, refreshTokenRepo,
 		),
-		GetAccount: *aUC.NewGetAccountUsecase(authRepo),
+		GetAccount: *authenUsecase.NewGetAccountUsecase(accountRepo),
 
-		GetCart: *cUC.NewGetCartUsecase(
+		GetCart: *cartUsecase.NewGetCartUsecase(
 			cartRepo, inventoryRepo, productRepo, productImageRepo, infra.StorageProvider,
 		),
-		AddItem:    *cUC.NewAddItemUsecase(cartRepo, inventoryRepo, productRepo),
-		UpdateItem: *cUC.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
-		RemoveItem: *cUC.NewRemoveItemUsecase(cartRepo),
+		AddItem:    *cartUsecase.NewAddItemUsecase(cartRepo, inventoryRepo, productRepo),
+		UpdateItem: *cartUsecase.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
+		RemoveItem: *cartUsecase.NewRemoveItemUsecase(cartRepo),
 
-		ListLocations: *lUC.NewListLocationUsecase(infra.LocationRepository),
+		ListLocations: *locationUsecase.NewListLocationUsecase(infra.LocationRepository),
 
-		GetUser: *uUC.NewGetUserUsecase(userRepo),
+		GetUser: *userUsecase.NewGetUserUsecase(userRepo),
 
-		ListUserAddresses: *adUC.NewListUserAddressUsecase(addressRepo),
-		CreateAddress:     *adUC.NewCreateAddressUsecase(addressRepo),
+		ListUserAddresses: *addressUsecase.NewListUserAddressUsecase(addressRepo),
+		CreateAddress:     *addressUsecase.NewCreateAddressUsecase(addressRepo),
 
-		GetShopAddress:    *adUC.NewGetShopAddressUsecase(addressShopRepo),
-		ListShopAddresses: *adUC.NewListShopAddressesUsecase(addressShopRepo),
-		CreateShopAddress: *adUC.NewCreateShopAddressUsecase(addressShopRepo),
+		GetShopAddress:    *addressUsecase.NewGetShopAddressUsecase(addressShopRepo),
+		ListShopAddresses: *addressUsecase.NewListShopAddressesUsecase(addressShopRepo),
+		CreateShopAddress: *addressUsecase.NewCreateShopAddressUsecase(addressShopRepo),
 
-		GetShop:    *sUC.NewGetShopUsecase(shopRepo),
-		CreateShop: *sUC.NewCreateShopUsecase(shopRepo, slugGen),
+		GetShop:    *shopUsecase.NewGetShopUsecase(shopRepo),
+		CreateShop: *shopUsecase.NewCreateShopUsecase(shopRepo, slugGen),
 
-		CreatePaymentAccount: *payUC.NewCreatePaymentAccountUsecase(paymentAccRepo, paymentMethodRepo),
-		ListPaymentAccount:   *payUC.NewListPaymentAccountUsecase(paymentAccRepo),
-		CreatePaymentMethod:  *payUC.NewCreatePaymentMethodUsecase(paymentMethodRepo),
-		ListPaymentMethod:    *payUC.NewListPaymentMethodUsecase(paymentMethodRepo),
+		CreatePaymentAccount: *paymentUsecase.NewCreatePaymentAccountUsecase(paymentAccRepo, paymentMethodRepo),
+		ListPaymentAccount:   *paymentUsecase.NewListPaymentAccountUsecase(paymentAccRepo),
+		CreatePaymentMethod:  *paymentUsecase.NewCreatePaymentMethodUsecase(paymentMethodRepo),
+		ListPaymentMethod:    *paymentUsecase.NewListPaymentMethodUsecase(paymentMethodRepo),
 
-		ConfigureShopCourier: *coUC.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
+		ConfigureShopCourier: *courierUsecase.NewConfigureShopCourierUsecase(courierRepo, shopCourierRepo, shopRepo),
 
-		EstimateShippingOptions: *shUC.NewEstimateShippingOptionsUsecase(infra.ShippingCostProvider),
+		EstimateShippingOptions: *shipmentUsecase.NewEstimateShippingOptionsUsecase(infra.ShippingCostProvider),
 	}
 }

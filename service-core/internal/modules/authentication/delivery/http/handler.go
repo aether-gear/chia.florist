@@ -15,23 +15,23 @@ import (
 )
 
 type authHandler struct {
-	signInEmail *usecase.LoginEmailUsecase
-	signUp      *usecase.RegisterUsecase
-	verify      *usecase.VerifyAccountUsecase
-	getAccount  *usecase.GetAccountUsecase
+	loginCustomer    *usecase.LoginCustomerUsecase
+	registerCustomer *usecase.RegisterCustomerUsecase
+	verifyAccount    *usecase.VerifyAccountUsecase
+	getAccount       *usecase.GetAccountUsecase
 }
 
 func NewAuthHandler(
-	signInEmail *usecase.LoginEmailUsecase,
-	signUp *usecase.RegisterUsecase,
-	verify *usecase.VerifyAccountUsecase,
+	loginCustomer *usecase.LoginCustomerUsecase,
+	registerCustomer *usecase.RegisterCustomerUsecase,
+	verifyAccount *usecase.VerifyAccountUsecase,
 	getAccount *usecase.GetAccountUsecase,
 ) *authHandler {
 	return &authHandler{
-		signInEmail: signInEmail,
-		signUp:      signUp,
-		verify:      verify,
-		getAccount:  getAccount,
+		loginCustomer:    loginCustomer,
+		registerCustomer: registerCustomer,
+		verifyAccount:    verifyAccount,
+		getAccount:       getAccount,
 	}
 }
 
@@ -73,14 +73,14 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		return apperrors.NewBadRequest("invalid password")
 	}
 
-	input := usecase.LoginEmailParams{
+	input := usecase.LoginCustomerParams{
 		UserAgent: req.UserAgent,
 		IPAddress: req.IPAddress,
 		Email:     req.Email,
 		Password:  req.Password,
 	}
 
-	tokens, err := h.signInEmail.Execute(input)
+	tokens, err := h.loginCustomer.Execute(input)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 		return apperrors.NewBadRequest("invalid user name")
 	}
 
-	input := usecase.SignUpParams{
+	input := usecase.RegisterCustomerParams{
 		Email:    req.Email,
 		Password: req.Password,
 		Name:     req.Name,
@@ -128,7 +128,7 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 		Phone:    req.Phone,
 	}
 
-	challengeID, err := h.signUp.Execute(input)
+	challengeID, err := h.registerCustomer.Execute(input)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 		OTP:         req.OTP,
 	}
 
-	tokens, err := h.verify.Execute(input)
+	tokens, err := h.verifyAccount.Execute(input)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	})
 
 	response := map[string]string{
-		"message": "login success",
+		"message": "verify success",
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)

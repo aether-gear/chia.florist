@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 
@@ -42,7 +42,7 @@ func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) e
 		return fmt.Errorf("failed to retrieve payment account: %w", err)
 	}
 	if method == nil {
-		return appErr.NewNotFound(domain.ErrPaymentMethodNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrPaymentMethodNotFound.Error())
 	}
 
 	paymentAccount := domain.PaymentAccount{
@@ -59,10 +59,10 @@ func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) e
 
 	if err := paymentAccount.ValidateForMethod(method.Type); err != nil {
 		if errors.Is(err, domain.ErrUnsupportedPaymentMethod) {
-			return appErr.NewBadRequest(err.Error())
+			return apperrors.NewBadRequest(err.Error())
 		}
 
-		return appErr.NewInvalidInput(err.Error())
+		return apperrors.NewInvalidInput(err.Error())
 	}
 
 	err = u.paymentAccRepo.Save(paymentAccount)

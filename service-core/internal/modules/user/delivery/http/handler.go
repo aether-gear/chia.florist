@@ -59,12 +59,14 @@ func (h *UserHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) err
 		return apperrors.NewNotFound("user not found")
 	}
 
-	response := userResponse{
-		ID:          result.ID,
-		Name:        result.Name,
-		Username:    result.Username,
-		Phone:       result.Phone,
-		LastLoginAt: result.LastLoginAt,
+	response := map[string]userResponse{
+		"me": {
+			ID:          result.ID,
+			Name:        result.Name,
+			Username:    result.Username,
+			Phone:       result.Phone,
+			LastLoginAt: result.LastLoginAt,
+		},
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

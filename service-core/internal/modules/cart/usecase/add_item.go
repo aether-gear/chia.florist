@@ -3,25 +3,25 @@ package usecase
 import (
 	"fmt"
 
-	appErr "service-core/internal/common/errors"
-	cartD "service-core/internal/modules/cart/domain"
-	cartR "service-core/internal/modules/cart/repository"
-	inventoryR "service-core/internal/modules/inventory/repository"
-	productR "service-core/internal/modules/product/repository"
+	apperrors "service-core/internal/common/errors"
+	"service-core/internal/modules/cart/domain"
+	"service-core/internal/modules/cart/repository"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
+	productRepo "service-core/internal/modules/product/repository"
 
 	"github.com/google/uuid"
 )
 
 type AddItemUsecase struct {
-	cartRepo      cartR.CartRepository
-	inventoryRepo inventoryR.InventoryRepository
-	productRepo   productR.ProductRepository
+	cartRepo      repository.CartRepository
+	inventoryRepo inventoryRepo.InventoryRepository
+	productRepo   productRepo.ProductRepository
 }
 
 func NewAddItemUsecase(
-	cartRepo cartR.CartRepository,
-	inventoryRepo inventoryR.InventoryRepository,
-	productRepo productR.ProductRepository,
+	cartRepo repository.CartRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
+	productRepo productRepo.ProductRepository,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
 		cartRepo:      cartRepo,
@@ -37,11 +37,11 @@ type AddItemInput struct {
 
 func (u *AddItemUsecase) Execute(input AddItemInput) error {
 	if input.ShopID == uuid.Nil {
-		return appErr.NewInvalidInput(cartD.ErrInvalidShopID.Error())
+		return apperrors.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
 	if input.Quantity <= 0 {
-		return appErr.NewInvalidInput(cartD.ErrInvalidQuantity.Error())
+		return apperrors.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
 	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(input.ProductID, input.ShopID)
@@ -49,7 +49,7 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}
 	if inventory == nil {
-		return appErr.NewNotFound(cartD.ErrProductNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
 	product, err := u.productRepo.GetByID(input.ProductID)
@@ -57,7 +57,7 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
 	if product == nil {
-		return appErr.NewNotFound(cartD.ErrProductNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(input.UserID)
@@ -72,7 +72,7 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 	}
 
 	if cart.HasProductInAnotherShop(input.ProductID, input.ShopID) {
-		return appErr.NewConflict(cartD.ErrProductAlreadyAssignedToShop.Error())
+		return apperrors.NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
 	}
 
 	targetQuantity := input.Quantity
@@ -80,11 +80,11 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		targetQuantity += existingItem.Quantity
 	}
 	if targetQuantity > inventory.Available() {
-		return appErr.NewConflict(cartD.ErrInsufficientStock.Error())
+		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
 	if err := cart.AddItem(input.ProductID, input.ShopID, input.Quantity); err != nil {
-		return appErr.NewInvalidInput(err.Error())
+		return apperrors.NewInvalidInput(err.Error())
 	}
 
 	if err := u.cartRepo.Save(cart); err != nil {

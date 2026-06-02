@@ -3,7 +3,7 @@ package usecase
 import (
 	"fmt"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/repository"
 
@@ -28,7 +28,7 @@ type RemoveItemInput struct {
 
 func (u *RemoveItemUsecase) Execute(input RemoveItemInput) error {
 	if input.ShopID == uuid.Nil {
-		return appErr.NewInvalidInput(domain.ErrInvalidShopID.Error())
+		return apperrors.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByUserID(input.UserID)
@@ -36,7 +36,7 @@ func (u *RemoveItemUsecase) Execute(input RemoveItemInput) error {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
-		return appErr.NewNotFound(domain.ErrCartNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrCartNotFound.Error())
 	}
 
 	cart.RemoveItem(input.ProductID, input.ShopID)

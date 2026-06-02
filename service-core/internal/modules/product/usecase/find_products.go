@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"service-core/internal/infra/storage"
-	inventoryD "service-core/internal/modules/inventory/domain"
-	inventoryR "service-core/internal/modules/inventory/repository"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 
@@ -14,14 +14,14 @@ import (
 
 type FindProductsUsecase struct {
 	productRepo    repository.ProductRepository
-	inventoryRepo  inventoryR.InventoryRepository
+	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
 	fileStore      storage.Provider
 }
 
 func NewFindProductsUsecase(
 	productRepo repository.ProductRepository,
-	inventoryRepo inventoryR.InventoryRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
 	fileStore storage.Provider,
 ) *FindProductsUsecase {
@@ -39,7 +39,7 @@ type ProductCatalogResponse struct {
 		TotalStock    int
 		ReservedStock int
 	}
-	ShopInventories []inventoryD.Inventory
+	ShopInventories []inventoryDomain.Inventory
 	Images          struct {
 		Thumbnail string
 	}

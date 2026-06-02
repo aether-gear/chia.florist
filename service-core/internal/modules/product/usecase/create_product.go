@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 	"service-core/internal/shared/slug"
@@ -54,7 +54,7 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 	if err := product.Validate(); err != nil {
 		if errors.Is(err, domain.ErrInvalidProductName) ||
 			errors.Is(err, domain.ErrInvalidProductPrice) {
-			return appErr.NewInvalidInput(err.Error())
+			return apperrors.NewInvalidInput(err.Error())
 		}
 
 		return err

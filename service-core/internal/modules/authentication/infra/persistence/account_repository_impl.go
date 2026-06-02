@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
@@ -181,7 +181,7 @@ func (r *accountRepositoryImpl) ActivateByUserID(id uuid.UUID) error {
 	}
 
 	if result.RowsAffected() == 0 {
-		return appErr.NewNotFound(
+		return apperrors.NewNotFound(
 			domain.ErrNotFoundAccount.Error(),
 		)
 	}

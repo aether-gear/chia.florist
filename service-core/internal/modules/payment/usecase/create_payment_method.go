@@ -3,7 +3,7 @@ package usecase
 import (
 	"fmt"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 
@@ -45,7 +45,7 @@ func (u *CreatePaymentMethodUsecase) Execute(input CreatePaymentMethodInput) err
 	}
 
 	if err := paymentMethod.Validate(); err != nil {
-		return appErr.NewInvalidInput(err.Error())
+		return apperrors.NewInvalidInput(err.Error())
 	}
 
 	err := u.paymentMethodRepo.Save(paymentMethod)

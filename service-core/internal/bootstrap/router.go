@@ -4,13 +4,13 @@ import (
 	"net/http"
 
 	apphttp "service-core/internal/common/http"
-	"service-core/internal/common/logger"
-	"service-core/internal/common/middleware"
+	applogger "service-core/internal/common/logger"
+	appmiddleware "service-core/internal/common/middleware"
+
+	authendomain "service-core/internal/modules/authentication/domain"
 
 	addressH "service-core/internal/modules/address/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
-	authendomain "service-core/internal/modules/authentication/domain"
-
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
@@ -25,20 +25,24 @@ import (
 )
 
 func NewRouter(c *Container) *chi.Mux {
+	var log = c.Logger
+
 	var (
-		log          = c.Logger
-		core         = buildChain(log, c.CORSAllowedOrigins)
+		core = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+		)
 		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.AuthMiddleware,
+			c.Authenticator.RequireAuth(),
 			c.Authorizer.LoadActor(),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
 		)
 		customerOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.AuthMiddleware,
+			c.Authenticator.RequireAuth(),
 			c.Authorizer.LoadActor(),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
 		)
@@ -57,8 +61,8 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		authHandler = authH.NewAuthHandler(
-			&c.LoginAccount,
-			&c.RegisterAccount,
+			&c.LoginCustomer,
+			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
 		)
@@ -129,8 +133,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", customerOnly(cartHandler.AddItem))
-				r.Put("/{itemID}", customerOnly(cartHandler.UpdateItem))
-				r.Delete("/{itemID}", customerOnly(cartHandler.RemoveItem))
+				r.Put("/{shopID}/{productID}", customerOnly(cartHandler.UpdateItem))
+				r.Delete("/{shopID}/{productID}", customerOnly(cartHandler.RemoveItem))
 			})
 		})
 
@@ -146,7 +150,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users", func(r chi.Router) {
-			r.Get("/{id}", core(userHandler.GetUserByID))
+			r.Get("/{id}", merchantOnly(userHandler.GetUserByID))
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
@@ -180,7 +184,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/payments", func(r chi.Router) {
 			r.Route("/accounts", func(r chi.Router) {
-				r.Get("/", core(paymentHandler.ListPaymentAccount))
+				r.Get("/", customerOnly(paymentHandler.ListPaymentAccount))
 				r.Post("/", merchantOnly(paymentHandler.CreatePaymentAccount))
 			})
 
@@ -191,7 +195,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/shipping", func(r chi.Router) {
-			r.Post("/cost", core(shipmentHandler.EstimateShippingOptions))
+			r.Post("/cost", customerOnly(shipmentHandler.EstimateShippingOptions))
 		})
 	})
 
@@ -199,20 +203,20 @@ func NewRouter(c *Container) *chi.Mux {
 }
 
 func buildChain(
-	log logger.Logger,
+	log applogger.Logger,
 	allowedOrigins []string,
-	extra ...middleware.Middleware,
+	extra ...appmiddleware.Middleware,
 ) func(apphttp.AppHandler) http.HandlerFunc {
-	base := []middleware.Middleware{
-		middleware.CORS(allowedOrigins),
-		middleware.Recovery(log),
-		middleware.Logging(log),
-		middleware.Response(),
+	base := []appmiddleware.Middleware{
+		appmiddleware.CORS(allowedOrigins),
+		appmiddleware.Recovery(log),
+		appmiddleware.Logging(log),
+		appmiddleware.Response(),
 	}
 
 	mws := append(base, extra...)
 
 	return func(h apphttp.AppHandler) http.HandlerFunc {
-		return middleware.Chain(h, mws...)
+		return appmiddleware.Chain(h, mws...)
 	}
 }

@@ -3,24 +3,23 @@ package usecase
 import (
 	"fmt"
 
-	appErr "service-core/internal/common/errors"
-
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/courier/domain"
-	courierRepo "service-core/internal/modules/courier/repository"
+	"service-core/internal/modules/courier/repository"
 	shopRepo "service-core/internal/modules/shop/repository"
 
 	"github.com/google/uuid"
 )
 
 type ConfigureShopCourierUsecase struct {
-	courierRepo     courierRepo.CourierRepository
-	shopCourierRepo courierRepo.ShopCourierRepository
+	courierRepo     repository.CourierRepository
+	shopCourierRepo repository.ShopCourierRepository
 	shopRepo        shopRepo.ShopRepository
 }
 
 func NewConfigureShopCourierUsecase(
-	courierRepo courierRepo.CourierRepository,
-	shopCourierRepo courierRepo.ShopCourierRepository,
+	courierRepo repository.CourierRepository,
+	shopCourierRepo repository.ShopCourierRepository,
 	shopRepo shopRepo.ShopRepository,
 ) *ConfigureShopCourierUsecase {
 	return &ConfigureShopCourierUsecase{
@@ -44,7 +43,7 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		return fmt.Errorf("failed to retrieve shop: %w", err)
 	}
 	if shop == nil {
-		return appErr.NewNotFound(domain.ErrShopNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrShopNotFound.Error())
 	}
 
 	codes := make([]string, len(inputs))
