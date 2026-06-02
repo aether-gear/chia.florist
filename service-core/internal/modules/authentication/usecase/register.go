@@ -82,6 +82,7 @@ func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
 		UserID:    user.ID,
 		Email:     params.Email,
 		Status:    authDomain.AccountPending,
+		Type:      authDomain.AccountTypeCustomer,
 		Password:  hash,
 		CreatedAt: now,
 	}
@@ -90,10 +91,12 @@ func (u *RegisterUsecase) Execute(params SignUpParams) (*uuid.UUID, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create otp: %w", err)
 	}
+
 	otpHash, err := u.hasher.Hash(otp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash otp: %w", err)
 	}
+
 	challenge := authDomain.VerificationChallenge{
 		ID:           uuid.New(),
 		UserID:       &user.ID,

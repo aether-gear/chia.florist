@@ -6,13 +6,21 @@ import (
 	"github.com/google/uuid"
 )
 
-type AccountStatus string
+type (
+	AccountStatus string
+	AccountType   string
+)
 
 const (
 	AccountPending   AccountStatus = "pending"
 	AccountActive    AccountStatus = "active"
 	AccountSuspended AccountStatus = "suspended"
 	AccountLocked    AccountStatus = "locked"
+)
+
+const (
+	AccountTypeCustomer AccountType = "customer"
+	AccountTypeMerchant AccountType = "merchant"
 )
 
 type Account struct {
@@ -23,6 +31,7 @@ type Account struct {
 	Password string
 
 	Status AccountStatus
+	Type   AccountType
 
 	LastLoginAt *time.Time
 

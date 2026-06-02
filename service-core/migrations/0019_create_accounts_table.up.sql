@@ -1,6 +1,9 @@
 CREATE TYPE account_status
     AS ENUM ('pending', 'active', 'suspended', 'locked');
 
+CREATE TYPE account_type
+    AS ENUM ('customer', 'merchant');
+
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -10,6 +13,7 @@ CREATE TABLE accounts (
     password TEXT NOT NULL,
 
     status account_status DEFAULT 'pending',
+    type account_type NOT NULL,
 
     last_login_at TIMESTAMPTZ,
 

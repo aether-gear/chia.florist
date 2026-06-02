@@ -37,6 +37,7 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 			email,
 			password,
 			status,
+			type,
 			last_login_at,
 			created_at,
 			updated_at
@@ -55,6 +56,7 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 		&m.Email,
 		&m.Password,
 		&m.Status,
+		&m.Type,
 		&m.LastLoginAt,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -80,6 +82,7 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 			email,
 			password,
 			status,
+			type,
 			last_login_at,
 			created_at,
 			updated_at
@@ -98,6 +101,7 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 		&m.Email,
 		&m.Password,
 		&m.Status,
+		&m.Type,
 		&m.LastLoginAt,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -123,6 +127,7 @@ func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, erro
 			email,
 			password,
 			status,
+			type,
 			last_login_at,
 			created_at,
 			updated_at
@@ -141,6 +146,7 @@ func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, erro
 		&m.Email,
 		&m.Password,
 		&m.Status,
+		&m.Type,
 		&m.LastLoginAt,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -155,13 +161,8 @@ func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, erro
 	return &m, nil
 }
 
-func (r *accountRepositoryImpl) ActivateByUserID(
-	id uuid.UUID,
-) error {
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		5*time.Second,
-	)
+func (r *accountRepositoryImpl) ActivateByUserID(id uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	query := `
@@ -199,9 +200,10 @@ func (r *accountRepositoryImpl) Create(acc domain.Account) error {
 			email,
 			password,
 			status,
+			type,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err := r.db.Exec(ctx, query,
@@ -210,6 +212,7 @@ func (r *accountRepositoryImpl) Create(acc domain.Account) error {
 		acc.Email,
 		acc.Password,
 		acc.Status,
+		acc.Type,
 		acc.CreatedAt,
 	)
 	if err != nil {

@@ -9,6 +9,10 @@ var (
 )
 
 var (
+	ErrEmailNotVerified = errors.New("email not verified")
+)
+
+var (
 	ErrNotFoundChallenge = errors.New("challenge not found")
 	ErrExpiredChallenge  = errors.New("challenge expired")
 	ErrConsumedChallenge = errors.New("challenge already consumed")

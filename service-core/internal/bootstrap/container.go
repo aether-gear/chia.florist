@@ -14,12 +14,15 @@ import (
 	cRepoImpl "service-core/internal/modules/cart/infra/persistence"
 	coRepoImpl "service-core/internal/modules/courier/infra/persistence"
 	iRepoImpl "service-core/internal/modules/inventory/infra/persistence"
+	mRepoImpl "service-core/internal/modules/merchant/infra/persistence"
 	payRepoImpl "service-core/internal/modules/payment/infra/persistence"
 	pRepoImpl "service-core/internal/modules/product/infra/persistence"
 	sRepoImpl "service-core/internal/modules/shop/infra/persistence"
 	uRepoImpl "service-core/internal/modules/user/infra/persistence"
 
 	aService "service-core/internal/modules/authentication/infra/service"
+	authorSvc "service-core/internal/modules/authorization/infra/service"
+	authorRepo "service-core/internal/modules/authorization/repository"
 
 	adUC "service-core/internal/modules/address/usecase"
 	aUC "service-core/internal/modules/authentication/usecase"
@@ -38,6 +41,7 @@ type Container struct {
 	Logger             logger.Logger
 	CORSAllowedOrigins []string
 	AuthMiddleware     appmiddleware.Middleware
+	Authorizer         authorRepo.Authorizer
 
 	ImageVariantProvider imgService.VariantCreator
 	ImageTransformer     imgService.ImageTransformer
@@ -103,6 +107,7 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		shopRepo          = sRepoImpl.NewShopRepositoryImpl(infra.DB)
 		courierRepo       = coRepoImpl.NewCourierRepositoryImpl(infra.DB)
 		shopCourierRepo   = coRepoImpl.NewShopCourierRepositoryImpl(infra.DB)
+		merchantRepo      = mRepoImpl.NewMerchantRepositoryImpl(infra.DB)
 	)
 
 	var (
@@ -110,6 +115,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 		pwHasher    = aService.NewBcryptHasher()
 		tokenHasher = aService.NewSHATokenHasher()
 		authMidd    = aService.NewAuthMiddleware(tokenSvc, sessionRepo)
+
+		actorSvc   = authorSvc.NewActorService(authRepo, merchantRepo)
+		authorMdwr = authorSvc.NewAuthorizerService(actorSvc)
 	)
 
 	var (
@@ -131,8 +139,9 @@ func NewContainer(cfg Config, infra *Infra) *Container {
 
 	return &Container{
 		Logger:             log,
-		AuthMiddleware:     authMidd.RequireAuth(),
 		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
+		AuthMiddleware:     authMidd.RequireAuth(),
+		Authorizer:         authorMdwr,
 
 		FindProducts: *pUC.NewFindProductsUsecase(
 			productRepo, inventoryRepo, productImageRepo, infra.StorageProvider,

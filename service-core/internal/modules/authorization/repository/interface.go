@@ -1,17 +1,18 @@
 package repository
 
 import (
+	appmiddleware "service-core/internal/common/middleware"
+	authendomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authorization/domain"
 
 	"github.com/google/uuid"
 )
 
-type RoleRepository interface {
-	ListByUserID(userID uuid.UUID) ([]domain.Role, error)
+type ActorService interface {
+	Load(userID uuid.UUID) (*domain.Actor, error)
+}
 
-	AssignToUserID(userID, roleID uuid.UUID) error
-
-	RemoveFromUser(userID, roleID uuid.UUID)
-
-	HasRole(userID uuid.UUID, code string) (bool, error)
+type Authorizer interface {
+	LoadActor() appmiddleware.Middleware
+	RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware
 }

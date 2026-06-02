@@ -9,6 +9,8 @@ import (
 
 	addressH "service-core/internal/modules/address/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
+	authendomain "service-core/internal/modules/authentication/domain"
+
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
@@ -24,12 +26,21 @@ import (
 
 func NewRouter(c *Container) *chi.Mux {
 	var (
-		log       = c.Logger
-		core      = buildChain(log, c.CORSAllowedOrigins)
-		protected = buildChain(
+		log          = c.Logger
+		core         = buildChain(log, c.CORSAllowedOrigins)
+		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
 			c.AuthMiddleware,
+			c.Authorizer.LoadActor(),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
+		)
+		customerOnly = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.AuthMiddleware,
+			c.Authorizer.LoadActor(),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
 		)
 	)
 
@@ -101,10 +112,10 @@ func NewRouter(c *Container) *chi.Mux {
 	r.Route("/", func(r chi.Router) {
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", core(productHandler.FindProducts))
-			r.Post("/", core(productHandler.CreateProduct))
+			r.Post("/", merchantOnly(productHandler.CreateProduct))
 			r.Get("/{id}", core(productHandler.GetProduct))
 
-			r.Post("/{id}/images", core(productHandler.AddProductImages))
+			r.Post("/{id}/images", merchantOnly(productHandler.AddProductImages))
 		})
 
 		r.Route("/auth", func(r chi.Router) {
@@ -114,12 +125,12 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/carts", func(r chi.Router) {
-			r.Get("/", protected(cartHandler.GetCart))
+			r.Get("/", customerOnly(cartHandler.GetCart))
 
 			r.Route("/items", func(r chi.Router) {
-				r.Post("/", protected(cartHandler.AddItem))
-				r.Put("/{itemID}", protected(cartHandler.UpdateItem))
-				r.Delete("/{itemID}", protected(cartHandler.RemoveItem))
+				r.Post("/", customerOnly(cartHandler.AddItem))
+				r.Put("/{itemID}", customerOnly(cartHandler.UpdateItem))
+				r.Delete("/{itemID}", customerOnly(cartHandler.RemoveItem))
 			})
 		})
 
@@ -139,43 +150,43 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
-			r.Get("/", protected(userHandler.GetCurrentUser))
+			r.Get("/", customerOnly(userHandler.GetCurrentUser))
 
 			r.Route("/addresses", func(r chi.Router) {
-				r.Get("/", protected(addressHandler.ListUserAddresses))
-				r.Post("/", protected(addressHandler.CreateUserAddress))
+				r.Get("/", customerOnly(addressHandler.ListUserAddresses))
+				r.Post("/", customerOnly(addressHandler.CreateUserAddress))
 			})
 		})
 
 		r.Route("/shops", func(r chi.Router) {
-			r.Post("/", core(shopHandler.CreateShop))
+			r.Post("/", merchantOnly(shopHandler.CreateShop))
 			r.Get("/{id}", core(shopHandler.GetShopByID))
 
 			r.Route("/{id}/addresses", func(r chi.Router) {
 				r.Get("/", core(addressHandler.ListShopAddresses))
-				r.Post("/", core(addressHandler.CreateShopAddress))
+				r.Post("/", merchantOnly(addressHandler.CreateShopAddress))
 				r.Get("/{addressID}", core(addressHandler.GetShopAddress))
 			})
 
 			r.Route("/{id}/couriers", func(r chi.Router) {
-				r.Post("/", core(courierHandler.ConfigureCourierShop))
+				r.Post("/", merchantOnly(courierHandler.ConfigureCourierShop))
 			})
 
 			r.Route("/{id}/products", func(r chi.Router) {
 				r.Post("/{productID}/inventories",
-					core(inventoryHandler.AddInventory))
+					merchantOnly(inventoryHandler.AddInventory))
 			})
 		})
 
 		r.Route("/payments", func(r chi.Router) {
 			r.Route("/accounts", func(r chi.Router) {
 				r.Get("/", core(paymentHandler.ListPaymentAccount))
-				r.Post("/", core(paymentHandler.CreatePaymentAccount))
+				r.Post("/", merchantOnly(paymentHandler.CreatePaymentAccount))
 			})
 
 			r.Route("/methods", func(r chi.Router) {
 				r.Get("/", core(paymentHandler.ListPaymentMethod))
-				r.Post("/", core(paymentHandler.CreatePaymentMethod))
+				r.Post("/", merchantOnly(paymentHandler.CreatePaymentMethod))
 			})
 		})
 
