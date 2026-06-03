@@ -1,27 +1,66 @@
 package repository
 
 import (
+	"context"
+
 	"service-core/internal/modules/payment/domain"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type PaymentMethodRepository interface {
-	Save(method domain.PaymentMethod) error
-	FindByName(name string) (*domain.PaymentMethod, error)
-	GetByID(id uuid.UUID) (*domain.PaymentMethod, error)
-	ListAll() ([]domain.PaymentMethod, error)
+	Save(
+		ctx context.Context,
+		method domain.PaymentMethod,
+	) error
+
+	FindByName(
+		ctx context.Context,
+		name string,
+	) (*domain.PaymentMethod, error)
+
+	GetByID(
+		ctx context.Context,
+		id uuid.UUID,
+	) (*domain.PaymentMethod, error)
+
+	ListAll(
+		ctx context.Context,
+	) ([]domain.PaymentMethod, error)
 }
 
 type PaymentAccountRepository interface {
-	Save(paymentAccount domain.PaymentAccount) error
-	GetByID(paymentID uuid.UUID) (*domain.PaymentAccount, error)
+	Save(
+		ctx context.Context,
+		paymentAccount domain.PaymentAccount,
+	) error
 
-	AcquireLeastLoaded(methodID uuid.UUID) (*domain.PaymentAccount, error)
+	GetByID(
+		ctx context.Context,
+		paymentID uuid.UUID,
+	) (*domain.PaymentAccount, error)
 
-	IncrementLoad(accountID uuid.UUID) error
-	DecrementLoad(accountID uuid.UUID) error
+	AcquireLeastLoaded(
+		ctx context.Context,
+		exec transaction.Executor,
+		methodID uuid.UUID,
+	) (*domain.PaymentAccount, error)
 
-	ListByMethodID(methodID uuid.UUID) ([]domain.PaymentAccount, error)
-	ListAll() ([]domain.PaymentAccount, error)
+	IncrementLoad(
+		ctx context.Context,
+		accountID uuid.UUID,
+	) error
+	DecrementLoad(
+		ctx context.Context,
+		accountID uuid.UUID,
+	) error
+
+	ListByMethodID(
+		ctx context.Context,
+		methodID uuid.UUID,
+	) ([]domain.PaymentAccount, error)
+	ListAll(
+		ctx context.Context,
+	) ([]domain.PaymentAccount, error)
 }

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -32,7 +33,10 @@ type CreateShopInput struct {
 	IsActive    bool
 }
 
-func (u *CreateShopUsecase) Execute(input CreateShopInput) error {
+func (u *CreateShopUsecase) Execute(
+	ctx context.Context,
+	input CreateShopInput,
+) error {
 	shop := domain.Shop{
 		ID:          uuid.New(),
 		Name:        input.Name,
@@ -42,7 +46,7 @@ func (u *CreateShopUsecase) Execute(input CreateShopInput) error {
 		CreatedAt:   time.Now(),
 	}
 
-	err := u.shopRepo.Create(shop)
+	err := u.shopRepo.Create(ctx, shop)
 	if err != nil {
 		return fmt.Errorf("failed to create shop: %w", err)
 	}

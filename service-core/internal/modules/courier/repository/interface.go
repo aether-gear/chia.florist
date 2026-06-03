@@ -1,17 +1,33 @@
 package repository
 
 import (
+	"context"
+
 	"service-core/internal/modules/courier/domain"
 
 	"github.com/google/uuid"
 )
 
 type CourierRepository interface {
-	GetActiveCodes(codes []string) ([]string, error)
-	ValidateCouriers(codes []string) ([]string, error)
+	GetActiveCodes(
+		ctx context.Context,
+		codes []string,
+	) ([]string, error)
+
+	ValidateCouriers(
+		ctx context.Context,
+		codes []string,
+	) ([]string, error)
 }
 
 type ShopCourierRepository interface {
-	GetByShopID(shopID uuid.UUID) ([]domain.ShopCourier, error)
-	SaveShopCouriers(shopCouriers []domain.ShopCourier) error
+	GetByShopID(
+		ctx context.Context,
+		shopID uuid.UUID,
+	) ([]domain.ShopCourier, error)
+
+	SaveShopCouriers(
+		ctx context.Context,
+		shopCouriers []domain.ShopCourier,
+	) error
 }

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -30,6 +31,7 @@ type EstimateShippingOptionsInput struct {
 }
 
 func (u *EstimateShippingOptionsUsecase) Execute(
+	ctx context.Context,
 	input EstimateShippingOptionsInput,
 ) ([]repository.CostOption, error) {
 	if input.Origin == input.Destination {
@@ -68,7 +70,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 		PriceFilter:   input.PriceFilter,
 	}
 
-	costOptions, err := u.shippingCostProvider.CalculateCost(query)
+	costOptions, err := u.shippingCostProvider.CalculateCost(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate shipping cost: %w", err)
 	}

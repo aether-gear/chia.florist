@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/merchant/domain"
@@ -25,10 +24,7 @@ func NewMerchantRepositoryImpl(conn *database.Connection) repository.MerchantRep
 	}
 }
 
-func (r *merchantRepositoryImpl) GetByAccountID(accountID uuid.UUID) (*domain.Merchant, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *merchantRepositoryImpl) GetByAccountID(ctx context.Context, accountID uuid.UUID) (*domain.Merchant, error) {
 	query := `
 		SELECT
 			id,

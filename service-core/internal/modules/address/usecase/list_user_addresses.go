@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/modules/address/domain"
@@ -21,8 +22,11 @@ func NewListUserAddressUsecase(
 	}
 }
 
-func (u *ListUserAddressUsecase) ListByUserID(userID uuid.UUID) ([]domain.Address, error) {
-	res, err := u.userAddressRepo.GetByUserID(userID)
+func (u *ListUserAddressUsecase) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]domain.Address, error) {
+	res, err := u.userAddressRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve address: %w", err)
 	}

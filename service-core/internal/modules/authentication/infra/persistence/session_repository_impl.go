@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	errorCommon "service-core/internal/common/errors"
 	database "service-core/internal/infra/db"
@@ -26,10 +25,9 @@ func NewSessionRepositoryImpl(conn *database.Connection) repository.SessionRepos
 	}
 }
 
-func (r *sessionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Session, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) GetByID(
+	ctx context.Context, id uuid.UUID,
+) (*domain.Session, error) {
 	query := `
 		SELECT
 			id,
@@ -48,7 +46,6 @@ func (r *sessionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Session, error) {
 	`
 
 	var s domain.Session
-
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&s.ID,
 		&s.UserID,
@@ -69,10 +66,9 @@ func (r *sessionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Session, error) {
 	return &s, nil
 }
 
-func (r *sessionRepositoryImpl) RevokeByID(id uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) RevokeByID(
+	ctx context.Context, id uuid.UUID,
+) error {
 	query := `
 		UPDATE
 			sessions
@@ -95,10 +91,9 @@ func (r *sessionRepositoryImpl) RevokeByID(id uuid.UUID) error {
 	return nil
 }
 
-func (r *sessionRepositoryImpl) UpdateLastActivityByID(id uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) UpdateLastActivityByID(
+	ctx context.Context, id uuid.UUID,
+) error {
 	query := `
 		UPDATE sessions
 		SET
@@ -115,10 +110,9 @@ func (r *sessionRepositoryImpl) UpdateLastActivityByID(id uuid.UUID) error {
 	return nil
 }
 
-func (r *sessionRepositoryImpl) Save(session domain.Session) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) Save(
+	ctx context.Context, session domain.Session,
+) error {
 	query := `
 		INSERT INTO sessions (
 			id,

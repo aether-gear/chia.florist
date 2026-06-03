@@ -47,7 +47,7 @@ func (s *authorizer) LoadActor() appmiddleware.Middleware {
 				return apperrors.NewUnauthorized("authentication required")
 			}
 
-			actor, err := s.actorSvc.Load(authCtx.UserID)
+			actor, err := s.actorSvc.Load(r.Context(), authCtx.UserID)
 			if err != nil {
 				return err
 			}

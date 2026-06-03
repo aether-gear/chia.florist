@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/modules/authentication/domain"
@@ -21,8 +22,8 @@ func NewGetAccountUsecase(
 	}
 }
 
-func (u *GetAccountUsecase) Execute(id uuid.UUID) (*domain.Account, error) {
-	acc, err := u.accountRepo.GetByUserID(id)
+func (u *GetAccountUsecase) Execute(ctx context.Context, id uuid.UUID) (*domain.Account, error) {
+	acc, err := u.accountRepo.GetByUserID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/modules/location/domain"
@@ -19,8 +20,8 @@ func NewListLocationUsecase(
 	}
 }
 
-func (u *ListLocationUsecase) Province() ([]domain.Province, error) {
-	res, err := u.locationRepo.ListProvinces()
+func (u *ListLocationUsecase) Province(ctx context.Context) ([]domain.Province, error) {
+	res, err := u.locationRepo.ListProvinces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load provinces: %w", err)
 	}
@@ -28,8 +29,8 @@ func (u *ListLocationUsecase) Province() ([]domain.Province, error) {
 	return res, nil
 }
 
-func (u *ListLocationUsecase) City(provinceID string) ([]domain.City, error) {
-	res, err := u.locationRepo.ListCitiesByProvince(provinceID)
+func (u *ListLocationUsecase) City(ctx context.Context, provinceID string) ([]domain.City, error) {
+	res, err := u.locationRepo.ListCitiesByProvince(ctx, provinceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cities: %w", err)
 	}
@@ -37,8 +38,8 @@ func (u *ListLocationUsecase) City(provinceID string) ([]domain.City, error) {
 	return res, nil
 }
 
-func (u *ListLocationUsecase) District(cityID string) ([]domain.District, error) {
-	res, err := u.locationRepo.ListDistrictsByCity(cityID)
+func (u *ListLocationUsecase) District(ctx context.Context, cityID string) ([]domain.District, error) {
+	res, err := u.locationRepo.ListDistrictsByCity(ctx, cityID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load districts: %w", err)
 	}
@@ -46,8 +47,8 @@ func (u *ListLocationUsecase) District(cityID string) ([]domain.District, error)
 	return res, nil
 }
 
-func (u *ListLocationUsecase) Village(districtID string) ([]domain.Village, error) {
-	res, err := u.locationRepo.ListVillagesByDistrict(districtID)
+func (u *ListLocationUsecase) Village(ctx context.Context, districtID string) ([]domain.Village, error) {
+	res, err := u.locationRepo.ListVillagesByDistrict(ctx, districtID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load villages: %w", err)
 	}

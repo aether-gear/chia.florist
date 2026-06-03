@@ -40,7 +40,7 @@ func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	acc, err := h.getAccount.Execute(authCtx.UserID)
+	acc, err := h.getAccount.Execute(r.Context(), authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		Password:  req.Password,
 	}
 
-	tokens, err := h.loginCustomer.Execute(input)
+	tokens, err := h.loginCustomer.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (h *authHandler) SignUpAccount(w http.ResponseWriter, r *http.Request) erro
 		Phone:    req.Phone,
 	}
 
-	challengeID, err := h.registerCustomer.Execute(input)
+	challengeID, err := h.registerCustomer.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 		OTP:         req.OTP,
 	}
 
-	tokens, err := h.verifyAccount.Execute(input)
+	tokens, err := h.verifyAccount.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}

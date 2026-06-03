@@ -3,10 +3,8 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
-
 	"service-core/internal/modules/courier/domain"
 	"service-core/internal/modules/courier/repository"
 
@@ -24,10 +22,9 @@ func NewShopCourierRepositoryImpl(conn *database.Connection) repository.ShopCour
 	}
 }
 
-func (r *shopCourierRepositoryImpl) GetByShopID(shopID uuid.UUID) ([]domain.ShopCourier, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopCourierRepositoryImpl) GetByShopID(
+	ctx context.Context, shopID uuid.UUID,
+) ([]domain.ShopCourier, error) {
 	query := `
 		SELECT
 			shop_id,
@@ -67,10 +64,10 @@ func (r *shopCourierRepositoryImpl) GetByShopID(shopID uuid.UUID) ([]domain.Shop
 	return shopCouriers, nil
 }
 
-func (r *shopCourierRepositoryImpl) SaveShopCouriers(shopCouriers []domain.ShopCourier) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopCourierRepositoryImpl) SaveShopCouriers(
+	ctx context.Context,
+	shopCouriers []domain.ShopCourier,
+) error {
 	if len(shopCouriers) == 0 {
 		return nil
 	}
@@ -102,9 +99,7 @@ func (r *shopCourierRepositoryImpl) SaveShopCouriers(shopCouriers []domain.ShopC
 			active = EXCLUDED.active
 	`
 
-	_, err := r.db.Exec(
-		ctx,
-		query,
+	_, err := r.db.Exec(ctx, query,
 		shopIDs,
 		codes,
 		actives,

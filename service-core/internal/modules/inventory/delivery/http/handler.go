@@ -40,11 +40,13 @@ func (h *InventoryHandler) AddInventory(w http.ResponseWriter, r *http.Request) 
 		return apperrors.NewBadRequest("invalid stock")
 	}
 
-	if err := h.createInventory.Execute(usecase.CreateInventoryInput{
-		ProductID: productID,
-		ShopID:    shopID,
-		Stock:     req.Stock,
-	}); err != nil {
+	if err := h.createInventory.Execute(
+		r.Context(),
+		usecase.CreateInventoryInput{
+			ProductID: productID,
+			ShopID:    shopID,
+			Stock:     req.Stock,
+		}); err != nil {
 		return err
 	}
 

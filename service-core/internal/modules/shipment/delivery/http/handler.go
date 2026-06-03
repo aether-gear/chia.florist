@@ -45,7 +45,7 @@ func (h *ShipmentHandler) EstimateShippingOptions(w http.ResponseWriter, r *http
 		PriceFilter: req.PriceFilter,
 	}
 
-	results, err := h.estimateShippOpts.Execute(input)
+	results, err := h.estimateShippOpts.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}

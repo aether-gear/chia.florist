@@ -44,7 +44,7 @@ func (aM *jwtAuthenticator) RequireAuth() commonmiddleware.Middleware {
 				return apperrors.NewUnauthorized(authendomain.ErrInvalidToken.Error())
 			}
 
-			session, err := aM.sessionRepo.GetByID(claims.SessionID)
+			session, err := aM.sessionRepo.GetByID(r.Context(), claims.SessionID)
 			if err != nil {
 				return fmt.Errorf("failed to load session: %w", err)
 			}

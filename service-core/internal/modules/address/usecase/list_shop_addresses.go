@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/modules/address/domain"
@@ -21,8 +22,11 @@ func NewListShopAddressesUsecase(
 	}
 }
 
-func (u *ListShopAddressesUsecase) FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error) {
-	res, err := u.shopAddressRepo.FindByShopID(shopID)
+func (u *ListShopAddressesUsecase) FindByShopID(
+	ctx context.Context,
+	shopID uuid.UUID,
+) ([]domain.ShopAddress, error) {
+	res, err := u.shopAddressRepo.FindByShopID(ctx, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve address: %w", err)
 	}

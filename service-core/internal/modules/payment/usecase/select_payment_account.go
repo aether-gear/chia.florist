@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -23,8 +24,8 @@ func NewSelectPayment(
 	}
 }
 
-func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, error) {
-	accounts, err := u.paymentAccRepo.ListByMethodID(methodID)
+func (u *SelectPayment) Execute(ctx context.Context, methodID uuid.UUID) (*domain.PaymentAccount, error) {
+	accounts, err := u.paymentAccRepo.ListByMethodID(ctx, methodID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load payment methods: %w", err)
 	}
@@ -43,7 +44,7 @@ func (u *SelectPayment) Execute(methodID uuid.UUID) (*domain.PaymentAccount, err
 	selected.LastUsedAt = &now
 	selected.CurrentLoad += 1
 
-	if err := u.paymentAccRepo.Save(selected); err != nil {
+	if err := u.paymentAccRepo.Save(ctx, selected); err != nil {
 		return nil, fmt.Errorf("failed to update payment method: %w", err)
 	}
 

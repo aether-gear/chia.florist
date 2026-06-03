@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/user/domain"
 	"service-core/internal/modules/user/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -26,10 +26,10 @@ func NewUserRepositoryImpl(conn *database.Connection) repository.UserRepository 
 	}
 }
 
-func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]domain.User, int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) FindUsers(
+	ctx context.Context,
+	params repository.FindUserParams,
+) ([]domain.User, int, error) {
 	var (
 		conditions []string
 		args       []any
@@ -126,10 +126,9 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 	return results, total, nil
 }
 
-func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) GetByID(
+	ctx context.Context, id uuid.UUID,
+) (*domain.User, error) {
 	query := `
 		SELECT
 			u.id,
@@ -169,10 +168,9 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 	return &m, nil
 }
 
-func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) GetByUsername(
+	ctx context.Context, username string,
+) (*domain.User, error) {
 	query := `
 		SELECT 
 			u.id,
@@ -190,7 +188,6 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 	`
 
 	var m domain.User
-
 	err := r.db.QueryRow(ctx, query, username).Scan(
 		&m.ID,
 		&m.Name,
@@ -212,10 +209,11 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 	return &m, nil
 }
 
-func (r *userRepositoryImpl) CreateUser(props repository.CreateUserProps) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) CreateUser(
+	ctx context.Context,
+	exec transaction.Executor,
+	props repository.CreateUserProps,
+) error {
 	query := `
 		INSERT INTO users (
 			id,
@@ -227,7 +225,7 @@ func (r *userRepositoryImpl) CreateUser(props repository.CreateUserProps) error 
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		props.ID,
 		props.Name,
 		props.Username,

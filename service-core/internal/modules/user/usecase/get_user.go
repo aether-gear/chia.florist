@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/modules/user/domain"
@@ -21,8 +22,11 @@ func NewGetUserUsecase(
 	}
 }
 
-func (u *GetUserUsecase) ByID(id uuid.UUID) (*domain.User, error) {
-	user, err := u.userRepo.GetByID(id)
+func (u *GetUserUsecase) ByID(
+	ctx context.Context,
+	id uuid.UUID,
+) (*domain.User, error) {
+	user, err := u.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return &domain.User{}, fmt.Errorf("failed to retrieve user: %w", err)
 	}

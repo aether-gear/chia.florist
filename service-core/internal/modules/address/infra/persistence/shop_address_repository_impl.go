@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
@@ -25,10 +24,9 @@ func NewShopAddressRepositoryImpl(conn *database.Connection) repository.ShopAddr
 	}
 }
 
-func (r *shopAddressRepositoryImpl) GetByID(addressID uuid.UUID) (*domain.ShopAddress, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopAddressRepositoryImpl) GetByID(
+	ctx context.Context, addressID uuid.UUID,
+) (*domain.ShopAddress, error) {
 	query := `
 		SELECT
 			id,
@@ -51,7 +49,6 @@ func (r *shopAddressRepositoryImpl) GetByID(addressID uuid.UUID) (*domain.ShopAd
 	`
 
 	var a domain.ShopAddress
-
 	err := r.db.QueryRow(ctx, query, addressID).Scan(
 		&a.ID,
 		&a.ShopID,
@@ -79,10 +76,9 @@ func (r *shopAddressRepositoryImpl) GetByID(addressID uuid.UUID) (*domain.ShopAd
 	return &a, nil
 }
 
-func (r *shopAddressRepositoryImpl) FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopAddressRepositoryImpl) FindByShopID(
+	ctx context.Context, shopID uuid.UUID,
+) ([]domain.ShopAddress, error) {
 	query := `
 		SELECT
 			id,
@@ -143,15 +139,23 @@ func (r *shopAddressRepositoryImpl) FindByShopID(shopID uuid.UUID) ([]domain.Sho
 	return addresses, nil
 }
 
-func (r *shopAddressRepositoryImpl) Create(address domain.ShopAddress) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopAddressRepositoryImpl) Create(
+	ctx context.Context, address domain.ShopAddress,
+) error {
 	query := `
 		INSERT INTO shop_addresses (
-			id, shop_id, label, phone, is_active,
-			province, city, district, village,
-			full_address, postal_code, created_at
+			id,
+			shop_id,
+			label,
+			phone,
+			is_active,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			created_at
 		) VALUES (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
 		)

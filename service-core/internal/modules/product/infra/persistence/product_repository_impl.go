@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
@@ -26,10 +25,9 @@ func NewProductRepository(conn *database.Connection) repository.ProductRepositor
 	}
 }
 
-func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]domain.Product, int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productRepositoryImpl) FindProducts(
+	ctx context.Context, params repository.FindProductParams,
+) ([]domain.Product, int, error) {
 	var (
 		conditions []string
 		args       []any
@@ -111,7 +109,6 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	defer rows.Close()
 
 	var results []domain.Product
-
 	for rows.Next() {
 		var item domain.Product
 
@@ -142,10 +139,9 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	return results, total, nil
 }
-func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productRepositoryImpl) GetByID(
+	ctx context.Context, id uuid.UUID,
+) (*domain.Product, error) {
 	query := `
 		SELECT
 			p.id,
@@ -166,7 +162,6 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
 	`
 
 	var result domain.Product
-
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&result.ID,
 		&result.SKU,
@@ -192,13 +187,12 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
 	return &result, nil
 }
 
-func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, error) {
+func (r *productRepositoryImpl) FindByIDs(
+	ctx context.Context, ids []uuid.UUID,
+) ([]domain.Product, error) {
 	if len(ids) == 0 {
 		return []domain.Product{}, nil
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	query := `
 		SELECT
@@ -230,7 +224,6 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, er
 	defer rows.Close()
 
 	var results []domain.Product
-
 	for rows.Next() {
 		var item domain.Product
 
@@ -263,10 +256,9 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, er
 	return results, nil
 }
 
-func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productRepositoryImpl) CreateProduct(
+	ctx context.Context, product *domain.Product,
+) error {
 	query := `
 		INSERT INTO products (
 			id,

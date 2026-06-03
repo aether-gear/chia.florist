@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
@@ -35,10 +36,11 @@ type ConfigureShopCourierInput struct {
 }
 
 func (u *ConfigureShopCourierUsecase) Execute(
+	ctx context.Context,
 	shopID uuid.UUID,
 	inputs []ConfigureShopCourierInput,
 ) error {
-	shop, err := u.shopRepo.GetByID(shopID)
+	shop, err := u.shopRepo.GetByID(ctx, shopID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve shop: %w", err)
 	}
@@ -51,7 +53,7 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		codes[i] = input.Code
 	}
 
-	validCodes, err := u.courierRepo.ValidateCouriers(codes)
+	validCodes, err := u.courierRepo.ValidateCouriers(ctx, codes)
 	if err != nil {
 		return fmt.Errorf("failed to validate couriers: %w", err)
 	}
@@ -78,7 +80,7 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		})
 	}
 
-	if err := u.shopCourierRepo.SaveShopCouriers(shopCouriers); err != nil {
+	if err := u.shopCourierRepo.SaveShopCouriers(ctx, shopCouriers); err != nil {
 		return fmt.Errorf("failed to save shop couriers: %w", err)
 	}
 

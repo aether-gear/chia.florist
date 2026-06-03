@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
@@ -22,10 +21,10 @@ func NewRefreshTokenRepositoryImpl(conn *database.Connection) repository.Refresh
 	}
 }
 
-func (r *refreshTokenRepositoryImpl) Save(refreshToken domain.RefreshToken) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *refreshTokenRepositoryImpl) Save(
+	ctx context.Context,
+	refreshToken domain.RefreshToken,
+) error {
 	query := `
 		INSERT INTO refresh_tokens (
 			id,

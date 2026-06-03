@@ -25,7 +25,7 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) error 
 		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	result, err := h.getUser.ByID(id)
+	result, err := h.getUser.ByID(r.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (h *UserHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) err
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	result, err := h.getUser.ByID(authCtx.UserID)
+	result, err := h.getUser.ByID(r.Context(), authCtx.UserID)
 	if err != nil {
 		return err
 	}

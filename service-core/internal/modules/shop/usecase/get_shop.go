@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/modules/shop/domain"
@@ -19,8 +20,11 @@ func NewGetShopUsecase(shopRepo repository.ShopRepository) *GetShopUsecase {
 	}
 }
 
-func (u *GetShopUsecase) GetByID(shopID uuid.UUID) (*domain.Shop, error) {
-	shop, err := u.shopRepo.GetByID(shopID)
+func (u *GetShopUsecase) GetByID(
+	ctx context.Context,
+	shopID uuid.UUID,
+) (*domain.Shop, error) {
+	shop, err := u.shopRepo.GetByID(ctx, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve shop: %w", err)
 	}

@@ -60,7 +60,7 @@ func (h *PaymentHandler) CreatePaymentAccount(w http.ResponseWriter, r *http.Req
 		IsActive:      isActive,
 	}
 
-	err = h.createPaymentAccount.Execute(input)
+	err = h.createPaymentAccount.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (h *PaymentHandler) CreatePaymentAccount(w http.ResponseWriter, r *http.Req
 }
 
 func (h *PaymentHandler) ListPaymentAccount(w http.ResponseWriter, r *http.Request) error {
-	payAccs, err := h.listPaymentAccount.ListAll()
+	payAccs, err := h.listPaymentAccount.ListAll(r.Context())
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 		FeePercentage: feePercentage,
 	}
 
-	err = h.createPaymentMethod.Execute(input)
+	err = h.createPaymentMethod.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Request) error {
-	payMethods, err := h.listPaymentMethod.ListAll()
+	payMethods, err := h.listPaymentMethod.ListAll(r.Context())
 	if err != nil {
 		return err
 	}

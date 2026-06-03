@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -39,8 +40,11 @@ type CreateInventoryInput struct {
 	Stock     int
 }
 
-func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
-	product, err := u.productRepo.GetByID(input.ProductID)
+func (u *CreateInventoryUsecase) Execute(
+	ctx context.Context,
+	input CreateInventoryInput,
+) error {
+	product, err := u.productRepo.GetByID(ctx, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to load product: %w", err)
 	}
@@ -48,7 +52,7 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
 	}
 
-	shop, err := u.shopRepo.GetByID(input.ShopID)
+	shop, err := u.shopRepo.GetByID(ctx, input.ShopID)
 	if err != nil {
 		return fmt.Errorf("failed to load shop: %w", err)
 	}
@@ -56,7 +60,8 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return apperrors.NewNotFound("shop not found")
 	}
 
-	existing, err := u.inventoryRepo.GetByProductIDAndShopID(input.ProductID, input.ShopID)
+	existing, err := u.inventoryRepo.
+		GetByProductIDAndShopID(ctx, input.ProductID, input.ShopID)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory: %w", err)
 	}
@@ -80,7 +85,7 @@ func (u *CreateInventoryUsecase) Execute(input CreateInventoryInput) error {
 		return err
 	}
 
-	if err := u.inventoryRepo.Create(inventory); err != nil {
+	if err := u.inventoryRepo.Create(ctx, inventory); err != nil {
 		return fmt.Errorf("failed to save inventory: %w", err)
 	}
 

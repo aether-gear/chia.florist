@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/infra/storage"
@@ -49,8 +50,11 @@ type ProductDetailResponse struct {
 	Images          []ImageProductDetail
 }
 
-func (u *GetProductUsecase) Execute(id uuid.UUID) (*ProductDetailResponse, error) {
-	product, err := u.productRepo.GetByID(id)
+func (u *GetProductUsecase) Execute(
+	ctx context.Context,
+	id uuid.UUID,
+) (*ProductDetailResponse, error) {
+	product, err := u.productRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products with inventory: %w", err)
 	}
@@ -58,12 +62,12 @@ func (u *GetProductUsecase) Execute(id uuid.UUID) (*ProductDetailResponse, error
 		return nil, nil
 	}
 
-	inventories, err := u.inventoryRepo.ListByProductID(id)
+	inventories, err := u.inventoryRepo.ListByProductID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory by product: %w", err)
 	}
 
-	images, err := u.productImgRepo.ListByProductID(id)
+	images, err := u.productImgRepo.ListByProductID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images by product: %w", err)
 	}

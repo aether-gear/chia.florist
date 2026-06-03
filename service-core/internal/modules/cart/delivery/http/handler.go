@@ -38,7 +38,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	result, err := h.getCart.Execute(authCtx.UserID)
+	result, err := h.getCart.Execute(r.Context(), authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 		Quantity:  req.Quantity,
 	}
 
-	if err := h.addItem.Execute(input); err != nil {
+	if err := h.addItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -169,7 +169,7 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		Quantity:  req.Quantity,
 	}
 
-	if err := h.updateItem.Execute(input); err != nil {
+	if err := h.updateItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -203,7 +203,7 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 		ShopID:    shopID,
 	}
 
-	if err := h.removeItem.Execute(input); err != nil {
+	if err := h.removeItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 

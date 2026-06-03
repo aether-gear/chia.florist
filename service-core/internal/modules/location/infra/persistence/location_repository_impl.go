@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/location/domain"
@@ -22,10 +21,7 @@ func NewLocationRepositoryImpl(conn *database.Connection) repository.LocationRep
 	}
 }
 
-func (r *locationRepositoryImpl) ListProvinces() ([]domain.Province, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *locationRepositoryImpl) ListProvinces(ctx context.Context) ([]domain.Province, error) {
 	query := `
 		SELECT
 			id, name
@@ -60,10 +56,9 @@ func (r *locationRepositoryImpl) ListProvinces() ([]domain.Province, error) {
 	return districts, nil
 }
 
-func (r *locationRepositoryImpl) ListCitiesByProvince(provinceID string) ([]domain.City, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *locationRepositoryImpl) ListCitiesByProvince(
+	ctx context.Context, provinceID string,
+) ([]domain.City, error) {
 	query := `
 		SELECT 
 			id,
@@ -102,10 +97,9 @@ func (r *locationRepositoryImpl) ListCitiesByProvince(provinceID string) ([]doma
 	return districts, nil
 }
 
-func (r *locationRepositoryImpl) ListDistrictsByCity(cityID string) ([]domain.District, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *locationRepositoryImpl) ListDistrictsByCity(
+	ctx context.Context, cityID string,
+) ([]domain.District, error) {
 	query := `
 		SELECT 
 			id,
@@ -144,10 +138,9 @@ func (r *locationRepositoryImpl) ListDistrictsByCity(cityID string) ([]domain.Di
 	return districts, nil
 }
 
-func (r *locationRepositoryImpl) ListVillagesByDistrict(districtID string) ([]domain.Village, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *locationRepositoryImpl) ListVillagesByDistrict(
+	ctx context.Context, districtID string,
+) ([]domain.Village, error) {
 	query := `
 		SELECT 
 			id,

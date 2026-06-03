@@ -30,7 +30,7 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	result, err := h.getShop.GetByID(id)
+	result, err := h.getShop.GetByID(r.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 		IsActive:    parsedIsActive,
 	}
 
-	err = h.createShop.Execute(input)
+	err = h.createShop.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}

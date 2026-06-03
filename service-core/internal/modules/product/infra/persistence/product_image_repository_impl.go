@@ -3,12 +3,12 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
-	"service-core/internal/shared/image"
+	image "service-core/internal/shared/image"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,15 +25,13 @@ func NewProductImageRepository(conn *database.Connection) repository.ProductImag
 }
 
 func (r *productImageRepositoryImpl) ListByProductIDs(
+	ctx context.Context,
 	productIDs []uuid.UUID,
 ) (map[uuid.UUID][]domain.ProductImage, error) {
 	result := make(map[uuid.UUID][]domain.ProductImage)
 	if len(productIDs) == 0 {
 		return result, nil
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	query := `
 		SELECT
@@ -121,10 +119,10 @@ func (r *productImageRepositoryImpl) ListByProductIDs(
 	return result, nil
 }
 
-func (r *productImageRepositoryImpl) ListByProductID(productID uuid.UUID) ([]domain.ProductImage, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productImageRepositoryImpl) ListByProductID(
+	ctx context.Context,
+	productID uuid.UUID,
+) ([]domain.ProductImage, error) {
 	query := `
 		SELECT
 			id,
@@ -213,16 +211,11 @@ func (r *productImageRepositoryImpl) ListByProductID(productID uuid.UUID) ([]dom
 	return images, nil
 }
 
-func (r *productImageRepositoryImpl) Create(images []domain.ProductImage) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin tx create product image failed: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
+func (r *productImageRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	images []domain.ProductImage,
+) error {
 	query := `
 		INSERT INTO product_images (
 			id,
@@ -240,7 +233,7 @@ func (r *productImageRepositoryImpl) Create(images []domain.ProductImage) error 
 	`
 
 	for _, image := range images {
-		_, err := r.db.Exec(ctx, query,
+		_, err := exec.Exec(ctx, query,
 			image.ID,
 			image.ProductID,
 			image.Variants[domain.ResolutionThumbnail].Key,
@@ -258,17 +251,13 @@ func (r *productImageRepositoryImpl) Create(images []domain.ProductImage) error 
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit tx insert product image failed: %w", err)
-	}
-
 	return nil
 }
 
-func (r *productImageRepositoryImpl) SoftDeleteByProductID(productID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productImageRepositoryImpl) SoftDeleteByProductID(
+	ctx context.Context,
+	productID uuid.UUID,
+) error {
 	query := `
 		UPDATE
 			product_images 

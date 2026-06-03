@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/inventory/domain"
@@ -25,10 +24,9 @@ func NewInventoryRepository(conn *database.Connection) repository.InventoryRepos
 	}
 }
 
-func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(productID uuid.UUID, shopID uuid.UUID) (*domain.Inventory, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(
+	ctx context.Context, productID uuid.UUID, shopID uuid.UUID,
+) (*domain.Inventory, error) {
 	query := `
 		SELECT
 			id,
@@ -63,10 +61,9 @@ func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(productID uuid.UUID, s
 	return &inventory, nil
 }
 
-func (r *inventoryRepositoryImpl) ListByProductID(productID uuid.UUID) ([]domain.Inventory, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *inventoryRepositoryImpl) ListByProductID(
+	ctx context.Context, productID uuid.UUID,
+) ([]domain.Inventory, error) {
 	query := `
 		SELECT
 			id,
@@ -88,7 +85,6 @@ func (r *inventoryRepositoryImpl) ListByProductID(productID uuid.UUID) ([]domain
 	defer rows.Close()
 
 	var inventories []domain.Inventory
-
 	for rows.Next() {
 		var inventory domain.Inventory
 		if err := rows.Scan(
@@ -113,14 +109,13 @@ func (r *inventoryRepositoryImpl) ListByProductID(productID uuid.UUID) ([]domain
 	return inventories, nil
 }
 
-func (r *inventoryRepositoryImpl) ListByProductIDs(productIDs []uuid.UUID) (map[uuid.UUID][]domain.Inventory, error) {
+func (r *inventoryRepositoryImpl) ListByProductIDs(
+	ctx context.Context, productIDs []uuid.UUID,
+) (map[uuid.UUID][]domain.Inventory, error) {
 	result := make(map[uuid.UUID][]domain.Inventory)
 	if len(productIDs) == 0 {
 		return result, nil
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	query := `
 		SELECT
@@ -148,7 +143,6 @@ func (r *inventoryRepositoryImpl) ListByProductIDs(productIDs []uuid.UUID) (map[
 	defer rows.Close()
 
 	var inventories []domain.Inventory
-
 	for rows.Next() {
 		var inventory domain.Inventory
 		if err := rows.Scan(
@@ -177,10 +171,9 @@ func (r *inventoryRepositoryImpl) ListByProductIDs(productIDs []uuid.UUID) (map[
 	return result, nil
 }
 
-func (r *inventoryRepositoryImpl) ListByShopID(shopID uuid.UUID) ([]domain.Inventory, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *inventoryRepositoryImpl) ListByShopID(
+	ctx context.Context, shopID uuid.UUID,
+) ([]domain.Inventory, error) {
 	query := `
 		SELECT
 			id,
@@ -202,7 +195,6 @@ func (r *inventoryRepositoryImpl) ListByShopID(shopID uuid.UUID) ([]domain.Inven
 	defer rows.Close()
 
 	var inventories []domain.Inventory
-
 	for rows.Next() {
 		var inventory domain.Inventory
 		if err := rows.Scan(
@@ -227,10 +219,9 @@ func (r *inventoryRepositoryImpl) ListByShopID(shopID uuid.UUID) ([]domain.Inven
 	return inventories, nil
 }
 
-func (r *inventoryRepositoryImpl) Create(inventory *domain.Inventory) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *inventoryRepositoryImpl) Create(
+	ctx context.Context, inventory *domain.Inventory,
+) error {
 	query := `
 		INSERT INTO inventory (
 			id,

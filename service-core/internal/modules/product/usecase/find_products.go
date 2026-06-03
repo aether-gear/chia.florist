@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/infra/storage"
@@ -53,18 +54,21 @@ type FindProductsInput struct {
 }
 
 func (u *FindProductsUsecase) Execute(
+	ctx context.Context,
 	input FindProductsInput,
 ) (
 	[]ProductCatalogResponse,
 	int,
 	error,
 ) {
-	products, total, err := u.productRepo.FindProducts(repository.FindProductParams{
-		Page:  input.Page,
-		Limit: input.Limit,
-		ID:    input.ID,
-		Name:  input.Name,
-	})
+	products, total, err := u.productRepo.FindProducts(
+		ctx,
+		repository.FindProductParams{
+			Page:  input.Page,
+			Limit: input.Limit,
+			ID:    input.ID,
+			Name:  input.Name,
+		})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load products: %w", err)
 	}
@@ -77,12 +81,12 @@ func (u *FindProductsUsecase) Execute(
 		productIDs = append(productIDs, product.ID)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProductIDs(productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProductIDs(productIDs)
+	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load images for products: %w", err)
 	}

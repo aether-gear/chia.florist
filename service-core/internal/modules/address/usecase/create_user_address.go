@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -33,7 +34,10 @@ type CreateAddressInput struct {
 	PostalCode   string
 }
 
-func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
+func (u *CreateAddressUsecase) Execute(
+	ctx context.Context,
+	input CreateAddressInput,
+) error {
 	var isDefault bool
 	if *input.IsDefault {
 		isDefault = *input.IsDefault
@@ -58,7 +62,7 @@ func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
 		CreatedAt: time.Now(),
 	}
 
-	err := u.userAddressRepo.Create(address)
+	err := u.userAddressRepo.Create(ctx, address)
 	if err != nil {
 		return fmt.Errorf("failed to save address: %w", err)
 	}

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -36,8 +37,11 @@ type CreatePaymentAccountInput struct {
 	IsActive      bool
 }
 
-func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) error {
-	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
+func (u *CreatePaymentAccountUsecase) Execute(
+	ctx context.Context,
+	input CreatePaymentAccountInput,
+) error {
+	method, err := u.paymentMethodRepo.GetByID(ctx, input.MethodID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve payment account: %w", err)
 	}
@@ -65,7 +69,7 @@ func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) e
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	err = u.paymentAccRepo.Save(paymentAccount)
+	err = u.paymentAccRepo.Save(ctx, paymentAccount)
 	if err != nil {
 		return fmt.Errorf("failed to save payment account: %w", err)
 	}

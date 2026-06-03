@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
@@ -25,15 +24,21 @@ func NewPaymentMethodRepository(conn *database.Connection) repository.PaymentMet
 	}
 }
 
-func (r *paymentMethodRepositoryImpl) Save(method domain.PaymentMethod) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) Save(
+	ctx context.Context, method domain.PaymentMethod,
+) error {
 	query := `
 		INSERT INTO payment_methods (
-			id, name, type, is_active, description,
-			fee_type, fee_amount, fee_rate,
-			created_at, updated_at
+			id,
+			name,
+			type,
+			is_active,
+			description,
+			fee_type,
+			fee_amount,
+			fee_rate,
+			created_at,
+			updated_at
 		) VALUES (
 		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10
 		)
@@ -59,20 +64,24 @@ func (r *paymentMethodRepositoryImpl) Save(method domain.PaymentMethod) error {
 	return nil
 }
 
-func (r *paymentMethodRepositoryImpl) FindByName(name string) (*domain.PaymentMethod, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) FindByName(
+	ctx context.Context, name string,
+) (*domain.PaymentMethod, error) {
 	query := `
-		SELECT id, name, type, is_active, description,
-			   created_at, updated_at
+		SELECT
+			id,
+			name,
+			type,
+			is_active,
+			description,
+			created_at,
+			updated_at
 		FROM payment_methods
 		WHERE name LIKE $1 || '%'
 		LIMIT 1
 	`
 
 	var method domain.PaymentMethod
-
 	err := r.db.QueryRow(ctx, query, name).Scan(
 		&method.ID,
 		&method.Name,
@@ -92,10 +101,9 @@ func (r *paymentMethodRepositoryImpl) FindByName(name string) (*domain.PaymentMe
 	return &method, nil
 }
 
-func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.PaymentMethod, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) GetByID(
+	ctx context.Context, paymentID uuid.UUID,
+) (*domain.PaymentMethod, error) {
 	query := `
 		SELECT 
 			id,
@@ -111,7 +119,6 @@ func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Paym
 	`
 
 	var method domain.PaymentMethod
-
 	err := r.db.QueryRow(ctx, query, paymentID).Scan(
 		&method.ID,
 		&method.Name,
@@ -132,10 +139,9 @@ func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Paym
 	return &method, nil
 }
 
-func (r *paymentMethodRepositoryImpl) ListAll() ([]domain.PaymentMethod, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) ListAll(
+	ctx context.Context,
+) ([]domain.PaymentMethod, error) {
 	query := `
 		SELECT 
 			id,
@@ -156,7 +162,6 @@ func (r *paymentMethodRepositoryImpl) ListAll() ([]domain.PaymentMethod, error) 
 	defer rows.Close()
 
 	var result []domain.PaymentMethod
-
 	for rows.Next() {
 		var row domain.PaymentMethod
 

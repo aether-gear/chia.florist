@@ -56,7 +56,7 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		input.ID = &id
 	}
 
-	products, total, err := h.findProducts.Execute(input)
+	products, total, err := h.findProducts.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		return apperrors.NewBadRequest("invalid product id")
 	}
 
-	product, err := h.getProduct.Execute(productID)
+	product, err := h.getProduct.Execute(r.Context(), productID)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		Weight:      req.Weight,
 	}
 
-	err := h.createProduct.Execute(input)
+	err := h.createProduct.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 		Images:    images,
 	}
 
-	err = h.addProductImage.Execute(input)
+	err = h.addProductImage.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}

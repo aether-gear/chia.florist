@@ -43,7 +43,7 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	err = h.configureShopCourier.Execute(shopID, inputs)
+	err = h.configureShopCourier.Execute(r.Context(), shopID, inputs)
 	if err != nil {
 		return err
 	}

@@ -1,11 +1,16 @@
 package repository
 
 import (
+	"context"
+
 	"service-core/internal/modules/merchant/domain"
 
 	"github.com/google/uuid"
 )
 
 type MerchantRepository interface {
-	GetByAccountID(accountID uuid.UUID) (*domain.Merchant, error)
+	GetByAccountID(
+		ctx context.Context,
+		accountID uuid.UUID,
+	) (*domain.Merchant, error)
 }

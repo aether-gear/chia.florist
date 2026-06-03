@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -22,6 +24,8 @@ type VerifyAccountUsecase struct {
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	transactor       transaction.Transactor
+	executor         transaction.Executor
 }
 
 func NewVerifyAccountUsecase(
@@ -33,6 +37,8 @@ func NewVerifyAccountUsecase(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *VerifyAccountUsecase {
 	return &VerifyAccountUsecase{
 		accountRepo:      accountRepo,
@@ -43,6 +49,8 @@ func NewVerifyAccountUsecase(
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
+		transactor:       transactor,
+		executor:         executor,
 	}
 }
 
@@ -58,11 +66,12 @@ type VerifyAccountResult struct {
 }
 
 func (u *VerifyAccountUsecase) Execute(
+	ctx context.Context,
 	input VerifyAccountParams,
 ) (*VerifyAccountResult, error) {
 	now := time.Now()
 
-	challenge, err := u.challengeRepo.GetByID(input.ChallengeID)
+	challenge, err := u.challengeRepo.GetByID(ctx, input.ChallengeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get challenge: %w", err)
 	}
@@ -86,7 +95,7 @@ func (u *VerifyAccountUsecase) Execute(
 	if err := u.pwHasher.Compare(challenge.CodeHash, strconv.Itoa(input.OTP)); err != nil {
 		challenge.AttemptCount++
 
-		if err := u.challengeRepo.Save(*challenge); err != nil {
+		if err := u.challengeRepo.Save(ctx, u.executor, *challenge); err != nil {
 			return nil, fmt.Errorf(
 				"failed to update challenge attempts: %w",
 				err,
@@ -100,13 +109,6 @@ func (u *VerifyAccountUsecase) Execute(
 
 	challenge.VerifiedAt = &now
 	challenge.ConsumedAt = &now
-	if err := u.challengeRepo.Save(*challenge); err != nil {
-		return nil, fmt.Errorf("failed to consume challenge: %w", err)
-	}
-
-	if err := u.accountRepo.ActivateByUserID(*challenge.UserID); err != nil {
-		return nil, fmt.Errorf("failed to activate account: %w", err)
-	}
 
 	sessionID := uuid.New()
 	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
@@ -147,11 +149,29 @@ func (u *VerifyAccountUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	if err := u.sessionRepo.Save(session); err != nil {
-		return nil, fmt.Errorf("failed to save session %w", err)
-	}
-	if err := u.refreshTokenRepo.Save(refreshToken); err != nil {
-		return nil, fmt.Errorf("failed to save refresh token %w", err)
+	err = u.transactor.WithinTransaction(
+		ctx,
+		func(exec transaction.Executor) error {
+			if err := u.challengeRepo.Save(ctx, exec, *challenge); err != nil {
+				return fmt.Errorf("failed to consume challenge: %w", err)
+			}
+
+			if err := u.accountRepo.ActivateByUserID(ctx, exec, *challenge.UserID); err != nil {
+				return fmt.Errorf("failed to activate account: %w", err)
+			}
+
+			if err := u.sessionRepo.Save(ctx, session); err != nil {
+				return fmt.Errorf("failed to save session %w", err)
+			}
+			if err := u.refreshTokenRepo.Save(ctx, refreshToken); err != nil {
+				return fmt.Errorf("failed to save refresh token %w", err)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	result := VerifyAccountResult{

@@ -1,27 +1,55 @@
 package repository
 
 import (
+	"context"
+
 	"service-core/internal/modules/product/domain"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type ProductRepository interface {
-	GetByID(id uuid.UUID) (*domain.Product, error)
+	GetByID(
+		ctx context.Context,
+		id uuid.UUID,
+	) (*domain.Product, error)
 
-	FindProducts(params FindProductParams) ([]domain.Product, int, error)
-	FindByIDs(IDs []uuid.UUID) ([]domain.Product, error)
+	FindProducts(
+		ctx context.Context,
+		params FindProductParams,
+	) ([]domain.Product, int, error)
+	FindByIDs(
+		ctx context.Context,
+		IDs []uuid.UUID,
+	) ([]domain.Product, error)
 
-	CreateProduct(product *domain.Product) error
+	CreateProduct(
+		ctx context.Context,
+		product *domain.Product,
+	) error
 }
 
 type ProductImageRepository interface {
-	Create(images []domain.ProductImage) error
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		images []domain.ProductImage,
+	) error
 
-	ListByProductIDs(productIDs []uuid.UUID) (map[uuid.UUID][]domain.ProductImage, error)
-	ListByProductID(productID uuid.UUID) ([]domain.ProductImage, error)
+	ListByProductIDs(
+		ctx context.Context,
+		productIDs []uuid.UUID,
+	) (map[uuid.UUID][]domain.ProductImage, error)
+	ListByProductID(
+		ctx context.Context,
+		productID uuid.UUID,
+	) ([]domain.ProductImage, error)
 
-	SoftDeleteByProductID(productID uuid.UUID) error
+	SoftDeleteByProductID(
+		ctx context.Context,
+		productID uuid.UUID,
+	) error
 }
 
 type ProductImageUploadService interface {

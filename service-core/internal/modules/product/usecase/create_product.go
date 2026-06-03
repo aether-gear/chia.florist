@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -37,7 +38,10 @@ type CreateProductInput struct {
 	Weight      *float64
 }
 
-func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
+func (u *CreateProductUsecase) Execute(
+	ctx context.Context,
+	input CreateProductInput,
+) error {
 	now := time.Now()
 
 	product := &domain.Product{
@@ -60,7 +64,7 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		return err
 	}
 
-	if err := u.productRepo.CreateProduct(product); err != nil {
+	if err := u.productRepo.CreateProduct(ctx, product); err != nil {
 		return fmt.Errorf("failed to save product: %w", err)
 	}
 

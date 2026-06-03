@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
@@ -32,7 +33,10 @@ type CreatePaymentMethodInput struct {
 	FeePercentage float64
 }
 
-func (u *CreatePaymentMethodUsecase) Execute(input CreatePaymentMethodInput) error {
+func (u *CreatePaymentMethodUsecase) Execute(
+	ctx context.Context,
+	input CreatePaymentMethodInput,
+) error {
 	paymentMethod := domain.PaymentMethod{
 		ID:            uuid.New(),
 		Name:          input.Name,
@@ -48,7 +52,7 @@ func (u *CreatePaymentMethodUsecase) Execute(input CreatePaymentMethodInput) err
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	err := u.paymentMethodRepo.Save(paymentMethod)
+	err := u.paymentMethodRepo.Save(ctx, paymentMethod)
 	if err != nil {
 		return fmt.Errorf("failed to save payment method: %w", err)
 	}

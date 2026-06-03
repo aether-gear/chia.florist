@@ -43,9 +43,6 @@ type Container struct {
 	Authenticator      authenRepo.Authenticator
 	Authorizer         authorRepo.Authorizer
 
-	ImageVariantProvider imgSvc.VariantCreator
-	ImageTransformer     imgSvc.ImageTransformer
-
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
 	CreateProduct    productUsecase.CreateProductUsecase
@@ -152,29 +149,36 @@ func NewContainer(cfg Config, infra *Dependency) *Container {
 		),
 		CreateProduct: *productUsecase.NewCreateProductUsecase(productRepo, slugGen),
 		AddProductImages: *productUsecase.NewAddProductImagesUsecase(
-			productRepo, productImageRepo, slugGen, imageVariantProvider, infra.StorageProvider,
+			productRepo, productImageRepo, slugGen, imageVariantProvider,
+			infra.StorageProvider, infra.TransactionProvider,
 		),
 		CreateInventory: *inventoryUsecase.NewCreateInventoryUsecase(inventoryRepo, productRepo, shopRepo),
 
 		LoginCustomer: *authenUsecase.NewLoginCustomerUsecase(
-			accountRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo,
+			accountRepo, pwHasher, tokenHasher, tokenSvc, sessionRepo, refreshTokenRepo, infra.TransactionProvider,
 		),
 		RegisterCustomer: *authenUsecase.NewRegisterCustomerUsecase(
-			accountRepo, pwHasher, userRepo, challengeRepo, otpGen, mailSender,
+			accountRepo, pwHasher, userRepo, challengeRepo, otpGen,
+			mailSender, infra.TransactionProvider,
 		),
 		VerifyAccount: *authenUsecase.NewVerifyAccountUsecase(
-			accountRepo, pwHasher, tokenHasher, userRepo, challengeRepo, tokenSvc, sessionRepo, refreshTokenRepo,
+			accountRepo, pwHasher, tokenHasher, userRepo, challengeRepo,
+			tokenSvc, sessionRepo, refreshTokenRepo, infra.TransactionProvider, infra.TransactionExecutor,
 		),
 		GetAccount: *authenUsecase.NewGetAccountUsecase(accountRepo),
 
 		GetCart: *cartUsecase.NewGetCartUsecase(
 			cartRepo, inventoryRepo, productRepo, productImageRepo, infra.StorageProvider,
 		),
-		AddItem:    *cartUsecase.NewAddItemUsecase(cartRepo, inventoryRepo, productRepo),
-		UpdateItem: *cartUsecase.NewUpdateItemUsecase(cartRepo, inventoryRepo, productRepo),
-		RemoveItem: *cartUsecase.NewRemoveItemUsecase(cartRepo),
+		AddItem: *cartUsecase.NewAddItemUsecase(
+			cartRepo, inventoryRepo, productRepo, infra.TransactionProvider,
+		),
+		UpdateItem: *cartUsecase.NewUpdateItemUsecase(
+			cartRepo, inventoryRepo, productRepo, infra.TransactionProvider,
+		),
+		RemoveItem: *cartUsecase.NewRemoveItemUsecase(cartRepo, infra.TransactionProvider),
 
-		ListLocations: *locationUsecase.NewListLocationUsecase(infra.LocationRepository),
+		ListLocations: *locationUsecase.NewListLocationUsecase(infra.LocationProvider),
 
 		GetUser: *userUsecase.NewGetUserUsecase(userRepo),
 
