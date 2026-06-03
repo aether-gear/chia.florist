@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 
-	"service-core/internal/shared/transaction"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
