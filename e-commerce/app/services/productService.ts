@@ -1,35 +1,81 @@
-import type { Product } from '../models/Product'
+// app/services/productService.ts
+import type { Product, ApiProductDetail, ApiProductListItem, ApiProductListResponse, CatalogProduct } from '~/types/product'
+import { bootstrapConfig } from '~/utils/bootstrap'
 
 export const productService = {
-  async getProducts(): Promise<Product[]> {
-    // Simulated API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([
-          {
-            id: '1',
-            name: 'Rose Bouquet',
-            description: 'A beautiful bouquet of red roses.',
-            price: 49.99,
-            imageUrl: 'https://placehold.co/400x400?text=Rose',
-            category: 'flower-boards'
-          },
-          {
-            id: '2',
-            name: 'Wedding Board',
-            description: 'Custom flower board for weddings.',
-            price: 159.99,
-            imageUrl: 'https://placehold.co/400x400?text=Wedding',
-            category: 'flower-boards'
-          }
-        ])
-      }, 500)
-    })
+  /**
+   * Helper function to map API product detail to UI Product domain model.
+   */
+  mapApiProduct(apiProduct: ApiProductDetail): Product {
+    // Map list of image URLs from ProductImage array
+    const images = Array.isArray(apiProduct.images)
+      ? apiProduct.images.map(img => img.preview || img.detail || img.thumbnail)
+      : []
+
+    // Fallback image if empty
+    if (images.length === 0) {
+      images.push('/images/birthday.jpeg')
+    }
+
+    return {
+      id: apiProduct.id,
+      name: apiProduct.name,
+      price: apiProduct.price,
+      rating: 4.5,
+      reviews: 150,
+      available: apiProduct.is_available,
+      description: apiProduct.description || 'Premium arrangement from Chia Florist.',
+      images: images,
+      colors: ['#cbd5e1', '#f43f5e'],
+      sizes: ['1.5m', '1.8m', '2m'],
+      sku: apiProduct.sku,
+      slug: apiProduct.slug,
+      weight: apiProduct.weight,
+      stock: apiProduct.stock
+    }
   },
 
+  /**
+   * Helper function to map API product list item to CatalogProduct domain model.
+   */
+  mapApiCatalogProduct(apiProduct: ApiProductListItem): CatalogProduct {
+    return {
+      id: apiProduct.id,
+      name: apiProduct.name,
+      price: apiProduct.price,
+      rating: 4.8,
+      reviews: 180,
+      image: apiProduct.images?.thumbnail || '/images/birthday.jpeg',
+      tag: apiProduct.sku ? apiProduct.sku.split('-')[1] || 'Collection' : 'Collection',
+      desc: `Premium quality ${apiProduct.name} crafted for your special moments.`,
+      isAvailable: apiProduct.is_available
+    }
+  },
+
+  /**
+   * Fetch catalog products directly from the API.
+   * No mockup fallbacks.
+   */
+  async getCatalogProducts(): Promise<CatalogProduct[]> {
+    const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products/')
+    console.log('API Response for Catalog Products:', response)
+    if (response && Array.isArray(response.products)) {
+      return response.products.map(p => this.mapApiCatalogProduct(p))
+    }
+    return []
+  },
+
+  /**
+   * Fetch specific product details by ID directly from the API.
+   * No mockup fallbacks.
+   */
   async getProductById(id: string): Promise<Product | null> {
-    // Simulated API call
-    const products = await this.getProducts()
-    return products.find(p => p.id === id) || null
+    const response = await bootstrapConfig.fetchApi<ApiProductDetail>(`/products/${id}`)
+    console.log('API Response for Product Details:', response)
+
+    if (response && response.id) {
+      return this.mapApiProduct(response)
+    }
+    return null
   }
 }
