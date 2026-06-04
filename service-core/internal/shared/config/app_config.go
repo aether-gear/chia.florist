@@ -3,12 +3,16 @@ package config
 import "strings"
 
 type AppConfig struct {
+	Host               string
+	Port               string
 	Env                string
 	CORSAllowedOrigins []string
 }
 
 func LoadAppConfig() AppConfig {
 	return AppConfig{
+		Host:               GetEnv("MY_APP_SAYA_HOST", "0.0.0.0"),
+		Port:               GetEnv("MY_APP_SAYA_PORT", "8000"),
 		Env:                GetEnv("APP_ENV"),
 		CORSAllowedOrigins: splitCSVEnv("APP_CORS_ALLOWED_ORIGINS"),
 	}
