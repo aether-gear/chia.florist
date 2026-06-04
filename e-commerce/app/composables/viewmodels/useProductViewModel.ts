@@ -1,32 +1,48 @@
+// app/composables/viewmodels/useProductViewModel.ts
 import { ref, computed } from 'vue'
 import { productService } from '~/services/productService'
-import type { Product } from '~/models/Product'
+import type { Product, CatalogProduct } from '~/types/product'
 
 export const useProductViewModel = () => {
   const products = ref<Product[]>([])
+  const catalogProducts = ref<CatalogProduct[]>([])
   const currentProduct = ref<Product | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
-  const fetchProducts = async () => {
+  /**
+   * Fetch all products for the catalog page and map them.
+   */
+  const fetchCatalogProducts = async () => {
     isLoading.value = true
     error.value = null
     try {
-      products.value = await productService.getProducts()
+      catalogProducts.value = await productService.getCatalogProducts()
+      if (catalogProducts.value.length === 0) {
+        error.value = 'Produk sedang tidak tersedia'
+      }
     } catch (e) {
-      error.value = 'Failed to load products'
+      error.value = 'Produk sedang tidak tersedia'
     } finally {
       isLoading.value = false
     }
   }
 
+  /**
+   * Fetch a specific product's details by ID.
+   */
   const fetchProductById = async (id: string) => {
     isLoading.value = true
     error.value = null
     try {
-      currentProduct.value = await productService.getProductById(id)
+      const result = await productService.getProductById(id)
+      if (result) {
+        currentProduct.value = result
+      } else {
+        error.value = 'Produk tidak ditemukan atau sedang tidak tersedia'
+      }
     } catch (e) {
-      error.value = 'Failed to load product details'
+      error.value = 'Produk tidak ditemukan atau sedang tidak tersedia'
     } finally {
       isLoading.value = false
     }
@@ -34,10 +50,11 @@ export const useProductViewModel = () => {
 
   return {
     products: computed(() => products.value),
+    catalogProducts: computed(() => catalogProducts.value),
     currentProduct: computed(() => currentProduct.value),
     isLoading: computed(() => isLoading.value),
     error: computed(() => error.value),
-    fetchProducts,
+    fetchCatalogProducts,
     fetchProductById
   }
 }

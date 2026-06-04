@@ -1,11 +1,7 @@
-export interface Product {
-  id: string
-  name: string
-  description: string
-  price: number
-  imageUrl: string
-  category: string
-}
+// app/models/Product.ts
+import type { Product } from '~/types/product'
+
+export type { Product }
 
 export interface CartItem {
   product: Product
