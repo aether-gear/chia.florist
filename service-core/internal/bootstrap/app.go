@@ -11,6 +11,7 @@ type App struct {
 	dependencies *Dependency
 	container    *Container
 	router       *chi.Mux
+	cfg          Config
 }
 
 func New(cfg Config) (*App, error) {
@@ -26,6 +27,7 @@ func New(cfg Config) (*App, error) {
 		dependencies: dependencies,
 		container:    c,
 		router:       r,
+		cfg:          cfg,
 	}, nil
 }
 
@@ -38,6 +40,7 @@ func (a *App) Close() {
 }
 
 func (a *App) Run() error {
-	log.Println("service-core running on :8000")
-	return http.ListenAndServe(":8000", a.router)
+	addr := a.cfg.App.Host + ":" + a.cfg.App.Port
+	log.Printf("service-core running on %s\n", addr)
+	return http.ListenAndServe(addr, a.router)
 }
