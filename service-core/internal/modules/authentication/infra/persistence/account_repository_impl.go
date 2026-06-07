@@ -4,32 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	apperrors "service-core/internal/common/errors"
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type accountRepositoryImpl struct {
-	db *pgxpool.Pool
+type accountRepositoryImpl struct{}
+
+func NewAccountRepository() repository.AccountRepository {
+	return &accountRepositoryImpl{}
 }
 
-func NewAccountRepository(conn *database.Connection) repository.AccountRepository {
-	return &accountRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) GetByEmail(
+	ctx context.Context,
+	exec transaction.Executor,
+	email string,
+) (*domain.Account, error) {
 	query := `
 		SELECT
 			id,
@@ -49,8 +44,7 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 	`
 
 	var m domain.Account
-
-	err := r.db.QueryRow(ctx, query, email).Scan(
+	err := exec.QueryRow(ctx, query, email).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
@@ -71,10 +65,11 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 	return &m, nil
 }
 
-func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Account, error) {
 	query := `
 		SELECT
 			id,
@@ -94,8 +89,7 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	`
 
 	var m domain.Account
-
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
@@ -116,10 +110,11 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	return &m, nil
 }
 
-func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) GetByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Account, error) {
 	query := `
 		SELECT
 			id,
@@ -139,8 +134,7 @@ func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, erro
 	`
 
 	var m domain.Account
-
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
@@ -161,10 +155,11 @@ func (r *accountRepositoryImpl) GetByUserID(id uuid.UUID) (*domain.Account, erro
 	return &m, nil
 }
 
-func (r *accountRepositoryImpl) ActivateByUserID(id uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) ActivateByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
 	query := `
 		UPDATE accounts
 		SET
@@ -172,7 +167,7 @@ func (r *accountRepositoryImpl) ActivateByUserID(id uuid.UUID) error {
 		WHERE user_id = $1
 	`
 
-	result, err := r.db.Exec(ctx, query, id)
+	result, err := exec.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf(
 			"query to activate account: %w",
@@ -189,10 +184,11 @@ func (r *accountRepositoryImpl) ActivateByUserID(id uuid.UUID) error {
 	return nil
 }
 
-func (r *accountRepositoryImpl) Create(acc domain.Account) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	acc domain.Account,
+) error {
 	query := `
 		INSERT INTO accounts (
 			id,
@@ -206,7 +202,7 @@ func (r *accountRepositoryImpl) Create(acc domain.Account) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		acc.ID,
 		acc.UserID,
 		acc.Email,

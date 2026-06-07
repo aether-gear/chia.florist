@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"service-core/internal/modules/payment/repository"
 
 	"github.com/google/uuid"
@@ -30,6 +31,6 @@ type AllocatePaymentByMethodResponse struct {
 	QRString      *string
 }
 
-func (u *AllocatePaymentByMethodUsecase) Execute(methodID uuid.UUID) error {
+func (u *AllocatePaymentByMethodUsecase) Execute(ctx context.Context, methodID uuid.UUID) error {
 	return nil
 }

@@ -4,31 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type challengeRepositoryImpl struct {
-	db *pgxpool.Pool
+type challengeRepositoryImpl struct{}
+
+func NewChallengeRepository() repository.VerificationChallengeRepository {
+	return &challengeRepositoryImpl{}
 }
 
-func NewChallengeRepository(conn *database.Connection) repository.VerificationChallengeRepository {
-	return &challengeRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *challengeRepositoryImpl) GetByID(id uuid.UUID) (*domain.VerificationChallenge, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *challengeRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.VerificationChallenge, error) {
 	query := `
 		SELECT
 			id,
@@ -49,8 +44,7 @@ func (r *challengeRepositoryImpl) GetByID(id uuid.UUID) (*domain.VerificationCha
 	`
 
 	var vC domain.VerificationChallenge
-
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&vC.ID,
 		&vC.UserID,
 		&vC.Type,
@@ -74,10 +68,11 @@ func (r *challengeRepositoryImpl) GetByID(id uuid.UUID) (*domain.VerificationCha
 	return &vC, nil
 }
 
-func (r *challengeRepositoryImpl) Create(challenge domain.VerificationChallenge) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *challengeRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	challenge domain.VerificationChallenge,
+) error {
 	query := `
 		INSERT INTO verification_challenges (
 			id,
@@ -94,7 +89,7 @@ func (r *challengeRepositoryImpl) Create(challenge domain.VerificationChallenge)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		challenge.ID,
 		challenge.UserID,
 		challenge.Type,
@@ -113,10 +108,11 @@ func (r *challengeRepositoryImpl) Create(challenge domain.VerificationChallenge)
 	return nil
 }
 
-func (r *challengeRepositoryImpl) Save(challenge domain.VerificationChallenge) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *challengeRepositoryImpl) Save(
+	ctx context.Context,
+	exec transaction.Executor,
+	challenge domain.VerificationChallenge,
+) error {
 	query := `
 		INSERT INTO verification_challenges (
 			id,
@@ -147,7 +143,7 @@ func (r *challengeRepositoryImpl) Save(challenge domain.VerificationChallenge) e
 			attempt_count = EXCLUDED.attempt_count
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		challenge.ID,
 		challenge.UserID,
 		challenge.Type,

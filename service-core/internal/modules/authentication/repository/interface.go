@@ -1,40 +1,91 @@
 package repository
 
 import (
+	"context"
+
 	appmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type AccountRepository interface {
-	GetByEmail(email string) (*domain.Account, error)
-	GetByID(id uuid.UUID) (*domain.Account, error)
-	GetByUserID(id uuid.UUID) (*domain.Account, error)
+	GetByEmail(
+		ctx context.Context,
+		exec transaction.Executor,
+		email string,
+	) (*domain.Account, error)
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.Account, error)
+	GetByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.Account, error)
 
-	ActivateByUserID(id uuid.UUID) error
+	ActivateByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
 
-	Create(account domain.Account) error
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		account domain.Account,
+	) error
 }
 
 type SessionRepository interface {
-	GetByID(id uuid.UUID) (*domain.Session, error)
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.Session, error)
 
-	RevokeByID(id uuid.UUID) error
+	RevokeByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
 
-	UpdateLastActivityByID(id uuid.UUID) error
+	UpdateLastActivityByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
 
-	Save(session domain.Session) error
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		session domain.Session,
+	) error
 }
 
 type VerificationChallengeRepository interface {
-	GetByID(id uuid.UUID) (*domain.VerificationChallenge, error)
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.VerificationChallenge, error)
 
-	Save(challenge domain.VerificationChallenge) error
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		challenge domain.VerificationChallenge,
+	) error
 }
 
 type RefreshTokenRepository interface {
-	Save(challenge domain.RefreshToken) error
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		challenge domain.RefreshToken,
+	) error
 }
 
 type TokenService interface {
@@ -53,5 +104,7 @@ type TokenHasher interface {
 }
 
 type Authenticator interface {
-	RequireAuth() appmiddleware.Middleware
+	RequireAuth(
+		exec transaction.Executor,
+	) appmiddleware.Middleware
 }

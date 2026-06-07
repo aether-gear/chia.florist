@@ -4,31 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type shopAddressRepositoryImpl struct {
-	db *pgxpool.Pool
+type shopAddressRepositoryImpl struct{}
+
+func NewShopAddressRepositoryImpl() repository.ShopAddressRepository {
+	return &shopAddressRepositoryImpl{}
 }
 
-func NewShopAddressRepositoryImpl(conn *database.Connection) repository.ShopAddressRepository {
-	return &shopAddressRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *shopAddressRepositoryImpl) GetByID(addressID uuid.UUID) (*domain.ShopAddress, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopAddressRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
+) (*domain.ShopAddress, error) {
 	query := `
 		SELECT
 			id,
@@ -51,8 +46,7 @@ func (r *shopAddressRepositoryImpl) GetByID(addressID uuid.UUID) (*domain.ShopAd
 	`
 
 	var a domain.ShopAddress
-
-	err := r.db.QueryRow(ctx, query, addressID).Scan(
+	err := exec.QueryRow(ctx, query, addressID).Scan(
 		&a.ID,
 		&a.ShopID,
 		&a.Label,
@@ -79,10 +73,11 @@ func (r *shopAddressRepositoryImpl) GetByID(addressID uuid.UUID) (*domain.ShopAd
 	return &a, nil
 }
 
-func (r *shopAddressRepositoryImpl) FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopAddressRepositoryImpl) FindByShopID(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
+) ([]domain.ShopAddress, error) {
 	query := `
 		SELECT
 			id,
@@ -103,7 +98,7 @@ func (r *shopAddressRepositoryImpl) FindByShopID(shopID uuid.UUID) ([]domain.Sho
 		WHERE shop_id = $1 AND deleted_at IS NULL
 	`
 
-	rows, err := r.db.Query(ctx, query, shopID)
+	rows, err := exec.Query(ctx, query, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("query address by shop id failed: %w", err)
 	}
@@ -143,21 +138,31 @@ func (r *shopAddressRepositoryImpl) FindByShopID(shopID uuid.UUID) ([]domain.Sho
 	return addresses, nil
 }
 
-func (r *shopAddressRepositoryImpl) Create(address domain.ShopAddress) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopAddressRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	address domain.ShopAddress,
+) error {
 	query := `
 		INSERT INTO shop_addresses (
-			id, shop_id, label, phone, is_active,
-			province, city, district, village,
-			full_address, postal_code, created_at
+			id,
+			shop_id,
+			label,
+			phone,
+			is_active,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			created_at
 		) VALUES (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		address.ID,
 		address.ShopID,
 		address.Label,

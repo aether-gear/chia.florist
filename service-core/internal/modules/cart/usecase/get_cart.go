@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/infra/storage"
@@ -10,6 +11,7 @@ import (
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -20,6 +22,7 @@ type GetCartUsecase struct {
 	productRepo    productRepo.ProductRepository
 	productImgRepo productRepo.ProductImageRepository
 	fileStore      storage.Provider
+	executor       transaction.Executor
 }
 
 func NewGetCartUsecase(
@@ -28,6 +31,7 @@ func NewGetCartUsecase(
 	productRepo productRepo.ProductRepository,
 	productImgRepo productRepo.ProductImageRepository,
 	fileStore storage.Provider,
+	executor transaction.Executor,
 ) *GetCartUsecase {
 	return &GetCartUsecase{
 		cartRepo:       cartRepo,
@@ -35,6 +39,7 @@ func NewGetCartUsecase(
 		productRepo:    productRepo,
 		productImgRepo: productImgRepo,
 		fileStore:      fileStore,
+		executor:       executor,
 	}
 }
 
@@ -55,14 +60,17 @@ type GetCartResult struct {
 	Products map[uuid.UUID]ProductCartResponse
 }
 
-func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
-	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
+func (u *GetCartUsecase) Execute(
+	ctx context.Context,
+	userID uuid.UUID,
+) (*GetCartResult, error) {
+	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve cart: %w", err)
 	}
 
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(userID)
+		cart, err = u.cartRepo.NewCart(ctx, u.executor, userID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create cart: %w", err)
 		}
@@ -80,17 +88,17 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		productIDs = append(productIDs, item.ProductID)
 	}
 
-	products, err := u.productRepo.FindByIDs(productIDs)
+	products, err := u.productRepo.FindByIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cart with products: %w", err)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProductIDs(productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProductIDs(productIDs)
+	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images for products: %w", err)
 	}
@@ -107,7 +115,8 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 
 		if len(images) > 0 {
 			key := images[0].Variants[productDomain.ResolutionThumbnail].Key
-			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
+			result.Images.Thumbnail = u.fileStore.
+				PublicURL(key, "public-assets")
 		}
 
 		for _, inventory := range inventories {

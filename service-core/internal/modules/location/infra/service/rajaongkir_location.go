@@ -7,10 +7,10 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"service-core/internal/modules/location/domain"
 	"service-core/internal/modules/location/repository"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type rajaOngkirLocation struct {
@@ -43,10 +43,10 @@ type rajaOngkirResponse struct {
 	} `json:"data"`
 }
 
-func (s *rajaOngkirLocation) ListProvinces() ([]domain.Province, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (s *rajaOngkirLocation) ListProvinces(
+	ctx context.Context,
+	exec transaction.Executor,
+) ([]domain.Province, error) {
 	body, err := s.doRequest(ctx, http.MethodGet, "/province", nil)
 	if err != nil {
 		return nil, fmt.Errorf("request for provinces: %w", err)
@@ -72,10 +72,11 @@ func (s *rajaOngkirLocation) ListProvinces() ([]domain.Province, error) {
 	return provinces, nil
 }
 
-func (s *rajaOngkirLocation) ListCitiesByProvince(provinceID string) ([]domain.City, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (s *rajaOngkirLocation) ListCitiesByProvince(
+	ctx context.Context,
+	exec transaction.Executor,
+	provinceID string,
+) ([]domain.City, error) {
 	path := fmt.Sprintf("/city/%s", provinceID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
@@ -102,10 +103,11 @@ func (s *rajaOngkirLocation) ListCitiesByProvince(provinceID string) ([]domain.C
 	return cities, nil
 }
 
-func (s *rajaOngkirLocation) ListDistrictsByCity(cityID string) ([]domain.District, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (s *rajaOngkirLocation) ListDistrictsByCity(
+	ctx context.Context,
+	exec transaction.Executor,
+	cityID string,
+) ([]domain.District, error) {
 	path := fmt.Sprintf("/district/%s", cityID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
@@ -132,10 +134,11 @@ func (s *rajaOngkirLocation) ListDistrictsByCity(cityID string) ([]domain.Distri
 	return districts, nil
 }
 
-func (s *rajaOngkirLocation) ListVillagesByDistrict(districtID string) ([]domain.Village, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (s *rajaOngkirLocation) ListVillagesByDistrict(
+	ctx context.Context,
+	exec transaction.Executor,
+	districtID string,
+) ([]domain.Village, error) {
 	path := fmt.Sprintf("/sub-district/%s", districtID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {

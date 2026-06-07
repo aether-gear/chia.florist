@@ -35,15 +35,15 @@ func NewRouter(c *Container) *chi.Mux {
 		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.Authenticator.RequireAuth(),
-			c.Authorizer.LoadActor(),
+			c.Authenticator.RequireAuth(c.DBExecutor),
+			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
 		)
 		customerOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.Authenticator.RequireAuth(),
-			c.Authorizer.LoadActor(),
+			c.Authenticator.RequireAuth(c.DBExecutor),
+			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
 		)
 	)

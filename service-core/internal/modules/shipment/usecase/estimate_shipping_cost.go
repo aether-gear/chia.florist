@@ -1,23 +1,28 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/shipment/domain"
 	"service-core/internal/modules/shipment/repository"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type EstimateShippingOptionsUsecase struct {
 	shippingCostProvider repository.ShippingCostProvider
+	executor             transaction.Executor
 }
 
 func NewEstimateShippingOptionsUsecase(
 	shippingCostProvider repository.ShippingCostProvider,
+	executor transaction.Executor,
 ) *EstimateShippingOptionsUsecase {
 	return &EstimateShippingOptionsUsecase{
 		shippingCostProvider: shippingCostProvider,
+		executor:             executor,
 	}
 }
 
@@ -30,6 +35,7 @@ type EstimateShippingOptionsInput struct {
 }
 
 func (u *EstimateShippingOptionsUsecase) Execute(
+	ctx context.Context,
 	input EstimateShippingOptionsInput,
 ) ([]repository.CostOption, error) {
 	if input.Origin == input.Destination {
@@ -68,7 +74,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 		PriceFilter:   input.PriceFilter,
 	}
 
-	costOptions, err := u.shippingCostProvider.CalculateCost(query)
+	costOptions, err := u.shippingCostProvider.CalculateCost(ctx, u.executor, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate shipping cost: %w", err)
 	}

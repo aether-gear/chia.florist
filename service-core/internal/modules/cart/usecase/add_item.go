@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
@@ -8,6 +9,7 @@ import (
 	"service-core/internal/modules/cart/repository"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	productRepo "service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -16,17 +18,23 @@ type AddItemUsecase struct {
 	cartRepo      repository.CartRepository
 	inventoryRepo inventoryRepo.InventoryRepository
 	productRepo   productRepo.ProductRepository
+	transactor    transaction.Transactor
+	executor      transaction.Executor
 }
 
 func NewAddItemUsecase(
 	cartRepo repository.CartRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productRepo productRepo.ProductRepository,
+	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
 		cartRepo:      cartRepo,
 		inventoryRepo: inventoryRepo,
 		productRepo:   productRepo,
+		transactor:    transactor,
+		executor:      executor,
 	}
 }
 
@@ -35,7 +43,10 @@ type AddItemInput struct {
 	Quantity                  int
 }
 
-func (u *AddItemUsecase) Execute(input AddItemInput) error {
+func (u *AddItemUsecase) Execute(
+	ctx context.Context,
+	input AddItemInput,
+) error {
 	if input.ShopID == uuid.Nil {
 		return apperrors.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
@@ -44,7 +55,9 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		return apperrors.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
-	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(input.ProductID, input.ShopID)
+	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(
+		ctx, u.executor, input.ProductID, input.ShopID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}
@@ -52,7 +65,7 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	product, err := u.productRepo.GetByID(input.ProductID)
+	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
@@ -60,19 +73,20 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(input.UserID)
+	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(input.UserID)
+		cart, err = u.cartRepo.NewCart(ctx, u.executor, input.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to create cart: %w", err)
 		}
 	}
 
 	if cart.HasProductInAnotherShop(input.ProductID, input.ShopID) {
-		return apperrors.NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
+		return apperrors.
+			NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
 	}
 
 	targetQuantity := input.Quantity
@@ -87,8 +101,18 @@ func (u *AddItemUsecase) Execute(input AddItemInput) error {
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	if err := u.cartRepo.Save(cart); err != nil {
-		return fmt.Errorf("failed to add item: %w", err)
+	err = u.transactor.WithinTransaction(
+		ctx,
+		func(exec transaction.Executor) error {
+			if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
+				return fmt.Errorf("failed to add item: %w", err)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil

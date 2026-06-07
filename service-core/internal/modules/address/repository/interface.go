@@ -1,24 +1,48 @@
 package repository
 
 import (
+	"context"
+
 	"service-core/internal/modules/address/domain"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type UserAddressRepository interface {
-	GetByUserID(userID uuid.UUID) ([]domain.Address, error)
+	GetByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) ([]domain.Address, error)
 	// GetDefault(userID uuid.UUID) (*domain.Address, error)
-	Create(address domain.Address) error
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		address domain.Address,
+	) error
 }
 
 type ShopAddressRepository interface {
-	GetByID(id uuid.UUID) (*domain.ShopAddress, error)
-	FindByShopID(shopID uuid.UUID) ([]domain.ShopAddress, error)
-
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.ShopAddress, error)
 	// GetDefaultByShopID(shopID string) (*domain.ShopAddress, error)
 
-	Create(address domain.ShopAddress) error
+	FindByShopID(
+		ctx context.Context,
+		exec transaction.Executor,
+		shopID uuid.UUID,
+	) ([]domain.ShopAddress, error)
+
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		address domain.ShopAddress,
+	) error
+
 	// Update(address domain.ShopAddress) error
 
 	// SetDefault(shopID string, addressID string) error

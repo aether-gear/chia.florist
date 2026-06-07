@@ -4,30 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/repository"
-	"time"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type shopRepositoryImpl struct {
-	db *pgxpool.Pool
+type shopRepositoryImpl struct{}
+
+func NewShopRepositoryImpl() repository.ShopRepository {
+	return &shopRepositoryImpl{}
 }
 
-func NewShopRepositoryImpl(conn *database.Connection) repository.ShopRepository {
-	return &shopRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *shopRepositoryImpl) GetByID(shopID uuid.UUID) (*domain.Shop, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
+) (*domain.Shop, error) {
 	query := `
 		SELECT
 			id,
@@ -43,8 +38,7 @@ func (r *shopRepositoryImpl) GetByID(shopID uuid.UUID) (*domain.Shop, error) {
 	`
 
 	var s domain.Shop
-
-	err := r.db.QueryRow(ctx, query, shopID).Scan(
+	err := exec.QueryRow(ctx, query, shopID).Scan(
 		&s.ID,
 		&s.Name,
 		&s.Slug,
@@ -64,10 +58,11 @@ func (r *shopRepositoryImpl) GetByID(shopID uuid.UUID) (*domain.Shop, error) {
 	return &s, nil
 }
 
-func (r *shopRepositoryImpl) Create(shop domain.Shop) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	shop domain.Shop,
+) error {
 	query := `
 		INSERT INTO shops (
 			id,
@@ -79,7 +74,7 @@ func (r *shopRepositoryImpl) Create(shop domain.Shop) error {
 		) VALUES ($1,$2,$3,$4,$5,$6)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		shop.ID,
 		shop.Name,
 		shop.Slug,

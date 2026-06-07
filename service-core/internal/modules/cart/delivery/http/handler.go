@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -39,7 +38,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	result, err := h.getCart.Execute(authCtx.UserID)
+	result, err := h.getCart.Execute(r.Context(), authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -95,7 +94,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 	var req addItemRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
@@ -125,7 +124,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 		Quantity:  req.Quantity,
 	}
 
-	if err := h.addItem.Execute(input); err != nil {
+	if err := h.addItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -140,7 +139,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 	var req updateItemRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
@@ -170,7 +169,7 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		Quantity:  req.Quantity,
 	}
 
-	if err := h.updateItem.Execute(input); err != nil {
+	if err := h.updateItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -204,7 +203,7 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 		ShopID:    shopID,
 	}
 
-	if err := h.removeItem.Execute(input); err != nil {
+	if err := h.removeItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 

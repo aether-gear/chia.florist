@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 	"service-core/internal/shared/slug"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -16,15 +18,18 @@ import (
 type CreateProductUsecase struct {
 	productRepo repository.ProductRepository
 	slugGen     slug.Generator
+	executor    transaction.Executor
 }
 
 func NewCreateProductUsecase(
 	productRepo repository.ProductRepository,
 	slugGen slug.Generator,
+	executor transaction.Executor,
 ) *CreateProductUsecase {
 	return &CreateProductUsecase{
 		productRepo: productRepo,
 		slugGen:     slugGen,
+		executor:    executor,
 	}
 }
 
@@ -37,7 +42,10 @@ type CreateProductInput struct {
 	Weight      *float64
 }
 
-func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
+func (u *CreateProductUsecase) Execute(
+	ctx context.Context,
+	input CreateProductInput,
+) error {
 	now := time.Now()
 
 	product := &domain.Product{
@@ -60,7 +68,7 @@ func (u *CreateProductUsecase) Execute(input CreateProductInput) error {
 		return err
 	}
 
-	if err := u.productRepo.CreateProduct(product); err != nil {
+	if err := u.productRepo.CreateProduct(ctx, u.executor, product); err != nil {
 		return fmt.Errorf("failed to save product: %w", err)
 	}
 

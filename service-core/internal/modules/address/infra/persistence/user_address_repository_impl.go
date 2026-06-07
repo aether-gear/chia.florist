@@ -3,30 +3,25 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type userAddressRepositoryImpl struct {
-	db *pgxpool.Pool
+type userAddressRepositoryImpl struct{}
+
+func NewUserAddressRepositoryImpl() repository.UserAddressRepository {
+	return &userAddressRepositoryImpl{}
 }
 
-func NewUserAddressRepositoryImpl(conn *database.Connection) repository.UserAddressRepository {
-	return &userAddressRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *userAddressRepositoryImpl) GetByUserID(userID uuid.UUID) ([]domain.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userAddressRepositoryImpl) GetByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) ([]domain.Address, error) {
 	query := `
 		SELECT
 			id,
@@ -47,7 +42,7 @@ func (r *userAddressRepositoryImpl) GetByUserID(userID uuid.UUID) ([]domain.Addr
 		WHERE user_id = $1 AND deleted_at IS NULL
 	`
 
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := exec.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("query user_addresses by user id failed: %w", err)
 	}
@@ -87,21 +82,32 @@ func (r *userAddressRepositoryImpl) GetByUserID(userID uuid.UUID) ([]domain.Addr
 	return addresses, nil
 }
 
-func (r *userAddressRepositoryImpl) Create(address domain.Address) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userAddressRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	address domain.Address,
+) error {
 	query := `
 		INSERT INTO user_addresses (
-			id, user_id, recipient_name, phone, is_default,
-			province, city, district, village,
-			full_address, postal_code, created_at, updated_at
+			id,
+			user_id,
+			recipient_name,
+			phone,
+			is_default,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			created_at,
+			updated_at
 		) VALUES (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		address.ID,
 		address.UserID,
 		address.ReceiverName,

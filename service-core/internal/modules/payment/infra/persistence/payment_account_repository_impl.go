@@ -4,31 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type paymentAccountRepositoryImpl struct {
-	db *pgxpool.Pool
+type paymentAccountRepositoryImpl struct{}
+
+func NewPaymentAccountRepository() repository.PaymentAccountRepository {
+	return &paymentAccountRepositoryImpl{}
 }
 
-func NewPaymentAccountRepository(conn *database.Connection) repository.PaymentAccountRepository {
-	return &paymentAccountRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *paymentAccountRepositoryImpl) Save(acc domain.PaymentAccount) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentAccountRepositoryImpl) Save(
+	ctx context.Context,
+	exec transaction.Executor,
+	acc domain.PaymentAccount,
+) error {
 	query := `
 		INSERT INTO payment_accounts (
 			id,
@@ -46,7 +41,7 @@ func (r *paymentAccountRepositoryImpl) Save(acc domain.PaymentAccount) error {
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		acc.ID,
 		acc.MethodID,
 		acc.AccountName,
@@ -66,10 +61,11 @@ func (r *paymentAccountRepositoryImpl) Save(acc domain.PaymentAccount) error {
 	return nil
 }
 
-func (r *paymentAccountRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.PaymentAccount, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentAccountRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	paymentID uuid.UUID,
+) (*domain.PaymentAccount, error) {
 	query := `
 		SELECT 
 			id,
@@ -88,8 +84,7 @@ func (r *paymentAccountRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Pay
 	`
 
 	var acc domain.PaymentAccount
-
-	err := r.db.QueryRow(ctx, query, paymentID).Scan(
+	err := exec.QueryRow(ctx, query, paymentID).Scan(
 		&acc.ID,
 		&acc.MethodID,
 		&acc.AccountName,
@@ -112,20 +107,24 @@ func (r *paymentAccountRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Pay
 	return &acc, nil
 }
 
-func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*domain.PaymentAccount, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx acquire least loaded payment account failed: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
+func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(
+	ctx context.Context,
+	exec transaction.Executor,
+	methodID uuid.UUID,
+) (*domain.PaymentAccount, error) {
 	query := `
-		SELECT id, method_id, account_name, account_number,
-			phone_number, qr_string, is_active,
-			current_load, last_used_at, created_at, updated_at
+		SELECT
+			id,
+			method_id,
+			account_name,
+			account_number,
+			phone_number,
+			qr_string,
+			is_active,
+			current_load,
+			last_used_at,
+			created_at,
+			updated_at
 		FROM payment_accounts
 		WHERE method_id = $1 AND is_active = true AND deleted_at IS NULL
 		ORDER BY current_load ASC
@@ -135,7 +134,7 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*
 
 	var acc domain.PaymentAccount
 
-	err = tx.QueryRow(ctx, query, methodID).Scan(
+	err := exec.QueryRow(ctx, query, methodID).Scan(
 		&acc.ID,
 		&acc.MethodID,
 		&acc.AccountName,
@@ -165,7 +164,7 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*
 		RETURNING current_load, last_used_at, updated_at
 	`
 
-	err = tx.QueryRow(ctx, updateQuery, acc.ID).Scan(
+	err = exec.QueryRow(ctx, updateQuery, acc.ID).Scan(
 		&acc.CurrentLoad,
 		&acc.LastUsedAt,
 		&acc.UpdatedAt,
@@ -177,17 +176,14 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(methodID uuid.UUID) (*
 		return nil, fmt.Errorf("udpate payment account current load failed: %w", err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit tx acquire least loaded payment account failed: %w", err)
-	}
-
 	return &acc, nil
 }
 
-func (r *paymentAccountRepositoryImpl) IncrementLoad(accountID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentAccountRepositoryImpl) IncrementLoad(
+	ctx context.Context,
+	exec transaction.Executor,
+	accountID uuid.UUID,
+) error {
 	query := `
 		UPDATE payment_accounts
 		SET current_load = current_load + 1
@@ -195,7 +191,7 @@ func (r *paymentAccountRepositoryImpl) IncrementLoad(accountID uuid.UUID) error 
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	_, err := r.db.Exec(ctx, query, accountID)
+	_, err := exec.Exec(ctx, query, accountID)
 	if err != nil {
 		return fmt.Errorf("update payment account current load failed: %w", err)
 	}
@@ -203,17 +199,18 @@ func (r *paymentAccountRepositoryImpl) IncrementLoad(accountID uuid.UUID) error 
 	return nil
 }
 
-func (r *paymentAccountRepositoryImpl) DecrementLoad(accountID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentAccountRepositoryImpl) DecrementLoad(
+	ctx context.Context,
+	exec transaction.Executor,
+	accountID uuid.UUID,
+) error {
 	query := `
 		UPDATE payment_accounts
 		SET current_load = GREATEST(current_load - 1, 0)
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	_, err := r.db.Exec(ctx, query, accountID)
+	_, err := exec.Exec(ctx, query, accountID)
 	if err != nil {
 		return fmt.Errorf("update payment account current load failed: %w", err)
 	}
@@ -221,20 +218,29 @@ func (r *paymentAccountRepositoryImpl) DecrementLoad(accountID uuid.UUID) error 
 	return nil
 }
 
-func (r *paymentAccountRepositoryImpl) ListByMethodID(methodID uuid.UUID) ([]domain.PaymentAccount, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentAccountRepositoryImpl) ListByMethodID(
+	ctx context.Context,
+	exec transaction.Executor,
+	methodID uuid.UUID,
+) ([]domain.PaymentAccount, error) {
 	query := `
-		SELECT id, method_id, account_name, account_number,
-		       phone_number, qr_string, is_active,
-		       current_load, last_used_at, created_at
+		SELECT 
+			id,
+			method_id,
+			account_name,
+			account_number,
+			phone_number,
+			qr_string,
+			is_active,
+			current_load,
+			last_used_at,
+			created_at
 		FROM payment_accounts
 		WHERE method_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, methodID)
+	rows, err := exec.Query(ctx, query, methodID)
 	if err != nil {
 		return nil, fmt.Errorf("query payment accounts by method id failed: %w", err)
 	}
@@ -271,27 +277,34 @@ func (r *paymentAccountRepositoryImpl) ListByMethodID(methodID uuid.UUID) ([]dom
 	return result, nil
 }
 
-func (r *paymentAccountRepositoryImpl) ListAll() ([]domain.PaymentAccount, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentAccountRepositoryImpl) ListAll(
+	ctx context.Context,
+	exec transaction.Executor,
+) ([]domain.PaymentAccount, error) {
 	query := `
-		SELECT id, method_id, account_name, account_number,
-		       phone_number, qr_string, is_active,
-		       current_load, last_used_at, created_at
+		SELECT
+			id,
+			method_id,
+			account_name,
+			account_number,
+			phone_number,
+			qr_string,
+			is_active,
+			current_load,
+			last_used_at,
+			created_at
 		FROM payment_accounts
 		WHERE deleted_at IS NULL
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := exec.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query payment accounts failed: %w", err)
 	}
 	defer rows.Close()
 
 	var result []domain.PaymentAccount
-
 	for rows.Next() {
 		var acc domain.PaymentAccount
 

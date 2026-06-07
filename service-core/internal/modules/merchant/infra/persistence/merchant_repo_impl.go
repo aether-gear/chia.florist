@@ -4,31 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/merchant/domain"
 	"service-core/internal/modules/merchant/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type merchantRepositoryImpl struct {
-	db *pgxpool.Pool
+type merchantRepositoryImpl struct{}
+
+func NewMerchantRepositoryImpl() repository.MerchantRepository {
+	return &merchantRepositoryImpl{}
 }
 
-func NewMerchantRepositoryImpl(conn *database.Connection) repository.MerchantRepository {
-	return &merchantRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *merchantRepositoryImpl) GetByAccountID(accountID uuid.UUID) (*domain.Merchant, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *merchantRepositoryImpl) GetByAccountID(
+	ctx context.Context,
+	exec transaction.Executor,
+	accountID uuid.UUID,
+) (*domain.Merchant, error) {
 	query := `
 		SELECT
 			id,
@@ -43,7 +38,7 @@ func (r *merchantRepositoryImpl) GetByAccountID(accountID uuid.UUID) (*domain.Me
 	`
 
 	var merchant domain.Merchant
-	err := r.db.QueryRow(ctx, query, accountID).Scan(
+	err := exec.QueryRow(ctx, query, accountID).Scan(
 		&merchant.ID,
 		&merchant.AccountID,
 		&merchant.CreatedAt,

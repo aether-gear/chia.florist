@@ -1,12 +1,14 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/courier/domain"
 	"service-core/internal/modules/courier/repository"
 	shopRepo "service-core/internal/modules/shop/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -15,17 +17,20 @@ type ConfigureShopCourierUsecase struct {
 	courierRepo     repository.CourierRepository
 	shopCourierRepo repository.ShopCourierRepository
 	shopRepo        shopRepo.ShopRepository
+	executor        transaction.Executor
 }
 
 func NewConfigureShopCourierUsecase(
 	courierRepo repository.CourierRepository,
 	shopCourierRepo repository.ShopCourierRepository,
 	shopRepo shopRepo.ShopRepository,
+	executor transaction.Executor,
 ) *ConfigureShopCourierUsecase {
 	return &ConfigureShopCourierUsecase{
 		courierRepo:     courierRepo,
 		shopCourierRepo: shopCourierRepo,
 		shopRepo:        shopRepo,
+		executor:        executor,
 	}
 }
 
@@ -35,10 +40,11 @@ type ConfigureShopCourierInput struct {
 }
 
 func (u *ConfigureShopCourierUsecase) Execute(
+	ctx context.Context,
 	shopID uuid.UUID,
 	inputs []ConfigureShopCourierInput,
 ) error {
-	shop, err := u.shopRepo.GetByID(shopID)
+	shop, err := u.shopRepo.GetByID(ctx, u.executor, shopID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve shop: %w", err)
 	}
@@ -51,7 +57,7 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		codes[i] = input.Code
 	}
 
-	validCodes, err := u.courierRepo.ValidateCouriers(codes)
+	validCodes, err := u.courierRepo.ValidateCouriers(ctx, u.executor, codes)
 	if err != nil {
 		return fmt.Errorf("failed to validate couriers: %w", err)
 	}
@@ -78,7 +84,7 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		})
 	}
 
-	if err := u.shopCourierRepo.SaveShopCouriers(shopCouriers); err != nil {
+	if err := u.shopCourierRepo.SaveShopCouriers(ctx, u.executor, shopCouriers); err != nil {
 		return fmt.Errorf("failed to save shop couriers: %w", err)
 	}
 

@@ -1,12 +1,14 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -18,6 +20,8 @@ type LoginCustomerUsecase struct {
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	transactor       transaction.Transactor
+	executor         transaction.Executor
 }
 
 func NewLoginCustomerUsecase(
@@ -27,6 +31,8 @@ func NewLoginCustomerUsecase(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *LoginCustomerUsecase {
 	return &LoginCustomerUsecase{
 		accountRepo:      accountRepo,
@@ -35,6 +41,8 @@ func NewLoginCustomerUsecase(
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
+		transactor:       transactor,
+		executor:         executor,
 	}
 }
 
@@ -49,8 +57,11 @@ type LoginEmailResult struct {
 	AccessToken, RefreshToken repository.GeneratedToken
 }
 
-func (u *LoginCustomerUsecase) Execute(input LoginCustomerParams) (*LoginEmailResult, error) {
-	existing, err := u.accountRepo.GetByEmail(input.Email)
+func (u *LoginCustomerUsecase) Execute(
+	ctx context.Context,
+	input LoginCustomerParams,
+) (*LoginEmailResult, error) {
+	existing, err := u.accountRepo.GetByEmail(ctx, u.executor, input.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -105,11 +116,21 @@ func (u *LoginCustomerUsecase) Execute(input LoginCustomerParams) (*LoginEmailRe
 		CreatedAt: now,
 	}
 
-	if err := u.sessionRepo.Save(session); err != nil {
-		return nil, fmt.Errorf("failed to save session %w", err)
-	}
-	if err := u.refreshTokenRepo.Save(refreshTknDomain); err != nil {
-		return nil, fmt.Errorf("failed to save refresh token %w", err)
+	err = u.transactor.WithinTransaction(
+		ctx,
+		func(exec transaction.Executor) error {
+			if err := u.sessionRepo.Save(ctx, u.executor, session); err != nil {
+				return fmt.Errorf("failed to save session %w", err)
+			}
+			if err := u.refreshTokenRepo.Save(ctx, u.executor, refreshTknDomain); err != nil {
+				return fmt.Errorf("failed to save refresh token %w", err)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	result := LoginEmailResult{

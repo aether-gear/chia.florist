@@ -20,7 +20,7 @@ func NewLocationHandler(
 }
 
 func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) error {
-	result, err := h.listLocation.Province()
+	result, err := h.listLocation.Province(r.Context())
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) error
 func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) error {
 	provinceID := apphttp.Param(r, "id")
 
-	result, err := h.listLocation.City(provinceID)
+	result, err := h.listLocation.City(r.Context(), provinceID)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) error {
 func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) error {
 	cityID := apphttp.Param(r, "id")
 
-	result, err := h.listLocation.District(cityID)
+	result, err := h.listLocation.District(r.Context(), cityID)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) error
 func (h *LocationHandler) Village(w http.ResponseWriter, r *http.Request) error {
 	districtID := apphttp.Param(r, "id")
 
-	result, err := h.listLocation.Village(districtID)
+	result, err := h.listLocation.Village(r.Context(), districtID)
 	if err != nil {
 		return err
 	}

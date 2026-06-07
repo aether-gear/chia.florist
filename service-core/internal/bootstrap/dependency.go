@@ -5,6 +5,7 @@ import (
 
 	database "service-core/internal/infra/db"
 	storage "service-core/internal/infra/storage"
+	transaction "service-core/internal/shared/transaction"
 
 	supabaseStorage "service-core/internal/infra/storage/supabase"
 	lService "service-core/internal/modules/location/infra/service"
@@ -16,8 +17,10 @@ import (
 type Dependency struct {
 	DB                   *database.Connection
 	StorageProvider      storage.Provider
-	LocationRepository   locationRepo.LocationRepository
+	LocationProvider     locationRepo.LocationRepository
 	ShippingCostProvider shipmentRepo.ShippingCostProvider
+	TransactionProvider  transaction.Transactor
+	TransactionExecutor  transaction.Executor
 }
 
 func NewDependency(cfg Config) (*Dependency, error) {
@@ -39,7 +42,7 @@ func NewDependency(cfg Config) (*Dependency, error) {
 	return &Dependency{
 		DB:              db,
 		StorageProvider: storageProvider,
-		LocationRepository: lService.NewRajaOngkirLocation(
+		LocationProvider: lService.NewRajaOngkirLocation(
 			cfg.Shipping.DestinationKey,
 			cfg.Shipping.DestinationURL,
 			&http.Client{
@@ -53,6 +56,8 @@ func NewDependency(cfg Config) (*Dependency, error) {
 				Timeout: cfg.Shipping.Timeout,
 			},
 		),
+		TransactionProvider: database.NewPostgresTransactor(db.Pool),
+		TransactionExecutor: db.Pool,
 	}, nil
 }
 

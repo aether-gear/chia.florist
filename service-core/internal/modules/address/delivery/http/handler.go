@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -43,7 +42,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	addresses, err := h.listUserAddresses.ListByUserID(authCtx.UserID)
+	addresses, err := h.listUserAddresses.ListByUserID(r.Context(), authCtx.UserID)
 	if err != nil {
 		return err
 	}
@@ -79,7 +78,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Request) error {
 	var req createUserAddressRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
 	}
 
@@ -129,7 +128,7 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:   req.PostalCode,
 	}
 
-	err := h.createUserAddress.Execute(input)
+	err := h.createUserAddress.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -148,7 +147,7 @@ func (h *AddressHandler) GetShopAddress(w http.ResponseWriter, r *http.Request) 
 		return apperrors.NewBadRequest("invalid address id")
 	}
 
-	result, err := h.getShopAddress.GetByID(addressID)
+	result, err := h.getShopAddress.GetByID(r.Context(), addressID)
 	if err != nil {
 		return err
 	}
@@ -178,7 +177,7 @@ func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	result, err := h.listShopAddresses.FindByShopID(shopID)
+	result, err := h.listShopAddresses.FindByShopID(r.Context(), shopID)
 	if err != nil {
 		return err
 	}
@@ -214,7 +213,7 @@ func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Reques
 func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Request) error {
 	var req createShopAddressRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
@@ -262,7 +261,7 @@ func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:  req.PostalCode,
 	}
 
-	err = h.createShopAddress.Execute(input)
+	err = h.createShopAddress.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}

@@ -5,31 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/user/domain"
 	"service-core/internal/modules/user/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type userRepositoryImpl struct {
-	db *pgxpool.Pool
+type userRepositoryImpl struct{}
+
+func NewUserRepositoryImpl() repository.UserRepository {
+	return &userRepositoryImpl{}
 }
 
-func NewUserRepositoryImpl(conn *database.Connection) repository.UserRepository {
-	return &userRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]domain.User, int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) FindUsers(
+	ctx context.Context,
+	exec transaction.Executor,
+	params repository.FindUserParams,
+) ([]domain.User, int, error) {
 	var (
 		conditions []string
 		args       []any
@@ -86,12 +81,12 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d OFFSET %d", limit, offset)
 
 	var total int
-	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
+	err := exec.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query count users failed: %w", err)
 	}
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := exec.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query users failed: %w", err)
 	}
@@ -126,10 +121,11 @@ func (r *userRepositoryImpl) FindUsers(params repository.FindUserParams) ([]doma
 	return results, total, nil
 }
 
-func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.User, error) {
 	query := `
 		SELECT
 			u.id,
@@ -148,7 +144,7 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 
 	var m domain.User
 
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.Name,
 		&m.Username,
@@ -169,10 +165,11 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 	return &m, nil
 }
 
-func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) GetByUsername(
+	ctx context.Context,
+	exec transaction.Executor,
+	username string,
+) (*domain.User, error) {
 	query := `
 		SELECT 
 			u.id,
@@ -190,8 +187,7 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 	`
 
 	var m domain.User
-
-	err := r.db.QueryRow(ctx, query, username).Scan(
+	err := exec.QueryRow(ctx, query, username).Scan(
 		&m.ID,
 		&m.Name,
 		&m.Username,
@@ -212,10 +208,11 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 	return &m, nil
 }
 
-func (r *userRepositoryImpl) CreateUser(props repository.CreateUserProps) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *userRepositoryImpl) CreateUser(
+	ctx context.Context,
+	exec transaction.Executor,
+	props repository.CreateUserProps,
+) error {
 	query := `
 		INSERT INTO users (
 			id,
@@ -227,7 +224,7 @@ func (r *userRepositoryImpl) CreateUser(props repository.CreateUserProps) error 
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		props.ID,
 		props.Name,
 		props.Username,

@@ -10,9 +10,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"service-core/internal/modules/shipment/repository"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type rajaOngkirCostEstimation struct {
@@ -57,10 +57,11 @@ type rajaOngkirResponse struct {
 	} `json:"data"`
 }
 
-func (s *rajaOngkirCostEstimation) CalculateCost(input repository.CalculateCostInput) ([]repository.CostOption, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (s *rajaOngkirCostEstimation) CalculateCost(
+	ctx context.Context,
+	exec transaction.Executor,
+	input repository.CalculateCostInput,
+) ([]repository.CostOption, error) {
 	body, err := s.doRequest(ctx, http.MethodPost, input)
 	if err != nil {
 		return nil, err

@@ -10,6 +10,7 @@ import (
 	authendomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/authorization/repository"
+	"service-core/internal/shared/transaction"
 )
 
 type actorContextKey struct{}
@@ -39,7 +40,9 @@ func (s *authorizer) RequireAccountType(allowedTypes ...authendomain.AccountType
 	)
 }
 
-func (s *authorizer) LoadActor() appmiddleware.Middleware {
+func (s *authorizer) LoadActor(
+	exec transaction.Executor,
+) appmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			authCtx, ok := authendomain.GetAuthContext(r.Context())
@@ -47,7 +50,7 @@ func (s *authorizer) LoadActor() appmiddleware.Middleware {
 				return apperrors.NewUnauthorized("authentication required")
 			}
 
-			actor, err := s.actorSvc.Load(authCtx.UserID)
+			actor, err := s.actorSvc.Load(r.Context(), exec, authCtx.UserID)
 			if err != nil {
 				return err
 			}

@@ -1,22 +1,29 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type CreateShopAddressUsecase struct {
 	shopAddressRepo repository.ShopAddressRepository
+	executor        transaction.Executor
 }
 
-func NewCreateShopAddressUsecase(shopAddressRepo repository.ShopAddressRepository) *CreateShopAddressUsecase {
+func NewCreateShopAddressUsecase(
+	shopAddressRepo repository.ShopAddressRepository,
+	executor transaction.Executor,
+) *CreateShopAddressUsecase {
 	return &CreateShopAddressUsecase{
 		shopAddressRepo: shopAddressRepo,
+		executor:        executor,
 	}
 }
 
@@ -33,7 +40,10 @@ type CreateShopAddressInput struct {
 	PostalCode  string
 }
 
-func (u *CreateShopAddressUsecase) Execute(input CreateShopAddressInput) error {
+func (u *CreateShopAddressUsecase) Execute(
+	ctx context.Context,
+	input CreateShopAddressInput,
+) error {
 	var isDefault bool
 	if *input.IsActive {
 		isDefault = *input.IsActive
@@ -58,7 +68,7 @@ func (u *CreateShopAddressUsecase) Execute(input CreateShopAddressInput) error {
 		CreatedAt: time.Now(),
 	}
 
-	err := u.shopAddressRepo.Create(address)
+	err := u.shopAddressRepo.Create(ctx, u.executor, address)
 	if err != nil {
 		return fmt.Errorf("failed to save address: %w", err)
 	}

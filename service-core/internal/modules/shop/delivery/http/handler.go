@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -31,7 +30,7 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	result, err := h.getShop.GetByID(id)
+	result, err := h.getShop.GetByID(r.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -55,7 +54,7 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 	var req createShopRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
@@ -75,7 +74,7 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 		IsActive:    parsedIsActive,
 	}
 
-	err = h.createShop.Execute(input)
+	err = h.createShop.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
