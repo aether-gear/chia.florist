@@ -13,14 +13,17 @@ import (
 type AccountRepository interface {
 	GetByEmail(
 		ctx context.Context,
+		exec transaction.Executor,
 		email string,
 	) (*domain.Account, error)
 	GetByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.Account, error)
 	GetByUserID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.Account, error)
 
@@ -40,21 +43,25 @@ type AccountRepository interface {
 type SessionRepository interface {
 	GetByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.Session, error)
 
 	RevokeByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) error
 
 	UpdateLastActivityByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) error
 
 	Save(
 		ctx context.Context,
+		exec transaction.Executor,
 		session domain.Session,
 	) error
 }
@@ -62,6 +69,7 @@ type SessionRepository interface {
 type VerificationChallengeRepository interface {
 	GetByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.VerificationChallenge, error)
 
@@ -75,6 +83,7 @@ type VerificationChallengeRepository interface {
 type RefreshTokenRepository interface {
 	Save(
 		ctx context.Context,
+		exec transaction.Executor,
 		challenge domain.RefreshToken,
 	) error
 }
@@ -95,5 +104,7 @@ type TokenHasher interface {
 }
 
 type Authenticator interface {
-	RequireAuth() appmiddleware.Middleware
+	RequireAuth(
+		exec transaction.Executor,
+	) appmiddleware.Middleware
 }

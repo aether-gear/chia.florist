@@ -4,26 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/courier/domain"
 	"service-core/internal/modules/courier/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type shopCourierRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type shopCourierRepositoryImpl struct{}
 
-func NewShopCourierRepositoryImpl(conn *database.Connection) repository.ShopCourierRepository {
-	return &shopCourierRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewShopCourierRepositoryImpl() repository.ShopCourierRepository {
+	return &shopCourierRepositoryImpl{}
 }
 
 func (r *shopCourierRepositoryImpl) GetByShopID(
-	ctx context.Context, shopID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
 ) ([]domain.ShopCourier, error) {
 	query := `
 		SELECT
@@ -34,7 +31,7 @@ func (r *shopCourierRepositoryImpl) GetByShopID(
 		WHERE shop_id = $1
 	`
 
-	rows, err := r.db.Query(ctx, query, shopID)
+	rows, err := exec.Query(ctx, query, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("query shop courier by shop id failed: %w", err)
 	}
@@ -66,6 +63,7 @@ func (r *shopCourierRepositoryImpl) GetByShopID(
 
 func (r *shopCourierRepositoryImpl) SaveShopCouriers(
 	ctx context.Context,
+	exec transaction.Executor,
 	shopCouriers []domain.ShopCourier,
 ) error {
 	if len(shopCouriers) == 0 {
@@ -99,7 +97,7 @@ func (r *shopCourierRepositoryImpl) SaveShopCouriers(
 			active = EXCLUDED.active
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		shopIDs,
 		codes,
 		actives,

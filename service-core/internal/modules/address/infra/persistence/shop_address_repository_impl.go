@@ -5,27 +5,24 @@ import (
 	"errors"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type shopAddressRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type shopAddressRepositoryImpl struct{}
 
-func NewShopAddressRepositoryImpl(conn *database.Connection) repository.ShopAddressRepository {
-	return &shopAddressRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewShopAddressRepositoryImpl() repository.ShopAddressRepository {
+	return &shopAddressRepositoryImpl{}
 }
 
 func (r *shopAddressRepositoryImpl) GetByID(
-	ctx context.Context, addressID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
 ) (*domain.ShopAddress, error) {
 	query := `
 		SELECT
@@ -49,7 +46,7 @@ func (r *shopAddressRepositoryImpl) GetByID(
 	`
 
 	var a domain.ShopAddress
-	err := r.db.QueryRow(ctx, query, addressID).Scan(
+	err := exec.QueryRow(ctx, query, addressID).Scan(
 		&a.ID,
 		&a.ShopID,
 		&a.Label,
@@ -77,7 +74,9 @@ func (r *shopAddressRepositoryImpl) GetByID(
 }
 
 func (r *shopAddressRepositoryImpl) FindByShopID(
-	ctx context.Context, shopID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
 ) ([]domain.ShopAddress, error) {
 	query := `
 		SELECT
@@ -99,7 +98,7 @@ func (r *shopAddressRepositoryImpl) FindByShopID(
 		WHERE shop_id = $1 AND deleted_at IS NULL
 	`
 
-	rows, err := r.db.Query(ctx, query, shopID)
+	rows, err := exec.Query(ctx, query, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("query address by shop id failed: %w", err)
 	}
@@ -140,7 +139,9 @@ func (r *shopAddressRepositoryImpl) FindByShopID(
 }
 
 func (r *shopAddressRepositoryImpl) Create(
-	ctx context.Context, address domain.ShopAddress,
+	ctx context.Context,
+	exec transaction.Executor,
+	address domain.ShopAddress,
 ) error {
 	query := `
 		INSERT INTO shop_addresses (
@@ -161,7 +162,7 @@ func (r *shopAddressRepositoryImpl) Create(
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		address.ID,
 		address.ShopID,
 		address.Label,

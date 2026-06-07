@@ -24,6 +24,7 @@ type RegisterCustomerUsecase struct {
 	otpGen        otp.Generator
 	mailer        mailer.Sender
 	transactor    transaction.Transactor
+	executor      transaction.Executor
 }
 
 func NewRegisterCustomerUsecase(
@@ -34,6 +35,7 @@ func NewRegisterCustomerUsecase(
 	otpGen otp.Generator,
 	mailer mailer.Sender,
 	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *RegisterCustomerUsecase {
 	return &RegisterCustomerUsecase{
 		accountRepo:   accountRepo,
@@ -43,6 +45,7 @@ func NewRegisterCustomerUsecase(
 		otpGen:        otpGen,
 		mailer:        mailer,
 		transactor:    transactor,
+		executor:      executor,
 	}
 }
 
@@ -60,11 +63,11 @@ func (u *RegisterCustomerUsecase) Execute(
 ) (*uuid.UUID, error) {
 	now := time.Now()
 
-	existUsr, err := u.userRepo.GetByUsername(ctx, params.Username)
+	existUsr, err := u.userRepo.GetByUsername(ctx, u.executor, params.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user: %w", err)
 	}
-	existAcc, err := u.accountRepo.GetByEmail(ctx, params.Email)
+	existAcc, err := u.accountRepo.GetByEmail(ctx, u.executor, params.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check account: %w", err)
 	}

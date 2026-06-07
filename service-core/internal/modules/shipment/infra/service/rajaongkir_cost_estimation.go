@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"service-core/internal/modules/shipment/repository"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type rajaOngkirCostEstimation struct {
@@ -58,6 +59,7 @@ type rajaOngkirResponse struct {
 
 func (s *rajaOngkirCostEstimation) CalculateCost(
 	ctx context.Context,
+	exec transaction.Executor,
 	input repository.CalculateCostInput,
 ) ([]repository.CostOption, error) {
 	body, err := s.doRequest(ctx, http.MethodPost, input)

@@ -9,6 +9,7 @@ import (
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -18,6 +19,7 @@ type FindProductsUsecase struct {
 	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
 	fileStore      storage.Provider
+	executor       transaction.Executor
 }
 
 func NewFindProductsUsecase(
@@ -25,12 +27,14 @@ func NewFindProductsUsecase(
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
 	fileStore storage.Provider,
+	executor transaction.Executor,
 ) *FindProductsUsecase {
 	return &FindProductsUsecase{
 		productRepo:    productRepo,
 		inventoryRepo:  inventoryRepo,
 		productImgRepo: productImgRepo,
 		fileStore:      fileStore,
+		executor:       executor,
 	}
 }
 
@@ -63,6 +67,7 @@ func (u *FindProductsUsecase) Execute(
 ) {
 	products, total, err := u.productRepo.FindProducts(
 		ctx,
+		u.executor,
 		repository.FindProductParams{
 			Page:  input.Page,
 			Limit: input.Limit,
@@ -81,12 +86,12 @@ func (u *FindProductsUsecase) Execute(
 		productIDs = append(productIDs, product.ID)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, productIDs)
+	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load images for products: %w", err)
 	}

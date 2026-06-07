@@ -4,31 +4,28 @@ import (
 	"context"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/location/domain"
 	"service-core/internal/modules/location/repository"
-
-	"github.com/jackc/pgx/v5/pgxpool"
+	transaction "service-core/internal/shared/transaction"
 )
 
-type locationRepositoryImpl struct {
-	db *pgxpool.Pool
+type locationRepositoryImpl struct{}
+
+func NewLocationRepositoryImpl() repository.LocationRepository {
+	return &locationRepositoryImpl{}
 }
 
-func NewLocationRepositoryImpl(conn *database.Connection) repository.LocationRepository {
-	return &locationRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *locationRepositoryImpl) ListProvinces(ctx context.Context) ([]domain.Province, error) {
+func (r *locationRepositoryImpl) ListProvinces(
+	ctx context.Context,
+	exec transaction.Executor,
+) ([]domain.Province, error) {
 	query := `
 		SELECT
 			id, name
 		FROM provinces
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := exec.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query provinces failed: %w", err)
 	}
@@ -57,7 +54,9 @@ func (r *locationRepositoryImpl) ListProvinces(ctx context.Context) ([]domain.Pr
 }
 
 func (r *locationRepositoryImpl) ListCitiesByProvince(
-	ctx context.Context, provinceID string,
+	ctx context.Context,
+	exec transaction.Executor,
+	provinceID string,
 ) ([]domain.City, error) {
 	query := `
 		SELECT 
@@ -68,7 +67,7 @@ func (r *locationRepositoryImpl) ListCitiesByProvince(
 		WHERE province_id = $1
 	`
 
-	rows, err := r.db.Query(ctx, query, provinceID)
+	rows, err := exec.Query(ctx, query, provinceID)
 	if err != nil {
 		return nil, fmt.Errorf("query cities by province id failed: %w", err)
 	}
@@ -98,7 +97,9 @@ func (r *locationRepositoryImpl) ListCitiesByProvince(
 }
 
 func (r *locationRepositoryImpl) ListDistrictsByCity(
-	ctx context.Context, cityID string,
+	ctx context.Context,
+	exec transaction.Executor,
+	cityID string,
 ) ([]domain.District, error) {
 	query := `
 		SELECT 
@@ -109,7 +110,7 @@ func (r *locationRepositoryImpl) ListDistrictsByCity(
 		WHERE city_id = $1
 	`
 
-	rows, err := r.db.Query(ctx, query, cityID)
+	rows, err := exec.Query(ctx, query, cityID)
 	if err != nil {
 		return nil, fmt.Errorf("query districts by city id failed: %w", err)
 	}
@@ -139,7 +140,9 @@ func (r *locationRepositoryImpl) ListDistrictsByCity(
 }
 
 func (r *locationRepositoryImpl) ListVillagesByDistrict(
-	ctx context.Context, districtID string,
+	ctx context.Context,
+	exec transaction.Executor,
+	districtID string,
 ) ([]domain.Village, error) {
 	query := `
 		SELECT 
@@ -150,7 +153,7 @@ func (r *locationRepositoryImpl) ListVillagesByDistrict(
 		WHERE district_id = $1
 	`
 
-	rows, err := r.db.Query(ctx, query, districtID)
+	rows, err := exec.Query(ctx, query, districtID)
 	if err != nil {
 		return nil, fmt.Errorf("query villages by district id failed: %w", err)
 	}

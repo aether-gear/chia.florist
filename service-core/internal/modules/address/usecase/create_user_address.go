@@ -7,15 +7,21 @@ import (
 
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type CreateAddressUsecase struct {
 	userAddressRepo repository.UserAddressRepository
+	executor        transaction.Executor
 }
 
-func NewCreateAddressUsecase(userAddressRepo repository.UserAddressRepository) *CreateAddressUsecase {
+func NewCreateAddressUsecase(
+	userAddressRepo repository.UserAddressRepository,
+	executor transaction.Executor,
+
+) *CreateAddressUsecase {
 	return &CreateAddressUsecase{
 		userAddressRepo: userAddressRepo,
 	}
@@ -62,7 +68,7 @@ func (u *CreateAddressUsecase) Execute(
 		CreatedAt: time.Now(),
 	}
 
-	err := u.userAddressRepo.Create(ctx, address)
+	err := u.userAddressRepo.Create(ctx, u.executor, address)
 	if err != nil {
 		return fmt.Errorf("failed to save address: %w", err)
 	}

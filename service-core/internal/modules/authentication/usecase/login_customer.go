@@ -21,6 +21,7 @@ type LoginCustomerUsecase struct {
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
 	transactor       transaction.Transactor
+	executor         transaction.Executor
 }
 
 func NewLoginCustomerUsecase(
@@ -31,6 +32,7 @@ func NewLoginCustomerUsecase(
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
 	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *LoginCustomerUsecase {
 	return &LoginCustomerUsecase{
 		accountRepo:      accountRepo,
@@ -40,6 +42,7 @@ func NewLoginCustomerUsecase(
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		transactor:       transactor,
+		executor:         executor,
 	}
 }
 
@@ -58,7 +61,7 @@ func (u *LoginCustomerUsecase) Execute(
 	ctx context.Context,
 	input LoginCustomerParams,
 ) (*LoginEmailResult, error) {
-	existing, err := u.accountRepo.GetByEmail(ctx, input.Email)
+	existing, err := u.accountRepo.GetByEmail(ctx, u.executor, input.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -116,10 +119,10 @@ func (u *LoginCustomerUsecase) Execute(
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.sessionRepo.Save(ctx, session); err != nil {
+			if err := u.sessionRepo.Save(ctx, u.executor, session); err != nil {
 				return fmt.Errorf("failed to save session %w", err)
 			}
-			if err := u.refreshTokenRepo.Save(ctx, refreshTknDomain); err != nil {
+			if err := u.refreshTokenRepo.Save(ctx, u.executor, refreshTknDomain); err != nil {
 				return fmt.Errorf("failed to save refresh token %w", err)
 			}
 

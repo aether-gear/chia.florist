@@ -6,28 +6,24 @@ import (
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type accountRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type accountRepositoryImpl struct{}
 
-func NewAccountRepository(conn *database.Connection) repository.AccountRepository {
-	return &accountRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewAccountRepository() repository.AccountRepository {
+	return &accountRepositoryImpl{}
 }
 
 func (r *accountRepositoryImpl) GetByEmail(
-	ctx context.Context, email string,
+	ctx context.Context,
+	exec transaction.Executor,
+	email string,
 ) (*domain.Account, error) {
 	query := `
 		SELECT
@@ -48,7 +44,7 @@ func (r *accountRepositoryImpl) GetByEmail(
 	`
 
 	var m domain.Account
-	err := r.db.QueryRow(ctx, query, email).Scan(
+	err := exec.QueryRow(ctx, query, email).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
@@ -70,7 +66,9 @@ func (r *accountRepositoryImpl) GetByEmail(
 }
 
 func (r *accountRepositoryImpl) GetByID(
-	ctx context.Context, id uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
 ) (*domain.Account, error) {
 	query := `
 		SELECT
@@ -91,7 +89,7 @@ func (r *accountRepositoryImpl) GetByID(
 	`
 
 	var m domain.Account
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
@@ -113,7 +111,9 @@ func (r *accountRepositoryImpl) GetByID(
 }
 
 func (r *accountRepositoryImpl) GetByUserID(
-	ctx context.Context, id uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
 ) (*domain.Account, error) {
 	query := `
 		SELECT
@@ -134,7 +134,7 @@ func (r *accountRepositoryImpl) GetByUserID(
 	`
 
 	var m domain.Account
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,

@@ -4,26 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type userAddressRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type userAddressRepositoryImpl struct{}
 
-func NewUserAddressRepositoryImpl(conn *database.Connection) repository.UserAddressRepository {
-	return &userAddressRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewUserAddressRepositoryImpl() repository.UserAddressRepository {
+	return &userAddressRepositoryImpl{}
 }
 
 func (r *userAddressRepositoryImpl) GetByUserID(
-	ctx context.Context, userID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
 ) ([]domain.Address, error) {
 	query := `
 		SELECT
@@ -45,7 +42,7 @@ func (r *userAddressRepositoryImpl) GetByUserID(
 		WHERE user_id = $1 AND deleted_at IS NULL
 	`
 
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := exec.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("query user_addresses by user id failed: %w", err)
 	}
@@ -86,7 +83,9 @@ func (r *userAddressRepositoryImpl) GetByUserID(
 }
 
 func (r *userAddressRepositoryImpl) Create(
-	ctx context.Context, address domain.Address,
+	ctx context.Context,
+	exec transaction.Executor,
+	address domain.Address,
 ) error {
 	query := `
 		INSERT INTO user_addresses (
@@ -108,7 +107,7 @@ func (r *userAddressRepositoryImpl) Create(
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		address.ID,
 		address.UserID,
 		address.ReceiverName,

@@ -9,6 +9,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -16,15 +17,18 @@ import (
 type CreatePaymentAccountUsecase struct {
 	paymentMethodRepo repository.PaymentMethodRepository
 	paymentAccRepo    repository.PaymentAccountRepository
+	executor          transaction.Executor
 }
 
 func NewCreatePaymentAccountUsecase(
 	paymentAccRepo repository.PaymentAccountRepository,
 	paymentMethodRepo repository.PaymentMethodRepository,
+	executor transaction.Executor,
 ) *CreatePaymentAccountUsecase {
 	return &CreatePaymentAccountUsecase{
 		paymentAccRepo:    paymentAccRepo,
 		paymentMethodRepo: paymentMethodRepo,
+		executor:          executor,
 	}
 }
 
@@ -41,7 +45,7 @@ func (u *CreatePaymentAccountUsecase) Execute(
 	ctx context.Context,
 	input CreatePaymentAccountInput,
 ) error {
-	method, err := u.paymentMethodRepo.GetByID(ctx, input.MethodID)
+	method, err := u.paymentMethodRepo.GetByID(ctx, u.executor, input.MethodID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve payment account: %w", err)
 	}
@@ -69,7 +73,7 @@ func (u *CreatePaymentAccountUsecase) Execute(
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	err = u.paymentAccRepo.Save(ctx, paymentAccount)
+	err = u.paymentAccRepo.Save(ctx, u.executor, paymentAccount)
 	if err != nil {
 		return fmt.Errorf("failed to save payment account: %w", err)
 	}

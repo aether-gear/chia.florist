@@ -6,27 +6,24 @@ import (
 	"fmt"
 	"strings"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type productRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type productRepositoryImpl struct{}
 
-func NewProductRepository(conn *database.Connection) repository.ProductRepository {
-	return &productRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewProductRepository() repository.ProductRepository {
+	return &productRepositoryImpl{}
 }
 
 func (r *productRepositoryImpl) FindProducts(
-	ctx context.Context, params repository.FindProductParams,
+	ctx context.Context,
+	exec transaction.Executor,
+	params repository.FindProductParams,
 ) ([]domain.Product, int, error) {
 	var (
 		conditions []string
@@ -77,7 +74,7 @@ func (r *productRepositoryImpl) FindProducts(
 	countQuery := "SELECT COUNT(DISTINCT p.id) " + baseQuery + whereClause
 
 	var total int
-	err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	err := exec.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query count products failed: %w", err)
 	}
@@ -102,7 +99,7 @@ func (r *productRepositoryImpl) FindProducts(
 
 	args = append(args, limit, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := exec.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query products failed: %w", err)
 	}
@@ -139,8 +136,11 @@ func (r *productRepositoryImpl) FindProducts(
 
 	return results, total, nil
 }
+
 func (r *productRepositoryImpl) GetByID(
-	ctx context.Context, id uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
 ) (*domain.Product, error) {
 	query := `
 		SELECT
@@ -162,7 +162,7 @@ func (r *productRepositoryImpl) GetByID(
 	`
 
 	var result domain.Product
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&result.ID,
 		&result.SKU,
 		&result.Name,
@@ -188,7 +188,9 @@ func (r *productRepositoryImpl) GetByID(
 }
 
 func (r *productRepositoryImpl) FindByIDs(
-	ctx context.Context, ids []uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	ids []uuid.UUID,
 ) ([]domain.Product, error) {
 	if len(ids) == 0 {
 		return []domain.Product{}, nil
@@ -217,7 +219,7 @@ func (r *productRepositoryImpl) FindByIDs(
 		productIDStrings[i] = id.String()
 	}
 
-	rows, err := r.db.Query(ctx, query, productIDStrings)
+	rows, err := exec.Query(ctx, query, productIDStrings)
 	if err != nil {
 		return nil, fmt.Errorf("query products by many ids failed: %w", err)
 	}
@@ -257,7 +259,9 @@ func (r *productRepositoryImpl) FindByIDs(
 }
 
 func (r *productRepositoryImpl) CreateProduct(
-	ctx context.Context, product *domain.Product,
+	ctx context.Context,
+	exec transaction.Executor,
+	product *domain.Product,
 ) error {
 	query := `
 		INSERT INTO products (
@@ -274,7 +278,7 @@ func (r *productRepositoryImpl) CreateProduct(
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		product.ID,
 		product.SKU,
 		product.Name,

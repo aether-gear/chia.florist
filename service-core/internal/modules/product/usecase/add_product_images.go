@@ -29,6 +29,7 @@ type AddProductImagesUsecase struct {
 	resolutionGen  image.VariantCreator
 	fileStore      storage.Provider
 	transactor     transaction.Transactor
+	executor       transaction.Executor
 }
 
 func NewAddProductImagesUsecase(
@@ -38,6 +39,7 @@ func NewAddProductImagesUsecase(
 	resolutionGen image.VariantCreator,
 	fileStore storage.Provider,
 	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *AddProductImagesUsecase {
 	return &AddProductImagesUsecase{
 		productRepo:    productRepo,
@@ -46,6 +48,7 @@ func NewAddProductImagesUsecase(
 		resolutionGen:  resolutionGen,
 		fileStore:      fileStore,
 		transactor:     transactor,
+		executor:       executor,
 	}
 }
 
@@ -72,7 +75,7 @@ func (u *AddProductImagesUsecase) Execute(
 	ctx context.Context,
 	input AddProductImageInput,
 ) error {
-	product, err := u.productRepo.GetByID(ctx, input.ProductID)
+	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to get product: %w", err)
 	}

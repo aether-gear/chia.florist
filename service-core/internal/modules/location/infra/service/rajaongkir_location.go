@@ -10,6 +10,7 @@ import (
 
 	"service-core/internal/modules/location/domain"
 	"service-core/internal/modules/location/repository"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type rajaOngkirLocation struct {
@@ -44,6 +45,7 @@ type rajaOngkirResponse struct {
 
 func (s *rajaOngkirLocation) ListProvinces(
 	ctx context.Context,
+	exec transaction.Executor,
 ) ([]domain.Province, error) {
 	body, err := s.doRequest(ctx, http.MethodGet, "/province", nil)
 	if err != nil {
@@ -71,7 +73,9 @@ func (s *rajaOngkirLocation) ListProvinces(
 }
 
 func (s *rajaOngkirLocation) ListCitiesByProvince(
-	ctx context.Context, provinceID string,
+	ctx context.Context,
+	exec transaction.Executor,
+	provinceID string,
 ) ([]domain.City, error) {
 	path := fmt.Sprintf("/city/%s", provinceID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
@@ -100,7 +104,9 @@ func (s *rajaOngkirLocation) ListCitiesByProvince(
 }
 
 func (s *rajaOngkirLocation) ListDistrictsByCity(
-	ctx context.Context, cityID string,
+	ctx context.Context,
+	exec transaction.Executor,
+	cityID string,
 ) ([]domain.District, error) {
 	path := fmt.Sprintf("/district/%s", cityID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)
@@ -129,7 +135,9 @@ func (s *rajaOngkirLocation) ListDistrictsByCity(
 }
 
 func (s *rajaOngkirLocation) ListVillagesByDistrict(
-	ctx context.Context, districtID string,
+	ctx context.Context,
+	exec transaction.Executor,
+	districtID string,
 ) ([]domain.Village, error) {
 	path := fmt.Sprintf("/sub-district/%s", districtID)
 	body, err := s.doRequest(ctx, http.MethodGet, path, nil)

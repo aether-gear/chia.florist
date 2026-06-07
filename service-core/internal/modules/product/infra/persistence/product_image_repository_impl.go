@@ -4,28 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 	image "service-core/internal/shared/image"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type productImageRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type productImageRepositoryImpl struct{}
 
-func NewProductImageRepository(conn *database.Connection) repository.ProductImageRepository {
-	return &productImageRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewProductImageRepository() repository.ProductImageRepository {
+	return &productImageRepositoryImpl{}
 }
 
 func (r *productImageRepositoryImpl) ListByProductIDs(
 	ctx context.Context,
+	exec transaction.Executor,
 	productIDs []uuid.UUID,
 ) (map[uuid.UUID][]domain.ProductImage, error) {
 	result := make(map[uuid.UUID][]domain.ProductImage)
@@ -57,7 +52,7 @@ func (r *productImageRepositoryImpl) ListByProductIDs(
 		productIDStrings[i] = id.String()
 	}
 
-	rows, err := r.db.Query(ctx, query, productIDStrings)
+	rows, err := exec.Query(ctx, query, productIDStrings)
 	if err != nil {
 		return nil, fmt.Errorf("query product images failed: %w", err)
 	}
@@ -121,6 +116,7 @@ func (r *productImageRepositoryImpl) ListByProductIDs(
 
 func (r *productImageRepositoryImpl) ListByProductID(
 	ctx context.Context,
+	exec transaction.Executor,
 	productID uuid.UUID,
 ) ([]domain.ProductImage, error) {
 	query := `
@@ -142,7 +138,7 @@ func (r *productImageRepositoryImpl) ListByProductID(
 		ORDER BY display_order ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, productID)
+	rows, err := exec.Query(ctx, query, productID)
 	if err != nil {
 		return nil, fmt.Errorf("query product images failed: %w", err)
 	}
@@ -256,6 +252,7 @@ func (r *productImageRepositoryImpl) Create(
 
 func (r *productImageRepositoryImpl) SoftDeleteByProductID(
 	ctx context.Context,
+	exec transaction.Executor,
 	productID uuid.UUID,
 ) error {
 	query := `
@@ -267,7 +264,7 @@ func (r *productImageRepositoryImpl) SoftDeleteByProductID(
 			product_id = $1
 	`
 
-	_, err := r.db.Exec(ctx, query, productID)
+	_, err := exec.Exec(ctx, query, productID)
 	if err != nil {
 		return fmt.Errorf("delete product images failed: %w", err)
 	}

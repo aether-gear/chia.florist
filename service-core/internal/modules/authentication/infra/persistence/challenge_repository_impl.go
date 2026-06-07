@@ -5,28 +5,24 @@ import (
 	"errors"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type challengeRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type challengeRepositoryImpl struct{}
 
-func NewChallengeRepository(conn *database.Connection) repository.VerificationChallengeRepository {
-	return &challengeRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewChallengeRepository() repository.VerificationChallengeRepository {
+	return &challengeRepositoryImpl{}
 }
 
 func (r *challengeRepositoryImpl) GetByID(
-	ctx context.Context, id uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
 ) (*domain.VerificationChallenge, error) {
 	query := `
 		SELECT
@@ -48,7 +44,7 @@ func (r *challengeRepositoryImpl) GetByID(
 	`
 
 	var vC domain.VerificationChallenge
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&vC.ID,
 		&vC.UserID,
 		&vC.Type,
@@ -74,6 +70,7 @@ func (r *challengeRepositoryImpl) GetByID(
 
 func (r *challengeRepositoryImpl) Create(
 	ctx context.Context,
+	exec transaction.Executor,
 	challenge domain.VerificationChallenge,
 ) error {
 	query := `
@@ -92,7 +89,7 @@ func (r *challengeRepositoryImpl) Create(
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		challenge.ID,
 		challenge.UserID,
 		challenge.Type,

@@ -4,25 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
-
-	"github.com/jackc/pgx/v5/pgxpool"
+	transaction "service-core/internal/shared/transaction"
 )
 
-type refreshTokenRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type refreshTokenRepositoryImpl struct{}
 
-func NewRefreshTokenRepositoryImpl(conn *database.Connection) repository.RefreshTokenRepository {
-	return &refreshTokenRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewRefreshTokenRepositoryImpl() repository.RefreshTokenRepository {
+	return &refreshTokenRepositoryImpl{}
 }
 
 func (r *refreshTokenRepositoryImpl) Save(
 	ctx context.Context,
+	exec transaction.Executor,
 	refreshToken domain.RefreshToken,
 ) error {
 	query := `
@@ -46,7 +41,7 @@ func (r *refreshTokenRepositoryImpl) Save(
 			created_at = EXCLUDED.created_at
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		refreshToken.ID,
 		refreshToken.SessionID,
 		refreshToken.TokenHash,

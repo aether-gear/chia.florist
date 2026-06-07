@@ -5,28 +5,24 @@ import (
 	"errors"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type paymentAccountRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type paymentAccountRepositoryImpl struct{}
 
-func NewPaymentAccountRepository(conn *database.Connection) repository.PaymentAccountRepository {
-	return &paymentAccountRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewPaymentAccountRepository() repository.PaymentAccountRepository {
+	return &paymentAccountRepositoryImpl{}
 }
 
 func (r *paymentAccountRepositoryImpl) Save(
-	ctx context.Context, acc domain.PaymentAccount,
+	ctx context.Context,
+	exec transaction.Executor,
+	acc domain.PaymentAccount,
 ) error {
 	query := `
 		INSERT INTO payment_accounts (
@@ -45,7 +41,7 @@ func (r *paymentAccountRepositoryImpl) Save(
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		acc.ID,
 		acc.MethodID,
 		acc.AccountName,
@@ -66,7 +62,9 @@ func (r *paymentAccountRepositoryImpl) Save(
 }
 
 func (r *paymentAccountRepositoryImpl) GetByID(
-	ctx context.Context, paymentID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	paymentID uuid.UUID,
 ) (*domain.PaymentAccount, error) {
 	query := `
 		SELECT 
@@ -86,7 +84,7 @@ func (r *paymentAccountRepositoryImpl) GetByID(
 	`
 
 	var acc domain.PaymentAccount
-	err := r.db.QueryRow(ctx, query, paymentID).Scan(
+	err := exec.QueryRow(ctx, query, paymentID).Scan(
 		&acc.ID,
 		&acc.MethodID,
 		&acc.AccountName,
@@ -182,7 +180,10 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(
 }
 
 func (r *paymentAccountRepositoryImpl) IncrementLoad(
-	ctx context.Context, accountID uuid.UUID) error {
+	ctx context.Context,
+	exec transaction.Executor,
+	accountID uuid.UUID,
+) error {
 	query := `
 		UPDATE payment_accounts
 		SET current_load = current_load + 1
@@ -190,7 +191,7 @@ func (r *paymentAccountRepositoryImpl) IncrementLoad(
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	_, err := r.db.Exec(ctx, query, accountID)
+	_, err := exec.Exec(ctx, query, accountID)
 	if err != nil {
 		return fmt.Errorf("update payment account current load failed: %w", err)
 	}
@@ -199,14 +200,17 @@ func (r *paymentAccountRepositoryImpl) IncrementLoad(
 }
 
 func (r *paymentAccountRepositoryImpl) DecrementLoad(
-	ctx context.Context, accountID uuid.UUID) error {
+	ctx context.Context,
+	exec transaction.Executor,
+	accountID uuid.UUID,
+) error {
 	query := `
 		UPDATE payment_accounts
 		SET current_load = GREATEST(current_load - 1, 0)
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	_, err := r.db.Exec(ctx, query, accountID)
+	_, err := exec.Exec(ctx, query, accountID)
 	if err != nil {
 		return fmt.Errorf("update payment account current load failed: %w", err)
 	}
@@ -215,7 +219,9 @@ func (r *paymentAccountRepositoryImpl) DecrementLoad(
 }
 
 func (r *paymentAccountRepositoryImpl) ListByMethodID(
-	ctx context.Context, methodID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	methodID uuid.UUID,
 ) ([]domain.PaymentAccount, error) {
 	query := `
 		SELECT 
@@ -234,7 +240,7 @@ func (r *paymentAccountRepositoryImpl) ListByMethodID(
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, methodID)
+	rows, err := exec.Query(ctx, query, methodID)
 	if err != nil {
 		return nil, fmt.Errorf("query payment accounts by method id failed: %w", err)
 	}
@@ -273,6 +279,7 @@ func (r *paymentAccountRepositoryImpl) ListByMethodID(
 
 func (r *paymentAccountRepositoryImpl) ListAll(
 	ctx context.Context,
+	exec transaction.Executor,
 ) ([]domain.PaymentAccount, error) {
 	query := `
 		SELECT
@@ -291,7 +298,7 @@ func (r *paymentAccountRepositoryImpl) ListAll(
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := exec.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query payment accounts failed: %w", err)
 	}

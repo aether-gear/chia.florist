@@ -6,28 +6,23 @@ import (
 	"fmt"
 	"strings"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/user/domain"
 	"service-core/internal/modules/user/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type userRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type userRepositoryImpl struct{}
 
-func NewUserRepositoryImpl(conn *database.Connection) repository.UserRepository {
-	return &userRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewUserRepositoryImpl() repository.UserRepository {
+	return &userRepositoryImpl{}
 }
 
 func (r *userRepositoryImpl) FindUsers(
 	ctx context.Context,
+	exec transaction.Executor,
 	params repository.FindUserParams,
 ) ([]domain.User, int, error) {
 	var (
@@ -86,12 +81,12 @@ func (r *userRepositoryImpl) FindUsers(
 	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d OFFSET %d", limit, offset)
 
 	var total int
-	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
+	err := exec.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query count users failed: %w", err)
 	}
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := exec.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query users failed: %w", err)
 	}
@@ -127,7 +122,9 @@ func (r *userRepositoryImpl) FindUsers(
 }
 
 func (r *userRepositoryImpl) GetByID(
-	ctx context.Context, id uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
 ) (*domain.User, error) {
 	query := `
 		SELECT
@@ -147,7 +144,7 @@ func (r *userRepositoryImpl) GetByID(
 
 	var m domain.User
 
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.Name,
 		&m.Username,
@@ -169,7 +166,9 @@ func (r *userRepositoryImpl) GetByID(
 }
 
 func (r *userRepositoryImpl) GetByUsername(
-	ctx context.Context, username string,
+	ctx context.Context,
+	exec transaction.Executor,
+	username string,
 ) (*domain.User, error) {
 	query := `
 		SELECT 
@@ -188,7 +187,7 @@ func (r *userRepositoryImpl) GetByUsername(
 	`
 
 	var m domain.User
-	err := r.db.QueryRow(ctx, query, username).Scan(
+	err := exec.QueryRow(ctx, query, username).Scan(
 		&m.ID,
 		&m.Name,
 		&m.Username,

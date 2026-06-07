@@ -12,15 +12,18 @@ import (
 type UserRepository interface {
 	FindUsers(
 		ctx context.Context,
+		exec transaction.Executor,
 		params FindUserParams,
 	) ([]domain.User, int, error)
 
 	GetByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.User, error)
 	GetByUsername(
 		ctx context.Context,
+		exec transaction.Executor,
 		username string,
 	) (*domain.User, error)
 

@@ -71,7 +71,7 @@ func (u *VerifyAccountUsecase) Execute(
 ) (*VerifyAccountResult, error) {
 	now := time.Now()
 
-	challenge, err := u.challengeRepo.GetByID(ctx, input.ChallengeID)
+	challenge, err := u.challengeRepo.GetByID(ctx, u.executor, input.ChallengeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get challenge: %w", err)
 	}
@@ -160,10 +160,10 @@ func (u *VerifyAccountUsecase) Execute(
 				return fmt.Errorf("failed to activate account: %w", err)
 			}
 
-			if err := u.sessionRepo.Save(ctx, session); err != nil {
+			if err := u.sessionRepo.Save(ctx, u.executor, session); err != nil {
 				return fmt.Errorf("failed to save session %w", err)
 			}
-			if err := u.refreshTokenRepo.Save(ctx, refreshToken); err != nil {
+			if err := u.refreshTokenRepo.Save(ctx, u.executor, refreshToken); err != nil {
 				return fmt.Errorf("failed to save refresh token %w", err)
 			}
 

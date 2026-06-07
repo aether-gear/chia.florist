@@ -10,6 +10,7 @@ import (
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
 	"service-core/internal/shared/slug"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -17,15 +18,18 @@ import (
 type CreateProductUsecase struct {
 	productRepo repository.ProductRepository
 	slugGen     slug.Generator
+	executor    transaction.Executor
 }
 
 func NewCreateProductUsecase(
 	productRepo repository.ProductRepository,
 	slugGen slug.Generator,
+	executor transaction.Executor,
 ) *CreateProductUsecase {
 	return &CreateProductUsecase{
 		productRepo: productRepo,
 		slugGen:     slugGen,
+		executor:    executor,
 	}
 }
 
@@ -64,7 +68,7 @@ func (u *CreateProductUsecase) Execute(
 		return err
 	}
 
-	if err := u.productRepo.CreateProduct(ctx, product); err != nil {
+	if err := u.productRepo.CreateProduct(ctx, u.executor, product); err != nil {
 		return fmt.Errorf("failed to save product: %w", err)
 	}
 

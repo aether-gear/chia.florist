@@ -12,11 +12,13 @@ import (
 type CartRepository interface {
 	GetWithItemsByUserID(
 		ctx context.Context,
+		exec transaction.Executor,
 		userID uuid.UUID,
 	) (*domain.Cart, error)
 
 	NewCart(
 		ctx context.Context,
+		exec transaction.Executor,
 		userID uuid.UUID,
 	) (*domain.Cart, error)
 

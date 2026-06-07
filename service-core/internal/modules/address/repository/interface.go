@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"service-core/internal/modules/address/domain"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -11,11 +12,13 @@ import (
 type UserAddressRepository interface {
 	GetByUserID(
 		ctx context.Context,
+		exec transaction.Executor,
 		userID uuid.UUID,
 	) ([]domain.Address, error)
 	// GetDefault(userID uuid.UUID) (*domain.Address, error)
 	Create(
 		ctx context.Context,
+		exec transaction.Executor,
 		address domain.Address,
 	) error
 }
@@ -23,17 +26,20 @@ type UserAddressRepository interface {
 type ShopAddressRepository interface {
 	GetByID(
 		ctx context.Context,
+		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.ShopAddress, error)
 	// GetDefaultByShopID(shopID string) (*domain.ShopAddress, error)
 
 	FindByShopID(
 		ctx context.Context,
+		exec transaction.Executor,
 		shopID uuid.UUID,
 	) ([]domain.ShopAddress, error)
 
 	Create(
 		ctx context.Context,
+		exec transaction.Executor,
 		address domain.ShopAddress,
 	) error
 

@@ -7,19 +7,23 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type CreatePaymentMethodUsecase struct {
 	paymentMethodRepo repository.PaymentMethodRepository
+	executor          transaction.Executor
 }
 
 func NewCreatePaymentMethodUsecase(
 	paymentMethodRepo repository.PaymentMethodRepository,
+	executor transaction.Executor,
 ) *CreatePaymentMethodUsecase {
 	return &CreatePaymentMethodUsecase{
 		paymentMethodRepo: paymentMethodRepo,
+		executor:          executor,
 	}
 }
 
@@ -52,7 +56,7 @@ func (u *CreatePaymentMethodUsecase) Execute(
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	err := u.paymentMethodRepo.Save(ctx, paymentMethod)
+	err := u.paymentMethodRepo.Save(ctx, u.executor, paymentMethod)
 	if err != nil {
 		return fmt.Errorf("failed to save payment method: %w", err)
 	}

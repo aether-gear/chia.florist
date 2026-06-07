@@ -19,6 +19,7 @@ type AddItemUsecase struct {
 	inventoryRepo inventoryRepo.InventoryRepository
 	productRepo   productRepo.ProductRepository
 	transactor    transaction.Transactor
+	executor      transaction.Executor
 }
 
 func NewAddItemUsecase(
@@ -26,12 +27,14 @@ func NewAddItemUsecase(
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productRepo productRepo.ProductRepository,
 	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
 		cartRepo:      cartRepo,
 		inventoryRepo: inventoryRepo,
 		productRepo:   productRepo,
 		transactor:    transactor,
+		executor:      executor,
 	}
 }
 
@@ -53,7 +56,7 @@ func (u *AddItemUsecase) Execute(
 	}
 
 	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(
-		ctx, input.ProductID, input.ShopID,
+		ctx, u.executor, input.ProductID, input.ShopID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
@@ -62,7 +65,7 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	product, err := u.productRepo.GetByID(ctx, input.ProductID)
+	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
@@ -70,12 +73,12 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, input.UserID)
+	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(ctx, input.UserID)
+		cart, err = u.cartRepo.NewCart(ctx, u.executor, input.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to create cart: %w", err)
 		}

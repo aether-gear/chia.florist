@@ -5,27 +5,25 @@ import (
 	"errors"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/inventory/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type inventoryRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type inventoryRepositoryImpl struct{}
 
-func NewInventoryRepository(conn *database.Connection) repository.InventoryRepository {
-	return &inventoryRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewInventoryRepository() repository.InventoryRepository {
+	return &inventoryRepositoryImpl{}
 }
 
 func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(
-	ctx context.Context, productID uuid.UUID, shopID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+	shopID uuid.UUID,
 ) (*domain.Inventory, error) {
 	query := `
 		SELECT
@@ -42,7 +40,7 @@ func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(
 	`
 
 	var inventory domain.Inventory
-	err := r.db.QueryRow(ctx, query, productID, shopID).Scan(
+	err := exec.QueryRow(ctx, query, productID, shopID).Scan(
 		&inventory.ID,
 		&inventory.ProductID,
 		&inventory.ShopID,
@@ -62,7 +60,9 @@ func (r *inventoryRepositoryImpl) GetByProductIDAndShopID(
 }
 
 func (r *inventoryRepositoryImpl) ListByProductID(
-	ctx context.Context, productID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
 ) ([]domain.Inventory, error) {
 	query := `
 		SELECT
@@ -78,7 +78,7 @@ func (r *inventoryRepositoryImpl) ListByProductID(
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, productID)
+	rows, err := exec.Query(ctx, query, productID)
 	if err != nil {
 		return nil, fmt.Errorf("query inventory by product failed: %w", err)
 	}
@@ -110,7 +110,9 @@ func (r *inventoryRepositoryImpl) ListByProductID(
 }
 
 func (r *inventoryRepositoryImpl) ListByProductIDs(
-	ctx context.Context, productIDs []uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	productIDs []uuid.UUID,
 ) (map[uuid.UUID][]domain.Inventory, error) {
 	result := make(map[uuid.UUID][]domain.Inventory)
 	if len(productIDs) == 0 {
@@ -136,7 +138,7 @@ func (r *inventoryRepositoryImpl) ListByProductIDs(
 		productIDStrings[i] = id.String()
 	}
 
-	rows, err := r.db.Query(ctx, query, productIDStrings)
+	rows, err := exec.Query(ctx, query, productIDStrings)
 	if err != nil {
 		return nil, fmt.Errorf("query inventory by products failed: %w", err)
 	}
@@ -172,7 +174,9 @@ func (r *inventoryRepositoryImpl) ListByProductIDs(
 }
 
 func (r *inventoryRepositoryImpl) ListByShopID(
-	ctx context.Context, shopID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
 ) ([]domain.Inventory, error) {
 	query := `
 		SELECT
@@ -188,7 +192,7 @@ func (r *inventoryRepositoryImpl) ListByShopID(
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, shopID)
+	rows, err := exec.Query(ctx, query, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("query inventory by shop failed: %w", err)
 	}
@@ -220,7 +224,9 @@ func (r *inventoryRepositoryImpl) ListByShopID(
 }
 
 func (r *inventoryRepositoryImpl) Create(
-	ctx context.Context, inventory *domain.Inventory,
+	ctx context.Context,
+	exec transaction.Executor,
+	inventory *domain.Inventory,
 ) error {
 	query := `
 		INSERT INTO inventory (
@@ -234,7 +240,7 @@ func (r *inventoryRepositoryImpl) Create(
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		inventory.ID,
 		inventory.ProductID,
 		inventory.ShopID,

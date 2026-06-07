@@ -5,27 +5,24 @@ import (
 	"errors"
 	"fmt"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type paymentMethodRepositoryImpl struct {
-	db *pgxpool.Pool
-}
+type paymentMethodRepositoryImpl struct{}
 
-func NewPaymentMethodRepository(conn *database.Connection) repository.PaymentMethodRepository {
-	return &paymentMethodRepositoryImpl{
-		db: conn.Pool,
-	}
+func NewPaymentMethodRepository() repository.PaymentMethodRepository {
+	return &paymentMethodRepositoryImpl{}
 }
 
 func (r *paymentMethodRepositoryImpl) Save(
-	ctx context.Context, method domain.PaymentMethod,
+	ctx context.Context,
+	exec transaction.Executor,
+	method domain.PaymentMethod,
 ) error {
 	query := `
 		INSERT INTO payment_methods (
@@ -44,7 +41,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		method.ID,
 		method.Name,
 		method.Type,
@@ -65,7 +62,9 @@ func (r *paymentMethodRepositoryImpl) Save(
 }
 
 func (r *paymentMethodRepositoryImpl) FindByName(
-	ctx context.Context, name string,
+	ctx context.Context,
+	exec transaction.Executor,
+	name string,
 ) (*domain.PaymentMethod, error) {
 	query := `
 		SELECT
@@ -82,7 +81,7 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 	`
 
 	var method domain.PaymentMethod
-	err := r.db.QueryRow(ctx, query, name).Scan(
+	err := exec.QueryRow(ctx, query, name).Scan(
 		&method.ID,
 		&method.Name,
 		&method.Type,
@@ -102,7 +101,9 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 }
 
 func (r *paymentMethodRepositoryImpl) GetByID(
-	ctx context.Context, paymentID uuid.UUID,
+	ctx context.Context,
+	exec transaction.Executor,
+	paymentID uuid.UUID,
 ) (*domain.PaymentMethod, error) {
 	query := `
 		SELECT 
@@ -119,7 +120,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 	`
 
 	var method domain.PaymentMethod
-	err := r.db.QueryRow(ctx, query, paymentID).Scan(
+	err := exec.QueryRow(ctx, query, paymentID).Scan(
 		&method.ID,
 		&method.Name,
 		&method.Type,
@@ -141,6 +142,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 
 func (r *paymentMethodRepositoryImpl) ListAll(
 	ctx context.Context,
+	exec transaction.Executor,
 ) ([]domain.PaymentMethod, error) {
 	query := `
 		SELECT 
@@ -155,7 +157,7 @@ func (r *paymentMethodRepositoryImpl) ListAll(
 		WHERE deleted_at IS NULL
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := exec.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query payment methods failed: %w", err)
 	}

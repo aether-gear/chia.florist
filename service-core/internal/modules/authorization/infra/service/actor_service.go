@@ -9,6 +9,7 @@ import (
 	"service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/authorization/repository"
 	merchantRepo "service-core/internal/modules/merchant/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -28,8 +29,12 @@ func NewActorService(
 	}
 }
 
-func (s *ActorService) Load(ctx context.Context, userID uuid.UUID) (*domain.Actor, error) {
-	account, err := s.accountRepo.GetByUserID(ctx, userID)
+func (s *ActorService) Load(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*domain.Actor, error) {
+	account, err := s.accountRepo.GetByUserID(ctx, exec, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -40,7 +45,7 @@ func (s *ActorService) Load(ctx context.Context, userID uuid.UUID) (*domain.Acto
 	}
 
 	if actor.Type == authenDomain.AccountTypeMerchant {
-		merchant, err := s.merchantRepo.GetByAccountID(ctx, account.ID)
+		merchant, err := s.merchantRepo.GetByAccountID(ctx, exec, account.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve merchant: %w", err)
 		}
