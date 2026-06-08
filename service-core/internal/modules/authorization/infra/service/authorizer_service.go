@@ -40,6 +40,40 @@ func (s *authorizer) RequireAccountType(allowedTypes ...authendomain.AccountType
 	)
 }
 
+func (s *authorizer) RequireMerchantRole(allowedRoles ...string) appmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			actor, ok := GetActor(r.Context())
+			if !ok {
+				return apperrors.NewUnauthorized("authentication required")
+			}
+
+			if actor.Type != authendomain.AccountTypeMerchant {
+				return apperrors.NewForbidden(domain.ErrMerchantRequired.Error())
+			}
+
+			allowed := false
+			for _, actorRole := range actor.Roles {
+				for _, requiredRole := range allowedRoles {
+					if actorRole.Code == requiredRole {
+						allowed = true
+						break
+					}
+				}
+				if allowed {
+					break
+				}
+			}
+
+			if !allowed {
+				return apperrors.NewForbidden(domain.ErrInsufficientRole.Error())
+			}
+
+			return next(w, r)
+		}
+	}
+}
+
 func (s *authorizer) LoadActor(
 	exec transaction.Executor,
 ) appmiddleware.Middleware {
@@ -50,7 +84,10 @@ func (s *authorizer) LoadActor(
 				return apperrors.NewUnauthorized("authentication required")
 			}
 
-			actor, err := s.actorSvc.Load(r.Context(), exec, authCtx.UserID)
+			actor, err := s.actorSvc.Load(r.Context(), exec,
+				authCtx.UserID,
+				*authCtx.MerchantID,
+			)
 			if err != nil {
 				return err
 			}

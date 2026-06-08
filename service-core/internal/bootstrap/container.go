@@ -11,6 +11,7 @@ import (
 
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
+	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
 	cartPersistence "service-core/internal/modules/cart/infra/persistence"
 	courierPersistence "service-core/internal/modules/courier/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
@@ -31,6 +32,7 @@ import (
 	courierUsecase "service-core/internal/modules/courier/usecase"
 	inventoryUsecase "service-core/internal/modules/inventory/usecase"
 	locationUsecase "service-core/internal/modules/location/usecase"
+	merchantUsecase "service-core/internal/modules/merchant/usecase"
 	paymentUsecase "service-core/internal/modules/payment/usecase"
 	productUsecase "service-core/internal/modules/product/usecase"
 	shipmentUsecase "service-core/internal/modules/shipment/usecase"
@@ -52,9 +54,13 @@ type Container struct {
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
 	LoginCustomer    authenUsecase.LoginCustomerUsecase
+	LoginMerchant    authenUsecase.LoginMerchantUsecase
 	RegisterCustomer authenUsecase.RegisterCustomerUsecase
 	VerifyAccount    authenUsecase.VerifyAccountUsecase
 	GetAccount       authenUsecase.GetAccountUsecase
+
+	CreateMerchant     merchantUsecase.CreateMerchantUsecase
+	AddMerchantAccount merchantUsecase.AddMerchantAccountUsecase
 
 	GetCart    cartUsecase.GetCartUsecase
 	AddItem    cartUsecase.AddItemUsecase
@@ -109,16 +115,27 @@ func NewContainer(cfg Config,
 		courierRepo       = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo   = courierPersistence.NewShopCourierRepositoryImpl()
 		merchantRepo      = merchantPersistence.NewMerchantRepositoryImpl()
+		membershipRepo    = authorPersistence.NewMerchantMembershipRepositoryImpl()
+		roleRepo          = authorPersistence.NewRoleRepositoryImpl()
 	)
 
 	var (
 		tokenSvc    = authenSvc.NewJWTService(cfg.JWT.Secret)
 		pwHasher    = authenSvc.NewBcryptHasher()
 		tokenHasher = authenSvc.NewSHATokenHasher()
-		authMidd    = authenSvc.NewJWTAuthenticator(tokenSvc, sessionRepo)
+		authMidd    = authenSvc.NewJWTAuthenticator(
+			tokenSvc,
+			sessionRepo,
+		)
 
-		actorSvc   = authorSvc.NewActorService(accountRepo, merchantRepo)
-		authorMdwr = authorSvc.NewAuthorizer(actorSvc)
+		actorSvc = authorSvc.NewActorService(
+			accountRepo,
+			merchantRepo,
+			membershipRepo,
+		)
+		authorMdwr = authorSvc.NewAuthorizer(
+			actorSvc,
+		)
 	)
 
 	var (
@@ -195,6 +212,36 @@ func NewContainer(cfg Config,
 				infra.TransactionProvider,
 				infra.TransactionExecutor,
 			),
+		LoginMerchant: *authenUsecase.
+			NewLoginMerchantUsecase(
+				accountRepo,
+				pwHasher,
+				tokenHasher,
+				tokenSvc,
+				sessionRepo,
+				refreshTokenRepo,
+				merchantRepo,
+				membershipRepo,
+				infra.TransactionProvider,
+				infra.TransactionExecutor,
+			),
+
+		CreateMerchant: *merchantUsecase.
+			NewCreateMerchantUsecase(
+				merchantRepo,
+				infra.TransactionExecutor,
+			),
+		AddMerchantAccount: *merchantUsecase.
+			NewAddMerchantAccountUsecase(
+				accountRepo,
+				pwHasher,
+				userRepo,
+				membershipRepo,
+				roleRepo,
+				infra.TransactionProvider,
+				infra.TransactionExecutor,
+			),
+
 		RegisterCustomer: *authenUsecase.
 			NewRegisterCustomerUsecase(
 				accountRepo,

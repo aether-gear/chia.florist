@@ -2,15 +2,11 @@ package persistence
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"service-core/internal/modules/merchant/domain"
 	"service-core/internal/modules/merchant/repository"
 	transaction "service-core/internal/shared/transaction"
-
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 type merchantRepositoryImpl struct{}
@@ -19,37 +15,33 @@ func NewMerchantRepositoryImpl() repository.MerchantRepository {
 	return &merchantRepositoryImpl{}
 }
 
-func (r *merchantRepositoryImpl) GetByAccountID(
+func (r *merchantRepositoryImpl) Create(
 	ctx context.Context,
 	exec transaction.Executor,
-	accountID uuid.UUID,
-) (*domain.Merchant, error) {
+	merchant domain.Merchant,
+) error {
 	query := `
-		SELECT
+		INSERT INTO merchants (
 			id,
-			account_id,
-			created_at,
-			updated_at
-		FROM
-			merchants
-		WHERE
-			account_id = $1 AND deleted_at IS NOT NULL
-		LIMIT 1
+			name,
+			description,
+			logo_url,
+			banner_url,
+			created_at
+		) VALUES ($1,$2,$3,$4,$5,$6)
 	`
 
-	var merchant domain.Merchant
-	err := exec.QueryRow(ctx, query, accountID).Scan(
-		&merchant.ID,
-		&merchant.AccountID,
-		&merchant.CreatedAt,
-		&merchant.UpdatedAt,
+	_, err := exec.Exec(ctx, query,
+		merchant.ID,
+		merchant.Name,
+		merchant.Description,
+		merchant.LogoUrl,
+		merchant.BannerUrl,
+		merchant.CreatedAt,
 	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("query merchant by account id failed: %w", err)
-	}
 
-	return &merchant, nil
+	if err != nil {
+		return fmt.Errorf("insert merchant failed: %w", err)
+	}
+	return nil
 }

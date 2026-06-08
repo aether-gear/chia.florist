@@ -1,7 +1,11 @@
 CREATE TABLE merchants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    account_id UUID NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+	description TEXT,
+
+	logo_url TEXT,
+	banner_url TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,

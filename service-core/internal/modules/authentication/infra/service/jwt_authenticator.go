@@ -31,10 +31,11 @@ func NewJWTAuthenticator(
 
 func (aM *jwtAuthenticator) RequireAuth(
 	exec transaction.Executor,
+	cookie string,
 ) commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
-			token, err := appcookie.CookieValue(r, appcookie.AccessTokenCookieName)
+			token, err := appcookie.CookieValue(r, cookie)
 			if err != nil {
 				return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
 			}
@@ -47,7 +48,11 @@ func (aM *jwtAuthenticator) RequireAuth(
 				return apperrors.NewUnauthorized(domain.ErrInvalidToken.Error())
 			}
 
-			session, err := aM.sessionRepo.GetByID(r.Context(), exec, claims.SessionID)
+			session, err := aM.sessionRepo.GetByID(
+				r.Context(),
+				exec,
+				claims.SessionID,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to load session: %w", err)
 			}
@@ -63,6 +68,8 @@ func (aM *jwtAuthenticator) RequireAuth(
 				SessionID:       claims.SessionID,
 				TokenType:       claims.Type,
 				IsAuthenticated: true,
+				MerchantID:      claims.MerchantID,
+				Roles:           claims.Roles,
 			}
 
 			r = r.WithContext(domain.WithAuthContext(r.Context(), &authCtx))

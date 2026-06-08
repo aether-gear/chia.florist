@@ -14,10 +14,13 @@ const (
 )
 
 type TokenClaims struct {
-	UserID    uuid.UUID
-	SessionID uuid.UUID
+	UserID     uuid.UUID
+	SessionID  uuid.UUID
+	MerchantID *uuid.UUID
 
 	Type TokenType
+
+	Roles []string
 
 	IssuedAt  time.Time
 	ExpiresAt time.Time
