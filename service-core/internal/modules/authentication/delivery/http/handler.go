@@ -15,6 +15,7 @@ import (
 
 type authHandler struct {
 	loginCustomer    *usecase.LoginCustomerUsecase
+	loginMerchant    *usecase.LoginMerchantUsecase
 	registerCustomer *usecase.RegisterCustomerUsecase
 	verifyAccount    *usecase.VerifyAccountUsecase
 	getAccount       *usecase.GetAccountUsecase
@@ -22,12 +23,14 @@ type authHandler struct {
 
 func NewAuthHandler(
 	loginCustomer *usecase.LoginCustomerUsecase,
+	loginMerchant *usecase.LoginMerchantUsecase,
 	registerCustomer *usecase.RegisterCustomerUsecase,
 	verifyAccount *usecase.VerifyAccountUsecase,
 	getAccount *usecase.GetAccountUsecase,
 ) *authHandler {
 	return &authHandler{
 		loginCustomer:    loginCustomer,
+		loginMerchant:    loginMerchant,
 		registerCustomer: registerCustomer,
 		verifyAccount:    verifyAccount,
 		getAccount:       getAccount,
@@ -186,5 +189,49 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)
+	return nil
+}
+
+func (h *authHandler) SignInMerchantEmail(w http.ResponseWriter, r *http.Request) error {
+	var req signInEmailRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+
+	if req.Email == "" {
+		return apperrors.NewBadRequest("invalid email")
+	}
+	if req.Password == "" {
+		return apperrors.NewBadRequest("invalid password")
+	}
+
+	input := usecase.LoginMerchantParams{
+		UserAgent: req.UserAgent,
+		IPAddress: req.IPAddress,
+		Email:     req.Email,
+		Password:  req.Password,
+	}
+
+	tokens, err := h.loginMerchant.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     appcookie.AccessTokenMerchantCookieName,
+		Value:    tokens.AccessToken.Token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  tokens.AccessToken.ExpiresAt,
+	})
+
+	response := map[string]string{
+		"message": "login success",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }

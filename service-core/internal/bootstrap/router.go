@@ -4,10 +4,12 @@ import (
 	"net/http"
 
 	apphttp "service-core/internal/common/http"
+	appcookie "service-core/internal/common/http/cookie"
 	applogger "service-core/internal/common/logger"
 	appmiddleware "service-core/internal/common/middleware"
 
 	authendomain "service-core/internal/modules/authentication/domain"
+	authorzDomain "service-core/internal/modules/authorization/domain"
 
 	addressH "service-core/internal/modules/address/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
@@ -15,6 +17,7 @@ import (
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
 	locationH "service-core/internal/modules/location/delivery/http"
+	merchantH "service-core/internal/modules/merchant/delivery/http"
 	paymentH "service-core/internal/modules/payment/delivery/http"
 	productH "service-core/internal/modules/product/delivery/http"
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
@@ -35,14 +38,31 @@ func NewRouter(c *Container) *chi.Mux {
 		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.Authenticator.RequireAuth(c.DBExecutor),
+			c.Authenticator.RequireAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenCookieName,
+			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
+		)
+		merchantAdminOnly = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.Authenticator.RequireAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenMerchantCookieName,
+			),
+			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
+			c.Authorizer.RequireMerchantRole(authorzDomain.RoleMerchantAdmin),
 		)
 		customerOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
-			c.Authenticator.RequireAuth(c.DBExecutor),
+			c.Authenticator.RequireAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenCookieName,
+			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
 		)
@@ -62,9 +82,15 @@ func NewRouter(c *Container) *chi.Mux {
 
 		authHandler = authH.NewAuthHandler(
 			&c.LoginCustomer,
+			&c.LoginMerchant,
 			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
+		)
+
+		merchantHandler = merchantH.NewMerchantHandler(
+			&c.AddMerchantAccount,
+			&c.CreateMerchant,
 		)
 
 		cartHandler = cartH.NewCartHandler(
@@ -124,8 +150,16 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/signin", core(authHandler.SignInEmail))
+			r.Post("/merchant/signin", core(authHandler.SignInMerchantEmail))
 			r.Post("/signup", core(authHandler.SignUpAccount))
 			r.Post("/verify", core(authHandler.VerifyAccount))
+		})
+
+		r.Route("/merchants", func(r chi.Router) {
+			r.Post("/", merchantAdminOnly(merchantHandler.CreateMerchant))
+			r.Route("/{merchantID}/accounts", func(r chi.Router) {
+				r.Post("/", merchantAdminOnly(merchantHandler.AddMerchantAccount))
+			})
 		})
 
 		r.Route("/carts", func(r chi.Router) {

@@ -1,5 +1,6 @@
 package appcookie
 
 const (
-	AccessTokenCookieName = "chast"
+	AccessTokenCookieName         = "chast"
+	AccessTokenMerchantCookieName = "hotpot"
 )

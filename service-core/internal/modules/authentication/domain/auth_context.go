@@ -14,12 +14,13 @@ type AuthContext struct {
 	UserID    uuid.UUID
 	SessionID uuid.UUID
 
+	MerchantID *uuid.UUID
+
 	TokenType TokenType
 
 	IsAuthenticated bool
 
-	// Roles       []string
-	// Permissions []string
+	Roles []string
 }
 
 func WithAuthContext(ctx context.Context, authCtx *AuthContext) context.Context {

@@ -51,6 +51,7 @@ type ActorService interface {
 		ctx context.Context,
 		exec transaction.Executor,
 		userID uuid.UUID,
+		merchantID uuid.UUID,
 	) (*domain.Actor, error)
 }
 
@@ -59,4 +60,5 @@ type Authorizer interface {
 		exec transaction.Executor,
 	) appmiddleware.Middleware
 	RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware
+	RequireMerchantRole(allowedRoles ...string) appmiddleware.Middleware
 }

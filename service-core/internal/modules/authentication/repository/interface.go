@@ -106,5 +106,6 @@ type TokenHasher interface {
 type Authenticator interface {
 	RequireAuth(
 		exec transaction.Executor,
+		cookie string,
 	) appmiddleware.Middleware
 }

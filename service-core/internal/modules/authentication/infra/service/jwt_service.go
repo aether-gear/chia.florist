@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"service-core/internal/modules/authentication/domain"
@@ -22,9 +23,11 @@ func NewJWTService(secret string) repository.TokenService {
 }
 
 type jwtClaims struct {
-	UserID    string `json:"user_id"`
-	SessionID string `json:"session_id"`
-	Type      string `json:"type"`
+	UserID     string `json:"user_id"`
+	SessionID  string `json:"session_id"`
+	Type       string `json:"type"`
+	MerchantID string `json:"merchant_id,omitempty"`
+	Role       string `json:"roles,omitempty"` // comma-separated
 
 	jwt.RegisteredClaims
 }
@@ -33,10 +36,19 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 	now := time.Now()
 	exp := now.Add(params.Duration)
 
+	merchantIDStr := ""
+	if params.MerchantID != nil {
+		merchantIDStr = params.MerchantID.String()
+	}
+
+	rolesStr := strings.Join(params.Roles, ",")
+
 	claims := jwtClaims{
-		UserID:    params.UserID.String(),
-		SessionID: params.SessionID.String(),
-		Type:      string(params.Type),
+		UserID:     params.UserID.String(),
+		SessionID:  params.SessionID.String(),
+		Type:       string(params.Type),
+		MerchantID: merchantIDStr,
+		Role:       rolesStr,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(exp),
@@ -96,11 +108,24 @@ func (j *JWTService) Validate(tokenStr string) (*domain.TokenClaims, error) {
 		return nil, fmt.Errorf("invalid session id claim: %w", err)
 	}
 
-	return &domain.TokenClaims{
+	tknClaim := &domain.TokenClaims{
 		UserID:    userID,
 		SessionID: sessionID,
 		Type:      domain.TokenType(claims.Type),
 		IssuedAt:  claims.IssuedAt.Time,
 		ExpiresAt: claims.ExpiresAt.Time,
-	}, nil
+	}
+
+	if claims.MerchantID != "" {
+		mid, err := uuid.Parse(claims.MerchantID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid merchant_id claim: %w", err)
+		}
+		tknClaim.MerchantID = &mid
+	}
+	if claims.Role != "" {
+		tknClaim.Roles = strings.Split(claims.Role, ",")
+	}
+
+	return tknClaim, nil
 }
