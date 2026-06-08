@@ -10,6 +10,42 @@ import (
 	"github.com/google/uuid"
 )
 
+type MerchantMembershipRepository interface {
+	GetByAccountID(
+		ctx context.Context,
+		exec transaction.Executor,
+		accountID uuid.UUID,
+	) (*domain.MerchantMembership, error)
+
+	GetByAccountIDAndMerchantID(
+		ctx context.Context,
+		exec transaction.Executor,
+		accountID uuid.UUID,
+		merchantID uuid.UUID,
+	) (*domain.MerchantMembership, error)
+
+	ListRolesByAccountIDAndMerchantID(
+		ctx context.Context,
+		exec transaction.Executor,
+		accountID uuid.UUID,
+		merchantID uuid.UUID,
+	) ([]domain.Role, error)
+
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		membership domain.MerchantMembership,
+	) error
+}
+
+type RoleRepository interface {
+	GetByCode(
+		ctx context.Context,
+		exec transaction.Executor,
+		code string,
+	) (*domain.Role, error)
+}
+
 type ActorService interface {
 	Load(
 		ctx context.Context,
