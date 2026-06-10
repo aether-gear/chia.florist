@@ -43,6 +43,7 @@ type WAFRule struct {
 	Pattern     string   `json:"pattern"`
 	Tags        []string `json:"tags,omitempty"`
 	Impact      string   `json:"impact,omitempty"`
+	Enabled     bool     `json:"enabled"`
 }
 
 type IPRecord struct {
@@ -208,6 +209,63 @@ func removeString(slice []string, s string) []string {
 	return result
 }
 
+// --- Rate Limiting ---
+type IPRateLimit struct {
+	Count        int
+	LastReset    time.Time
+	BlockedUntil time.Time
+}
+
+var (
+	rateLimits = make(map[string]*IPRateLimit)
+	rateMutex  sync.Mutex
+)
+
+func isRateLimited(ip string) bool {
+	rateMutex.Lock()
+	defer rateMutex.Unlock()
+
+	now := time.Now()
+	limiter, exists := rateLimits[ip]
+	if !exists {
+		rateLimits[ip] = &IPRateLimit{
+			Count:     1,
+			LastReset: now,
+		}
+		return false
+	}
+
+	// Check if already temporarily blocked
+	if now.Before(limiter.BlockedUntil) {
+		return true
+	}
+
+	// If 1 second has passed, reset count
+	if now.Sub(limiter.LastReset) > time.Second {
+		limiter.Count = 1
+		limiter.LastReset = now
+		return false
+	}
+
+	limiter.Count++
+	if limiter.Count > 50 {
+		// Temporary block for 10 seconds
+		limiter.BlockedUntil = now.Add(10 * time.Second)
+		return true
+	}
+
+	return false
+}
+
+func autoBanIP(ip, reason string) {
+	ipMutex.Lock()
+	defer ipMutex.Unlock()
+	if _, exists := blockedIPs[ip]; !exists {
+		blockedIPs[ip] = "Auto-Banned: " + reason
+		saveIPConfig()
+	}
+}
+
 // --- WAF Middleware ---
 func WAFMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +288,15 @@ func WAFMiddleware(next http.Handler) http.Handler {
 			}
 			logRequest(r, "Blocked", reasonStr, "", "N/A")
 			http.Error(w, "403 Forbidden - IP Banned manually", http.StatusForbidden)
+			return
+		}
+
+		// Rate Limiting Check
+		if isRateLimited(ip) {
+			logRequest(r, "Blocked", "Rate Limit Exceeded (>50 req/sec)", "RATELIMIT", "Rate Limiter Block")
+			fmt.Printf("[WAF] RATE LIMIT BLOCKED %s\n", ip)
+			autoBanIP(ip, "Rate Limit Exceeded (>50 req/sec)")
+			http.Error(w, "429 Too Many Requests - Rate Limit Exceeded", http.StatusTooManyRequests)
 			return
 		}
 
@@ -268,6 +335,7 @@ func WAFMiddleware(next http.Handler) http.Handler {
 			if strings.Contains(lowerPayload, strings.ToLower(kw)) {
 				logRequest(r, "Blocked", "Blocked by Keyword: "+kw, "KW-BLOCK", "Keyword Exact Match")
 				fmt.Printf("[WAF] KEYWORD BLOCKED '%s' from %s\n", kw, ip)
+				autoBanIP(ip, "Malicious Keyword: "+kw)
 				http.Error(w, "403 Forbidden - WAF Keyword Match", http.StatusForbidden)
 				return
 			}
@@ -278,10 +346,14 @@ func WAFMiddleware(next http.Handler) http.Handler {
 		rulesMutex.RUnlock()
 
 		for _, rule := range localRules {
+			if !rule.Enabled {
+				continue
+			}
 			match, _ := regexp.MatchString(rule.Pattern, payload)
 			if match {
 				logRequest(r, "Blocked", "Matched Rule: "+rule.Description, rule.ID, rule.Description)
 				fmt.Printf("[WAF] BLOCKED %s from %s\n", rule.Description, ip)
+				autoBanIP(ip, "Rule Violation: "+rule.ID)
 				http.Error(w, "403 Forbidden - WAF Blocked Request", http.StatusForbidden)
 				return
 			}
@@ -413,11 +485,43 @@ func handleRules(w http.ResponseWriter, r *http.Request) {
 		rulesMutex.Lock()
 		// Auto ID
 		newRule.ID = fmt.Sprintf("%d", len(rules)+1000)
+		newRule.Enabled = true // Default to enabled
 		rules = append(rules, newRule)
 		rulesMutex.Unlock()
 
 		saveRules()
 		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method == http.MethodPut {
+		var req struct {
+			ID      string `json:"id"`
+			Enabled bool   `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		rulesMutex.Lock()
+		found := false
+		for i := range rules {
+			if rules[i].ID == req.ID {
+				rules[i].Enabled = req.Enabled
+				found = true
+				break
+			}
+		}
+		rulesMutex.Unlock()
+
+		if found {
+			saveRules()
+			w.WriteHeader(http.StatusOK)
+		} else {
+			http.Error(w, "Rule not found", http.StatusNotFound)
+		}
+		return
 	}
 }
 
