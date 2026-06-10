@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useCart } from '~/composables/useCart'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 
 useHead({ title: 'My Profile - Chia Florist' })
+
+const authVm = useAuthViewModel()
 
 const activeTab = ref('personal')
 // State untuk menyaring 4 status pesanan
@@ -10,19 +13,34 @@ const activeOrderStatus = ref<'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulas
 
 // Memisahkan data user secara reaktif yang bersih
 const user = ref({
-  name: 'Rayhan Shidqi',
-  email: 'rayhan.shidqi@gmail.com',
-  phone: '+62 812 3456 7890',
+  name: 'Loading...',
+  email: 'Loading...',
+  phone: 'Loading...',
   address: 'Jl. Melati No. 12, Jakarta Timur'
+})
+
+// Sync profile data from ViewModel
+watch(() => authVm.currentUser.value, (me) => {
+  if (me) {
+    user.value.name = me.name || ''
+    user.value.email = me.email || ''
+    user.value.phone = me.phone || ''
+  }
+}, { immediate: true })
+
+onMounted(async () => {
+  await authVm.fetchCurrentUser()
+  if (!authVm.isAuthenticated.value) {
+    navigateTo('/login')
+  }
 })
 
 // Ambil data orders global dari composable
 const { orders } = useCart()
 
 // Menyediakan fungsi logout lokal
-const handleLogout = () => {
-  window.alert('Logging out...')
-  navigateTo('/login')
+const handleLogout = async () => {
+  await authVm.logout()
 }
 
 // Memfilter pesanan yang ditampilkan berdasarkan sub-tab status yang aktif

@@ -1,36 +1,108 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 
-useHead({ title: 'Login - Chia Florist' })
+useHead({ 
+  title: 'Sign In - Chia Florist',
+  meta: [
+    { name: 'description', content: 'Sign in or verify your account to access your Chia Florist profile.' }
+  ]
+})
 
-const nameOrEmail = ref('')
+const route = useRoute()
+const authVm = useAuthViewModel()
+const activePanel = ref<'login' | 'verify'>('login')
+const email = ref('')
 const password = ref('')
-const isSubmitting = ref(false)
+const otpCode = ref('')
 const errorMessage = ref('')
 
+// Load values from viewModel if they exist (e.g. from localStorage)
+const registrationEmail = computed(() => authVm.registrationEmail.value)
+
+onMounted(() => {
+  // If route query verify=true, automatically slide to verify on mount
+  if (route.query.verify === 'true' || route.query.verify === '1') {
+    // If registrationEmail exists, pre-fill email field
+    if (authVm.registrationEmail.value) {
+      email.value = authVm.registrationEmail.value
+    }
+    
+    // Smooth entrance slide
+    setTimeout(() => {
+      activePanel.value = 'verify'
+    }, 400)
+  }
+})
+
 const handleLogin = async () => {
-  if (!nameOrEmail.value || !password.value) {
+  if (!email.value || !password.value) {
     errorMessage.value = 'Please fill in all fields.'
     return
   }
-
-  isSubmitting.value = true
   errorMessage.value = ''
+  
+  try {
+    const success = await authVm.login({
+      email: email.value,
+      password: password.value
+    })
+    
+    if (success) {
+      navigateTo('/profile')
+    }
+  } catch (err: any) {
+    // Handle 403 unverified case
+    if (err.status === 403 && err.data?.message === 'email not verified') {
+      // Store current email to display
+      if (import.meta.client) {
+        localStorage.setItem('register_email', email.value)
+      }
+      
+      // Check if we have challenge ID saved locally
+      const savedChallenge = import.meta.client ? localStorage.getItem('auth_challenge_id') : null
+      if (savedChallenge) {
+        errorMessage.value = 'Email not verified. Sliding to verification...'
+        setTimeout(() => {
+          errorMessage.value = ''
+          activePanel.value = 'verify'
+        }, 1200)
+      } else {
+        errorMessage.value = 'Account is not verified yet. Please register again to get a verification code.'
+      }
+    } else {
+      errorMessage.value = err.data?.message || 'Login failed. Please check your credentials.'
+    }
+  }
+}
 
-  // =========================================================
-  // 🛠️ TRIK BYPASS INSTAN: Langsung lempar ke halaman OTP
-  // =========================================================
-  localStorage.setItem('register_email', nameOrEmail.value)
-  navigateTo('/verify')
-  return 
-  // =========================================================
+const handleVerify = async () => {
+  if (!otpCode.value || otpCode.value.length !== 6) {
+    errorMessage.value = 'Please enter a valid 6-digit verification code.'
+    return
+  }
+  errorMessage.value = ''
+  try {
+    const success = await authVm.verifyOtp(parseInt(otpCode.value))
+    if (success) {
+      navigateTo('/profile')
+    }
+  } catch (err: any) {
+    errorMessage.value = err.data?.message || 'Verification failed. Please try again.'
+  }
+}
+
+const handleBackToLogin = () => {
+  errorMessage.value = ''
+  activePanel.value = 'login'
 }
 </script>
-
 <template>
   <div class="max-w-7xl mx-auto px-8 py-20 mt-10 min-h-[80vh] flex items-center">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center w-full">
       
+      <!-- Left image section -->
       <div class="hidden md:block h-[600px]">
         <img 
           src="/images/florist.jpg"
@@ -38,67 +110,139 @@ const handleLogin = async () => {
           class="w-full h-full object-cover rounded-xl shadow-sm"
         />
       </div>
-
-      <div class="max-w-md w-full mx-auto space-y-8">
-        <div>
-          <h1 class="text-4xl font-medium tracking-tight mb-2">Welcome to Chia Florist</h1>
-          <p class="text-gray-600">Enter your details below</p>
+      <!-- Right sliding auth panels container -->
+      <div class="max-w-md w-full mx-auto overflow-hidden relative py-4">
+        
+        <!-- Error Alerts -->
+        <div 
+          v-if="errorMessage" 
+          class="mb-6 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-4 py-3 rounded-xl flex items-center gap-2 animate-shake"
+        >
+          <span>⚠️</span>
+          <p class="flex-1 leading-normal">{{ errorMessage }}</p>
         </div>
-
-        <form @submit.prevent="handleLogin" class="space-y-6">
+        <div 
+          class="flex transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          :style="{ transform: activePanel === 'login' ? 'translateX(0%)' : 'translateX(-50%)', width: '200%' }"
+        >
           
-          <div v-if="errorMessage" class="bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-4 py-3 rounded-xl">
-            ⚠️ {{ errorMessage }}
+          <!-- PANEL 1: LOGIN -->
+          <div class="w-1/2 pr-6 space-y-8 flex-shrink-0">
+            <div>
+              <h1 class="text-4xl font-medium tracking-tight mb-2">Welcome to Chia Florist</h1>
+              <p class="text-gray-600">Enter your details below</p>
+            </div>
+            <form @submit.prevent="handleLogin" class="space-y-6">
+              <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
+                <input 
+                  type="email" 
+                  v-model="email"
+                  placeholder="Email" 
+                  class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
+                  :disabled="authVm.isLoading.value"
+                  required
+                />
+              </div>
+              <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
+                <input 
+                  type="password" 
+                  v-model="password"
+                  placeholder="Password" 
+                  class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
+                  :disabled="authVm.isLoading.value"
+                  required
+                />
+              </div>
+              <div class="pt-4 space-y-4">
+                <button
+                  type="submit"
+                  class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] disabled:bg-gray-300 transition-all shadow-md cursor-pointer flex items-center justify-center"
+                  :disabled="authVm.isLoading.value"
+                >
+                  <span v-if="authVm.isLoading.value" class="animate-pulse">Logging in...</span>
+                  <span v-else>Login</span>
+                </button>
+                <button 
+                  type="button" 
+                  class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all cursor-pointer"
+                >
+                  <img src="/images/google.png" class="w-5 h-5" alt="Google Icon" />
+                  Login with Google
+                </button>
+              </div>
+            </form>
+            <div class="text-center pt-4 text-gray-600">
+              Not registered yet? 
+              <NuxtLink to="/register" class="font-medium text-black border-b border-gray-500 pb-0.5 ml-2 hover:text-[#1b4332] transition-colors">
+                Sign up
+              </NuxtLink>
+            </div>
           </div>
-
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
-            <input 
-              type="text" 
-              v-model="nameOrEmail"
-              placeholder="Email" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
-              :disabled="isSubmitting"
-            />
+          <!-- PANEL 2: VERIFICATION -->
+          <div class="w-1/2 pl-6 space-y-8 flex-shrink-0">
+            <div class="flex flex-col items-center text-center">
+              <div class="w-14 h-14 bg-[#1b4332] rounded-2xl flex items-center justify-center text-white text-2xl shadow-md mb-5 font-bold tracking-tighter">
+                CF
+              </div>
+              <h2 class="text-xl font-bold text-gray-900 tracking-tight">
+                Verify Your Account
+              </h2>
+              <p class="text-xs text-gray-400 mt-2 max-w-xs leading-relaxed">
+                We have sent a secure verification code to <br/>
+                <span class="text-gray-700 font-semibold break-all">{{ registrationEmail || email || 'your email' }}</span>
+              </p>
+            </div>
+            <form @submit.prevent="handleVerify" class="space-y-6">
+              <div class="space-y-2">
+                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 block text-center">
+                  Enter Verification Code
+                </label>
+                <input 
+                  type="text" 
+                  v-model="otpCode"
+                  placeholder="000000"
+                  maxlength="6"
+                  class="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-center text-xl font-mono tracking-[0.5em] indent-[0.25em] outline-none focus:bg-white focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/5 transition-all"
+                  :disabled="authVm.isLoading.value"
+                  required
+                />
+              </div>
+              <div class="grid grid-cols-2 gap-4 pt-2">
+                <button 
+                  type="button"
+                  @click="handleBackToLogin"
+                  class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all outline-none cursor-pointer"
+                  :disabled="authVm.isLoading.value"
+                >
+                  Back
+                </button>
+                
+                <button 
+                  type="submit"
+                  class="w-full py-3 bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white text-xs font-bold rounded-xl shadow-sm transition-all outline-none flex items-center justify-center cursor-pointer"
+                  :disabled="authVm.isLoading.value"
+                >
+                  <span v-if="authVm.isLoading.value" class="animate-pulse">Verifying...</span>
+                  <span v-else>Confirm</span>
+                </button>
+              </div>
+            </form>
+            
+            <div class="text-center text-xs text-gray-400 leading-relaxed max-w-xs mx-auto">
+              By confirming, you verify ownership. Codes expire shortly and rate limits apply.
+            </div>
           </div>
-
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
-            <input 
-              type="password" 
-              v-model="password"
-              placeholder="Password" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
-              :disabled="isSubmitting"
-            />
-          </div>
-
-          <div class="pt-4 space-y-4">
-            <button
-              type="submit"
-              class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] disabled:bg-gray-300 transition-all shadow-md cursor-pointer flex items-center justify-center"
-              :disabled="isSubmitting"
-            >
-              <span>Login</span>
-            </button>
-
-            <button 
-              type="button" 
-              class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all cursor-pointer"
-            >
-              <img src="/images/google.png" class="w-5 h-5" alt="Google Icon" />
-              Login with Google
-            </button>
-          </div>
-        </form>
-
-        <div class="text-center pt-4 text-gray-600">
-          Not registered yet? 
-          <NuxtLink to="/register" class="font-medium text-black border-b border-gray-500 pb-0.5 ml-2 hover:text-[#1b4332] transition-colors">
-            Sign in
-          </NuxtLink>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped></style>
+<style scoped>
+/* Shake animation for errors */
+.animate-shake { animation: shake 0.3s ease-in-out; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+</style>
