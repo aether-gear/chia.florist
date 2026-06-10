@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Orders', href: '/orders', icon: FileText },
   { name: 'Transactions', href: '/transactions', icon: Activity },
   { name: 'Shipments', href: '/shipments', icon: Truck },
+  { name: 'Profile Settings', href: '/merchant/settings', icon: Settings },
 ];
 
 export default function DashboardLayout() {

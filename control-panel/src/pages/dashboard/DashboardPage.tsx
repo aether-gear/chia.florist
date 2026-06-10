@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,14 @@ import { getWafSummary, getRecentLogs } from '@/data/wafData';
 
 export default function DashboardPage() {
   const wafSummary = getWafSummary();
-  const recentLogs = getRecentLogs(5);
+  const [logCount, setLogCount] = useState(5);
+  const [logStatus, setLogStatus] = useState('All');
+
+  const allRecentLogs = getRecentLogs(500);
+  const recentLogs = allRecentLogs.filter(log => {
+    if (logStatus === 'All') return true;
+    return log.status === logStatus;
+  }).slice(0, logCount);
 
   return (
     <div className="space-y-6">
@@ -112,9 +120,32 @@ export default function DashboardPage() {
 
       {/* WAF Logs Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent WAF Logs</CardTitle>
-          <CardDescription>Latest traffic evaluated by the Web Application Firewall.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Recent WAF Logs</CardTitle>
+            <CardDescription>Latest traffic evaluated by the Web Application Firewall.</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <select
+              className="h-9 w-28 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+              value={logStatus}
+              onChange={(e) => setLogStatus(e.target.value)}
+            >
+              <option value="All">All Status</option>
+              <option value="Allowed">Allowed</option>
+              <option value="Blocked">Blocked</option>
+            </select>
+            <select
+              className="h-9 w-20 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+              value={logCount}
+              onChange={(e) => setLogCount(Number(e.target.value))}
+            >
+              <option value={5}>5 Rows</option>
+              <option value={10}>10 Rows</option>
+              <option value={20}>20 Rows</option>
+              <option value={50}>50 Rows</option>
+            </select>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
