@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 useHead({ title: 'Redirecting to Verification - Chia Florist' })
 onMounted(() => {
-  navigateTo('/login?verify=true')
+  navigateTo('/register?verify=true')
 })
 </script>
 
