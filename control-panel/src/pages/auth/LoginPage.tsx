@@ -2,19 +2,38 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import { fetchApi } from '@/lib/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(email, password);
-    // Mock login, just redirect to dashboard
-    navigate('/');
+    setError(null);
+    setLoading(true);
+
+    try {
+      await fetchApi('/auth/merchant/signin', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          password,
+          user_agent: navigator.userAgent,
+          ip_address: '127.0.0.1' // In a real app, backend determines this or use a 3rd party service
+        })
+      });
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,8 +79,13 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)} 
               />
             </div>
-            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
-              Sign In
+              {error && (
+                <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+                  {error}
+                </div>
+              )}
+            <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
             </Button>
           </form>
         </CardContent>
