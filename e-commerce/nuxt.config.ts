@@ -15,7 +15,15 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      serviceCoreApiUrl: process.env.SERVICE_CORE_API_URL || 'http://192.168.1.50:7129'
+      serviceCoreApiUrl: process.env.SERVICE_CORE_API_URL || 'http://127.0.0.1:7129'
+    }
+  },
+
+  // Proxy all /api/core/** requests to the Go backend so the browser
+  // never makes a cross-origin call (eliminates CORS preflight entirely).
+  routeRules: {
+    '/api/core/**': {
+      proxy: `${process.env.SERVICE_CORE_API_URL || 'http://127.0.0.1:7129'}/**`
     }
   },
 
