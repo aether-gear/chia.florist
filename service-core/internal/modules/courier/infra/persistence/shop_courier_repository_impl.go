@@ -3,31 +3,25 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"time"
-
-	database "service-core/internal/infra/db"
 
 	"service-core/internal/modules/courier/domain"
 	"service-core/internal/modules/courier/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type shopCourierRepositoryImpl struct {
-	db *pgxpool.Pool
+type shopCourierRepositoryImpl struct{}
+
+func NewShopCourierRepositoryImpl() repository.ShopCourierRepository {
+	return &shopCourierRepositoryImpl{}
 }
 
-func NewShopCourierRepositoryImpl(conn *database.Connection) repository.ShopCourierRepository {
-	return &shopCourierRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *shopCourierRepositoryImpl) GetByShopID(shopID uuid.UUID) ([]domain.ShopCourier, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopCourierRepositoryImpl) GetByShopID(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
+) ([]domain.ShopCourier, error) {
 	query := `
 		SELECT
 			shop_id,
@@ -37,7 +31,7 @@ func (r *shopCourierRepositoryImpl) GetByShopID(shopID uuid.UUID) ([]domain.Shop
 		WHERE shop_id = $1
 	`
 
-	rows, err := r.db.Query(ctx, query, shopID)
+	rows, err := exec.Query(ctx, query, shopID)
 	if err != nil {
 		return nil, fmt.Errorf("query shop courier by shop id failed: %w", err)
 	}
@@ -67,10 +61,11 @@ func (r *shopCourierRepositoryImpl) GetByShopID(shopID uuid.UUID) ([]domain.Shop
 	return shopCouriers, nil
 }
 
-func (r *shopCourierRepositoryImpl) SaveShopCouriers(shopCouriers []domain.ShopCourier) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *shopCourierRepositoryImpl) SaveShopCouriers(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopCouriers []domain.ShopCourier,
+) error {
 	if len(shopCouriers) == 0 {
 		return nil
 	}
@@ -102,9 +97,7 @@ func (r *shopCourierRepositoryImpl) SaveShopCouriers(shopCouriers []domain.ShopC
 			active = EXCLUDED.active
 	`
 
-	_, err := r.db.Exec(
-		ctx,
-		query,
+	_, err := exec.Exec(ctx, query,
 		shopIDs,
 		codes,
 		actives,

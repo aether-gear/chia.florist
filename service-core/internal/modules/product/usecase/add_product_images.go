@@ -2,14 +2,16 @@ package usecase
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"time"
 
-	"service-core/internal/infra/storage"
+	storage "service-core/internal/infra/storage"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
-	"service-core/internal/shared/image"
-	"service-core/internal/shared/slug"
+	image "service-core/internal/shared/image"
+	slug "service-core/internal/shared/slug"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -26,6 +28,8 @@ type AddProductImagesUsecase struct {
 	slugGen        slug.Generator
 	resolutionGen  image.VariantCreator
 	fileStore      storage.Provider
+	transactor     transaction.Transactor
+	executor       transaction.Executor
 }
 
 func NewAddProductImagesUsecase(
@@ -34,6 +38,8 @@ func NewAddProductImagesUsecase(
 	slugGen slug.Generator,
 	resolutionGen image.VariantCreator,
 	fileStore storage.Provider,
+	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *AddProductImagesUsecase {
 	return &AddProductImagesUsecase{
 		productRepo:    productRepo,
@@ -41,6 +47,8 @@ func NewAddProductImagesUsecase(
 		slugGen:        slugGen,
 		resolutionGen:  resolutionGen,
 		fileStore:      fileStore,
+		transactor:     transactor,
+		executor:       executor,
 	}
 }
 
@@ -63,8 +71,11 @@ type productToVariants struct {
 	variantType image.ResolutionType
 }
 
-func (u *AddProductImagesUsecase) Execute(input AddProductImageInput) error {
-	product, err := u.productRepo.GetByID(input.ProductID)
+func (u *AddProductImagesUsecase) Execute(
+	ctx context.Context,
+	input AddProductImageInput,
+) error {
+	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to get product: %w", err)
 	}
@@ -177,9 +188,16 @@ func (u *AddProductImagesUsecase) Execute(input AddProductImageInput) error {
 			}
 	}
 
-	if err := u.productImgRepo.Create(productImages); err != nil {
-		return fmt.Errorf("failed to save product image: %w", err)
-	}
+	err = u.transactor.WithinTransaction(
+		ctx,
+		func(exec transaction.Executor) error {
+			if err := u.productImgRepo.Create(ctx, exec, productImages); err != nil {
+				return fmt.Errorf("failed to save product image: %w", err)
+			}
+
+			return nil
+		},
+	)
 
 	return nil
 }

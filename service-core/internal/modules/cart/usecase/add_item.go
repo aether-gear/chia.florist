@@ -1,89 +1,118 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/cart/domain"
-	cartR "service-core/internal/modules/cart/repository"
-	inventoryR "service-core/internal/modules/inventory/repository"
-	productR "service-core/internal/modules/product/repository"
+	"service-core/internal/modules/cart/repository"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
+	productRepo "service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type AddItemUsecase struct {
-	cartRepo      cartR.CartRepository
-	inventoryRepo inventoryR.InventoryRepository
-	productRepo   productR.ProductRepository
+	cartRepo      repository.CartRepository
+	inventoryRepo inventoryRepo.InventoryRepository
+	productRepo   productRepo.ProductRepository
+	transactor    transaction.Transactor
+	executor      transaction.Executor
 }
 
 func NewAddItemUsecase(
-	cartRepo cartR.CartRepository,
-	inventoryRepo inventoryR.InventoryRepository,
-	productRepo productR.ProductRepository,
+	cartRepo repository.CartRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
+	productRepo productRepo.ProductRepository,
+	transactor transaction.Transactor,
+	executor transaction.Executor,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
 		cartRepo:      cartRepo,
 		inventoryRepo: inventoryRepo,
 		productRepo:   productRepo,
+		transactor:    transactor,
+		executor:      executor,
 	}
 }
 
-func (u *AddItemUsecase) Execute(userID uuid.UUID, productID uuid.UUID, shopID uuid.UUID, quantity int) error {
-	if shopID == uuid.Nil {
-		return appErr.NewInvalidInput(domain.ErrInvalidShopID.Error())
+type AddItemInput struct {
+	UserID, ProductID, ShopID uuid.UUID
+	Quantity                  int
+}
+
+func (u *AddItemUsecase) Execute(
+	ctx context.Context,
+	input AddItemInput,
+) error {
+	if input.ShopID == uuid.Nil {
+		return apperrors.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
-	if quantity <= 0 {
-		return appErr.NewInvalidInput(domain.ErrInvalidQuantity.Error())
+	if input.Quantity <= 0 {
+		return apperrors.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
-	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(productID, shopID)
+	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(
+		ctx, u.executor, input.ProductID, input.ShopID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}
 	if inventory == nil {
-		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	product, err := u.productRepo.GetByID(productID)
+	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
 	if product == nil {
-		return appErr.NewNotFound(domain.ErrProductNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
+	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(userID)
+		cart, err = u.cartRepo.NewCart(ctx, u.executor, input.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to create cart: %w", err)
 		}
 	}
 
-	if cart.HasProductInAnotherShop(productID, shopID) {
-		return appErr.NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
+	if cart.HasProductInAnotherShop(input.ProductID, input.ShopID) {
+		return apperrors.
+			NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
 	}
 
-	targetQuantity := quantity
-	if existingItem := cart.FindItem(productID, shopID); existingItem != nil && existingItem.DeletedAt == nil {
+	targetQuantity := input.Quantity
+	if existingItem := cart.FindItem(input.ProductID, input.ShopID); existingItem != nil && existingItem.DeletedAt == nil {
 		targetQuantity += existingItem.Quantity
 	}
 	if targetQuantity > inventory.Available() {
-		return appErr.NewConflict(domain.ErrInsufficientStock.Error())
+		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
-	if err := cart.AddItem(productID, shopID, quantity); err != nil {
-		return appErr.NewInvalidInput(err.Error())
+	if err := cart.AddItem(input.ProductID, input.ShopID, input.Quantity); err != nil {
+		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	if err := u.cartRepo.Save(cart); err != nil {
-		return fmt.Errorf("failed to add item: %w", err)
+	err = u.transactor.WithinTransaction(
+		ctx,
+		func(exec transaction.Executor) error {
+			if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
+				return fmt.Errorf("failed to add item: %w", err)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil

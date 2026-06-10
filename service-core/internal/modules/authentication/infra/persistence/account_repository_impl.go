@@ -4,32 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	appErr "service-core/internal/common/errors"
-	database "service-core/internal/infra/db"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type accountRepositoryImpl struct {
-	db *pgxpool.Pool
+type accountRepositoryImpl struct{}
+
+func NewAccountRepository() repository.AccountRepository {
+	return &accountRepositoryImpl{}
 }
 
-func NewAccountRepository(conn *database.Connection) repository.AccountRepository {
-	return &accountRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) GetByEmail(
+	ctx context.Context,
+	exec transaction.Executor,
+	email string,
+) (*domain.Account, error) {
 	query := `
 		SELECT
 			id,
@@ -37,6 +32,7 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 			email,
 			password,
 			status,
+			type,
 			last_login_at,
 			created_at,
 			updated_at
@@ -48,13 +44,13 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 	`
 
 	var m domain.Account
-
-	err := r.db.QueryRow(ctx, query, email).Scan(
+	err := exec.QueryRow(ctx, query, email).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
 		&m.Password,
 		&m.Status,
+		&m.Type,
 		&m.LastLoginAt,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -69,10 +65,11 @@ func (r *accountRepositoryImpl) GetByEmail(email string) (*domain.Account, error
 	return &m, nil
 }
 
-func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Account, error) {
 	query := `
 		SELECT
 			id,
@@ -80,6 +77,7 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 			email,
 			password,
 			status,
+			type,
 			last_login_at,
 			created_at,
 			updated_at
@@ -91,13 +89,13 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	`
 
 	var m domain.Account
-
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&m.ID,
 		&m.UserID,
 		&m.Email,
 		&m.Password,
 		&m.Status,
+		&m.Type,
 		&m.LastLoginAt,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -112,15 +110,56 @@ func (r *accountRepositoryImpl) GetByID(id uuid.UUID) (*domain.Account, error) {
 	return &m, nil
 }
 
+func (r *accountRepositoryImpl) GetByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Account, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			email,
+			password,
+			status,
+			type,
+			last_login_at,
+			created_at,
+			updated_at
+		FROM
+			accounts
+		WHERE
+			user_id = $1
+		LIMIT 1
+	`
+
+	var m domain.Account
+	err := exec.QueryRow(ctx, query, id).Scan(
+		&m.ID,
+		&m.UserID,
+		&m.Email,
+		&m.Password,
+		&m.Status,
+		&m.Type,
+		&m.LastLoginAt,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query account by user id failed: %w", err)
+	}
+
+	return &m, nil
+}
+
 func (r *accountRepositoryImpl) ActivateByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
 	id uuid.UUID,
 ) error {
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		5*time.Second,
-	)
-	defer cancel()
-
 	query := `
 		UPDATE accounts
 		SET
@@ -128,7 +167,7 @@ func (r *accountRepositoryImpl) ActivateByUserID(
 		WHERE user_id = $1
 	`
 
-	result, err := r.db.Exec(ctx, query, id)
+	result, err := exec.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf(
 			"query to activate account: %w",
@@ -137,7 +176,7 @@ func (r *accountRepositoryImpl) ActivateByUserID(
 	}
 
 	if result.RowsAffected() == 0 {
-		return appErr.NewNotFound(
+		return apperrors.NewNotFound(
 			domain.ErrNotFoundAccount.Error(),
 		)
 	}
@@ -145,10 +184,11 @@ func (r *accountRepositoryImpl) ActivateByUserID(
 	return nil
 }
 
-func (r *accountRepositoryImpl) Create(acc domain.Account) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *accountRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	acc domain.Account,
+) error {
 	query := `
 		INSERT INTO accounts (
 			id,
@@ -156,17 +196,19 @@ func (r *accountRepositoryImpl) Create(acc domain.Account) error {
 			email,
 			password,
 			status,
+			type,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		acc.ID,
 		acc.UserID,
 		acc.Email,
 		acc.Password,
 		acc.Status,
+		acc.Type,
 		acc.CreatedAt,
 	)
 	if err != nil {

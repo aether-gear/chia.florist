@@ -1,33 +1,37 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/infra/storage"
-	cartD "service-core/internal/modules/cart/domain"
-	cartR "service-core/internal/modules/cart/repository"
-	inventoryD "service-core/internal/modules/inventory/domain"
-	inventoryR "service-core/internal/modules/inventory/repository"
-	productD "service-core/internal/modules/product/domain"
-	productR "service-core/internal/modules/product/repository"
+	"service-core/internal/modules/cart/domain"
+	"service-core/internal/modules/cart/repository"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepo "service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type GetCartUsecase struct {
-	cartRepo       cartR.CartRepository
-	inventoryRepo  inventoryR.InventoryRepository
-	productRepo    productR.ProductRepository
-	productImgRepo productR.ProductImageRepository
+	cartRepo       repository.CartRepository
+	inventoryRepo  inventoryRepo.InventoryRepository
+	productRepo    productRepo.ProductRepository
+	productImgRepo productRepo.ProductImageRepository
 	fileStore      storage.Provider
+	executor       transaction.Executor
 }
 
 func NewGetCartUsecase(
-	cartRepo cartR.CartRepository,
-	inventoryRepo inventoryR.InventoryRepository,
-	productRepo productR.ProductRepository,
-	productImgRepo productR.ProductImageRepository,
+	cartRepo repository.CartRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
+	productRepo productRepo.ProductRepository,
+	productImgRepo productRepo.ProductImageRepository,
 	fileStore storage.Provider,
+	executor transaction.Executor,
 ) *GetCartUsecase {
 	return &GetCartUsecase{
 		cartRepo:       cartRepo,
@@ -35,34 +39,38 @@ func NewGetCartUsecase(
 		productRepo:    productRepo,
 		productImgRepo: productImgRepo,
 		fileStore:      fileStore,
+		executor:       executor,
 	}
 }
 
 type ProductCartResponse struct {
-	Product   productD.Product
+	Product   productDomain.Product
 	Inventory struct {
 		TotalStock    int
 		ReservedStock int
 	}
-	ShopInventories []inventoryD.Inventory
+	ShopInventories []inventoryDomain.Inventory
 	Images          struct {
 		Thumbnail string
 	}
 }
 
 type GetCartResult struct {
-	Cart     *cartD.Cart
+	Cart     *domain.Cart
 	Products map[uuid.UUID]ProductCartResponse
 }
 
-func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
-	cart, err := u.cartRepo.GetWithItemsByUserID(userID)
+func (u *GetCartUsecase) Execute(
+	ctx context.Context,
+	userID uuid.UUID,
+) (*GetCartResult, error) {
+	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve cart: %w", err)
 	}
 
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(userID)
+		cart, err = u.cartRepo.NewCart(ctx, u.executor, userID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create cart: %w", err)
 		}
@@ -80,17 +88,17 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		productIDs = append(productIDs, item.ProductID)
 	}
 
-	products, err := u.productRepo.FindByIDs(productIDs)
+	products, err := u.productRepo.FindByIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cart with products: %w", err)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProductIDs(productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProductIDs(productIDs)
+	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images for products: %w", err)
 	}
@@ -106,8 +114,9 @@ func (u *GetCartUsecase) Execute(userID uuid.UUID) (*GetCartResult, error) {
 		}
 
 		if len(images) > 0 {
-			key := images[0].Variants[productD.ResolutionThumbnail].Key
-			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
+			key := images[0].Variants[productDomain.ResolutionThumbnail].Key
+			result.Images.Thumbnail = u.fileStore.
+				PublicURL(key, "public-assets")
 		}
 
 		for _, inventory := range inventories {

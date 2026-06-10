@@ -1,13 +1,11 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"service-core/internal/modules/shipment/usecase"
-
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	"service-core/internal/modules/shipment/usecase"
 )
 
 type ShipmentHandler struct {
@@ -23,18 +21,20 @@ func NewShipmentHandler(
 }
 
 func (h *ShipmentHandler) EstimateShippingOptions(w http.ResponseWriter, r *http.Request) error {
-	var req EstimateShippingOptionsRequest
+	var req estimateShippingOptionsRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
 	if req.Weight <= 0 {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid weight")
 	}
-
-	if req.Origin <= 0 || req.Destination <= 0 {
-		return errors.ErrBadRequest
+	if req.Origin <= 0 {
+		return apperrors.NewBadRequest("invalid origin")
+	}
+	if req.Destination <= 0 {
+		return apperrors.NewBadRequest("invalid destination")
 	}
 
 	input := usecase.EstimateShippingOptionsInput{
@@ -45,15 +45,15 @@ func (h *ShipmentHandler) EstimateShippingOptions(w http.ResponseWriter, r *http
 		PriceFilter: req.PriceFilter,
 	}
 
-	results, err := h.estimateShippOpts.Execute(input)
+	results, err := h.estimateShippOpts.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
 
-	couriers := make([]EstimateShippingOptionsResponse, 0, len(results))
+	couriers := make([]estimateShippingOptionsResponse, 0, len(results))
 
 	for _, result := range results {
-		option := EstimateShippingOptionsResponse{
+		option := estimateShippingOptionsResponse{
 			Name:        result.Name,
 			Code:        result.Code,
 			Service:     result.Service,

@@ -5,31 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type productRepositoryImpl struct {
-	db *pgxpool.Pool
+type productRepositoryImpl struct{}
+
+func NewProductRepository() repository.ProductRepository {
+	return &productRepositoryImpl{}
 }
 
-func NewProductRepository(conn *database.Connection) repository.ProductRepository {
-	return &productRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams) ([]domain.Product, int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productRepositoryImpl) FindProducts(
+	ctx context.Context,
+	exec transaction.Executor,
+	params repository.FindProductParams,
+) ([]domain.Product, int, error) {
 	var (
 		conditions []string
 		args       []any
@@ -79,7 +74,7 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 	countQuery := "SELECT COUNT(DISTINCT p.id) " + baseQuery + whereClause
 
 	var total int
-	err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	err := exec.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query count products failed: %w", err)
 	}
@@ -104,14 +99,13 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	args = append(args, limit, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := exec.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query products failed: %w", err)
 	}
 	defer rows.Close()
 
 	var results []domain.Product
-
 	for rows.Next() {
 		var item domain.Product
 
@@ -142,10 +136,12 @@ func (r *productRepositoryImpl) FindProducts(params repository.FindProductParams
 
 	return results, total, nil
 }
-func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
+func (r *productRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Product, error) {
 	query := `
 		SELECT
 			p.id,
@@ -166,8 +162,7 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
 	`
 
 	var result domain.Product
-
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&result.ID,
 		&result.SKU,
 		&result.Name,
@@ -192,13 +187,14 @@ func (r *productRepositoryImpl) GetByID(id uuid.UUID) (*domain.Product, error) {
 	return &result, nil
 }
 
-func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, error) {
+func (r *productRepositoryImpl) FindByIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	ids []uuid.UUID,
+) ([]domain.Product, error) {
 	if len(ids) == 0 {
 		return []domain.Product{}, nil
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	query := `
 		SELECT
@@ -223,14 +219,13 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, er
 		productIDStrings[i] = id.String()
 	}
 
-	rows, err := r.db.Query(ctx, query, productIDStrings)
+	rows, err := exec.Query(ctx, query, productIDStrings)
 	if err != nil {
 		return nil, fmt.Errorf("query products by many ids failed: %w", err)
 	}
 	defer rows.Close()
 
 	var results []domain.Product
-
 	for rows.Next() {
 		var item domain.Product
 
@@ -263,10 +258,11 @@ func (r *productRepositoryImpl) FindByIDs(ids []uuid.UUID) ([]domain.Product, er
 	return results, nil
 }
 
-func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *productRepositoryImpl) CreateProduct(
+	ctx context.Context,
+	exec transaction.Executor,
+	product *domain.Product,
+) error {
 	query := `
 		INSERT INTO products (
 			id,
@@ -282,7 +278,7 @@ func (r *productRepositoryImpl) CreateProduct(product *domain.Product) error {
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		product.ID,
 		product.SKU,
 		product.Name,

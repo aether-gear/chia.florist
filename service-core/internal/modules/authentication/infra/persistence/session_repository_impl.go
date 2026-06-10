@@ -4,32 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	errorCommon "service-core/internal/common/errors"
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type sessionRepositoryImpl struct {
-	db *pgxpool.Pool
+type sessionRepositoryImpl struct{}
+
+func NewSessionRepositoryImpl() repository.SessionRepository {
+	return &sessionRepositoryImpl{}
 }
 
-func NewSessionRepositoryImpl(conn *database.Connection) repository.SessionRepository {
-	return &sessionRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *sessionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Session, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Session, error) {
 	query := `
 		SELECT
 			id,
@@ -48,8 +43,7 @@ func (r *sessionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Session, error) {
 	`
 
 	var s domain.Session
-
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&s.ID,
 		&s.UserID,
 		&s.UserAgent,
@@ -69,10 +63,11 @@ func (r *sessionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Session, error) {
 	return &s, nil
 }
 
-func (r *sessionRepositoryImpl) RevokeByID(id uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) RevokeByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
 	query := `
 		UPDATE
 			sessions
@@ -83,7 +78,7 @@ func (r *sessionRepositoryImpl) RevokeByID(id uuid.UUID) error {
 			AND revoked_at IS NULL
 	`
 
-	result, err := r.db.Exec(ctx, query, id)
+	result, err := exec.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("query to revoke session: %w", err)
 	}
@@ -95,10 +90,11 @@ func (r *sessionRepositoryImpl) RevokeByID(id uuid.UUID) error {
 	return nil
 }
 
-func (r *sessionRepositoryImpl) UpdateLastActivityByID(id uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) UpdateLastActivityByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
 	query := `
 		UPDATE sessions
 		SET
@@ -107,7 +103,7 @@ func (r *sessionRepositoryImpl) UpdateLastActivityByID(id uuid.UUID) error {
 			id = $1
 	`
 
-	_, err := r.db.Exec(ctx, query, id)
+	_, err := exec.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("query to update last activity failed: %w", err)
 	}
@@ -115,10 +111,11 @@ func (r *sessionRepositoryImpl) UpdateLastActivityByID(id uuid.UUID) error {
 	return nil
 }
 
-func (r *sessionRepositoryImpl) Save(session domain.Session) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *sessionRepositoryImpl) Save(
+	ctx context.Context,
+	exec transaction.Executor,
+	session domain.Session,
+) error {
 	query := `
 		INSERT INTO sessions (
 			id,
@@ -144,7 +141,7 @@ func (r *sessionRepositoryImpl) Save(session domain.Session) error {
 			last_activity_at = EXCLUDED.last_activity_at
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		session.ID,
 		session.UserID,
 		session.UserAgent,

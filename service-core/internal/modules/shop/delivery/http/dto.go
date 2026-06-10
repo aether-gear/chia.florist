@@ -6,13 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreateShopRequest struct {
+type createShopRequest struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	IsActive    string  `json:"is_active"`
 }
 
-type GetShopResponse struct {
+type getShopResponse struct {
 	ID          uuid.UUID  `json:"id"`
 	Name        string     `json:"name"`
 	Slug        string     `json:"slug"`

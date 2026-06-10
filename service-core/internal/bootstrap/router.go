@@ -4,8 +4,12 @@ import (
 	"net/http"
 
 	apphttp "service-core/internal/common/http"
-	"service-core/internal/common/logger"
-	"service-core/internal/common/middleware"
+	appcookie "service-core/internal/common/http/cookie"
+	applogger "service-core/internal/common/logger"
+	appmiddleware "service-core/internal/common/middleware"
+
+	authendomain "service-core/internal/modules/authentication/domain"
+	authorzDomain "service-core/internal/modules/authorization/domain"
 
 	addressH "service-core/internal/modules/address/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
@@ -13,17 +17,55 @@ import (
 	courierH "service-core/internal/modules/courier/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
 	locationH "service-core/internal/modules/location/delivery/http"
+	merchantH "service-core/internal/modules/merchant/delivery/http"
 	paymentH "service-core/internal/modules/payment/delivery/http"
 	productH "service-core/internal/modules/product/delivery/http"
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
 	shopH "service-core/internal/modules/shop/delivery/http"
 	userH "service-core/internal/modules/user/delivery/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
-func NewRouter(c *Container) *http.ServeMux {
+func NewRouter(c *Container) *chi.Mux {
+	var log = c.Logger
+
 	var (
-		log  = c.Logger
-		core = buildChain(log)
+		core = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+		)
+		merchantOnly = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.Authenticator.RequireAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenCookieName,
+			),
+			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
+		)
+		merchantAdminOnly = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.Authenticator.RequireAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenMerchantCookieName,
+			),
+			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
+			c.Authorizer.RequireMerchantRole(authorzDomain.RoleMerchantAdmin),
+		)
+		customerOnly = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.Authenticator.RequireAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenCookieName,
+			),
+			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
+		)
 	)
 
 	var (
@@ -39,10 +81,16 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 
 		authHandler = authH.NewAuthHandler(
-			&c.LoginAccount,
-			&c.RegisterAccount,
+			&c.LoginCustomer,
+			&c.LoginMerchant,
+			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
+		)
+
+		merchantHandler = merchantH.NewMerchantHandler(
+			&c.AddMerchantAccount,
+			&c.CreateMerchant,
 		)
 
 		cartHandler = cartH.NewCartHandler(
@@ -89,159 +137,120 @@ func NewRouter(c *Container) *http.ServeMux {
 		)
 	)
 
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
 
-	mux.HandleFunc(
-		"/product",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  productHandler.FindProducts,
-			http.MethodPost: productHandler.CreateProduct,
-		})),
-	)
-	mux.HandleFunc(
-		"/product/",
-		core(productHandler.GetProduct),
-	)
-	mux.HandleFunc(
-		"/product/images",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: productHandler.AddProductImages,
-		})),
-	)
-	mux.HandleFunc(
-		"/inventory",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: inventoryHandler.CreateInventory,
-		})),
-	)
+	r.Route("/", func(r chi.Router) {
+		r.Route("/products", func(r chi.Router) {
+			r.Get("/", core(productHandler.FindProducts))
+			r.Post("/", merchantOnly(productHandler.CreateProduct))
+			r.Get("/{id}", core(productHandler.GetProduct))
 
-	mux.HandleFunc(
-		"/auth/signin",
-		core(authHandler.SignInEmail),
-	)
-	mux.HandleFunc(
-		"/auth/signup",
-		core(authHandler.SignUpAccount),
-	)
-	mux.HandleFunc(
-		"/auth/verify",
-		core(authHandler.VerifyAccount),
-	)
+			r.Post("/{id}/images", merchantOnly(productHandler.AddProductImages))
+		})
 
-	mux.HandleFunc(
-		"/cart",
-		core(cartHandler.GetCart),
-	)
-	mux.HandleFunc(
-		"/cart/items",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost:   cartHandler.AddItem,
-			http.MethodPut:    cartHandler.UpdateItem,
-			http.MethodDelete: cartHandler.RemoveItem,
-		})),
-	)
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/signin", core(authHandler.SignInEmail))
+			r.Post("/merchant/signin", core(authHandler.SignInMerchantEmail))
+			r.Post("/signup", core(authHandler.SignUpAccount))
+			r.Post("/verify", core(authHandler.VerifyAccount))
+		})
 
-	mux.HandleFunc(
-		"/locations/provinces",
-		core(locationHandler.Province),
-	)
-	mux.HandleFunc(
-		"/locations/cities/",
-		core(locationHandler.City),
-	)
-	mux.HandleFunc(
-		"/locations/districts/",
-		core(locationHandler.District),
-	)
-	mux.HandleFunc(
-		"/locations/villages/",
-		core(locationHandler.Village),
-	)
+		r.Route("/merchants", func(r chi.Router) {
+			r.Post("/", merchantAdminOnly(merchantHandler.CreateMerchant))
+			r.Route("/{merchantID}/accounts", func(r chi.Router) {
+				r.Post("/", merchantAdminOnly(merchantHandler.AddMerchantAccount))
+			})
+		})
 
-	mux.HandleFunc(
-		"/user/",
-		core(userHandler.GetUserByID),
-	)
-	mux.HandleFunc(
-		"/user/address",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressHandler.CreateUserAddress,
-		})),
-	)
+		r.Route("/carts", func(r chi.Router) {
+			r.Get("/", customerOnly(cartHandler.GetCart))
 
-	mux.HandleFunc(
-		"/shop",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: shopHandler.CreateShop,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: shopHandler.GetShopByID,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/address",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: addressHandler.CreateShopAddress,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/address/",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressHandler.GetShopAddress,
-		})),
-	)
-	mux.HandleFunc(
-		"/shop/addresses/",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet: addressHandler.ListShopAddresses,
-		})),
-	)
+			r.Route("/items", func(r chi.Router) {
+				r.Post("/", customerOnly(cartHandler.AddItem))
+				r.Put("/{shopID}/{productID}", customerOnly(cartHandler.UpdateItem))
+				r.Delete("/{shopID}/{productID}", customerOnly(cartHandler.RemoveItem))
+			})
+		})
 
-	mux.HandleFunc(
-		"/payment/account",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  paymentHandler.ListPaymentAccount,
-			http.MethodPost: paymentHandler.CreatePaymentAccount,
-		})),
-	)
-	mux.HandleFunc(
-		"/payment/method",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodGet:  paymentHandler.ListPaymentMethod,
-			http.MethodPost: paymentHandler.CreatePaymentMethod,
-		})),
-	)
+		r.Route("/provinces", func(r chi.Router) {
+			r.Get("/", core(locationHandler.Province))
+			r.Get("/{id}/cities", core(locationHandler.City))
+		})
+		r.Route("/cities", func(r chi.Router) {
+			r.Get("/{id}/districts", core(locationHandler.District))
+		})
+		r.Route("/districts", func(r chi.Router) {
+			r.Get("/{id}/villages", core(locationHandler.Village))
+		})
 
-	mux.HandleFunc(
-		"/shops/couriers",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: courierHandler.ConfigureCourierShop,
-		})),
-	)
+		r.Route("/users", func(r chi.Router) {
+			r.Get("/{id}", merchantOnly(userHandler.GetUserByID))
+		})
 
-	mux.HandleFunc(
-		"/shipping/cost",
-		core(apphttp.HandleMethods(apphttp.MethodHandler{
-			http.MethodPost: shipmentHandler.EstimateShippingOptions,
-		})),
-	)
+		r.Route("/users/me", func(r chi.Router) {
+			r.Get("/", customerOnly(userHandler.GetCurrentUser))
 
-	return mux
+			r.Route("/addresses", func(r chi.Router) {
+				r.Get("/", customerOnly(addressHandler.ListUserAddresses))
+				r.Post("/", customerOnly(addressHandler.CreateUserAddress))
+			})
+		})
+
+		r.Route("/shops", func(r chi.Router) {
+			r.Post("/", merchantOnly(shopHandler.CreateShop))
+			r.Get("/{id}", core(shopHandler.GetShopByID))
+
+			r.Route("/{id}/addresses", func(r chi.Router) {
+				r.Get("/", core(addressHandler.ListShopAddresses))
+				r.Post("/", merchantOnly(addressHandler.CreateShopAddress))
+				r.Get("/{addressID}", core(addressHandler.GetShopAddress))
+			})
+
+			r.Route("/{id}/couriers", func(r chi.Router) {
+				r.Post("/", merchantOnly(courierHandler.ConfigureCourierShop))
+			})
+
+			r.Route("/{id}/products", func(r chi.Router) {
+				r.Post("/{productID}/inventories",
+					merchantOnly(inventoryHandler.AddInventory))
+			})
+		})
+
+		r.Route("/payments", func(r chi.Router) {
+			r.Route("/accounts", func(r chi.Router) {
+				r.Get("/", customerOnly(paymentHandler.ListPaymentAccount))
+				r.Post("/", merchantOnly(paymentHandler.CreatePaymentAccount))
+			})
+
+			r.Route("/methods", func(r chi.Router) {
+				r.Get("/", core(paymentHandler.ListPaymentMethod))
+				r.Post("/", merchantOnly(paymentHandler.CreatePaymentMethod))
+			})
+		})
+
+		r.Route("/shipping", func(r chi.Router) {
+			r.Post("/cost", customerOnly(shipmentHandler.EstimateShippingOptions))
+		})
+	})
+
+	return r
 }
 
-func buildChain(log logger.Logger, extra ...middleware.Middleware) func(apphttp.AppHandler) http.HandlerFunc {
-	base := []middleware.Middleware{
-		middleware.Recovery(log),
-		middleware.Logging(log),
-		middleware.Response(),
+func buildChain(
+	log applogger.Logger,
+	allowedOrigins []string,
+	extra ...appmiddleware.Middleware,
+) func(apphttp.AppHandler) http.HandlerFunc {
+	base := []appmiddleware.Middleware{
+		appmiddleware.CORS(allowedOrigins),
+		appmiddleware.Recovery(log),
+		appmiddleware.Logging(log),
+		appmiddleware.Response(),
 	}
 
 	mws := append(base, extra...)
 
 	return func(h apphttp.AppHandler) http.HandlerFunc {
-		return middleware.Chain(h, mws...)
+		return appmiddleware.Chain(h, mws...)
 	}
 }

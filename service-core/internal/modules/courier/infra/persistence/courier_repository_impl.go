@@ -4,29 +4,22 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
-
-	database "service-core/internal/infra/db"
 
 	"service-core/internal/modules/courier/repository"
-
-	"github.com/jackc/pgx/v5/pgxpool"
+	transaction "service-core/internal/shared/transaction"
 )
 
-type courierRepositoryImpl struct {
-	db *pgxpool.Pool
+type courierRepositoryImpl struct{}
+
+func NewCourierRepositoryImpl() repository.CourierRepository {
+	return &courierRepositoryImpl{}
 }
 
-func NewCourierRepositoryImpl(conn *database.Connection) repository.CourierRepository {
-	return &courierRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *courierRepositoryImpl) GetActiveCodes(codes []string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *courierRepositoryImpl) GetActiveCodes(
+	ctx context.Context,
+	exec transaction.Executor,
+	codes []string,
+) ([]string, error) {
 	query := `
 		SELECT code
 		FROM couriers
@@ -34,7 +27,7 @@ func (r *courierRepositoryImpl) GetActiveCodes(codes []string) ([]string, error)
 		AND is_active = true
 	`
 
-	rows, err := r.db.Query(ctx, query, codes)
+	rows, err := exec.Query(ctx, query, codes)
 	if err != nil {
 		return nil, fmt.Errorf("query active couriers failed: %w", err)
 	}
@@ -53,13 +46,17 @@ func (r *courierRepositoryImpl) GetActiveCodes(codes []string) ([]string, error)
 	return result, nil
 }
 
-func (r *courierRepositoryImpl) ValidateCouriers(codes []string) ([]string, error) {
+func (r *courierRepositoryImpl) ValidateCouriers(
+	ctx context.Context,
+	exec transaction.Executor,
+	codes []string,
+) ([]string, error) {
 	if len(codes) == 0 {
 		return nil, fmt.Errorf("courier codes cannot be empty")
 	}
 
 	normalized := r.normalizeCodes(codes)
-	validCodes, err := r.GetActiveCodes(normalized)
+	validCodes, err := r.GetActiveCodes(ctx, exec, normalized)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve couriers: %w", err)
 	}

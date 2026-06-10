@@ -17,7 +17,7 @@ func main() {
 	}
 
 	cfg := bootstrap.LoadConfig()
-	infra, err := bootstrap.NewInfra(cfg)
+	infra, err := bootstrap.NewDependency(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

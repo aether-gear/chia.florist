@@ -1,10 +1,30 @@
 package repository
 
-import "service-core/internal/modules/location/domain"
+import (
+	"context"
+
+	"service-core/internal/modules/location/domain"
+	transaction "service-core/internal/shared/transaction"
+)
 
 type LocationRepository interface {
-	ListProvinces() ([]domain.Province, error)
-	ListCitiesByProvince(provinceID string) ([]domain.City, error)
-	ListDistrictsByCity(cityID string) ([]domain.District, error)
-	ListVillagesByDistrict(districtID string) ([]domain.Village, error)
+	ListProvinces(
+		ctx context.Context,
+		exec transaction.Executor,
+	) ([]domain.Province, error)
+	ListCitiesByProvince(
+		ctx context.Context,
+		exec transaction.Executor,
+		provinceID string,
+	) ([]domain.City, error)
+	ListDistrictsByCity(
+		ctx context.Context,
+		exec transaction.Executor,
+		cityID string,
+	) ([]domain.District, error)
+	ListVillagesByDistrict(
+		ctx context.Context,
+		exec transaction.Executor,
+		districtID string,
+	) ([]domain.Village, error)
 }

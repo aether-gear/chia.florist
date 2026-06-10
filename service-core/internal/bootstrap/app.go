@@ -3,39 +3,44 @@ package bootstrap
 import (
 	"log"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type App struct {
-	infra     *Infra
-	container *Container
-	router    *http.ServeMux
+	dependencies *Dependency
+	container    *Container
+	router       *chi.Mux
+	cfg          Config
 }
 
 func New(cfg Config) (*App, error) {
-	infra, err := NewInfra(cfg)
+	dependencies, err := NewDependency(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	c := NewContainer(cfg, infra)
+	c := NewContainer(cfg, dependencies)
 	r := NewRouter(c)
 
 	return &App{
-		infra:     infra,
-		container: c,
-		router:    r,
+		dependencies: dependencies,
+		container:    c,
+		router:       r,
+		cfg:          cfg,
 	}, nil
 }
 
 func (a *App) Close() {
-	if a == nil || a.infra == nil {
+	if a == nil || a.dependencies == nil {
 		return
 	}
 
-	a.infra.Close()
+	a.dependencies.Close()
 }
 
 func (a *App) Run() error {
-	log.Println("service-core running on :8000")
-	return http.ListenAndServe(":8000", a.router)
+	addr := a.cfg.App.Host + ":" + a.cfg.App.Port
+	log.Printf("service-core running on %s\n", addr)
+	return http.ListenAndServe(addr, a.router)
 }

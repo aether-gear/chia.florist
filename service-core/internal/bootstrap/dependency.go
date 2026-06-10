@@ -5,6 +5,7 @@ import (
 
 	database "service-core/internal/infra/db"
 	storage "service-core/internal/infra/storage"
+	transaction "service-core/internal/shared/transaction"
 
 	supabaseStorage "service-core/internal/infra/storage/supabase"
 	lService "service-core/internal/modules/location/infra/service"
@@ -13,14 +14,16 @@ import (
 	shipmentRepo "service-core/internal/modules/shipment/repository"
 )
 
-type Infra struct {
+type Dependency struct {
 	DB                   *database.Connection
 	StorageProvider      storage.Provider
-	LocationRepository   locationRepo.LocationRepository
+	LocationProvider     locationRepo.LocationRepository
 	ShippingCostProvider shipmentRepo.ShippingCostProvider
+	TransactionProvider  transaction.Transactor
+	TransactionExecutor  transaction.Executor
 }
 
-func NewInfra(cfg Config) (*Infra, error) {
+func NewDependency(cfg Config) (*Dependency, error) {
 	db, err := database.NewConnection(cfg.DB)
 	if err != nil {
 		return nil, err
@@ -36,10 +39,10 @@ func NewInfra(cfg Config) (*Infra, error) {
 		return nil, err
 	}
 
-	return &Infra{
+	return &Dependency{
 		DB:              db,
 		StorageProvider: storageProvider,
-		LocationRepository: lService.NewRajaOngkirLocation(
+		LocationProvider: lService.NewRajaOngkirLocation(
 			cfg.Shipping.DestinationKey,
 			cfg.Shipping.DestinationURL,
 			&http.Client{
@@ -53,10 +56,12 @@ func NewInfra(cfg Config) (*Infra, error) {
 				Timeout: cfg.Shipping.Timeout,
 			},
 		),
+		TransactionProvider: database.NewPostgresTransactor(db.Pool),
+		TransactionExecutor: db.Pool,
 	}, nil
 }
 
-func (i *Infra) Close() {
+func (i *Dependency) Close() {
 	if i == nil || i.DB == nil {
 		return
 	}

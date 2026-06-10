@@ -1,35 +1,40 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"service-core/internal/infra/storage"
-	inventoryD "service-core/internal/modules/inventory/domain"
-	inventoryR "service-core/internal/modules/inventory/repository"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type GetProductUsecase struct {
 	productRepo    repository.ProductRepository
-	inventoryRepo  inventoryR.InventoryRepository
+	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
 	fileStore      storage.Provider
+	executor       transaction.Executor
 }
 
 func NewGetProductUsecase(
 	productRepo repository.ProductRepository,
-	inventoryRepo inventoryR.InventoryRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
 	fileStore storage.Provider,
+	executor transaction.Executor,
 ) *GetProductUsecase {
 	return &GetProductUsecase{
 		productRepo:    productRepo,
 		inventoryRepo:  inventoryRepo,
 		productImgRepo: productImgRepo,
 		fileStore:      fileStore,
+		executor:       executor,
 	}
 }
 
@@ -45,12 +50,15 @@ type ProductDetailResponse struct {
 		TotalStock    int
 		ReservedStock int
 	}
-	ShopInventories []inventoryD.Inventory
+	ShopInventories []inventoryDomain.Inventory
 	Images          []ImageProductDetail
 }
 
-func (u *GetProductUsecase) Execute(id uuid.UUID) (*ProductDetailResponse, error) {
-	product, err := u.productRepo.GetByID(id)
+func (u *GetProductUsecase) Execute(
+	ctx context.Context,
+	id uuid.UUID,
+) (*ProductDetailResponse, error) {
+	product, err := u.productRepo.GetByID(ctx, u.executor, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products with inventory: %w", err)
 	}
@@ -58,12 +66,12 @@ func (u *GetProductUsecase) Execute(id uuid.UUID) (*ProductDetailResponse, error
 		return nil, nil
 	}
 
-	inventories, err := u.inventoryRepo.ListByProductID(id)
+	inventories, err := u.inventoryRepo.ListByProductID(ctx, u.executor, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory by product: %w", err)
 	}
 
-	images, err := u.productImgRepo.ListByProductID(id)
+	images, err := u.productImgRepo.ListByProductID(ctx, u.executor, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images by product: %w", err)
 	}

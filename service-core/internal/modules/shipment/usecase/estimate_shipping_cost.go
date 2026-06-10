@@ -1,24 +1,28 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	appErr "service-core/internal/common/errors"
-
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/shipment/domain"
 	"service-core/internal/modules/shipment/repository"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type EstimateShippingOptionsUsecase struct {
 	shippingCostProvider repository.ShippingCostProvider
+	executor             transaction.Executor
 }
 
 func NewEstimateShippingOptionsUsecase(
 	shippingCostProvider repository.ShippingCostProvider,
+	executor transaction.Executor,
 ) *EstimateShippingOptionsUsecase {
 	return &EstimateShippingOptionsUsecase{
 		shippingCostProvider: shippingCostProvider,
+		executor:             executor,
 	}
 }
 
@@ -31,14 +35,15 @@ type EstimateShippingOptionsInput struct {
 }
 
 func (u *EstimateShippingOptionsUsecase) Execute(
+	ctx context.Context,
 	input EstimateShippingOptionsInput,
 ) ([]repository.CostOption, error) {
 	if input.Origin == input.Destination {
-		return nil, appErr.NewInvalidInput(domain.ErrInvalidRoute.Error())
+		return nil, apperrors.NewInvalidInput(domain.ErrInvalidRoute.Error())
 	}
 
 	if len(input.Couriers) == 0 {
-		return nil, appErr.NewInvalidInput(domain.ErrNoCourierSelected.Error())
+		return nil, apperrors.NewInvalidInput(domain.ErrNoCourierSelected.Error())
 	}
 
 	seen := make(map[string]struct{})
@@ -46,7 +51,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 	for _, courier := range input.Couriers {
 		c := strings.TrimSpace(courier)
 		if c == "" {
-			return nil, appErr.NewInvalidInput(domain.ErrInvalidCourier.Error())
+			return nil, apperrors.NewInvalidInput(domain.ErrInvalidCourier.Error())
 		}
 
 		if _, exist := seen[c]; exist {
@@ -58,7 +63,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 	}
 
 	if input.Weight <= 0 {
-		return nil, appErr.NewInvalidInput(domain.ErrInvalidWeight.Error())
+		return nil, apperrors.NewInvalidInput(domain.ErrInvalidWeight.Error())
 	}
 
 	query := repository.CalculateCostInput{
@@ -69,7 +74,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 		PriceFilter:   input.PriceFilter,
 	}
 
-	costOptions, err := u.shippingCostProvider.CalculateCost(query)
+	costOptions, err := u.shippingCostProvider.CalculateCost(ctx, u.executor, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate shipping cost: %w", err)
 	}

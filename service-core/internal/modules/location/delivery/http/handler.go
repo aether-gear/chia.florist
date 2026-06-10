@@ -3,10 +3,8 @@ package http
 import (
 	"net/http"
 
-	"service-core/internal/modules/location/usecase"
-
-	"service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	"service-core/internal/modules/location/usecase"
 )
 
 type LocationHandler struct {
@@ -22,99 +20,106 @@ func NewLocationHandler(
 }
 
 func (h *LocationHandler) Province(w http.ResponseWriter, r *http.Request) error {
-	result, err := h.listLocation.Province()
+	result, err := h.listLocation.Province(r.Context())
 	if err != nil {
 		return err
 	}
 
-	res := make([]ProvinceResponse, 0, len(result))
+	provinces := make([]provinceResponse, 0, len(result))
 	for _, r := range result {
-		province := ProvinceResponse{
+		p := provinceResponse{
 			ID:   r.ID,
 			Name: r.Name,
 		}
 
-		res = append(res, province)
+		provinces = append(provinces, p)
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, res)
+	response := map[string][]provinceResponse{
+		"provinces": provinces,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
 
 func (h *LocationHandler) City(w http.ResponseWriter, r *http.Request) error {
-	provinceID := r.URL.Query().Get("province_id")
-	if provinceID == "" {
-		return errors.ErrBadRequest
-	}
+	provinceID := apphttp.Param(r, "id")
 
-	result, err := h.listLocation.City(provinceID)
+	result, err := h.listLocation.City(r.Context(), provinceID)
 	if err != nil {
 		return err
 	}
 
-	res := make([]CityResponse, 0, len(result))
+	cities := make([]cityResponse, 0, len(result))
 	for _, r := range result {
-		city := CityResponse{
+		c := cityResponse{
 			ID:         r.ID,
 			ProvinceID: r.ProvinceID,
 			Name:       r.Name,
 		}
 
-		res = append(res, city)
+		cities = append(cities, c)
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, res)
+	response := map[string][]cityResponse{
+		"cities": cities,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
 
 func (h *LocationHandler) District(w http.ResponseWriter, r *http.Request) error {
-	cityID := r.URL.Query().Get("city_id")
-	if cityID == "" {
-		return errors.ErrBadRequest
-	}
+	cityID := apphttp.Param(r, "id")
 
-	result, err := h.listLocation.District(cityID)
+	result, err := h.listLocation.District(r.Context(), cityID)
 	if err != nil {
 		return err
 	}
 
-	res := make([]DistrictResponse, 0, len(result))
+	districts := make([]districtResponse, 0, len(result))
 	for _, r := range result {
-		district := DistrictResponse{
+		d := districtResponse{
 			ID:     r.ID,
 			CityID: r.CityID,
 			Name:   r.Name,
 		}
 
-		res = append(res, district)
+		districts = append(districts, d)
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, res)
+	response := map[string][]districtResponse{
+		"districts": districts,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
 
 func (h *LocationHandler) Village(w http.ResponseWriter, r *http.Request) error {
-	districtID := r.URL.Query().Get("district_id")
-	if districtID == "" {
-		return errors.ErrBadRequest
-	}
+	districtID := apphttp.Param(r, "id")
 
-	result, err := h.listLocation.Village(districtID)
+	result, err := h.listLocation.Village(r.Context(), districtID)
 	if err != nil {
 		return err
 	}
 
-	res := make([]VillageResponse, 0, len(result))
+	villages := make([]villageResponse, 0, len(result))
 	for _, r := range result {
-		village := VillageResponse{
+		v := villageResponse{
 			ID:         r.ID,
 			DistrictID: r.DistrictID,
 			Name:       r.Name,
 		}
 
-		res = append(res, village)
+		villages = append(villages, v)
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, res)
+	response := map[string][]villageResponse{
+		"villages": villages,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }

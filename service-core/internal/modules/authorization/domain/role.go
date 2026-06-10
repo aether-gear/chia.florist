@@ -3,9 +3,8 @@ package domain
 import "github.com/google/uuid"
 
 const (
-	RoleAdmin    = "admin"
-	RoleSeller   = "seller"
-	RoleCustomer = "customer"
+	RoleMerchantAdmin = "merchant_admin"
+	RoleMerchantStaff = "merchant_staff"
 )
 
 type Role struct {

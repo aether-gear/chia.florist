@@ -1,7 +1,9 @@
 package domain
 
 import (
-	"github.com/golang-jwt/jwt/v5"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type TokenType string
@@ -12,9 +14,14 @@ const (
 )
 
 type TokenClaims struct {
-	UserID    string    `json:"user_id"`
-	SessionID string    `json:"session_id"`
-	Type      TokenType `json:"type"`
+	UserID     uuid.UUID
+	SessionID  uuid.UUID
+	MerchantID *uuid.UUID
 
-	jwt.RegisteredClaims
+	Type TokenType
+
+	Roles []string
+
+	IssuedAt  time.Time
+	ExpiresAt time.Time
 }

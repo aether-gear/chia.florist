@@ -1,20 +1,27 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type CreateAddressUsecase struct {
 	userAddressRepo repository.UserAddressRepository
+	executor        transaction.Executor
 }
 
-func NewCreateAddressUsecase(userAddressRepo repository.UserAddressRepository) *CreateAddressUsecase {
+func NewCreateAddressUsecase(
+	userAddressRepo repository.UserAddressRepository,
+	executor transaction.Executor,
+
+) *CreateAddressUsecase {
 	return &CreateAddressUsecase{
 		userAddressRepo: userAddressRepo,
 	}
@@ -33,7 +40,10 @@ type CreateAddressInput struct {
 	PostalCode   string
 }
 
-func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
+func (u *CreateAddressUsecase) Execute(
+	ctx context.Context,
+	input CreateAddressInput,
+) error {
 	var isDefault bool
 	if *input.IsDefault {
 		isDefault = *input.IsDefault
@@ -58,7 +68,7 @@ func (u *CreateAddressUsecase) Execute(input CreateAddressInput) error {
 		CreatedAt: time.Now(),
 	}
 
-	err := u.userAddressRepo.Create(address)
+	err := u.userAddressRepo.Create(ctx, u.executor, address)
 	if err != nil {
 		return fmt.Errorf("failed to save address: %w", err)
 	}

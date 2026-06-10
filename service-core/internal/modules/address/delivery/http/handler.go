@@ -1,14 +1,13 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/address/usecase"
+	authendomain "service-core/internal/modules/authentication/domain"
 
 	"github.com/google/uuid"
 )
@@ -38,29 +37,19 @@ func NewAddressHandler(
 }
 
 func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 || parts[3] == "" {
-		return errors.ErrBadRequest
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	id := parts[3]
-	if id == "" {
-		return errors.ErrBadRequest
-	}
-
-	parsedID, err := uuid.Parse(id)
-	if err != nil {
-		return errors.ErrBadRequest
-	}
-
-	result, err := h.listUserAddresses.ListByUserID(parsedID)
+	addresses, err := h.listUserAddresses.ListByUserID(r.Context(), authCtx.UserID)
 	if err != nil {
 		return err
 	}
 
-	response := make([]AddressResponse, 0, len(result))
-	for _, r := range result {
-		address := AddressResponse{
+	result := make([]userAddressResponse, 0, len(addresses))
+	for _, r := range addresses {
+		address := userAddressResponse{
 			UserID:       r.UserID,
 			ReceiverName: r.ReceiverName,
 			Phone:        r.Phone,
@@ -71,11 +60,15 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 			VillageID:    r.Detail.VillageID,
 			FullAddress:  r.Detail.FullAddress,
 			PostalCode:   r.Detail.PostalCode,
-			CreatedAt:    r.CreatedAt,
-			UpdatedAt:    r.UpdatedAt,
+			// CreatedAt:    r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
 		}
 
-		response = append(response, address)
+		result = append(result, address)
+	}
+
+	response := map[string][]userAddressResponse{
+		"addresses": result,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -83,36 +76,50 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Request) error {
-	var req CreateAddressRequest
+	var req createUserAddressRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
-	if req.ProvinceID == "" || req.CityID == "" || req.DistrictID == "" || req.VillageID == "" {
-		return errors.ErrBadRequest
+	if req.ProvinceID == "" {
+		return apperrors.NewBadRequest("invalid province id")
+	}
+	if req.DistrictID == "" {
+		return apperrors.NewBadRequest("invalid district id")
+	}
+	if req.CityID == "" {
+		return apperrors.NewBadRequest("invalid city id")
+	}
+	if req.VillageID == "" {
+		return apperrors.NewBadRequest("invalid village id")
+	}
+	if req.FullAddress == "" {
+		return apperrors.NewBadRequest("invalid full address")
+	}
+	if req.PostalCode == "" {
+		return apperrors.NewBadRequest("invalid postal code")
 	}
 
-	if req.FullAddress == "" || req.PostalCode == "" {
-		return errors.ErrBadRequest
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	parsedID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		return errors.ErrBadRequest
+	var parsedIsDefault = false
+	if req.IsDefault != nil && *req.IsDefault != "" {
+		parsed, err := strconv.ParseBool(*req.IsDefault)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid default status")
+		}
+		parsedIsDefault = parsed
 	}
 
-	var parsedBool bool
-	parsedBool, err = strconv.ParseBool(*req.IsDefault)
-	if err != nil {
-		return errors.ErrBadRequest
-	}
-
-	inputCreateAddress := usecase.CreateAddressInput{
-		UserID:       parsedID,
+	input := usecase.CreateAddressInput{
+		UserID:       authCtx.UserID,
 		ReceiverName: req.ReceiverName,
 		Phone:        req.Phone,
-		IsDefault:    &parsedBool,
+		IsDefault:    &parsedIsDefault,
 		ProvinceID:   req.ProvinceID,
 		CityID:       req.CityID,
 		DistrictID:   req.DistrictID,
@@ -121,7 +128,7 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:   req.PostalCode,
 	}
 
-	err = h.createUserAddress.Execute(inputCreateAddress)
+	err := h.createUserAddress.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -135,27 +142,17 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AddressHandler) GetShopAddress(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 || parts[3] == "" {
-		return errors.ErrBadRequest
-	}
-
-	addressID := parts[3]
-	if addressID == "" {
-		return errors.ErrBadRequest
-	}
-
-	parsedAddressID, err := uuid.Parse(addressID)
+	addressID, err := apphttp.ParamUUID(r, "addressID")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid address id")
 	}
 
-	result, err := h.getShopAddress.GetByID(parsedAddressID)
+	result, err := h.getShopAddress.GetByID(r.Context(), addressID)
 	if err != nil {
 		return err
 	}
 
-	response := ShopAddressResponse{
+	response := shopAddressResponse{
 		ShopID:      result.ShopID,
 		Label:       result.Label,
 		Phone:       result.Phone,
@@ -175,29 +172,19 @@ func (h *AddressHandler) GetShopAddress(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 || parts[3] == "" {
-		return errors.ErrBadRequest
-	}
-
-	shopID := parts[3]
-	if shopID == "" {
-		return errors.ErrBadRequest
-	}
-
-	parsedShopID, err := uuid.Parse(shopID)
+	shopID, err := apphttp.ParamUUID(r, "id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	result, err := h.listShopAddresses.FindByShopID(parsedShopID)
+	result, err := h.listShopAddresses.FindByShopID(r.Context(), shopID)
 	if err != nil {
 		return err
 	}
 
-	addresses := make([]ShopAddressResponse, 0, len(result))
+	addresses := make([]shopAddressResponse, 0, len(result))
 	for _, r := range result {
-		address := ShopAddressResponse{
+		address := shopAddressResponse{
 			ShopID:      r.ShopID,
 			Label:       r.Label,
 			Phone:       r.Phone,
@@ -215,8 +202,8 @@ func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Reques
 		addresses = append(addresses, address)
 	}
 
-	response := ShopAddressesResponse{
-		Addresses: addresses,
+	response := map[string][]shopAddressResponse{
+		"addresses": addresses,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -224,36 +211,48 @@ func (h *AddressHandler) ListShopAddresses(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Request) error {
-	var req CreateShopAddressRequest
+	var req createShopAddressRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	if req.ProvinceID == "" || req.CityID == "" || req.DistrictID == "" || req.VillageID == "" {
-		return errors.ErrBadRequest
+	if req.ProvinceID == "" {
+		return apperrors.NewBadRequest("invalid province id")
+	}
+	if req.DistrictID == "" {
+		return apperrors.NewBadRequest("invalid district id")
+	}
+	if req.CityID == "" {
+		return apperrors.NewBadRequest("invalid city id")
+	}
+	if req.VillageID == "" {
+		return apperrors.NewBadRequest("invalid village id")
 	}
 
-	if req.FullAddress == "" || req.PostalCode == "" {
-		return errors.ErrBadRequest
+	if req.FullAddress == "" {
+		return apperrors.NewBadRequest("invalid full address")
+	}
+	if req.PostalCode == "" {
+		return apperrors.NewBadRequest("invalid postal code")
 	}
 
-	parsedID, err := uuid.Parse(req.ShopID)
+	parsedShopID, err := uuid.Parse(req.ShopID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	var parsedBool bool
-	parsedBool, err = strconv.ParseBool(req.IsActive)
+	var parsedIsActive bool
+	parsedIsActive, err = strconv.ParseBool(req.IsActive)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid active status")
 	}
 
-	inputCreateAddress := usecase.CreateShopAddressInput{
-		ShopID:      parsedID,
+	input := usecase.CreateShopAddressInput{
+		ShopID:      parsedShopID,
 		Label:       req.Label,
 		Phone:       req.Phone,
-		IsActive:    &parsedBool,
+		IsActive:    &parsedIsActive,
 		ProvinceID:  req.ProvinceID,
 		CityID:      req.CityID,
 		DistrictID:  req.DistrictID,
@@ -262,7 +261,7 @@ func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:  req.PostalCode,
 	}
 
-	err = h.createShopAddress.Execute(inputCreateAddress)
+	err = h.createShopAddress.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}

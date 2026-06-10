@@ -4,42 +4,44 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	database "service-core/internal/infra/db"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type paymentMethodRepositoryImpl struct {
-	db *pgxpool.Pool
+type paymentMethodRepositoryImpl struct{}
+
+func NewPaymentMethodRepository() repository.PaymentMethodRepository {
+	return &paymentMethodRepositoryImpl{}
 }
 
-func NewPaymentMethodRepository(conn *database.Connection) repository.PaymentMethodRepository {
-	return &paymentMethodRepositoryImpl{
-		db: conn.Pool,
-	}
-}
-
-func (r *paymentMethodRepositoryImpl) Save(method domain.PaymentMethod) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) Save(
+	ctx context.Context,
+	exec transaction.Executor,
+	method domain.PaymentMethod,
+) error {
 	query := `
 		INSERT INTO payment_methods (
-			id, name, type, is_active, description,
-			fee_type, fee_amount, fee_rate,
-			created_at, updated_at
+			id,
+			name,
+			type,
+			is_active,
+			description,
+			fee_type,
+			fee_amount,
+			fee_rate,
+			created_at,
+			updated_at
 		) VALUES (
 		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10
 		)
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	_, err := exec.Exec(ctx, query,
 		method.ID,
 		method.Name,
 		method.Type,
@@ -59,21 +61,27 @@ func (r *paymentMethodRepositoryImpl) Save(method domain.PaymentMethod) error {
 	return nil
 }
 
-func (r *paymentMethodRepositoryImpl) FindByName(name string) (*domain.PaymentMethod, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) FindByName(
+	ctx context.Context,
+	exec transaction.Executor,
+	name string,
+) (*domain.PaymentMethod, error) {
 	query := `
-		SELECT id, name, type, is_active, description,
-			   created_at, updated_at
+		SELECT
+			id,
+			name,
+			type,
+			is_active,
+			description,
+			created_at,
+			updated_at
 		FROM payment_methods
 		WHERE name LIKE $1 || '%'
 		LIMIT 1
 	`
 
 	var method domain.PaymentMethod
-
-	err := r.db.QueryRow(ctx, query, name).Scan(
+	err := exec.QueryRow(ctx, query, name).Scan(
 		&method.ID,
 		&method.Name,
 		&method.Type,
@@ -92,10 +100,11 @@ func (r *paymentMethodRepositoryImpl) FindByName(name string) (*domain.PaymentMe
 	return &method, nil
 }
 
-func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.PaymentMethod, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	paymentID uuid.UUID,
+) (*domain.PaymentMethod, error) {
 	query := `
 		SELECT 
 			id,
@@ -111,8 +120,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Paym
 	`
 
 	var method domain.PaymentMethod
-
-	err := r.db.QueryRow(ctx, query, paymentID).Scan(
+	err := exec.QueryRow(ctx, query, paymentID).Scan(
 		&method.ID,
 		&method.Name,
 		&method.Type,
@@ -132,10 +140,10 @@ func (r *paymentMethodRepositoryImpl) GetByID(paymentID uuid.UUID) (*domain.Paym
 	return &method, nil
 }
 
-func (r *paymentMethodRepositoryImpl) ListAll() ([]domain.PaymentMethod, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (r *paymentMethodRepositoryImpl) ListAll(
+	ctx context.Context,
+	exec transaction.Executor,
+) ([]domain.PaymentMethod, error) {
 	query := `
 		SELECT 
 			id,
@@ -149,14 +157,13 @@ func (r *paymentMethodRepositoryImpl) ListAll() ([]domain.PaymentMethod, error) 
 		WHERE deleted_at IS NULL
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := exec.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query payment methods failed: %w", err)
 	}
 	defer rows.Close()
 
 	var result []domain.PaymentMethod
-
 	for rows.Next() {
 		var row domain.PaymentMethod
 

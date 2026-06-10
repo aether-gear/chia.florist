@@ -1,10 +1,9 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/courier/usecase"
 
@@ -24,15 +23,15 @@ func NewCourierHandler(
 }
 
 func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Request) error {
-	var req ConfigureCourierShopRequest
+	var req configureCourierShopRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return errors.ErrBadRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
 	}
 
 	shopID, err := uuid.Parse(req.ShopID)
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	inputs := make([]usecase.ConfigureShopCourierInput, 0, len(req.Couriers))
@@ -44,7 +43,7 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	err = h.configureShopCourier.Execute(shopID, inputs)
+	err = h.configureShopCourier.Execute(r.Context(), shopID, inputs)
 	if err != nil {
 		return err
 	}

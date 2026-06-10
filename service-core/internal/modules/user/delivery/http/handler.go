@@ -2,14 +2,11 @@ package http
 
 import (
 	"net/http"
-	"strings"
 
-	"service-core/internal/modules/user/usecase"
-
-	"service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-
-	"github.com/google/uuid"
+	authendomain "service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/user/usecase"
 )
 
 type UserHandler struct {
@@ -23,35 +20,53 @@ func NewUserHandler(getUser *usecase.GetUserUsecase) *UserHandler {
 }
 
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) error {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 || parts[2] == "" {
-		return errors.ErrBadRequest
-	}
-
-	id := parts[2]
-	if id == "" {
-		return errors.ErrBadRequest
-	}
-
-	parsedID, err := uuid.Parse(id)
+	id, err := apphttp.ParamUUID(r, "id")
 	if err != nil {
-		return errors.ErrBadRequest
+		return apperrors.NewBadRequest("invalid user id")
 	}
 
-	result, err := h.getUser.ByID(parsedID)
+	result, err := h.getUser.ByID(r.Context(), id)
 	if err != nil {
 		return err
 	}
 	if result == nil {
-		return errors.ErrNotFound
+		return apperrors.NewNotFound("user not found")
 	}
 
-	response := UserResponse{
+	response := userResponse{
 		ID:          result.ID,
 		Name:        result.Name,
 		Username:    result.Username,
 		Phone:       result.Phone,
 		LastLoginAt: result.LastLoginAt,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *UserHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	result, err := h.getUser.ByID(r.Context(), authCtx.UserID)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		return apperrors.NewNotFound("user not found")
+	}
+
+	response := map[string]userResponse{
+		"me": {
+			ID:          result.ID,
+			Name:        result.Name,
+			Username:    result.Username,
+			Phone:       result.Phone,
+			LastLoginAt: result.LastLoginAt,
+		},
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

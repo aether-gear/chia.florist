@@ -1,13 +1,15 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	appErr "service-core/internal/common/errors"
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -15,15 +17,18 @@ import (
 type CreatePaymentAccountUsecase struct {
 	paymentMethodRepo repository.PaymentMethodRepository
 	paymentAccRepo    repository.PaymentAccountRepository
+	executor          transaction.Executor
 }
 
 func NewCreatePaymentAccountUsecase(
 	paymentAccRepo repository.PaymentAccountRepository,
 	paymentMethodRepo repository.PaymentMethodRepository,
+	executor transaction.Executor,
 ) *CreatePaymentAccountUsecase {
 	return &CreatePaymentAccountUsecase{
 		paymentAccRepo:    paymentAccRepo,
 		paymentMethodRepo: paymentMethodRepo,
+		executor:          executor,
 	}
 }
 
@@ -36,13 +41,16 @@ type CreatePaymentAccountInput struct {
 	IsActive      bool
 }
 
-func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) error {
-	method, err := u.paymentMethodRepo.GetByID(input.MethodID)
+func (u *CreatePaymentAccountUsecase) Execute(
+	ctx context.Context,
+	input CreatePaymentAccountInput,
+) error {
+	method, err := u.paymentMethodRepo.GetByID(ctx, u.executor, input.MethodID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve payment account: %w", err)
 	}
 	if method == nil {
-		return appErr.NewNotFound(domain.ErrPaymentMethodNotFound.Error())
+		return apperrors.NewNotFound(domain.ErrPaymentMethodNotFound.Error())
 	}
 
 	paymentAccount := domain.PaymentAccount{
@@ -59,13 +67,13 @@ func (u *CreatePaymentAccountUsecase) Execute(input CreatePaymentAccountInput) e
 
 	if err := paymentAccount.ValidateForMethod(method.Type); err != nil {
 		if errors.Is(err, domain.ErrUnsupportedPaymentMethod) {
-			return appErr.NewBadRequest(err.Error())
+			return apperrors.NewBadRequest(err.Error())
 		}
 
-		return appErr.NewInvalidInput(err.Error())
+		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	err = u.paymentAccRepo.Save(paymentAccount)
+	err = u.paymentAccRepo.Save(ctx, u.executor, paymentAccount)
 	if err != nil {
 		return fmt.Errorf("failed to save payment account: %w", err)
 	}
