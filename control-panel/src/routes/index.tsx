@@ -4,6 +4,7 @@ import LoginPage from '../pages/auth/LoginPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import SecurityPage from '../pages/security/SecurityPage';
 import PlaceholderPage from '../pages/PlaceholderPage';
+import MerchantProfileSettings from '../pages/merchant-profile/MerchantProfileSettings';
 
 export default function AppRoutes() {
   return (
@@ -19,6 +20,7 @@ export default function AppRoutes() {
           <Route path="/orders" element={<PlaceholderPage title="Orders" />} />
           <Route path="/transactions" element={<PlaceholderPage title="Transactions" />} />
           <Route path="/shipments" element={<PlaceholderPage title="Shipments" />} />
+          <Route path="/merchant/settings" element={<MerchantProfileSettings />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />
