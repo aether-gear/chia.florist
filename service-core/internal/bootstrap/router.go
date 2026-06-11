@@ -115,6 +115,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		authHandler = authH.NewAuthHandler(
 			&c.Me,
+			&c.Logout,
 			&c.LoginCustomer,
 			&c.LoginMerchant,
 			&c.RegisterCustomer,
@@ -184,6 +185,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Get("/me", chains.CoreAuth(authHandler.Me))
+			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
 			r.Post("/signin", chains.Core(authHandler.SignInEmail))
 			r.Post("/merchant/signin", chains.Core(authHandler.SignInMerchantEmail))
 			r.Post("/signup", chains.Core(authHandler.SignUpAccount))

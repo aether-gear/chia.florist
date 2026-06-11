@@ -1,7 +1,6 @@
 package http
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -16,6 +15,7 @@ import (
 
 type authHandler struct {
 	me               *usecase.MeUsecase
+	logout           *usecase.LogoutUsecase
 	loginCustomer    *usecase.LoginCustomerUsecase
 	loginMerchant    *usecase.LoginMerchantUsecase
 	registerCustomer *usecase.RegisterCustomerUsecase
@@ -25,6 +25,7 @@ type authHandler struct {
 
 func NewAuthHandler(
 	me *usecase.MeUsecase,
+	logout *usecase.LogoutUsecase,
 	loginCustomer *usecase.LoginCustomerUsecase,
 	loginMerchant *usecase.LoginMerchantUsecase,
 	registerCustomer *usecase.RegisterCustomerUsecase,
@@ -33,6 +34,7 @@ func NewAuthHandler(
 ) *authHandler {
 	return &authHandler{
 		me:               me,
+		logout:           logout,
 		loginCustomer:    loginCustomer,
 		loginMerchant:    loginMerchant,
 		registerCustomer: registerCustomer,
@@ -66,15 +68,10 @@ func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
-	fmt.Println("hjkahjka")
-
 	authCtx, ok := authdomain.GetAuthContext(r.Context())
-	fmt.Println(authCtx)
 	if !ok || !authCtx.IsAuthenticated {
 		return apperrors.NewUnauthorized("authentication required")
 	}
-
-	fmt.Println("hjkahjka")
 
 	me, err := h.me.Execute(r.Context(), *authCtx)
 	if err != nil {
@@ -278,6 +275,25 @@ func (h *authHandler) SignInMerchantEmail(w http.ResponseWriter, r *http.Request
 
 	response := map[string]string{
 		"message": "login success",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	err := h.logout.Execute(r.Context(), *authCtx)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "logout success",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

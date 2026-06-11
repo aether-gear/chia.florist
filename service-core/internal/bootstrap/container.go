@@ -59,6 +59,7 @@ type Container struct {
 	RegisterCustomer authenUsecase.RegisterCustomerUsecase
 	VerifyAccount    authenUsecase.VerifyAccountUsecase
 	GetAccount       authenUsecase.GetAccountUsecase
+	Logout           authenUsecase.LogoutUsecase
 
 	CreateMerchant     merchantUsecase.CreateMerchantUsecase
 	AddMerchantAccount merchantUsecase.AddMerchantAccountUsecase
@@ -206,6 +207,12 @@ func NewContainer(cfg Config,
 			infra.TransactionExecutor,
 			accountRepo,
 			actorSvc,
+		),
+		Logout: *authenUsecase.NewLogoutUsecase(
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			refreshTokenRepo,
+			sessionRepo,
 		),
 		LoginCustomer: *authenUsecase.
 			NewLoginCustomerUsecase(
