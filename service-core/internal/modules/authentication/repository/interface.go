@@ -108,4 +108,9 @@ type Authenticator interface {
 		exec transaction.Executor,
 		cookie string,
 	) appmiddleware.Middleware
+
+	RequireAnyAuth(
+		exec transaction.Executor,
+		cookies ...string,
+	) appmiddleware.Middleware
 }
