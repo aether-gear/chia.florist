@@ -81,6 +81,12 @@ type VerificationChallengeRepository interface {
 }
 
 type RefreshTokenRepository interface {
+	RevokeBySessionID(
+		ctx context.Context,
+		exec transaction.Executor,
+		sessionID uuid.UUID,
+	) error
+
 	Save(
 		ctx context.Context,
 		exec transaction.Executor,
