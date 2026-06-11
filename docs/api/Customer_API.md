@@ -84,6 +84,30 @@ These endpoints are accessible to anyone (no authentication required) or require
     }
     ```
 
+#### Me
+- **Method**: `GET`
+- **Endpoint**: `/auth/me`
+- **Description**: Get the information of current user.
+- **Response**:
+  ```json
+  {
+    "account_id": "8b477309-1492-48b0-b9ac-f493aea10cc6",
+    "account_type": "customer",
+    "is_authenticated": true
+  }
+  ```
+
+#### Log Out
+- **Method**: `POST`
+- **Endpoint**: `/auth/logout`
+- **Description**: For log out. It will clear session and refresh token of the user.
+- **Response**:
+  ```json
+  {
+    "message": "logout success"
+  }
+  ```
+
 ### Products
 
 #### Find Products
