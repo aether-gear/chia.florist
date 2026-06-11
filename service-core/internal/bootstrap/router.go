@@ -35,6 +35,20 @@ func NewRouter(c *Container) *chi.Mux {
 			log,
 			c.CORSAllowedOrigins,
 		)
+		coreAuth = buildChain(
+			log,
+			c.CORSAllowedOrigins,
+			c.Authenticator.RequireAnyAuth(
+				c.DBExecutor,
+				appcookie.AccessTokenCookieName,
+				appcookie.AccessTokenMerchantCookieName,
+			),
+			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireAccountType(
+				authendomain.AccountTypeMerchant,
+				authendomain.AccountTypeCustomer,
+			),
+		)
 		merchantOnly = buildChain(
 			log,
 			c.CORSAllowedOrigins,
@@ -81,6 +95,7 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		authHandler = authH.NewAuthHandler(
+			&c.Me,
 			&c.LoginCustomer,
 			&c.LoginMerchant,
 			&c.RegisterCustomer,
@@ -149,6 +164,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/auth", func(r chi.Router) {
+			r.Get("/me", coreAuth(authHandler.Me))
 			r.Post("/signin", core(authHandler.SignInEmail))
 			r.Post("/merchant/signin", core(authHandler.SignInMerchantEmail))
 			r.Post("/signup", core(authHandler.SignUpAccount))
