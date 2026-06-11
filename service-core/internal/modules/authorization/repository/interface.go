@@ -51,7 +51,7 @@ type ActorService interface {
 		ctx context.Context,
 		exec transaction.Executor,
 		userID uuid.UUID,
-		merchantID uuid.UUID,
+		merchantID *uuid.UUID,
 	) (*domain.Actor, error)
 }
 
