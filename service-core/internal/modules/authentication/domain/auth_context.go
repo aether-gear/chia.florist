@@ -10,6 +10,16 @@ type authContextKey struct{}
 
 var requestAuthContextKey authContextKey
 
+// AuthContext represents the authenticated identity available to the
+// application during a request lifecycle.
+//
+// This type is independent from any specific authentication mechanism
+// and provides the minimum identity and authorization information
+// required by application services and use cases.
+//
+// AuthContext is typically constructed by authentication middleware
+// after a token has been validated and should be passed into business
+// workflows instead of token-specific structures.
 type AuthContext struct {
 	UserID    uuid.UUID
 	SessionID uuid.UUID

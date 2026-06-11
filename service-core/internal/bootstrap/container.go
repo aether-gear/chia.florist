@@ -53,11 +53,13 @@ type Container struct {
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
+	Me               authenUsecase.MeUsecase
 	LoginCustomer    authenUsecase.LoginCustomerUsecase
 	LoginMerchant    authenUsecase.LoginMerchantUsecase
 	RegisterCustomer authenUsecase.RegisterCustomerUsecase
 	VerifyAccount    authenUsecase.VerifyAccountUsecase
 	GetAccount       authenUsecase.GetAccountUsecase
+	Logout           authenUsecase.LogoutUsecase
 
 	CreateMerchant     merchantUsecase.CreateMerchantUsecase
 	AddMerchantAccount merchantUsecase.AddMerchantAccountUsecase
@@ -201,6 +203,17 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
+		Me: *authenUsecase.NewMeUsecase(
+			infra.TransactionExecutor,
+			accountRepo,
+			actorSvc,
+		),
+		Logout: *authenUsecase.NewLogoutUsecase(
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			refreshTokenRepo,
+			sessionRepo,
+		),
 		LoginCustomer: *authenUsecase.
 			NewLoginCustomerUsecase(
 				accountRepo,

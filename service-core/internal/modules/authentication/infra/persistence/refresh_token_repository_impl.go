@@ -7,12 +7,37 @@ import (
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
 )
 
 type refreshTokenRepositoryImpl struct{}
 
 func NewRefreshTokenRepositoryImpl() repository.RefreshTokenRepository {
 	return &refreshTokenRepositoryImpl{}
+}
+
+func (r *refreshTokenRepositoryImpl) RevokeBySessionID(
+	ctx context.Context,
+	exec transaction.Executor,
+	sessionID uuid.UUID,
+) error {
+	query := `
+			UPDATE
+				refresh_tokens
+			SET
+				revoked_at = now()
+			WHERE
+				id = $1
+				AND revoked_at IS NULL
+		`
+
+	_, err := exec.Exec(ctx, query, sessionID)
+	if err != nil {
+		return fmt.Errorf("query to revoke refresh token: %w", err)
+	}
+
+	return nil
 }
 
 func (r *refreshTokenRepositoryImpl) Save(

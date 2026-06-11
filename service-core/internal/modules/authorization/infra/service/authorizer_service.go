@@ -86,7 +86,7 @@ func (s *authorizer) LoadActor(
 
 			actor, err := s.actorSvc.Load(r.Context(), exec,
 				authCtx.UserID,
-				*authCtx.MerchantID,
+				authCtx.MerchantID,
 			)
 			if err != nil {
 				return err

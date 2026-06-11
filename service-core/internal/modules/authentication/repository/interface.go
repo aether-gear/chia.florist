@@ -81,6 +81,12 @@ type VerificationChallengeRepository interface {
 }
 
 type RefreshTokenRepository interface {
+	RevokeBySessionID(
+		ctx context.Context,
+		exec transaction.Executor,
+		sessionID uuid.UUID,
+	) error
+
 	Save(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -107,5 +113,10 @@ type Authenticator interface {
 	RequireAuth(
 		exec transaction.Executor,
 		cookie string,
+	) appmiddleware.Middleware
+
+	RequireAnyAuth(
+		exec transaction.Executor,
+		cookies ...string,
 	) appmiddleware.Middleware
 }

@@ -32,6 +32,41 @@ This document outlines the merchant staff and admin-facing APIs based on the cur
     }
     ```
 
+#### Me
+- **Method**: `GET`
+- **Endpoint**: `/auth/me`
+- **Description**: Get the information of current user.
+- **Response**:
+  ```json
+  {
+    "account_id": "51e20db6-5bdb-4f6a-b2b7-8d40c0db857d",
+    "account_type": "merchant",
+    "is_authenticated": true,
+    "roles": [
+      {
+        "code": "merchant_staff",
+        "name": "Merchant Staff"
+      }
+    ],
+    "permissions": [
+      {
+        "code": "merchant_staff"
+      }
+    ]
+  }
+  ```
+
+#### Log Out
+- **Method**: `POST`
+- **Endpoint**: `/auth/logout`
+- **Description**: For log out. It will clear session and refresh token of the user.
+- **Response**:
+  ```json
+  {
+    "message": "logout success"
+  }
+  ```
+
 ---
 
 ## Merchant Management (Admin Only)

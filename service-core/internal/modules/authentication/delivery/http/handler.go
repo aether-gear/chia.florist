@@ -14,6 +14,8 @@ import (
 )
 
 type authHandler struct {
+	me               *usecase.MeUsecase
+	logout           *usecase.LogoutUsecase
 	loginCustomer    *usecase.LoginCustomerUsecase
 	loginMerchant    *usecase.LoginMerchantUsecase
 	registerCustomer *usecase.RegisterCustomerUsecase
@@ -22,6 +24,8 @@ type authHandler struct {
 }
 
 func NewAuthHandler(
+	me *usecase.MeUsecase,
+	logout *usecase.LogoutUsecase,
 	loginCustomer *usecase.LoginCustomerUsecase,
 	loginMerchant *usecase.LoginMerchantUsecase,
 	registerCustomer *usecase.RegisterCustomerUsecase,
@@ -29,6 +33,8 @@ func NewAuthHandler(
 	getAccount *usecase.GetAccountUsecase,
 ) *authHandler {
 	return &authHandler{
+		me:               me,
+		logout:           logout,
 		loginCustomer:    loginCustomer,
 		loginMerchant:    loginMerchant,
 		registerCustomer: registerCustomer,
@@ -55,6 +61,45 @@ func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 		"id":            acc.ID,
 		"email":         acc.Email,
 		"last_login_at": acc.LastLoginAt,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	me, err := h.me.Execute(r.Context(), *authCtx)
+	if err != nil {
+		return err
+	}
+
+	roles := make([]roleResponse, 0, len(me.Actor.Roles))
+	for _, role := range me.Actor.Roles {
+		roles = append(roles, roleResponse{
+			Code: role.Code,
+			Name: role.Name,
+		})
+	}
+
+	permissions := make([]permissionResponse, 0, len(me.Actor.Permissions))
+	for _, role := range me.Actor.Roles {
+		permissions = append(permissions, permissionResponse{
+			Code: role.Code,
+		})
+	}
+
+	response := meResponse{
+		AccountID:       me.Account.ID,
+		AccountType:     string(me.Account.Type),
+		IsAuthenticated: true,
+		MerchantID:      me.Actor.MerchantID,
+		Roles:           roles,
+		Permissions:     permissions,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -230,6 +275,25 @@ func (h *authHandler) SignInMerchantEmail(w http.ResponseWriter, r *http.Request
 
 	response := map[string]string{
 		"message": "login success",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	err := h.logout.Execute(r.Context(), *authCtx)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "logout success",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

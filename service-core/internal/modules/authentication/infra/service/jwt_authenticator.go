@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -37,44 +38,104 @@ func (aM *jwtAuthenticator) RequireAuth(
 		return func(w http.ResponseWriter, r *http.Request) error {
 			token, err := appcookie.CookieValue(r, cookie)
 			if err != nil {
-				return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+				return apperrors.
+					NewUnauthorized(domain.ErrAuthenticationRequired.Error())
 			}
 
-			claims, err := aM.tokenSvc.Validate(token)
-			if err != nil {
-				return apperrors.NewUnauthorized(domain.ErrInvalidToken.Error())
-			}
-			if claims.Type != domain.TokenTypeAccess {
-				return apperrors.NewUnauthorized(domain.ErrInvalidToken.Error())
-			}
-
-			session, err := aM.sessionRepo.GetByID(
+			authCtx, err := aM.authenticate(
 				r.Context(),
 				exec,
-				claims.SessionID,
+				token,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to load session: %w", err)
-			}
-			if session == nil ||
-				session.UserID != claims.UserID ||
-				session.RevokedAt != nil ||
-				session.ExpiresAt.Before(time.Now()) {
-				return apperrors.NewUnauthorized(domain.ErrInvalidSession.Error())
+				return err
 			}
 
-			authCtx := domain.AuthContext{
-				UserID:          claims.UserID,
-				SessionID:       claims.SessionID,
-				TokenType:       claims.Type,
-				IsAuthenticated: true,
-				MerchantID:      claims.MerchantID,
-				Roles:           claims.Roles,
-			}
-
-			r = r.WithContext(domain.WithAuthContext(r.Context(), &authCtx))
+			r = r.WithContext(
+				domain.WithAuthContext(
+					r.Context(),
+					authCtx,
+				),
+			)
 
 			return next(w, r)
 		}
 	}
+}
+
+func (aM *jwtAuthenticator) RequireAnyAuth(
+	exec transaction.Executor,
+	cookies ...string,
+) commonmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			for _, cookie := range cookies {
+				token, err := appcookie.CookieValue(r, cookie)
+				if err != nil {
+					continue
+				}
+
+				authCtx, err := aM.authenticate(
+					r.Context(),
+					exec,
+					token,
+				)
+				if err != nil {
+					continue
+				}
+
+				r = r.WithContext(
+					domain.WithAuthContext(
+						r.Context(),
+						authCtx,
+					),
+				)
+
+				return next(w, r)
+			}
+
+			return apperrors.
+				NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+		}
+	}
+}
+
+func (aM *jwtAuthenticator) authenticate(
+	ctx context.Context,
+	exec transaction.Executor,
+	token string,
+) (*domain.AuthContext, error) {
+	claims, err := aM.tokenSvc.Validate(token)
+	if err != nil {
+		return nil, apperrors.NewUnauthorized(domain.ErrInvalidToken.Error())
+	}
+
+	if claims.Type != domain.TokenTypeAccess {
+		return nil, apperrors.NewUnauthorized(domain.ErrInvalidToken.Error())
+	}
+
+	session, err := aM.sessionRepo.GetByID(
+		ctx,
+		exec,
+		claims.SessionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load session: %w", err)
+	}
+
+	if session == nil ||
+		session.UserID != claims.UserID ||
+		session.RevokedAt != nil ||
+		session.ExpiresAt.Before(time.Now()) {
+		return nil, apperrors.NewUnauthorized(domain.ErrInvalidSession.Error())
+	}
+
+	return &domain.AuthContext{
+		UserID:          claims.UserID,
+		SessionID:       claims.SessionID,
+		TokenType:       claims.Type,
+		IsAuthenticated: true,
+		MerchantID:      claims.MerchantID,
+		Roles:           claims.Roles,
+	}, nil
 }

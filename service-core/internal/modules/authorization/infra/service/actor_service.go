@@ -36,7 +36,7 @@ func (s *ActorService) Load(
 	ctx context.Context,
 	exec transaction.Executor,
 	userID uuid.UUID,
-	merchantID uuid.UUID,
+	merchantID *uuid.UUID,
 ) (*domain.Actor, error) {
 	account, err := s.accountRepo.
 		GetByUserID(ctx, exec,
@@ -55,7 +55,7 @@ func (s *ActorService) Load(
 		roles, err := s.membershipRepo.
 			ListRolesByAccountIDAndMerchantID(ctx, exec,
 				account.ID,
-				merchantID,
+				*merchantID,
 			)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve merchant roles: %w", err)

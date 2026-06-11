@@ -1,6 +1,8 @@
 package http
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type signUpRequest struct {
 	Name     string  `json:"name"`
@@ -32,4 +34,23 @@ type signInUsernameRequest struct {
 type signUpResponse struct {
 	Message     string    `json:"message"`
 	ChallengeID uuid.UUID `json:"challenge_id"`
+}
+
+type roleResponse struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type permissionResponse struct {
+	Code string `json:"code"`
+}
+
+type meResponse struct {
+	AccountID       uuid.UUID `json:"account_id"`
+	AccountType     string    `json:"account_type"`
+	IsAuthenticated bool      `json:"is_authenticated"`
+
+	MerchantID  *uuid.UUID           `json:"merchant_id,omitempty"`
+	Roles       []roleResponse       `json:"roles,omitempty"`
+	Permissions []permissionResponse `json:"permissions,omitempty"`
 }
