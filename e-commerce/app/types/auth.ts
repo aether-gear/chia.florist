@@ -47,3 +47,9 @@ export interface UserMe {
 export interface GetCurrentUserResponse {
   me: UserMe
 }
+
+export interface GetMeResponse {
+  account_id: string
+  account_type: string
+  is_authenticated: boolean
+}
