@@ -28,7 +28,7 @@ func (r *refreshTokenRepositoryImpl) RevokeBySessionID(
 			SET
 				revoked_at = now()
 			WHERE
-				id = $1
+				session_id = $1
 				AND revoked_at IS NULL
 		`
 
