@@ -74,7 +74,7 @@ func (r *sessionRepositoryImpl) RevokeByID(
 		SET
 			revoked_at = now()
 		WHERE
-			session_id = $1
+			id = $1
 			AND revoked_at IS NULL
 	`
 
