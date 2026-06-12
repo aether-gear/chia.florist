@@ -5,9 +5,11 @@ import type {
   VerifyResponse, 
   SignInRequest, 
   SignInResponse, 
-  GetCurrentUserResponse 
+  GetCurrentUserResponse,
+  GetMeResponse
 } from '~/types/auth'
 import { bootstrapConfig } from '~/utils/bootstrap'
+
 export const authService = {
   /**
    * Register a new user account.
@@ -22,7 +24,7 @@ export const authService = {
    * Verify account using OTP code and challenge ID.
    */
   async verify(data: VerifyRequest): Promise<VerifyResponse> {
-    return bootstrapConfig.fetchApi<VerifyResponse>('/auth/verify', {
+    return $fetch<VerifyResponse>('/api/auth/verify', {
       method: 'POST',
       body: data
     })
@@ -31,9 +33,30 @@ export const authService = {
    * Sign in user via email and password.
    */
   async signIn(data: SignInRequest): Promise<SignInResponse> {
-    return bootstrapConfig.fetchApi<SignInResponse>('/auth/signin', {
+    return $fetch<SignInResponse>('/api/auth/signin', {
       method: 'POST',
       body: data
+    })
+  },
+  /**
+   * Retrieve session state from local server route.
+   */
+  async getMe(cookieHeader?: string): Promise<GetMeResponse> {
+    const headers: Record<string, string> = {}
+    if (cookieHeader) {
+      headers['cookie'] = cookieHeader
+    }
+    return $fetch<GetMeResponse>('/api/auth/me', {
+      method: 'GET',
+      headers
+    })
+  },
+  /**
+   * Sign out the user by hitting local route (which calls backend /auth/logout).
+   */
+  async signOut(): Promise<void> {
+    return $fetch<void>('/api/auth/logout', {
+      method: 'POST'
     })
   },
   /**

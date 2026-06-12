@@ -21,15 +21,39 @@ export const useAuthViewModel = () => {
     isLoading.value = true
     error.value = null
     try {
-      const isLoggedIn = useCookie('is_logged_in')
-      const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
-      if (isLoggedIn.value === 'true' && userProfile.value) {
+      const response = await authService.getMe(cookieHeader)
+      if (response && response.is_authenticated) {
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        const isLoggedIn = useCookie('is_logged_in')
+        
+        isLoggedIn.value = 'true'
+        
+        if (!userProfile.value) {
+          userProfile.value = {
+            id: response.account_id,
+            name: 'Customer',
+            username: 'customer',
+            phone: '',
+            last_login_at: new Date().toISOString()
+          }
+        } else {
+          userProfile.value.id = response.account_id
+        }
+        
         currentUser.value = userProfile.value as UserMe
       } else {
         currentUser.value = null
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        const isLoggedIn = useCookie('is_logged_in')
+        userProfile.value = null
+        isLoggedIn.value = null
       }
     } catch (err: any) {
       currentUser.value = null
+      const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+      const isLoggedIn = useCookie('is_logged_in')
+      userProfile.value = null
+      isLoggedIn.value = null
       console.warn('Failed to fetch user state:', err)
     } finally {
       isLoading.value = false
@@ -45,9 +69,7 @@ export const useAuthViewModel = () => {
     error.value = null
     
     try {
-      console.log(credentials)
       const response = await authService.signIn(credentials)
-      console.log(response)
       if (response.message === 'login success') {
         // Fetch profile to populate global user state
         await fetchCurrentUser()
@@ -182,8 +204,7 @@ export const useAuthViewModel = () => {
   const logout = async () => {
     isLoading.value = true
     try {
-      // Clear cookie using Nuxt endpoint
-      await $fetch('/api/auth/logout')
+      await authService.signOut()
     } catch (err) {
       console.error('Error hitting logout route:', err)
     } finally {

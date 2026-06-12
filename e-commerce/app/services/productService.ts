@@ -58,7 +58,6 @@ export const productService = {
    */
   async getCatalogProducts(): Promise<CatalogProduct[]> {
     const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products/')
-    console.log('API Response for Catalog Products:', response)
     if (response && Array.isArray(response.products)) {
       return response.products.map(p => this.mapApiCatalogProduct(p))
     }
@@ -71,7 +70,6 @@ export const productService = {
    */
   async getProductById(id: string): Promise<Product | null> {
     const response = await bootstrapConfig.fetchApi<ApiProductDetail>(`/products/${id}`)
-    console.log('API Response for Product Details:', response)
 
     if (response && response.id) {
       return this.mapApiProduct(response)

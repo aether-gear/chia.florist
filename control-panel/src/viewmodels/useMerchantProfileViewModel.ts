@@ -82,7 +82,6 @@ export function useMerchantProfileViewModel() {
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       setProfile(data); // update local state
-      console.log('Profile saved successfully', data);
       return true;
     } catch (err) {
       console.error('Failed to save profile', err);
