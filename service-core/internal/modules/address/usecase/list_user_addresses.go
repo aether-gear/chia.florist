@@ -30,7 +30,7 @@ func (u *ListUserAddressUsecase) ListByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
 ) ([]domain.Address, error) {
-	res, err := u.userAddressRepo.GetByUserID(ctx, u.executor, userID)
+	res, err := u.userAddressRepo.ListByUserID(ctx, u.executor, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve address: %w", err)
 	}

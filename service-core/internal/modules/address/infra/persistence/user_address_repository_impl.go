@@ -19,7 +19,7 @@ func NewUserAddressRepositoryImpl() repository.UserAddressRepository {
 	return &userAddressRepositoryImpl{}
 }
 
-func (r *userAddressRepositoryImpl) GetByUserID(
+func (r *userAddressRepositoryImpl) ListByUserID(
 	ctx context.Context,
 	exec transaction.Executor,
 	userID uuid.UUID,
