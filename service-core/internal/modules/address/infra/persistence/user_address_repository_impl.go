@@ -190,3 +190,26 @@ func (r *userAddressRepositoryImpl) Save(
 
 	return nil
 }
+
+func (r *userAddressRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
+) error {
+	query := `
+		UPDATE
+			user_addresses
+		SET
+			deleted_at = now()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, addressID)
+	if err != nil {
+		return fmt.Errorf("delete address failed: %w", err)
+	}
+
+	return nil
+}

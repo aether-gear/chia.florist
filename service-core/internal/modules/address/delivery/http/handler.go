@@ -13,25 +13,28 @@ import (
 )
 
 type AddressHandler struct {
-	getShopAddress    *usecase.GetShopAddressUsecase
 	listUserAddresses *usecase.ListUserAddressUsecase
-	listShopAddresses *usecase.ListShopAddressesUsecase
 	saveUserAddress   *usecase.SaveUserAddressUsecase
+	deleteUserAddress *usecase.DeleteUserAddressUsecase
+	getShopAddress    *usecase.GetShopAddressUsecase
+	listShopAddresses *usecase.ListShopAddressesUsecase
 	createShopAddress *usecase.CreateShopAddressUsecase
 }
 
 func NewAddressHandler(
-	getShopAddress *usecase.GetShopAddressUsecase,
 	listUserAddresses *usecase.ListUserAddressUsecase,
-	listShopAddresses *usecase.ListShopAddressesUsecase,
 	saveUserAddress *usecase.SaveUserAddressUsecase,
+	deleteUserAddress *usecase.DeleteUserAddressUsecase,
+	getShopAddress *usecase.GetShopAddressUsecase,
+	listShopAddresses *usecase.ListShopAddressesUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
-		getShopAddress:    getShopAddress,
 		listUserAddresses: listUserAddresses,
-		listShopAddresses: listShopAddresses,
 		saveUserAddress:   saveUserAddress,
+		deleteUserAddress: deleteUserAddress,
+		getShopAddress:    getShopAddress,
+		listShopAddresses: listShopAddresses,
 		createShopAddress: createShopAddress,
 	}
 }
@@ -146,7 +149,31 @@ func (h *AddressHandler) SaveUserAddress(w http.ResponseWriter, r *http.Request)
 	}
 
 	response := map[string]string{
-		"message": "address successfully created",
+		"message": "address saved successfully",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) DeleteUserAddress(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	addressID, err := apphttp.ParamUUID(r, "addressID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid address id")
+	}
+
+	err = h.deleteUserAddress.Execute(r.Context(), addressID)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "address deleted successfully",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

@@ -33,6 +33,12 @@ type UserAddressRepository interface {
 		exec transaction.Executor,
 		address domain.Address,
 	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		addressID uuid.UUID,
+	) error
 }
 
 type ShopAddressRepository interface {
