@@ -13,25 +13,28 @@ import (
 )
 
 type AddressHandler struct {
-	getShopAddress    *usecase.GetShopAddressUsecase
 	listUserAddresses *usecase.ListUserAddressUsecase
+	saveUserAddress   *usecase.SaveUserAddressUsecase
+	deleteUserAddress *usecase.DeleteUserAddressUsecase
+	getShopAddress    *usecase.GetShopAddressUsecase
 	listShopAddresses *usecase.ListShopAddressesUsecase
-	createUserAddress *usecase.CreateAddressUsecase
 	createShopAddress *usecase.CreateShopAddressUsecase
 }
 
 func NewAddressHandler(
-	getShopAddress *usecase.GetShopAddressUsecase,
 	listUserAddresses *usecase.ListUserAddressUsecase,
+	saveUserAddress *usecase.SaveUserAddressUsecase,
+	deleteUserAddress *usecase.DeleteUserAddressUsecase,
+	getShopAddress *usecase.GetShopAddressUsecase,
 	listShopAddresses *usecase.ListShopAddressesUsecase,
-	createUserAddress *usecase.CreateAddressUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
-		getShopAddress:    getShopAddress,
 		listUserAddresses: listUserAddresses,
+		saveUserAddress:   saveUserAddress,
+		deleteUserAddress: deleteUserAddress,
+		getShopAddress:    getShopAddress,
 		listShopAddresses: listShopAddresses,
-		createUserAddress: createUserAddress,
 		createShopAddress: createShopAddress,
 	}
 }
@@ -50,6 +53,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 	result := make([]userAddressResponse, 0, len(addresses))
 	for _, r := range addresses {
 		address := userAddressResponse{
+			AddressID:    r.ID,
 			UserID:       r.UserID,
 			ReceiverName: r.ReceiverName,
 			Phone:        r.Phone,
@@ -75,8 +79,8 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 	return nil
 }
 
-func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Request) error {
-	var req createUserAddressRequest
+func (h *AddressHandler) SaveUserAddress(w http.ResponseWriter, r *http.Request) error {
+	var req saveUserAddressRequest
 
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
@@ -106,6 +110,16 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
+	var addressID *uuid.UUID
+	if req.AddressID != nil {
+		parsed, err := uuid.Parse(*req.AddressID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid address id")
+		}
+
+		addressID = &parsed
+	}
+
 	var parsedIsDefault = false
 	if req.IsDefault != nil && *req.IsDefault != "" {
 		parsed, err := strconv.ParseBool(*req.IsDefault)
@@ -115,7 +129,8 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		parsedIsDefault = parsed
 	}
 
-	input := usecase.CreateAddressInput{
+	input := usecase.SaveUserAddressInput{
+		ID:           addressID,
 		UserID:       authCtx.UserID,
 		ReceiverName: req.ReceiverName,
 		Phone:        req.Phone,
@@ -128,13 +143,37 @@ func (h *AddressHandler) CreateUserAddress(w http.ResponseWriter, r *http.Reques
 		PostalCode:   req.PostalCode,
 	}
 
-	err := h.createUserAddress.Execute(r.Context(), input)
+	err := h.saveUserAddress.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
 
 	response := map[string]string{
-		"message": "address successfully created",
+		"message": "address saved successfully",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) DeleteUserAddress(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	addressID, err := apphttp.ParamUUID(r, "addressID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid address id")
+	}
+
+	err = h.deleteUserAddress.Execute(r.Context(), addressID)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "address deleted successfully",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

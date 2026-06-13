@@ -144,11 +144,12 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		addressHandler = addressH.NewAddressHandler(
-			&c.GetShopAddress,
 			&c.ListUserAddresses,
+			&c.CreateUserAddress,
+			&c.DeleteUserAddress,
+			&c.GetShopAddress,
 			&c.ListShopAddresses,
-			&c.CreateAddress,
-			&c.CreateShopAddress,
+			&c.SaveShopAddress,
 		)
 
 		paymentHandler = paymentH.NewPaymentHandler(
@@ -229,7 +230,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 			r.Route("/addresses", func(r chi.Router) {
 				r.Get("/", chains.CustomerOnly(addressHandler.ListUserAddresses))
-				r.Post("/", chains.CustomerOnly(addressHandler.CreateUserAddress))
+				r.Post("/", chains.CustomerOnly(addressHandler.SaveUserAddress))
+				r.Delete("/{addressID}", chains.CustomerOnly(addressHandler.DeleteUserAddress))
 			})
 		})
 

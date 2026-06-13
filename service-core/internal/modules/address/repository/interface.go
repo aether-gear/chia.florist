@@ -10,16 +10,40 @@ import (
 )
 
 type UserAddressRepository interface {
-	GetByUserID(
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		addressID uuid.UUID,
+	) (*domain.Address, error)
+
+	ListByUserID(
 		ctx context.Context,
 		exec transaction.Executor,
 		userID uuid.UUID,
 	) ([]domain.Address, error)
-	// GetDefault(userID uuid.UUID) (*domain.Address, error)
-	Create(
+
+	CountByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) (*int, error)
+
+	UnsetDefaultByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) error
+
+	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		address domain.Address,
+	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		addressID uuid.UUID,
 	) error
 }
 

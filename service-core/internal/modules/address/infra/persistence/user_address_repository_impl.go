@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"service-core/internal/modules/address/domain"
@@ -9,6 +10,7 @@ import (
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type userAddressRepositoryImpl struct{}
@@ -17,7 +19,57 @@ func NewUserAddressRepositoryImpl() repository.UserAddressRepository {
 	return &userAddressRepositoryImpl{}
 }
 
-func (r *userAddressRepositoryImpl) GetByUserID(
+func (r *userAddressRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
+) (*domain.Address, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			recipient_name,
+			phone,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			is_default,
+			created_at,
+			updated_at
+		FROM user_addresses
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	var add domain.Address
+	err := exec.QueryRow(ctx, query, addressID).Scan(
+		&add.ID,
+		&add.UserID,
+		&add.ReceiverName,
+		&add.Phone,
+		&add.Detail.ProvinceID,
+		&add.Detail.CityID,
+		&add.Detail.DistrictID,
+		&add.Detail.VillageID,
+		&add.Detail.FullAddress,
+		&add.Detail.PostalCode,
+		&add.IsDefault,
+		&add.CreatedAt,
+		&add.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query get address by id failed: %w", err)
+	}
+
+	return &add, nil
+}
+
+func (r *userAddressRepositoryImpl) ListByUserID(
 	ctx context.Context,
 	exec transaction.Executor,
 	userID uuid.UUID,
@@ -82,7 +134,58 @@ func (r *userAddressRepositoryImpl) GetByUserID(
 	return addresses, nil
 }
 
-func (r *userAddressRepositoryImpl) Create(
+func (r *userAddressRepositoryImpl) CountByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM
+			user_addresses
+		WHERE
+			user_id = $1
+			AND deleted_at IS NULL
+	`
+
+	var count int
+	err := exec.QueryRow(ctx, query, userID).Scan(&count)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query count address failed: %w", err)
+	}
+
+	return &count, nil
+}
+
+func (r *userAddressRepositoryImpl) UnsetDefaultByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) error {
+	query := `
+		UPDATE
+			user_addresses
+		SET
+			is_default = false,
+			updated_at = NOW()
+		WHERE
+			user_id = $1
+			AND is_default = true
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("query unset default address failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *userAddressRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
 	address domain.Address,
@@ -105,6 +208,19 @@ func (r *userAddressRepositoryImpl) Create(
 		) VALUES (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
 		)
+		ON CONFLICT (id)
+		DO UPDATE SET
+			recipient_name = EXCLUDED.recipient_name,
+			phone = EXCLUDED.phone,
+			is_default = EXCLUDED.is_default,
+			province = EXCLUDED.province,
+			city = EXCLUDED.city,
+			district = EXCLUDED.district,
+			village = EXCLUDED.village,
+			full_address = EXCLUDED.full_address,
+			postal_code = EXCLUDED.postal_code,
+			created_at = EXCLUDED.created_at,
+			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -124,6 +240,32 @@ func (r *userAddressRepositoryImpl) Create(
 	)
 	if err != nil {
 		return fmt.Errorf("insert address failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *userAddressRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
+) error {
+	query := `
+		UPDATE
+			user_addresses
+		SET
+			is_default = false,
+			deleted_at = now()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query,
+		addressID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete address failed: %w", err)
 	}
 
 	return nil
