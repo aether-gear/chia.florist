@@ -15,7 +15,15 @@ type UserAddressRepository interface {
 		exec transaction.Executor,
 		userID uuid.UUID,
 	) ([]domain.Address, error)
+
+	CountByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) (*int, error)
+
 	// GetDefault(userID uuid.UUID) (*domain.Address, error)
+
 	Create(
 		ctx context.Context,
 		exec transaction.Executor,

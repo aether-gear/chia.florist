@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -24,6 +25,7 @@ func NewCreateAddressUsecase(
 ) *CreateAddressUsecase {
 	return &CreateAddressUsecase{
 		userAddressRepo: userAddressRepo,
+		executor:        executor,
 	}
 }
 
@@ -51,6 +53,19 @@ func (u *CreateAddressUsecase) Execute(
 		isDefault = false
 	}
 
+	count, err := u.userAddressRepo.CountByUserID(
+		ctx,
+		u.executor,
+		input.UserID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to count address: %w", err)
+	}
+
+	if count != nil && *count > 10 {
+		return apperrors.NewConflict(domain.ErrAddressLimitReached.Error())
+	}
+
 	address := domain.Address{
 		ID:           uuid.New(),
 		UserID:       input.UserID,
@@ -68,7 +83,7 @@ func (u *CreateAddressUsecase) Execute(
 		CreatedAt: time.Now(),
 	}
 
-	err := u.userAddressRepo.Create(ctx, u.executor, address)
+	err = u.userAddressRepo.Create(ctx, u.executor, address)
 	if err != nil {
 		return fmt.Errorf("failed to save address: %w", err)
 	}

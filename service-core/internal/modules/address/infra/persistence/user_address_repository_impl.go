@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"service-core/internal/modules/address/domain"
@@ -9,6 +10,7 @@ import (
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type userAddressRepositoryImpl struct{}
@@ -80,6 +82,29 @@ func (r *userAddressRepositoryImpl) GetByUserID(
 	}
 
 	return addresses, nil
+}
+
+func (r *userAddressRepositoryImpl) CountByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM user_addresses
+		WHERE user_id = $1
+	`
+
+	var count int
+	err := exec.QueryRow(ctx, query, userID).Scan(&count)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query count address failed: %w", err)
+	}
+
+	return &count, nil
 }
 
 func (r *userAddressRepositoryImpl) Create(
