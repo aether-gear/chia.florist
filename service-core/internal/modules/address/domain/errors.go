@@ -3,5 +3,7 @@ package domain
 import "errors"
 
 var (
-	ErrAddressLimitReached = errors.New("maximum address limit reached")
+	ErrCannotDeleteDefaultAddress = errors.New("default address cannot be deleted")
+	ErrAddressNotFound            = errors.New("address not found")
+	ErrAddressLimitReached        = errors.New("maximum address limit reached")
 )

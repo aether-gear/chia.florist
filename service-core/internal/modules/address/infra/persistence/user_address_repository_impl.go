@@ -19,6 +19,56 @@ func NewUserAddressRepositoryImpl() repository.UserAddressRepository {
 	return &userAddressRepositoryImpl{}
 }
 
+func (r *userAddressRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
+) (*domain.Address, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			recipient_name,
+			phone,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			is_default,
+			created_at,
+			updated_at
+		FROM user_addresses
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	var add domain.Address
+	err := exec.QueryRow(ctx, query, addressID).Scan(
+		&add.ID,
+		&add.UserID,
+		&add.ReceiverName,
+		&add.Phone,
+		&add.Detail.ProvinceID,
+		&add.Detail.CityID,
+		&add.Detail.DistrictID,
+		&add.Detail.VillageID,
+		&add.Detail.FullAddress,
+		&add.Detail.PostalCode,
+		&add.IsDefault,
+		&add.CreatedAt,
+		&add.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query get address by id failed: %w", err)
+	}
+
+	return &add, nil
+}
+
 func (r *userAddressRepositoryImpl) ListByUserID(
 	ctx context.Context,
 	exec transaction.Executor,

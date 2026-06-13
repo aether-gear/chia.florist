@@ -10,6 +10,12 @@ import (
 )
 
 type UserAddressRepository interface {
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		addressID uuid.UUID,
+	) (*domain.Address, error)
+
 	ListByUserID(
 		ctx context.Context,
 		exec transaction.Executor,
