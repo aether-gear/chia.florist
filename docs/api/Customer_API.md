@@ -743,3 +743,105 @@ These endpoints require authentication and are restricted to users with the `Cus
     ]
   }
   ```
+
+### User Address
+ 
+#### List User Address
+- **Method**: `GET`
+- **Endpoint**: `/users/me/addresses/`
+- **Description**: List all user addresses.
+- **Request Header**:
+  - **Cookie**: 
+
+    | Key | Value |
+    | --- | --- |
+    | Cookie | chast="value" |
+- **Response**:
+  ```json
+  {
+    "addresses": [
+      {
+        "address_id": "e0c240b0-9259-493a-80e1-ac02358be59f",
+        "user_id": "28be4cae-6ad9-4ca4-a5b4-7c1d924139c0",
+        "receiver_name": "Iam",
+        "phone": "000",
+        "is_default": false,
+        "province_id": "5",
+        "city_id": "63",
+        "district_id": "611",
+        "village_id": "6555",
+        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan",
+        "postal_code": "17131",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "address_id": "cd0ce5ff-d5ed-4b1c-85a4-16fef4d19f01",
+        "user_id": "28be4cae-6ad9-4ca4-a5b4-7c1d924139c0",
+        "receiver_name": "Dialyn UwU",
+        "phone": "000",
+        "is_default": true,
+        "province_id": "5",
+        "city_id": "63",
+        "district_id": "611",
+        "village_id": "6555",
+        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan",
+        "postal_code": "17131",
+        "created_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  }
+  ```
+
+#### Save User Address - Update and Create
+- **Method**: `POST`
+- **Endpoint**: `/users/me/addresses/`
+- **Description**: Register a new user account.
+- **Request Header**:
+  - **Cookie**: 
+
+    | Key | Value |
+    | --- | --- |
+    | Cookie | chast="value" |
+- **Request Body**:
+  ```json
+  {
+    "address_id": "b4e4c76c-c017-4896-a086-0b1316e99457",
+    "receiver_name": "Dialyn UwU",
+    "phone": "000",
+    "is_default": "True",
+    "province_id": "5",
+    "city_id": "63",
+    "district_id": "611",
+    "village_id": "6555",
+    "postal_code": "17131",
+    "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "address saved successfully",
+  }
+  ```
+- **Notes**: 
+  - Request body with address id will be assumed of updating while without one will be assumed creating.
+  - Max. address per account is 10.
+
+#### Delete User Address
+- **Method**: `Delete`
+- **Endpoint**: `/users/me/addresses/{addressID}`
+- **Description**: Register a new user account.
+- **Request Header**:
+  - **Cookie**: 
+
+    | Key | Value |
+    | --- | --- |
+    | Cookie | chast="value" |
+- **Response**:
+  ```json
+  {
+    "message": "address deleted successfully",
+  }
+  ```
+- **Notes**:
+  - Can only delete non default address.
