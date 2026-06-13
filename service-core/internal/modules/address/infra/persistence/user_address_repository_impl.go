@@ -91,8 +91,11 @@ func (r *userAddressRepositoryImpl) CountByUserID(
 ) (*int, error) {
 	query := `
 		SELECT COUNT(*)
-		FROM user_addresses
-		WHERE user_id = $1
+		FROM
+			user_addresses
+		WHERE
+			user_id = $1
+			AND deleted_at IS NULL
 	`
 
 	var count int
@@ -120,7 +123,8 @@ func (r *userAddressRepositoryImpl) UnsetDefaultByUserID(
 			updated_at = NOW()
 		WHERE
 			user_id = $1
-			AND is_default = true;
+			AND is_default = true
+			AND deleted_at IS NULL
 	`
 
 	_, err := exec.Exec(ctx, query, userID)
@@ -200,13 +204,16 @@ func (r *userAddressRepositoryImpl) Delete(
 		UPDATE
 			user_addresses
 		SET
+			is_default = false,
 			deleted_at = now()
 		WHERE
 			id = $1
 			AND deleted_at IS NULL
 	`
 
-	_, err := exec.Exec(ctx, query, addressID)
+	_, err := exec.Exec(ctx, query,
+		addressID,
+	)
 	if err != nil {
 		return fmt.Errorf("delete address failed: %w", err)
 	}

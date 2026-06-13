@@ -59,6 +59,8 @@ func (u *SaveUserAddressUsecase) Execute(
 		addressID = *input.ID
 	}
 	if isCreate {
+		addressID = uuid.New()
+
 		count, err := u.userAddressRepo.
 			CountByUserID(ctx, u.executor, input.UserID)
 		if err != nil {
