@@ -107,7 +107,31 @@ func (r *userAddressRepositoryImpl) CountByUserID(
 	return &count, nil
 }
 
-func (r *userAddressRepositoryImpl) Create(
+func (r *userAddressRepositoryImpl) UnsetDefaultByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) error {
+	query := `
+		UPDATE
+			user_addresses
+		SET
+			is_default = false,
+			updated_at = NOW()
+		WHERE
+			user_id = $1
+			AND is_default = true;
+	`
+
+	_, err := exec.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("query unset default address failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *userAddressRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
 	address domain.Address,
@@ -130,6 +154,19 @@ func (r *userAddressRepositoryImpl) Create(
 		) VALUES (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
 		)
+		ON CONFLICT (id)
+		DO UPDATE SET
+			recipient_name = EXCLUDED.recipient_name,
+			phone = EXCLUDED.phone,
+			is_default = EXCLUDED.is_default,
+			province = EXCLUDED.province,
+			city = EXCLUDED.city,
+			district = EXCLUDED.district,
+			village = EXCLUDED.village,
+			full_address = EXCLUDED.full_address,
+			postal_code = EXCLUDED.postal_code,
+			created_at = EXCLUDED.created_at,
+			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := exec.Exec(ctx, query,

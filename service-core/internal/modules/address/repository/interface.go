@@ -22,9 +22,13 @@ type UserAddressRepository interface {
 		userID uuid.UUID,
 	) (*int, error)
 
-	// GetDefault(userID uuid.UUID) (*domain.Address, error)
+	UnsetDefaultByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) error
 
-	Create(
+	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		address domain.Address,

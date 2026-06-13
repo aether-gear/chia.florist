@@ -229,7 +229,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 			r.Route("/addresses", func(r chi.Router) {
 				r.Get("/", chains.CustomerOnly(addressHandler.ListUserAddresses))
-				r.Post("/", chains.CustomerOnly(addressHandler.CreateUserAddress))
+				r.Post("/", chains.CustomerOnly(addressHandler.SaveUserAddress))
 			})
 		})
 

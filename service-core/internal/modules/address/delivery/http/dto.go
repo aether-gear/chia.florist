@@ -6,7 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type createUserAddressRequest struct {
+type saveUserAddressRequest struct {
+	AddressID    *string `json:"address_id"`
 	ReceiverName string  `json:"receiver_name"`
 	Phone        *string `json:"phone"`
 	IsDefault    *string `json:"is_default"`
@@ -32,9 +33,10 @@ type createShopAddressRequest struct {
 }
 
 type userAddressResponse struct {
+	AddressID    uuid.UUID  `json:"address_id"`
 	UserID       uuid.UUID  `json:"user_id"`
 	ReceiverName string     `json:"receiver_name"`
-	Phone        *string    `json:"phone"`
+	Phone        *string    `json:"phone,omitempty"`
 	IsDefault    bool       `json:"is_default"`
 	ProvinceID   string     `json:"province_id"`
 	CityID       string     `json:"city_id"`
@@ -43,7 +45,7 @@ type userAddressResponse struct {
 	FullAddress  string     `json:"full_address"`
 	PostalCode   string     `json:"postal_code"`
 	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    *time.Time `json:"updated_at"`
+	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
 }
 
 type shopAddressResponse struct {
