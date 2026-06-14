@@ -22,11 +22,17 @@ export interface Order {
   status: 'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulasan'
 }
 
+interface PendingEntry {
+  quantity: number
+  shopId: string
+  timeoutId: ReturnType<typeof setTimeout> | null
+}
+
 // Global module-scoped map to track pending debounced product additions
-const pendingAdditions: Record<string, { quantity: number; shopId: string; timeoutId: any }> = {}
+const pendingAdditions: Record<string, PendingEntry> = {}
 
 // Global module-scoped map to track pending debounced product updates
-const pendingUpdates: Record<string, { quantity: number; shopId: string; timeoutId: any }> = {}
+const pendingUpdates: Record<string, PendingEntry> = {}
 
 // Guard: ensure the login watcher is only registered ONCE per client session,
 // no matter how many components call useCart().
@@ -95,16 +101,22 @@ export const useCart = () => {
         cart.value = cart.value.filter(i => i.isCustom)
 
         // Cancel and clear any pending additions
-        Object.keys(pendingAdditions).forEach((id) => {
-          clearTimeout(pendingAdditions[id].timeoutId)
-          delete pendingAdditions[id]
-        })
+        for (const id of Object.keys(pendingAdditions)) {
+          const pending = pendingAdditions[id]
+          if (pending) {
+            clearTimeout(pending.timeoutId ?? undefined)
+            delete pendingAdditions[id]
+          }
+        }
 
         // Cancel and clear any pending updates
-        Object.keys(pendingUpdates).forEach((id) => {
-          clearTimeout(pendingUpdates[id].timeoutId)
-          delete pendingUpdates[id]
-        })
+        for (const id of Object.keys(pendingUpdates)) {
+          const pending = pendingUpdates[id]
+          if (pending) {
+            clearTimeout(pending.timeoutId ?? undefined)
+            delete pendingUpdates[id]
+          }
+        }
       }
     }, { immediate: true })
   }
@@ -116,37 +128,37 @@ export const useCart = () => {
 
     const additionPromises = Object.keys(pendingAdditions).map(async (productId) => {
       const pending = pendingAdditions[productId]
-      if (pending) {
-        clearTimeout(pending.timeoutId)
-        const qty = pending.quantity
-        const shopId = pending.shopId
-        delete pendingAdditions[productId]
+      if (!pending) return
 
-        try {
-          await cartService.addItem({
-            product_id: productId,
-            shop_id: shopId,
-            quantity: qty
-          })
-        } catch (err) {
-          console.error(`Failed to flush addition for product ${productId}:`, err)
-        }
+      clearTimeout(pending.timeoutId ?? undefined)
+      const qty = pending.quantity
+      const shopId = pending.shopId
+      delete pendingAdditions[productId]
+
+      try {
+        await cartService.addItem({
+          product_id: productId,
+          shop_id: shopId,
+          quantity: qty
+        })
+      } catch (err) {
+        console.error(`Failed to flush addition for product ${productId}:`, err)
       }
     })
 
     const updatePromises = Object.keys(pendingUpdates).map(async (productId) => {
       const pending = pendingUpdates[productId]
-      if (pending) {
-        clearTimeout(pending.timeoutId)
-        const qty = pending.quantity
-        const shopId = pending.shopId
-        delete pendingUpdates[productId]
+      if (!pending) return
 
-        try {
-          await cartService.updateItem(shopId, productId, qty)
-        } catch (err) {
-          console.error(`Failed to flush update for product ${productId}:`, err)
-        }
+      clearTimeout(pending.timeoutId ?? undefined)
+      const qty = pending.quantity
+      const shopId = pending.shopId
+      delete pendingUpdates[productId]
+
+      try {
+        await cartService.updateItem(shopId, productId, qty)
+      } catch (err) {
+        console.error(`Failed to flush update for product ${productId}:`, err)
       }
     })
 
@@ -175,36 +187,42 @@ export const useCart = () => {
     // Regular products
     if (isLoggedIn.value === 'true') {
       const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      const productId = item.id
 
-      // Debounce and accumulate backend additions
-      if (pendingAdditions[item.id]) {
-        clearTimeout(pendingAdditions[item.id].timeoutId)
-        pendingAdditions[item.id].quantity += qty
-      } else {
-        pendingAdditions[item.id] = {
-          quantity: qty,
-          shopId,
-          timeoutId: null
-        }
+      // Ensure entry exists in the pending map
+      let pending = pendingAdditions[productId]
+      if (!pending) {
+        pending = { quantity: 0, shopId, timeoutId: null }
+        pendingAdditions[productId] = pending
       }
 
+      // Clear previous debounce timer
+      if (pending.timeoutId !== null) {
+        clearTimeout(pending.timeoutId)
+      }
+      pending.quantity += qty
+
       // Optimistically update frontend state for instant UI response
-      const existingItem = cart.value.find(i => i.id === item.id)
+      const existingItem = cart.value.find(i => i.id === productId)
       if (existingItem) {
         existingItem.quantity += qty
       } else {
         cart.value.push({ ...item, quantity: qty })
       }
 
-      pendingAdditions[item.id].timeoutId = setTimeout(async () => {
-        if (!pendingAdditions[item.id]) return
-        const finalQty = pendingAdditions[item.id].quantity
-        const targetShopId = pendingAdditions[item.id].shopId
-        delete pendingAdditions[item.id]
+      // Schedule the debounced API call
+      pending.timeoutId = setTimeout(async () => {
+        // Re-read from map — if it was already flushed/cancelled, bail out
+        const current = pendingAdditions[productId]
+        if (!current) return
+
+        const finalQty = current.quantity
+        const targetShopId = current.shopId
+        delete pendingAdditions[productId]
 
         try {
           await cartService.addItem({
-            product_id: item.id,
+            product_id: productId,
             shop_id: targetShopId,
             quantity: finalQty
           })
@@ -269,12 +287,13 @@ export const useCart = () => {
 
     // Regular products
     // Use the pending target quantity as the base to accumulate rapid clicks correctly
-    const currentQty = pendingUpdates[id] ? pendingUpdates[id].quantity : item.quantity
+    const existingUpdate = pendingUpdates[id]
+    const currentQty = existingUpdate ? existingUpdate.quantity : item.quantity
     const newQty = currentQty + change
 
     if (newQty <= 0) {
-      if (pendingUpdates[id]) {
-        clearTimeout(pendingUpdates[id].timeoutId)
+      if (existingUpdate) {
+        clearTimeout(existingUpdate.timeoutId ?? undefined)
         delete pendingUpdates[id]
       }
       await removeFromCart(id, size, color)
@@ -287,21 +306,27 @@ export const useCart = () => {
     if (isLoggedIn.value === 'true') {
       const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
 
-      // Debounce: cancel previous timer and reset with latest quantity
-      if (pendingUpdates[id]) {
-        clearTimeout(pendingUpdates[id].timeoutId)
+      // Ensure entry exists in the pending map
+      let pending = existingUpdate
+      if (!pending) {
+        pending = { quantity: newQty, shopId, timeoutId: null }
+        pendingUpdates[id] = pending
       }
 
-      pendingUpdates[id] = {
-        quantity: newQty,
-        shopId,
-        timeoutId: null
+      // Clear previous debounce timer
+      if (pending.timeoutId !== null) {
+        clearTimeout(pending.timeoutId)
       }
+      pending.quantity = newQty
 
-      pendingUpdates[id].timeoutId = setTimeout(async () => {
-        if (!pendingUpdates[id]) return
-        const finalQty = pendingUpdates[id].quantity
-        const targetShopId = pendingUpdates[id].shopId
+      // Schedule the debounced API call
+      pending.timeoutId = setTimeout(async () => {
+        // Re-read from map — if it was already flushed/cancelled, bail out
+        const current = pendingUpdates[id]
+        if (!current) return
+
+        const finalQty = current.quantity
+        const targetShopId = current.shopId
         delete pendingUpdates[id]
 
         try {
