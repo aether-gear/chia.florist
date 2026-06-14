@@ -47,13 +47,13 @@ onUnmounted(() => {
 
 // Data Produk (Diberikan id agar bisa di-redirect secara dinamis)
 const productOfferings = ref([
-  { id: 'wedding', name: 'Wedding', image: '/images/wedding.jpeg' },
-  { id: 'congratulations', name: 'Congratulation', image: '/images/congratulations.jpeg' },
-  { id: 'condolences', name: 'Condolences', image: '/images/condolences.jpeg' },
-  { id: 'grand-opening', name: 'Grand Opening', image: '/images/grandop.jpeg' },
-  { id: 'birthday', name: 'Birthday', image: '/images/birthday.jpeg' },
-  { id: 'graduate', name: 'Graduate', image: '/images/graduate.jpeg' },
-  { id: 'anniversary', name: 'Anniversary', image: '/images/anniversary.jpeg' },
+  { id: 'e0686de0-b1ce-4459-999c-ac1c69ada522', name: 'Wedding', image: '/images/wedding.jpeg' },
+  { id: 'fab51949-5a26-48e7-bdeb-e3a5b51337fe', name: 'Congratulation', image: '/images/congratulations.jpeg' },
+  { id: '799d0a71-7c88-4620-8ca0-27a827fbac07', name: 'Condolences', image: '/images/condolences.jpeg' },
+  { id: '2ceea56c-352f-4a48-a262-f60e9ee85b1c', name: 'Grand Opening', image: '/images/grandop.jpeg' },
+  { id: 'b40dcc46-8328-4fcd-af77-42ecc9511606', name: 'Birthday', image: '/images/birthday.jpeg' },
+  { id: '71be3ee1-17b4-4bb8-8f80-eae6ad93a844', name: 'Graduate', image: '/images/graduate.jpeg' },
+  { id: '9886edf6-087b-48e7-b00a-d79dd092e8d4', name: 'Anniversary', image: '/images/anniversary.jpeg' },
   { id: 'custom', name: 'Custom', image: '' }
 ])
 </script>
