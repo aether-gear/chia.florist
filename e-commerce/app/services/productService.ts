@@ -31,7 +31,8 @@ export const productService = {
       sku: apiProduct.sku,
       slug: apiProduct.slug,
       weight: apiProduct.weight,
-      stock: apiProduct.stock
+      stock: apiProduct.stock,
+      shopId: (apiProduct as any).shop_id
     }
   },
 
@@ -69,7 +70,7 @@ export const productService = {
    * No mockup fallbacks.
    */
   async getProductById(id: string): Promise<Product | null> {
-    const response = await bootstrapConfig.fetchApi<ApiProductDetail>(`/products/${id}`)
+    const response = await $fetch<ApiProductDetail & { shop_id?: string }>(`/api/products/${id}`)
 
     if (response && response.id) {
       return this.mapApiProduct(response)

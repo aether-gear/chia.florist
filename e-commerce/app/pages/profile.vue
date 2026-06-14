@@ -2,16 +2,27 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useCart } from '~/composables/useCart'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { useAddress } from '~/composables/useAddress'
+import type { UserAddress } from '~/types/address'
 
 useHead({ title: 'My Profile - Chia Florist' })
 
 const authVm = useAuthViewModel()
+const addressVm = useAddress()
 
 const activeTab = ref('personal')
-// State untuk menyaring 4 status pesanan
 const activeOrderStatus = ref<'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulasan'>('pembayaran')
 
-// Memisahkan data user secara reaktif yang bersih
+// Edit address states
+const showAddressForm = ref(false)
+const editingAddress = ref<UserAddress | null>(null)
+
+const provincesList = ref<any[]>([])
+const citiesList = ref<any[]>([])
+const districtsList = ref<any[]>([])
+const villagesList = ref<any[]>([])
+
+// User basic info state
 const user = ref({
   name: 'Loading...',
   email: 'Loading...',
@@ -28,6 +39,16 @@ watch(() => authVm.currentUser.value, (me) => {
   }
 }, { immediate: true })
 
+const loadAddressesData = async () => {
+  await addressVm.fetchAddresses()
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'addresses') {
+    loadAddressesData()
+  }
+})
+
 onMounted(async () => {
   await authVm.fetchCurrentUser()
   if (!authVm.isAuthenticated.value) {
@@ -35,21 +56,100 @@ onMounted(async () => {
   }
 })
 
-// Ambil data orders global dari composable
+// Chained location selections
+const initAddressForm = async (addr: UserAddress | null = null) => {
+  provincesList.value = await addressVm.loadProvinces()
+  
+  if (addr) {
+    editingAddress.value = { ...addr }
+    citiesList.value = await addressVm.loadCities(addr.province_id)
+    districtsList.value = await addressVm.loadDistricts(addr.city_id)
+    villagesList.value = await addressVm.loadVillages(addr.district_id)
+  } else {
+    editingAddress.value = {
+      receiver_name: '',
+      phone: '',
+      is_default: false,
+      province_id: '',
+      city_id: '',
+      district_id: '',
+      village_id: '',
+      full_address: '',
+      postal_code: ''
+    }
+    citiesList.value = []
+    districtsList.value = []
+    villagesList.value = []
+  }
+  showAddressForm.value = true
+}
+
+const onProvinceChange = async () => {
+  if (editingAddress.value) {
+    editingAddress.value.city_id = ''
+    editingAddress.value.district_id = ''
+    editingAddress.value.village_id = ''
+    citiesList.value = await addressVm.loadCities(editingAddress.value.province_id)
+    districtsList.value = []
+    villagesList.value = []
+  }
+}
+
+const onCityChange = async () => {
+  if (editingAddress.value) {
+    editingAddress.value.district_id = ''
+    editingAddress.value.village_id = ''
+    districtsList.value = await addressVm.loadDistricts(editingAddress.value.city_id)
+    villagesList.value = []
+  }
+}
+
+const onDistrictChange = async () => {
+  if (editingAddress.value) {
+    editingAddress.value.village_id = ''
+    villagesList.value = await addressVm.loadVillages(editingAddress.value.district_id)
+  }
+}
+
+const handleSaveAddress = async () => {
+  if (!editingAddress.value) return
+  const addr = editingAddress.value
+  if (!addr.receiver_name || !addr.phone || !addr.province_id || !addr.city_id || !addr.district_id || !addr.village_id || !addr.full_address || !addr.postal_code) {
+    alert('Please fill in all the required fields.')
+    return
+  }
+  const result = await addressVm.saveAddress(addr)
+  if (result.success) {
+    showAddressForm.value = false
+    editingAddress.value = null
+  } else {
+    alert(result.message)
+  }
+}
+
+const handleDeleteAddress = async (id: string) => {
+  if (confirm('Are you sure you want to delete this address?')) {
+    const result = await addressVm.deleteAddress(id)
+    if (!result.success) {
+      alert(result.message)
+    }
+  }
+}
+
+// Global orders from useCart
 const { orders } = useCart()
 
-// Menyediakan fungsi logout lokal
+// Logout
 const handleLogout = async () => {
   await authVm.logout()
 }
 
-// Memfilter pesanan yang ditampilkan berdasarkan sub-tab status yang aktif
+// Filter orders
 const filteredOrders = computed(() => {
   if (!orders || !orders.value) return []
   return orders.value.filter(order => order.status === activeOrderStatus.value)
 })
 
-// --- FIX: MEMBUNGKUS WHATSAPP & ALERT PESANAN SECARA AMAN ---
 const contactDriver = (orderId: string) => {
   window.open(`https://wa.me/628175234999?text=Halo%20Chia%20Florist,%20saya%20ingin%20menanyakan%20status%20kurir%20untuk%20pesanan%20${orderId}`, '_blank')
 }
@@ -85,7 +185,7 @@ const triggerAlert = (message: string) => {
 
             <nav class="space-y-1">
               <button 
-                v-for="tab in [{id:'personal', label:'Personal Information'}, {id:'orders', label:'Order Tracking'}]"
+                v-for="tab in [{id:'personal', label:'Personal Information'}, {id:'addresses', label:'Shipping Addresses'}, {id:'orders', label:'Order Tracking'}]"
                 :key="tab.id"
                 @click="activeTab = tab.id"
                 :class="['w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50']"
@@ -104,6 +204,7 @@ const triggerAlert = (message: string) => {
 
         <main class="lg:col-span-3 space-y-6">
           
+          <!-- Personal tab -->
           <div v-if="activeTab === 'personal'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade">
             <div class="px-8 py-6 border-b border-gray-50">
               <h3 class="font-bold text-gray-900 text-lg">Edit Profile</h3>
@@ -127,7 +228,7 @@ const triggerAlert = (message: string) => {
               </div>
               
               <div class="space-y-1.5">
-                <label class="text-xs font-bold text-gray-500">Shipping Address</label>
+                <label class="text-xs font-bold text-gray-500">Shipping Address (Legacy)</label>
                 <textarea rows="3" v-model="user.address" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold resize-none outline-none focus:bg-white focus:border-[#1b4332] transition-all"></textarea>
               </div>
               
@@ -137,8 +238,68 @@ const triggerAlert = (message: string) => {
             </div>
           </div>
 
+          <!-- Shipping Addresses tab -->
+          <div v-if="activeTab === 'addresses'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade">
+            <div class="px-8 py-6 border-b border-gray-50 flex justify-between items-center">
+              <div>
+                <h3 class="font-bold text-gray-900 text-lg">Shipping Addresses</h3>
+                <p class="text-xs text-gray-400 mt-1">Manage your delivery addresses for secure checkout.</p>
+              </div>
+              <button @click="initAddressForm()" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
+                + Add New Address
+              </button>
+            </div>
+
+            <div class="p-8 space-y-6">
+              <!-- Loading -->
+              <div v-if="addressVm.isLoading.value" class="flex flex-col items-center justify-center py-12 space-y-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#1b4332]"></div>
+                <p class="text-gray-500 text-xs font-medium">Loading addresses...</p>
+              </div>
+
+              <!-- Empty state -->
+              <div v-else-if="addressVm.addresses.value.length === 0" class="text-center py-16 space-y-4">
+                <div class="text-5xl">📍</div>
+                <h4 class="font-bold text-gray-900 text-base">No Address Registered</h4>
+                <p class="text-xs text-gray-400 max-w-sm mx-auto">Please add a shipping address to place orders and calculate courier fees.</p>
+              </div>
+
+              <!-- Address List -->
+              <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div 
+                  v-for="addr in addressVm.addresses.value" 
+                  :key="addr.address_id" 
+                  :class="['border rounded-2xl p-6 relative flex flex-col justify-between transition-all duration-300', addr.is_default ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-gray-300 bg-white']"
+                >
+                  <div>
+                    <div class="flex items-center gap-2 mb-3">
+                      <h4 class="font-bold text-gray-900 text-sm">{{ addr.receiver_name }}</h4>
+                      <span v-if="addr.is_default" class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">Default</span>
+                    </div>
+                    <p class="text-xs text-gray-600 font-semibold mb-2">📞 {{ addr.phone }}</p>
+                    <p class="text-xs text-gray-500 leading-relaxed">{{ addr.full_address }}</p>
+                    <p class="text-[11px] text-gray-400 mt-2 font-medium">Postal Code: {{ addr.postal_code }}</p>
+                  </div>
+
+                  <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
+                    <button @click="initAddressForm(addr)" class="text-xs font-bold text-gray-600 hover:text-black transition cursor-pointer">
+                      Edit
+                    </button>
+                    <button 
+                      v-if="!addr.is_default" 
+                      @click="handleDeleteAddress(addr.address_id!)" 
+                      class="text-xs font-bold text-red-500 hover:text-red-600 transition cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orders tab -->
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
-            
             <div class="bg-white border border-gray-100 p-2 rounded-2xl shadow-sm grid grid-cols-4 gap-1 text-center font-medium">
               <button 
                 v-for="status in [{id:'pembayaran', label:'Pembayaran'}, {id:'pengemasan', label:'Pengemasan'}, {id:'pengiriman', label:'Pengiriman'}, {id:'ulasan', label:'Ulasan'}]"
@@ -227,12 +388,96 @@ const triggerAlert = (message: string) => {
               <h4 class="font-bold text-gray-900 text-lg">Tidak Ada Pesanan</h4>
               <p class="text-sm text-gray-400 mt-1">Belum ada transaksi di tab status "{{ activeOrderStatus }}" ini.</p>
             </div>
-
           </div>
 
         </main>
       </div>
     </div>
+
+    <!-- Modal Address Form -->
+    <div v-if="showAddressForm" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col justify-between">
+        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+          <h3 class="font-extrabold text-gray-900 text-base">
+            {{ editingAddress?.address_id ? 'Edit Address' : 'Add New Address' }}
+          </h3>
+          <button @click="showAddressForm = false" class="text-gray-400 hover:text-black font-bold text-lg cursor-pointer">✕</button>
+        </div>
+
+        <div class="p-8 space-y-4 flex-1">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">Receiver Name *</label>
+              <input v-model="editingAddress!.receiver_name" type="text" placeholder="e.g. John Doe" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">Phone Number *</label>
+              <input v-model="editingAddress!.phone" type="text" placeholder="e.g. 0812345678" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">Province *</label>
+              <select v-model="editingAddress!.province_id" @change="onProvinceChange" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition">
+                <option value="">Select Province</option>
+                <option v-for="p in provincesList" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">City *</label>
+              <select v-model="editingAddress!.city_id" @change="onCityChange" :disabled="!editingAddress!.province_id" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition disabled:opacity-50">
+                <option value="">Select City</option>
+                <option v-for="c in citiesList" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">District *</label>
+              <select v-model="editingAddress!.district_id" @change="onDistrictChange" :disabled="!editingAddress!.city_id" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition disabled:opacity-50">
+                <option value="">Select District</option>
+                <option v-for="d in districtsList" :key="d.id" :value="d.id">{{ d.name }}</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">Village *</label>
+              <select v-model="editingAddress!.village_id" :disabled="!editingAddress!.district_id" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition disabled:opacity-50">
+                <option value="">Select Village</option>
+                <option v-for="v in villagesList" :key="v.id" :value="v.id">{{ v.name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-500">Postal Code *</label>
+              <input v-model="editingAddress!.postal_code" type="text" placeholder="e.g. 17131" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition" />
+            </div>
+            <div class="flex items-center pt-6 gap-2">
+              <input v-model="editingAddress!.is_default" type="checkbox" id="default-check" class="h-4 w-4 accent-[#1b4332] rounded focus:ring-0 cursor-pointer" />
+              <label for="default-check" class="text-xs font-bold text-gray-700 cursor-pointer">Set as default address</label>
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-gray-500">Complete Address *</label>
+            <textarea v-model="editingAddress!.full_address" rows="3" placeholder="Street name, house number, details..." class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition resize-none"></textarea>
+          </div>
+        </div>
+
+        <div class="px-8 py-6 border-t border-gray-100 flex justify-end gap-3">
+          <button @click="showAddressForm = false" class="px-5 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer">
+            Cancel
+          </button>
+          <button @click="handleSaveAddress" class="px-5 py-2.5 bg-[#1b4332] hover:bg-[#143326] text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
+            Save Address
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 

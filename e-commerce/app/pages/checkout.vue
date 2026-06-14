@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useCart } from '~/composables/useCart'
+import { useAddress } from '~/composables/useAddress'
 
 useHead({
   title: 'Secure Checkout - Chia Florist'
 })
 
 const { cart, cartSubtotal } = useCart()
+const addressVm = useAddress()
+const isLoggedIn = useCookie('is_logged_in')
 
 // State Formulir Checkout
 const checkoutForm = ref({
@@ -20,10 +23,30 @@ const checkoutForm = ref({
   notes: ''
 })
 
+const selectedSavedAddressId = ref('')
 const shippingFee = ref(10)
 
 const totalPayment = computed(() => {
   return cartSubtotal.value + shippingFee.value
+})
+
+const selectSavedAddress = (addr: any) => {
+  selectedSavedAddressId.value = addr.address_id
+  checkoutForm.value.fullName = addr.receiver_name
+  checkoutForm.value.phone = addr.phone || ''
+  checkoutForm.value.addressDetails = `${addr.full_address} (Postal Code: ${addr.postal_code})`
+}
+
+onMounted(async () => {
+  if (isLoggedIn.value === 'true') {
+    await addressVm.fetchAddresses()
+    
+    // Auto-select the default address if exists
+    const defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+    if (defaultAddr) {
+      selectSavedAddress(defaultAddr)
+    }
+  }
 })
 
 const handlePlaceOrder = () => {
@@ -51,6 +74,30 @@ const handlePlaceOrder = () => {
         
         <div class="lg:col-span-7 bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-8">
           
+          <!-- Saved addresses select -->
+          <div v-if="isLoggedIn === 'true' && addressVm.addresses.value.length > 0" class="p-6 bg-emerald-50/20 border border-emerald-100 rounded-3xl space-y-4 animate-fade">
+            <h3 class="text-sm font-bold text-emerald-800 flex items-center gap-2">
+              <span>📍</span> Use a Saved Shipping Address
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button 
+                v-for="addr in addressVm.addresses.value"
+                :key="addr.address_id"
+                @click="selectSavedAddress(addr)"
+                :class="['p-4 border rounded-2xl text-left transition-all duration-300 flex flex-col justify-between', selectedSavedAddressId === addr.address_id ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/10' : 'border-gray-200 bg-white hover:border-gray-300']"
+              >
+                <div>
+                  <div class="flex items-center gap-1.5 font-bold text-gray-900 mb-1">
+                    <span>{{ addr.receiver_name }}</span>
+                    <span v-if="addr.is_default" class="bg-emerald-100 text-emerald-800 text-[8px] px-1.5 py-0.5 rounded-full font-bold">Default</span>
+                  </div>
+                  <p class="text-xs text-gray-500 font-semibold mb-1">📞 {{ addr.phone }}</p>
+                  <p class="text-xs text-gray-400 line-clamp-2 leading-relaxed">{{ addr.full_address }}</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div>
             <h2 class="text-xl font-bold text-gray-900 mb-4">Contact Information</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -149,3 +196,8 @@ const handlePlaceOrder = () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.animate-fade { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
