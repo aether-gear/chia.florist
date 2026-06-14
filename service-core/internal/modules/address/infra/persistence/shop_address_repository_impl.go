@@ -73,6 +73,64 @@ func (r *shopAddressRepositoryImpl) GetByID(
 	return &a, nil
 }
 
+func (r *shopAddressRepositoryImpl) GetDefaultByShopID(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
+) (*domain.ShopAddress, error) {
+	query := `
+		SELECT
+			id,
+			shop_id,
+			label,
+			phone,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			is_active,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM
+			shop_addresses
+		WHERE
+			shop_id = $1
+			AND is_active = true
+			AND deleted_at IS NULL
+		LIMIT 1
+	`
+
+	var a domain.ShopAddress
+	err := exec.QueryRow(ctx, query, shopID).Scan(
+		&a.ID,
+		&a.ShopID,
+		&a.Label,
+		&a.Phone,
+		&a.Detail.ProvinceID,
+		&a.Detail.CityID,
+		&a.Detail.DistrictID,
+		&a.Detail.VillageID,
+		&a.Detail.FullAddress,
+		&a.Detail.PostalCode,
+		&a.IsActive,
+		&a.CreatedAt,
+		&a.UpdatedAt,
+		&a.DeletedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query address default by shop id failed: %w", err)
+	}
+
+	return &a, nil
+}
+
 func (r *shopAddressRepositoryImpl) FindByShopID(
 	ctx context.Context,
 	exec transaction.Executor,

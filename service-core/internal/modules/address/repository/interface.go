@@ -16,6 +16,12 @@ type UserAddressRepository interface {
 		addressID uuid.UUID,
 	) (*domain.Address, error)
 
+	GetDefaultByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) (*domain.Address, error)
+
 	ListByUserID(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -54,6 +60,12 @@ type ShopAddressRepository interface {
 		id uuid.UUID,
 	) (*domain.ShopAddress, error)
 	// GetDefaultByShopID(shopID string) (*domain.ShopAddress, error)
+
+	GetDefaultByShopID(
+		ctx context.Context,
+		exec transaction.Executor,
+		shopID uuid.UUID,
+	) (*domain.ShopAddress, error)
 
 	FindByShopID(
 		ctx context.Context,

@@ -22,82 +22,150 @@ export interface Order {
   status: 'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulasan'
 }
 
+interface PendingEntry {
+  quantity: number
+  shopId: string
+  timeoutId: ReturnType<typeof setTimeout> | null
+}
+
 // Global module-scoped map to track pending debounced product additions
-const pendingAdditions: Record<string, { quantity: number; shopId: string; timeoutId: any }> = {}
+const pendingAdditions: Record<string, PendingEntry> = {}
+
+// Global module-scoped map to track pending debounced product updates
+const pendingUpdates: Record<string, PendingEntry> = {}
+
+// Guard: ensure the login watcher is only registered ONCE per client session,
+// no matter how many components call useCart().
+let cartWatcherInitialized = false
+
+// In-flight loadCart promise — if a fetch is already running, all concurrent
+// callers share this same promise instead of firing duplicate requests.
+let loadCartPromise: Promise<void> | null = null
 
 export const useCart = () => {
-  // Global reactive Nuxt state
+  // Global reactive Nuxt state — useState is a singleton keyed by name
   const cart = useState<CartItem[]>('chia-florist-cart', () => [])
   const orders = useState<Order[]>('chia-florist-orders', () => [])
-  
+
   // Track login status using cookie
   const isLoggedIn = useCookie('is_logged_in')
 
-  // Load cart items from the backend and merge with local custom items
-  const loadCart = async () => {
-    if (isLoggedIn.value !== 'true') {
-      return
-    }
-    try {
-      const response = await cartService.getCart()
-      if (response && Array.isArray(response.items)) {
-        const backendItems: CartItem[] = response.items.map(item => ({
-          id: item.product_id,
-          name: item.name,
-          price: item.price,
-          image: item.images?.thumbnail || '/images/birthday.jpeg',
-          quantity: item.quantity,
-          shopId: item.shop_id,
-          isCustom: false
-        }))
-        
-        // Preserve any custom items from the current cart
-        const customItems = cart.value.filter(i => i.isCustom)
-        
-        cart.value = [...backendItems, ...customItems]
+  // Load cart items from the backend and merge with local custom items.
+  // Deduplicates concurrent calls: if a fetch is already in-flight, reuse it.
+  const loadCart = (): Promise<void> => {
+    if (isLoggedIn.value !== 'true') return Promise.resolve()
+
+    // Return the existing in-flight promise to avoid a duplicate request
+    if (loadCartPromise) return loadCartPromise
+
+    loadCartPromise = (async () => {
+      try {
+        const response = await cartService.getCart()
+        if (response && Array.isArray(response.items)) {
+          const backendItems: CartItem[] = response.items.map(item => ({
+            id: item.product_id,
+            name: item.name,
+            price: item.price,
+            image: item.images?.thumbnail || '/images/birthday.jpeg',
+            quantity: item.quantity,
+            shopId: item.shop_id,
+            isCustom: false
+          }))
+
+          // Preserve any custom items from the current cart
+          const customItems = cart.value.filter(i => i.isCustom)
+          cart.value = [...backendItems, ...customItems]
+        }
+      } catch (err) {
+        console.error('Failed to load cart from backend:', err)
+      } finally {
+        // Always clear the promise so future calls can issue a new request
+        loadCartPromise = null
       }
-    } catch (err) {
-      console.error('Failed to load cart from backend:', err)
-    }
+    })()
+
+    return loadCartPromise
   }
 
-  // Watch for login/logout changes to sync cart
-  if (import.meta.client) {
+  // Watch for login/logout changes to sync cart.
+  // The `cartWatcherInitialized` flag ensures this block runs only once globally,
+  // regardless of how many components call useCart().
+  if (import.meta.client && !cartWatcherInitialized) {
+    cartWatcherInitialized = true
+
     watch(isLoggedIn, (newVal) => {
       if (newVal === 'true') {
         loadCart()
       } else {
         // Clear regular items on logout, keeping only custom boards
         cart.value = cart.value.filter(i => i.isCustom)
+
+        // Cancel and clear any pending additions
+        for (const id of Object.keys(pendingAdditions)) {
+          const pending = pendingAdditions[id]
+          if (pending) {
+            clearTimeout(pending.timeoutId ?? undefined)
+            delete pendingAdditions[id]
+          }
+        }
+
+        // Cancel and clear any pending updates
+        for (const id of Object.keys(pendingUpdates)) {
+          const pending = pendingUpdates[id]
+          if (pending) {
+            clearTimeout(pending.timeoutId ?? undefined)
+            delete pendingUpdates[id]
+          }
+        }
       }
     }, { immediate: true })
   }
 
-  // Flush any pending debounced additions to the backend immediately
+  // Flush any pending debounced additions and updates to the backend immediately.
+  // Called before remove/checkout to avoid race conditions.
   const flushCart = async () => {
     if (isLoggedIn.value !== 'true') return
-    const promises = Object.keys(pendingAdditions).map(async (productId) => {
-      const pending = pendingAdditions[productId]
-      if (pending) {
-        clearTimeout(pending.timeoutId)
-        const qty = pending.quantity
-        const shopId = pending.shopId
-        delete pendingAdditions[productId]
 
-        try {
-          await cartService.addItem({
-            product_id: productId,
-            shop_id: shopId,
-            quantity: qty
-          })
-        } catch (err) {
-          console.error(`Failed to flush addition for product ${productId}:`, err)
-        }
+    const additionPromises = Object.keys(pendingAdditions).map(async (productId) => {
+      const pending = pendingAdditions[productId]
+      if (!pending) return
+
+      clearTimeout(pending.timeoutId ?? undefined)
+      const qty = pending.quantity
+      const shopId = pending.shopId
+      delete pendingAdditions[productId]
+
+      try {
+        await cartService.addItem({
+          product_id: productId,
+          shop_id: shopId,
+          quantity: qty
+        })
+      } catch (err) {
+        console.error(`Failed to flush addition for product ${productId}:`, err)
       }
     })
 
-    if (promises.length > 0) {
-      await Promise.all(promises)
+    const updatePromises = Object.keys(pendingUpdates).map(async (productId) => {
+      const pending = pendingUpdates[productId]
+      if (!pending) return
+
+      clearTimeout(pending.timeoutId ?? undefined)
+      const qty = pending.quantity
+      const shopId = pending.shopId
+      delete pendingUpdates[productId]
+
+      try {
+        await cartService.updateItem(shopId, productId, qty)
+      } catch (err) {
+        console.error(`Failed to flush update for product ${productId}:`, err)
+      }
+    })
+
+    const allPromises = [...additionPromises, ...updatePromises]
+
+    if (allPromises.length > 0) {
+      await Promise.all(allPromises)
       await loadCart()
     }
   }
@@ -119,36 +187,42 @@ export const useCart = () => {
     // Regular products
     if (isLoggedIn.value === 'true') {
       const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
-      
-      // Debounce and accumulate backend additions
-      if (pendingAdditions[item.id]) {
-        clearTimeout(pendingAdditions[item.id].timeoutId)
-        pendingAdditions[item.id].quantity += qty
-      } else {
-        pendingAdditions[item.id] = {
-          quantity: qty,
-          shopId,
-          timeoutId: null
-        }
+      const productId = item.id
+
+      // Ensure entry exists in the pending map
+      let pending = pendingAdditions[productId]
+      if (!pending) {
+        pending = { quantity: 0, shopId, timeoutId: null }
+        pendingAdditions[productId] = pending
       }
 
+      // Clear previous debounce timer
+      if (pending.timeoutId !== null) {
+        clearTimeout(pending.timeoutId)
+      }
+      pending.quantity += qty
+
       // Optimistically update frontend state for instant UI response
-      const existingItem = cart.value.find(i => i.id === item.id)
+      const existingItem = cart.value.find(i => i.id === productId)
       if (existingItem) {
         existingItem.quantity += qty
       } else {
         cart.value.push({ ...item, quantity: qty })
       }
 
-      pendingAdditions[item.id].timeoutId = setTimeout(async () => {
-        if (!pendingAdditions[item.id]) return
-        const finalQty = pendingAdditions[item.id].quantity
-        const targetShopId = pendingAdditions[item.id].shopId
-        delete pendingAdditions[item.id]
+      // Schedule the debounced API call
+      pending.timeoutId = setTimeout(async () => {
+        // Re-read from map — if it was already flushed/cancelled, bail out
+        const current = pendingAdditions[productId]
+        if (!current) return
+
+        const finalQty = current.quantity
+        const targetShopId = current.shopId
+        delete pendingAdditions[productId]
 
         try {
           await cartService.addItem({
-            product_id: item.id,
+            product_id: productId,
             shop_id: targetShopId,
             quantity: finalQty
           })
@@ -182,7 +256,7 @@ export const useCart = () => {
 
     // Regular products
     if (isLoggedIn.value === 'true') {
-      await flushCart() // Ensure no race condition with pending additions
+      await flushCart() // Ensure no race condition with pending additions/updates
       try {
         const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
         await cartService.removeItem(shopId, id)
@@ -212,23 +286,56 @@ export const useCart = () => {
     }
 
     // Regular products
-    const newQty = item.quantity + change
+    // Use the pending target quantity as the base to accumulate rapid clicks correctly
+    const existingUpdate = pendingUpdates[id]
+    const currentQty = existingUpdate ? existingUpdate.quantity : item.quantity
+    const newQty = currentQty + change
+
     if (newQty <= 0) {
+      if (existingUpdate) {
+        clearTimeout(existingUpdate.timeoutId ?? undefined)
+        delete pendingUpdates[id]
+      }
       await removeFromCart(id, size, color)
       return
     }
 
+    // Optimistically update frontend state for instant UI response
+    item.quantity = newQty
+
     if (isLoggedIn.value === 'true') {
-      await flushCart() // Ensure no race condition with pending additions
-      try {
-        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
-        await cartService.updateItem(shopId, id, newQty)
-        await loadCart()
-      } catch (err) {
-        console.error('Failed to update quantity in backend cart:', err)
+      const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+
+      // Ensure entry exists in the pending map
+      let pending = existingUpdate
+      if (!pending) {
+        pending = { quantity: newQty, shopId, timeoutId: null }
+        pendingUpdates[id] = pending
       }
-    } else {
-      item.quantity = newQty
+
+      // Clear previous debounce timer
+      if (pending.timeoutId !== null) {
+        clearTimeout(pending.timeoutId)
+      }
+      pending.quantity = newQty
+
+      // Schedule the debounced API call
+      pending.timeoutId = setTimeout(async () => {
+        // Re-read from map — if it was already flushed/cancelled, bail out
+        const current = pendingUpdates[id]
+        if (!current) return
+
+        const finalQty = current.quantity
+        const targetShopId = current.shopId
+        delete pendingUpdates[id]
+
+        try {
+          await cartService.updateItem(targetShopId, id, finalQty)
+          await loadCart()
+        } catch (err) {
+          console.error('Failed to update quantity in backend cart:', err)
+        }
+      }, 500) // 500ms debounce window
     }
   }
 

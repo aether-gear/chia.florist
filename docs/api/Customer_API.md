@@ -84,30 +84,6 @@ These endpoints are accessible to anyone (no authentication required) or require
     }
     ```
 
-#### Me
-- **Method**: `GET`
-- **Endpoint**: `/auth/me`
-- **Description**: Get the information of current user.
-- **Response**:
-  ```json
-  {
-    "account_id": "8b477309-1492-48b0-b9ac-f493aea10cc6",
-    "account_type": "customer",
-    "is_authenticated": true
-  }
-  ```
-
-#### Log Out
-- **Method**: `POST`
-- **Endpoint**: `/auth/logout`
-- **Description**: For log out. It will clear session and refresh token of the user.
-- **Response**:
-  ```json
-  {
-    "message": "logout success"
-  }
-  ```
-
 ### Products
 
 #### Find Products
@@ -406,6 +382,33 @@ These endpoints are accessible to anyone (no authentication required) or require
 
 These endpoints require authentication and are restricted to users with the `Customer` account type.
 
+### Authentication
+
+#### Me
+- **Method**: `GET`
+- **Endpoint**: `/auth/me`
+- **Description**: Get the information of current user.
+- **Response**:
+  ```json
+  {
+    "account_id": "8b477309-1492-48b0-b9ac-f493aea10cc6",
+    "account_type": "customer",
+    "is_authenticated": true
+  }
+  ```
+
+#### Log Out
+- **Method**: `POST`
+- **Endpoint**: `/auth/logout`
+- **Description**: For log out. It will clear session and refresh token of the user.
+- **Response**:
+  ```json
+  {
+    "message": "logout success"
+  }
+  ```
+
+
 ### Users
 
 #### Get Current User
@@ -631,6 +634,72 @@ These endpoints require authentication and are restricted to users with the `Cus
   ```json
   {
     "message": "item removed"
+  }
+  ```
+
+#### Checkout
+- **Method**: `POST`
+- **Endpoint**: `/carts/checkout/`
+- **Description**: For checkout products from cart.
+- **Request Header**:
+  - **Cookie**: 
+
+    | Key | Value |
+    | --- | --- |
+    | Cookie | chast="value" |
+    
+- **Request Body**:
+  ```json
+  "shops": [
+    {
+      "shop_id": "string - uuid (required)",
+      "items": [
+        {
+          "product_id": "string - uuid (required)",
+          "quantity": "integer (required)"
+        }
+      ]
+    }
+  ]
+  ```
+- **Response**:
+  ```json
+  {
+    "address": {
+      "id": "95120305-02ad-468e-9103-2bb113d41cd7",
+      "recipient_name": "Alamat Istri Belle Gweh",
+      "phone": "000",
+      "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+    },
+    "shops": [
+      {
+        "items": [
+          {
+            "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
+            "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+            "name": "Grand Opening",
+            "price": 150000,
+            "quantity": 144,
+            "subtotal": 21600000
+          }
+        ],
+        "shipping_fee": [
+          {
+              "code": "tiki",
+              "service": "SDS",
+              "etd": "0 day",
+              "fee": 19440000
+          },
+          {
+            "code": "wahana",
+            "service": "Ekonomis",
+            "etd": "2 day",
+            "fee": 1944000
+          }
+        ]
+      }
+    ],
+    "subtotal": 21600000
   }
   ```
 

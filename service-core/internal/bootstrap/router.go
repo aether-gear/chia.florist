@@ -73,7 +73,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		MerchantOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenCookieName,
+				appcookie.AccessTokenMerchantCookieName,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
@@ -133,6 +133,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetCart,
 			&c.UpdateItem,
 			&c.RemoveItem,
+			&c.Checkout,
 		)
 
 		locationHandler = locationH.NewLocationHandler(
@@ -202,6 +203,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/carts", func(r chi.Router) {
 			r.Get("/", chains.CustomerOnly(cartHandler.GetCart))
+			r.Post("/checkout", chains.CustomerOnly(cartHandler.Checkout))
 
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", chains.CustomerOnly(cartHandler.AddItem))
@@ -237,19 +239,19 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/shops", func(r chi.Router) {
 			r.Post("/", chains.MerchantOnly(shopHandler.CreateShop))
-			r.Get("/{id}", chains.Core(shopHandler.GetShopByID))
+			r.Get("/{shopID}", chains.Core(shopHandler.GetShopByID))
 
-			r.Route("/{id}/addresses", func(r chi.Router) {
+			r.Route("/{shopID}/addresses", func(r chi.Router) {
 				r.Get("/", chains.Core(addressHandler.ListShopAddresses))
 				r.Post("/", chains.MerchantOnly(addressHandler.CreateShopAddress))
 				r.Get("/{addressID}", chains.Core(addressHandler.GetShopAddress))
 			})
 
-			r.Route("/{id}/couriers", func(r chi.Router) {
+			r.Route("/{shopID}/couriers", func(r chi.Router) {
 				r.Post("/", chains.MerchantOnly(courierHandler.ConfigureCourierShop))
 			})
 
-			r.Route("/{id}/products", func(r chi.Router) {
+			r.Route("/{shopID}/products", func(r chi.Router) {
 				r.Post("/{productID}/inventories",
 					chains.MerchantOnly(inventoryHandler.AddInventory))
 			})

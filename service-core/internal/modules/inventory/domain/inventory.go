@@ -6,6 +6,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// Inventory represents stock availability for a product within a shop.
+//
+// ProductID identifies the product that owns this inventory record.
+// ShopID identifies the shop that owns and manages the inventory.
+//
+// Although a product typically belongs to a single shop, ShopID is stored
+// explicitly to simplify inventory queries, validation, and aggregation
+// without requiring an additional join to the product table.
+//
+// Available stock can be calculated as:
+//
+//	TotalStock - ReservedStock
 type Inventory struct {
 	ID            uuid.UUID
 	ProductID     uuid.UUID

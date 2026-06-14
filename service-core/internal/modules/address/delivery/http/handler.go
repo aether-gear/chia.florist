@@ -276,7 +276,7 @@ func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewBadRequest("invalid postal code")
 	}
 
-	parsedShopID, err := uuid.Parse(req.ShopID)
+	parsedShopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
