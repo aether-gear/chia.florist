@@ -1,17 +1,18 @@
-package location
+package seeds
 
 import (
 	"context"
 	"log"
-	"service-core/internal/shared/loader"
 	"strings"
+
+	"service-core/internal/shared/loader"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
-	seeded, err := isAlreadySeeded(ctx, pool)
+func SeedLocations(ctx context.Context, pool *pgxpool.Pool) error {
+	seeded, err := locationsAlreadySeeded(ctx, pool)
 	if err != nil {
 		return err
 	}
@@ -22,9 +23,10 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	log.Println("database: seeding provinces")
-	if err := seedLocation(ctx,
+	if err := seedLocation(
+		ctx,
 		pool,
-		"internal/seed/location/source/provinces.csv",
+		"sources/provinces.csv",
 		"provinces",
 		"id",
 		"name",
@@ -33,9 +35,10 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	log.Println("database: seeding cities")
-	if err := seedLocation(ctx,
+	if err := seedLocation(
+		ctx,
 		pool,
-		"internal/seed/location/source/regencies.csv",
+		"sources/regencies.csv",
 		"cities",
 		"id",
 		"province_id",
@@ -45,9 +48,10 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	log.Println("database: seeding districts")
-	if err := seedLocation(ctx,
+	if err := seedLocation(
+		ctx,
 		pool,
-		"internal/seed/location/source/districts.csv",
+		"sources/districts.csv",
 		"districts",
 		"id",
 		"city_id",
@@ -57,9 +61,10 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	log.Println("database: seeding villages")
-	if err := seedLocation(ctx,
+	if err := seedLocation(
+		ctx,
 		pool,
-		"internal/seed/location/source/villages.csv",
+		"sources/villages.csv",
 		"villages",
 		"id",
 		"district_id",
@@ -68,10 +73,10 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
-	return markSeeded(ctx, pool)
+	return markLocationSeeded(ctx, pool)
 }
 
-func isAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
+func locationsAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 	var exists bool
 
 	err := pool.QueryRow(ctx, `
@@ -83,7 +88,7 @@ func isAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 	return exists, err
 }
 
-func markSeeded(ctx context.Context, pool *pgxpool.Pool) error {
+func markLocationSeeded(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO seed_versions (name, version)
 		VALUES ($1, $2)
@@ -93,7 +98,8 @@ func markSeeded(ctx context.Context, pool *pgxpool.Pool) error {
 	return err
 }
 
-func seedLocation(ctx context.Context, pool *pgxpool.Pool, pathCSV string, table string, cols ...string) error {
+func seedLocation(
+	ctx context.Context, pool *pgxpool.Pool, pathCSV string, table string, cols ...string) error {
 	rows, err := loader.LoadCSV(pathCSV)
 	if err != nil {
 		return err
