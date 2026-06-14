@@ -230,7 +230,17 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	var usecaseInput []usecase.CheckoutShopInput
+	var addressID *uuid.UUID
+	if req.AddressID != nil {
+		parsed, err := uuid.Parse(*req.AddressID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid address id")
+		}
+
+		addressID = &parsed
+	}
+
+	var shopInput []usecase.CheckoutShopInput
 	for _, shopReq := range req.Shops {
 		shopID, err := uuid.Parse(shopReq.ShopID)
 		if err != nil {
@@ -253,14 +263,19 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 			})
 		}
 
-		usecaseInput = append(usecaseInput, usecase.CheckoutShopInput{
+		shopInput = append(shopInput, usecase.CheckoutShopInput{
 			ShopID: shopID,
 			Items:  items,
 		})
 	}
 
+	checkoutInput := usecase.CheckoutInput{
+		AddressID: addressID,
+		ShopInput: shopInput,
+	}
+
 	result, err := h.checkout.
-		Execute(r.Context(), *authCtx, usecaseInput)
+		Execute(r.Context(), *authCtx, checkoutInput)
 	if err != nil {
 		return err
 	}

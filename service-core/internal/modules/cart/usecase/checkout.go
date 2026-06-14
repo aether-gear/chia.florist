@@ -65,6 +65,11 @@ type CheckoutShopInput struct {
 	Items  []CheckoutItemInput
 }
 
+type CheckoutInput struct {
+	AddressID *uuid.UUID
+	ShopInput []CheckoutShopInput
+}
+
 type CheckoutAddressResult struct {
 	ID            uuid.UUID
 	RecipientName string
@@ -105,21 +110,37 @@ const defaultShippingWeightGrams = 1000
 func (u *CheckoutUsecase) Execute(
 	ctx context.Context,
 	authCtx authenDomain.AuthContext,
-	input []CheckoutShopInput,
+	input CheckoutInput,
 ) (*CheckoutResult, error) {
 	// Early fallback.
-	// Make sure default address is exist - Deuterrr
+	// Make sure default address is always exist - Deuterrr
+	var destAddress addressDomain.Address
 	defAddress, err := u.addressRepo.
 		GetDefaultByUserID(ctx, u.exec, authCtx.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve default address: %w", err)
+		return nil, fmt.Errorf("failed to retrieve destination address: %w", err)
 	}
 	if defAddress == nil {
 		return nil, apperrors.NewConflict(addressDomain.ErrNotFoundDefaultAddress.Error())
 	}
 
+	if input.AddressID != nil {
+		address, err := u.addressRepo.
+			GetByID(ctx, u.exec, *input.AddressID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve destination address: %w", err)
+		}
+		if address == nil {
+			return nil, apperrors.NewNotFound(addressDomain.ErrAddressNotFound.Error())
+		}
+
+		destAddress = *address
+	} else {
+		destAddress = *defAddress
+	}
+
 	var productIDs []uuid.UUID
-	for _, shopGroup := range input {
+	for _, shopGroup := range input.ShopInput {
 		for _, item := range shopGroup.Items {
 			productIDs = append(productIDs, item.ProductID)
 		}
@@ -153,14 +174,14 @@ func (u *CheckoutUsecase) Execute(
 		return nil, apperrors.NewInternal(errors.New("no courier service available at the moment"))
 	}
 
-	destDistrictID, err := strconv.Atoi(defAddress.Detail.DistrictID)
+	destDistrictID, err := strconv.Atoi(destAddress.Detail.DistrictID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid destination district id: %w", err)
 	}
 
 	var shopsResult []ShopResult
 	var totalSubtotal int64
-	for _, shopGroup := range input {
+	for _, shopGroup := range input.ShopInput {
 		var shopItems []CheckoutItemResult
 		for _, shopItem := range shopGroup.Items {
 			product, ok := productMap[shopItem.ProductID]
@@ -253,10 +274,10 @@ func (u *CheckoutUsecase) Execute(
 	}
 
 	address := CheckoutAddressResult{
-		ID:            defAddress.ID,
-		RecipientName: defAddress.ReceiverName,
-		Phone:         defAddress.Phone,
-		FullAddress:   defAddress.Detail.FullAddress,
+		ID:            destAddress.ID,
+		RecipientName: destAddress.ReceiverName,
+		Phone:         destAddress.Phone,
+		FullAddress:   destAddress.Detail.FullAddress,
 	}
 
 	return &CheckoutResult{

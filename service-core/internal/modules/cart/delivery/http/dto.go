@@ -45,7 +45,8 @@ type checkoutShopRequest struct {
 }
 
 type checkoutRequest struct {
-	Shops []checkoutShopRequest `json:"shops"`
+	AddressID *string               `json:"address_id"`
+	Shops     []checkoutShopRequest `json:"shops"`
 }
 
 type checkoutAddressResponse struct {
@@ -81,4 +82,3 @@ type checkoutResponse struct {
 	Shops    []shopResponse          `json:"shops"`
 	Subtotal int64                   `json:"subtotal"`
 }
-
