@@ -26,7 +26,7 @@ func SeedLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := seedLocation(
 		ctx,
 		pool,
-		"sources/provinces.csv",
+		"data/provinces.csv",
 		"provinces",
 		"id",
 		"name",
@@ -38,7 +38,7 @@ func SeedLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := seedLocation(
 		ctx,
 		pool,
-		"sources/regencies.csv",
+		"data/regencies.csv",
 		"cities",
 		"id",
 		"province_id",
@@ -51,7 +51,7 @@ func SeedLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := seedLocation(
 		ctx,
 		pool,
-		"sources/districts.csv",
+		"data/districts.csv",
 		"districts",
 		"id",
 		"city_id",
@@ -64,7 +64,7 @@ func SeedLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := seedLocation(
 		ctx,
 		pool,
-		"sources/villages.csv",
+		"data/villages.csv",
 		"villages",
 		"id",
 		"district_id",
