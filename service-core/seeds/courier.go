@@ -1,4 +1,4 @@
-package courier
+package seeds
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
-	seeded, err := isAlreadySeeded(ctx, pool)
+func SeedCouriers(ctx context.Context, pool *pgxpool.Pool) error {
+	seeded, err := courierAlreadySeeded(ctx, pool)
 	if err != nil {
 		return err
 	}
@@ -42,14 +42,14 @@ func SeedAll(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("failed to seed couriers: %w", err)
 	}
 
-	if err := markSeeded(ctx, pool); err != nil {
+	if err := markCourierSeeded(ctx, pool); err != nil {
 		return fmt.Errorf("failed to mark courier seed: %w", err)
 	}
 
 	return nil
 }
 
-func isAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
+func courierAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 	var exists bool
 
 	err := pool.QueryRow(ctx, `
@@ -61,7 +61,7 @@ func isAlreadySeeded(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 	return exists, err
 }
 
-func markSeeded(ctx context.Context, pool *pgxpool.Pool) error {
+func markCourierSeeded(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO seed_versions (name, version)
 		VALUES ($1, $2)
