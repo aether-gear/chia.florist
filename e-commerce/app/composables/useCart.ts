@@ -22,6 +22,9 @@ export interface Order {
   status: 'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulasan'
 }
 
+// Global module-scoped map to track pending debounced product additions
+const pendingAdditions: Record<string, { quantity: number; shopId: string; timeoutId: any }> = {}
+
 export const useCart = () => {
   // Global reactive Nuxt state
   const cart = useState<CartItem[]>('chia-florist-cart', () => [])
@@ -70,6 +73,35 @@ export const useCart = () => {
     }, { immediate: true })
   }
 
+  // Flush any pending debounced additions to the backend immediately
+  const flushCart = async () => {
+    if (isLoggedIn.value !== 'true') return
+    const promises = Object.keys(pendingAdditions).map(async (productId) => {
+      const pending = pendingAdditions[productId]
+      if (pending) {
+        clearTimeout(pending.timeoutId)
+        const qty = pending.quantity
+        const shopId = pending.shopId
+        delete pendingAdditions[productId]
+
+        try {
+          await cartService.addItem({
+            product_id: productId,
+            shop_id: shopId,
+            quantity: qty
+          })
+        } catch (err) {
+          console.error(`Failed to flush addition for product ${productId}:`, err)
+        }
+      }
+    })
+
+    if (promises.length > 0) {
+      await Promise.all(promises)
+      await loadCart()
+    }
+  }
+
   // Add Item to Cart
   const addToCart = async (item: Omit<CartItem, 'quantity'>, qty = 1) => {
     if (item.isCustom) {
@@ -86,17 +118,45 @@ export const useCart = () => {
 
     // Regular products
     if (isLoggedIn.value === 'true') {
-      try {
-        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
-        await cartService.addItem({
-          product_id: item.id,
-          shop_id: shopId,
-          quantity: qty
-        })
-        await loadCart()
-      } catch (err) {
-        console.error('Failed to add item to backend cart:', err)
+      const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      
+      // Debounce and accumulate backend additions
+      if (pendingAdditions[item.id]) {
+        clearTimeout(pendingAdditions[item.id].timeoutId)
+        pendingAdditions[item.id].quantity += qty
+      } else {
+        pendingAdditions[item.id] = {
+          quantity: qty,
+          shopId,
+          timeoutId: null
+        }
       }
+
+      // Optimistically update frontend state for instant UI response
+      const existingItem = cart.value.find(i => i.id === item.id)
+      if (existingItem) {
+        existingItem.quantity += qty
+      } else {
+        cart.value.push({ ...item, quantity: qty })
+      }
+
+      pendingAdditions[item.id].timeoutId = setTimeout(async () => {
+        if (!pendingAdditions[item.id]) return
+        const finalQty = pendingAdditions[item.id].quantity
+        const targetShopId = pendingAdditions[item.id].shopId
+        delete pendingAdditions[item.id]
+
+        try {
+          await cartService.addItem({
+            product_id: item.id,
+            shop_id: targetShopId,
+            quantity: finalQty
+          })
+          await loadCart()
+        } catch (err) {
+          console.error('Failed to add item to backend cart:', err)
+        }
+      }, 500) // 500ms debounce window
     } else {
       const existingItem = cart.value.find(i => i.id === item.id)
       if (existingItem) {
@@ -122,6 +182,7 @@ export const useCart = () => {
 
     // Regular products
     if (isLoggedIn.value === 'true') {
+      await flushCart() // Ensure no race condition with pending additions
       try {
         const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
         await cartService.removeItem(shopId, id)
@@ -158,6 +219,7 @@ export const useCart = () => {
     }
 
     if (isLoggedIn.value === 'true') {
+      await flushCart() // Ensure no race condition with pending additions
       try {
         const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
         await cartService.updateItem(shopId, id, newQty)
@@ -200,6 +262,7 @@ export const useCart = () => {
     cart,
     orders,
     loadCart,
+    flushCart,
     addToCart,
     removeFromCart,
     updateQuantity,

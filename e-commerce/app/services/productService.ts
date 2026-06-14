@@ -60,7 +60,9 @@ export const productService = {
   async getCatalogProducts(): Promise<CatalogProduct[]> {
     const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products/')
     if (response && Array.isArray(response.products)) {
-      return response.products.map(p => this.mapApiCatalogProduct(p))
+      return response.products
+        .filter(p => p.is_available)
+        .map(p => this.mapApiCatalogProduct(p))
     }
     return []
   },

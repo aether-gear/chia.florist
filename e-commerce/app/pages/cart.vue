@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useCart } from '~/composables/useCart'
 
 useHead({
@@ -6,7 +7,11 @@ useHead({
 })
 
 // Ambil fungsi & data dari global cart composable
-const { cart, removeFromCart, updateQuantity, cartSubtotal } = useCart()
+const { cart, removeFromCart, updateQuantity, cartSubtotal, flushCart } = useCart()
+
+onMounted(async () => {
+  await flushCart()
+})
 
 // Biaya pengiriman flat (simulasi)
 const shippingFee = ref(10)

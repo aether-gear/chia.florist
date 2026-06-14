@@ -7,7 +7,7 @@ useHead({
   title: 'Secure Checkout - Chia Florist'
 })
 
-const { cart, cartSubtotal } = useCart()
+const { cart, cartSubtotal, flushCart } = useCart()
 const addressVm = useAddress()
 const isLoggedIn = useCookie('is_logged_in')
 
@@ -39,6 +39,7 @@ const selectSavedAddress = (addr: any) => {
 
 onMounted(async () => {
   if (isLoggedIn.value === 'true') {
+    await flushCart()
     await addressVm.fetchAddresses()
     
     // Auto-select the default address if exists

@@ -8,13 +8,13 @@ const searchInput = ref<HTMLInputElement | null>(null)
 
 // --- DATA PRODUK (Source of Truth) ---
 const productOfferings = ref([
-  { id: 'wedding', name: 'Wedding', image: '/images/wedding.jpeg', price: 8 },
-  { id: 'congratulations', name: 'Congratulation', image: '/images/congratulations.jpeg', price: 8 },
-  { id: 'condolences', name: 'Condolences', image: '/images/condolences.jpeg', price: 8 },
-  { id: 'grand-opening', name: 'Grand Opening', image: '/images/grandop.jpeg', price: 8 },
-  { id: 'birthday', name: 'Birthday', image: '/images/birthday.jpeg', price: 8 },
-  { id: 'graduate', name: 'Graduate', image: '/images/graduate.jpeg', price: 8 },
-  { id: 'anniversary', name: 'Anniversary', image: '/images/anniversary.jpeg', price: 8 },
+  { id: 'e0686de0-b1ce-4459-999c-ac1c69ada522', name: 'Wedding', image: '/images/wedding.jpeg', price: 8 },
+  { id: 'fab51949-5a26-48e7-bdeb-e3a5b51337fe', name: 'Congratulation', image: '/images/congratulations.jpeg', price: 8 },
+  { id: '799d0a71-7c88-4620-8ca0-27a827fbac07', name: 'Condolences', image: '/images/condolences.jpeg', price: 8 },
+  { id: '2ceea56c-352f-4a48-a262-f60e9ee85b1c', name: 'Grand Opening', image: '/images/grandop.jpeg', price: 8 },
+  { id: 'b40dcc46-8328-4fcd-af77-42ecc9511606', name: 'Birthday', image: '/images/birthday.jpeg', price: 8 },
+  { id: '71be3ee1-17b4-4bb8-8f80-eae6ad93a844', name: 'Graduate', image: '/images/graduate.jpeg', price: 8 },
+  { id: '9886edf6-087b-48e7-b00a-d79dd092e8d4', name: 'Anniversary', image: '/images/anniversary.jpeg', price: 8 },
   { id: 'custom', name: 'Custom Board Simulator', image: '/images/custom-preview.png', price: 10 }
 ])
 

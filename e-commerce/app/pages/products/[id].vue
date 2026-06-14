@@ -119,7 +119,11 @@ useHead({
         <div class="md:col-span-5 space-y-6">
           <div>
             <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ product.name }}</h1>
-            <p class="text-sm text-gray-400 mt-2">({{ product.reviews }} Reviews) | <span class="text-green-600 font-medium">Available</span></p>
+            <p class="text-sm text-gray-400 mt-2">
+              ({{ product.reviews }} Reviews) | 
+              <span v-if="product.available" class="text-green-600 font-medium">Available</span>
+              <span v-else class="text-red-600 font-medium">Sold Out</span>
+            </p>
           </div>
 
           <div class="text-3xl font-semibold text-gray-900">${{ product.price.toFixed(2) }}</div>
@@ -154,16 +158,16 @@ useHead({
 
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-100">
             <div class="flex border border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 justify-between items-center w-full sm:w-auto">
-              <button @click="quantity > 1 ? quantity-- : null" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">-</button>
+              <button @click="quantity > 1 ? quantity-- : null" :disabled="!product.available" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">-</button>
               <span class="px-4 py-2.5 font-semibold text-gray-800 text-sm select-none">{{ quantity }}</span>
-              <button @click="quantity++" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">+</button>
+              <button @click="quantity++" :disabled="!product.available" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">+</button>
             </div>
 
             <div class="flex-1 flex gap-3 w-full">
-              <button @click="handleAddToCart" class="flex-1 border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 font-bold py-3 rounded-xl transition text-sm cursor-pointer">
+              <button @click="handleAddToCart" :disabled="!product.available" class="flex-1 border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 font-bold py-3 rounded-xl transition text-sm cursor-pointer disabled:cursor-not-allowed">
                 Add to Cart
               </button>
-              <button @click="handleBuyNow" class="flex-1 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 rounded-xl transition shadow-sm text-sm cursor-pointer">
+              <button @click="handleBuyNow" :disabled="!product.available" class="flex-1 bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-3 rounded-xl transition shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed">
                 Buy Now
               </button>
             </div>
