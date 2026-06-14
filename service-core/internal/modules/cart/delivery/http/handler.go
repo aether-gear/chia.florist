@@ -16,6 +16,7 @@ type CartHandler struct {
 	getCart    *usecase.GetCartUsecase
 	updateItem *usecase.UpdateItemUsecase
 	removeItem *usecase.RemoveItemUsecase
+	checkout   *usecase.CheckoutUsecase
 }
 
 func NewCartHandler(
@@ -23,12 +24,14 @@ func NewCartHandler(
 	getCart *usecase.GetCartUsecase,
 	updateItem *usecase.UpdateItemUsecase,
 	removeItem *usecase.RemoveItemUsecase,
+	checkout *usecase.CheckoutUsecase,
 ) *CartHandler {
 	return &CartHandler{
 		addItem:    addItem,
 		getCart:    getCart,
 		updateItem: updateItem,
 		removeItem: removeItem,
+		checkout:   checkout,
 	}
 }
 
@@ -209,6 +212,98 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 
 	response := map[string]string{
 		"message": "item removed",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
+	var req checkoutRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	var usecaseInput []usecase.CheckoutShopInput
+	for _, shopReq := range req.Shops {
+		shopID, err := uuid.Parse(shopReq.ShopID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid shop id")
+		}
+
+		var items []usecase.CheckoutItemInput
+		for _, itemReq := range shopReq.Items {
+			productID, err := uuid.Parse(itemReq.ProductID)
+			if err != nil {
+				return apperrors.NewBadRequest("invalid product id")
+			}
+			if itemReq.Quantity <= 0 {
+				return apperrors.NewBadRequest("invalid quantity")
+			}
+
+			items = append(items, usecase.CheckoutItemInput{
+				ProductID: productID,
+				Quantity:  itemReq.Quantity,
+			})
+		}
+
+		usecaseInput = append(usecaseInput, usecase.CheckoutShopInput{
+			ShopID: shopID,
+			Items:  items,
+		})
+	}
+
+	result, err := h.checkout.
+		Execute(r.Context(), *authCtx, usecaseInput)
+	if err != nil {
+		return err
+	}
+
+	var shopsResponse []shopResponse
+	for _, shop := range result.Shops {
+		var itemsResponse []checkoutItemResponse
+		for _, item := range shop.Items {
+			itemsResponse = append(itemsResponse, checkoutItemResponse{
+				ProductID: item.ProductID,
+				ShopID:    item.ShopID,
+				Name:      item.Name,
+				Price:     item.Price,
+				Quantity:  item.Quantity,
+				Subtotal:  item.Subtotal,
+			})
+		}
+
+		var shippingResponse []checkoutCouriersResponse
+		for _, courier := range shop.ShippingFee {
+			shippingResponse = append(shippingResponse, checkoutCouriersResponse{
+				Code:    courier.Code,
+				Service: courier.Service,
+				ETD:     courier.ETD,
+				Fee:     courier.Fee,
+			})
+		}
+
+		shopsResponse = append(shopsResponse, shopResponse{
+			Items:       itemsResponse,
+			ShippingFee: shippingResponse,
+		})
+	}
+
+	response := checkoutResponse{
+		Address: checkoutAddressResponse{
+			ID:            result.Address.ID,
+			RecipientName: result.Address.RecipientName,
+			Phone:         result.Address.Phone,
+			FullAddress:   result.Address.FullAddress,
+		},
+		Shops:    shopsResponse,
+		Subtotal: result.Subtotal,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

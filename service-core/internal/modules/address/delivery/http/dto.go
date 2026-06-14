@@ -20,7 +20,6 @@ type saveUserAddressRequest struct {
 }
 
 type createShopAddressRequest struct {
-	ShopID      string  `json:"shop_id"`
 	Label       string  `json:"label"`
 	Phone       *string `json:"phone"`
 	IsActive    string  `json:"is_active"`
