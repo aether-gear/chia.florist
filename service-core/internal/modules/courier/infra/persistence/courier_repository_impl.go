@@ -15,6 +15,37 @@ func NewCourierRepositoryImpl() repository.CourierRepository {
 	return &courierRepositoryImpl{}
 }
 
+func (r *courierRepositoryImpl) ListAll(
+	ctx context.Context,
+	exec transaction.Executor,
+) ([]string, error) {
+	query := `
+		SELECT
+			code
+		FROM
+			couriers
+		WHERE
+			is_active = true
+	`
+
+	rows, err := exec.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query load couriers failed: %w", err)
+	}
+	defer rows.Close()
+
+	var result []string
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, fmt.Errorf("scan courier failed: %w", err)
+		}
+		result = append(result, code)
+	}
+
+	return result, nil
+}
+
 func (r *courierRepositoryImpl) GetActiveCodes(
 	ctx context.Context,
 	exec transaction.Executor,

@@ -10,6 +10,11 @@ import (
 )
 
 type CourierRepository interface {
+	ListAll(
+		ctx context.Context,
+		exec transaction.Executor,
+	) ([]string, error)
+
 	GetActiveCodes(
 		ctx context.Context,
 		exec transaction.Executor,

@@ -69,6 +69,61 @@ func (r *userAddressRepositoryImpl) GetByID(
 	return &add, nil
 }
 
+func (r *userAddressRepositoryImpl) GetDefaultByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*domain.Address, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			recipient_name,
+			phone,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			is_default,
+			created_at,
+			updated_at
+		FROM
+			user_addresses
+		WHERE
+			user_id = $1
+			AND is_default = true
+			AND deleted_at IS NULL
+		LIMIT 1
+	`
+
+	var add domain.Address
+	err := exec.QueryRow(ctx, query, userID).Scan(
+		&add.ID,
+		&add.UserID,
+		&add.ReceiverName,
+		&add.Phone,
+		&add.Detail.ProvinceID,
+		&add.Detail.CityID,
+		&add.Detail.DistrictID,
+		&add.Detail.VillageID,
+		&add.Detail.FullAddress,
+		&add.Detail.PostalCode,
+		&add.IsDefault,
+		&add.CreatedAt,
+		&add.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query get default address by user id failed: %w", err)
+	}
+
+	return &add, nil
+}
+
 func (r *userAddressRepositoryImpl) ListByUserID(
 	ctx context.Context,
 	exec transaction.Executor,
