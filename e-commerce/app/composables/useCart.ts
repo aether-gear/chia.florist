@@ -1,5 +1,6 @@
 // app/composables/useCart.ts
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { cartService } from '~/services/cartService'
 
 export interface CartItem {
   id: string
@@ -10,6 +11,7 @@ export interface CartItem {
   size?: string
   color?: string
   isCustom?: boolean
+  shopId?: string
 }
 
 export interface Order {
@@ -21,53 +23,164 @@ export interface Order {
 }
 
 export const useCart = () => {
-  // Global reactive state Nuxt
+  // Global reactive Nuxt state
   const cart = useState<CartItem[]>('chia-florist-cart', () => [])
   const orders = useState<Order[]>('chia-florist-orders', () => [])
+  
+  // Track login status using cookie
+  const isLoggedIn = useCookie('is_logged_in')
 
-  // Fungsi Tambah Item ke Keranjang
-  const addToCart = (item: Omit<CartItem, 'quantity'>, qty = 1) => {
-    const existingItem = cart.value.find(
-      i => i.id === item.id && i.size === item.size && i.color === item.color
-    )
+  // Load cart items from the backend and merge with local custom items
+  const loadCart = async () => {
+    if (isLoggedIn.value !== 'true') {
+      return
+    }
+    try {
+      const response = await cartService.getCart()
+      if (response && Array.isArray(response.items)) {
+        const backendItems: CartItem[] = response.items.map(item => ({
+          id: item.product_id,
+          name: item.name,
+          price: item.price,
+          image: item.images?.thumbnail || '/images/birthday.jpeg',
+          quantity: item.quantity,
+          shopId: item.shop_id,
+          isCustom: false
+        }))
+        
+        // Preserve any custom items from the current cart
+        const customItems = cart.value.filter(i => i.isCustom)
+        
+        cart.value = [...backendItems, ...customItems]
+      }
+    } catch (err) {
+      console.error('Failed to load cart from backend:', err)
+    }
+  }
 
-    if (existingItem) {
-      existingItem.quantity += qty
+  // Watch for login/logout changes to sync cart
+  if (import.meta.client) {
+    watch(isLoggedIn, (newVal) => {
+      if (newVal === 'true') {
+        loadCart()
+      } else {
+        // Clear regular items on logout, keeping only custom boards
+        cart.value = cart.value.filter(i => i.isCustom)
+      }
+    }, { immediate: true })
+  }
+
+  // Add Item to Cart
+  const addToCart = async (item: Omit<CartItem, 'quantity'>, qty = 1) => {
+    if (item.isCustom) {
+      const existingItem = cart.value.find(
+        i => i.id === item.id && i.size === item.size && i.color === item.color
+      )
+      if (existingItem) {
+        existingItem.quantity += qty
+      } else {
+        cart.value.push({ ...item, quantity: qty })
+      }
+      return
+    }
+
+    // Regular products
+    if (isLoggedIn.value === 'true') {
+      try {
+        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+        await cartService.addItem({
+          product_id: item.id,
+          shop_id: shopId,
+          quantity: qty
+        })
+        await loadCart()
+      } catch (err) {
+        console.error('Failed to add item to backend cart:', err)
+      }
     } else {
-      cart.value.push({ ...item, quantity: qty })
-    }
-  }
-
-  // Fungsi Hapus Item
-  const removeFromCart = (id: string, size?: string, color?: string) => {
-    const index = cart.value.findIndex(i => i.id === id && i.size === size && i.color === color)
-    if (index !== -1) {
-      cart.value.splice(index, 1)
-    }
-  }
-
-  // Perbarui Jumlah Kuantitas (Plus/Minus)
-  const updateQuantity = (id: string, size: string | undefined, color: string | undefined, change: number) => {
-    const item = cart.value.find(i => i.id === id && i.size === size && i.color === color)
-    if (item) {
-      item.quantity += change
-      if (item.quantity <= 0) {
-        removeFromCart(id, size, color)
+      const existingItem = cart.value.find(i => i.id === item.id)
+      if (existingItem) {
+        existingItem.quantity += qty
+      } else {
+        cart.value.push({ ...item, quantity: qty })
       }
     }
   }
 
-  // Menghitung Subtotal Belanjaan
+  // Remove Item from Cart
+  const removeFromCart = async (id: string, size?: string, color?: string) => {
+    const item = cart.value.find(i => i.id === id && i.size === size && i.color === color)
+    if (!item) return
+
+    if (item.isCustom) {
+      const index = cart.value.findIndex(i => i.id === id && i.size === size && i.color === color)
+      if (index !== -1) {
+        cart.value.splice(index, 1)
+      }
+      return
+    }
+
+    // Regular products
+    if (isLoggedIn.value === 'true') {
+      try {
+        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+        await cartService.removeItem(shopId, id)
+        await loadCart()
+      } catch (err) {
+        console.error('Failed to remove item from backend cart:', err)
+      }
+    } else {
+      const index = cart.value.findIndex(i => i.id === id)
+      if (index !== -1) {
+        cart.value.splice(index, 1)
+      }
+    }
+  }
+
+  // Update Item Quantity
+  const updateQuantity = async (id: string, size: string | undefined, color: string | undefined, change: number) => {
+    const item = cart.value.find(i => i.id === id && i.size === size && i.color === color)
+    if (!item) return
+
+    if (item.isCustom) {
+      item.quantity += change
+      if (item.quantity <= 0) {
+        await removeFromCart(id, size, color)
+      }
+      return
+    }
+
+    // Regular products
+    const newQty = item.quantity + change
+    if (newQty <= 0) {
+      await removeFromCart(id, size, color)
+      return
+    }
+
+    if (isLoggedIn.value === 'true') {
+      try {
+        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+        await cartService.updateItem(shopId, id, newQty)
+        await loadCart()
+      } catch (err) {
+        console.error('Failed to update quantity in backend cart:', err)
+      }
+    } else {
+      item.quantity = newQty
+    }
+  }
+
+  // Calculate Subtotal
   const cartSubtotal = computed(() => {
     return cart.value.reduce((total, item) => total + item.price * item.quantity, 0)
   })
 
-  // Menghitung Total Item di Keranjang
+  // Calculate Total Items Count
   const cartCount = computed(() => {
     return cart.value.reduce((total, item) => total + item.quantity, 0)
   })
 
-  // Fungsi memindahkan items ke order tracking
+  // Checkout function
   const checkoutToOrder = (totalAmount: number) => {
     if (cart.value.length === 0) return
 
@@ -80,13 +193,13 @@ export const useCart = () => {
     }
 
     orders.value.push(newOrder)
-    cart.value = [] 
+    cart.value = []
   }
 
-  // FIX: Kembalikan semua state dan fungsi dalam SATU objek tunggal
   return {
     cart,
     orders,
+    loadCart,
     addToCart,
     removeFromCart,
     updateQuantity,

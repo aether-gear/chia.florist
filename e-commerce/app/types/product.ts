@@ -67,6 +67,7 @@ export interface Product {
   slug?: string
   weight?: number
   stock?: number
+  shopId?: string
 }
 
 /**
