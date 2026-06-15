@@ -166,6 +166,7 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		courierHandler = courierH.NewCourierHandler(
+			&c.ListAllCouriers,
 			&c.ConfigureShopCourier,
 		)
 
@@ -204,12 +205,17 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/carts", func(r chi.Router) {
 			r.Get("/", chains.CustomerOnly(cartHandler.GetCart))
 			r.Post("/checkout", chains.CustomerOnly(cartHandler.Checkout))
+			r.Post("/checkout-estimate", chains.CustomerOnly(cartHandler.CheckoutEstimate))
 
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", chains.CustomerOnly(cartHandler.AddItem))
 				r.Put("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.UpdateItem))
 				r.Delete("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.RemoveItem))
 			})
+		})
+
+		r.Route("/couriers", func(r chi.Router) {
+			r.Get("/", chains.CustomerOnly(courierHandler.ListAllCouriers))
 		})
 
 		r.Route("/provinces", func(r chi.Router) {

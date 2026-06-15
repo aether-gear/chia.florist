@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/shipment/repository"
 	transaction "service-core/internal/shared/transaction"
 )
@@ -73,6 +74,17 @@ func (s *rajaOngkirCostEstimation) CalculateCost(
 	}
 
 	if resp.Meta.Code != 200 {
+		if resp.Meta.Code == 422 {
+			return nil, apperrors.NewInvalidInput("The selected courier option is invalid or no longer supported")
+		}
+		if resp.Meta.Code == 404 {
+			return nil, apperrors.NewBadRequest("Shipping is currently unavailable for this destination using the selected courier")
+		}
+		if resp.Meta.Code == 400 ||
+			resp.Meta.Message == "Missing Params" {
+			return nil, apperrors.NewInternal(errors.New("Missing params"))
+		}
+
 		return nil, errors.New(resp.Meta.Message)
 	}
 

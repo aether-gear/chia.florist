@@ -11,15 +11,32 @@ import (
 )
 
 type CourierHandler struct {
+	listCouriers         *usecase.ListCouriersUsecase
 	configureShopCourier *usecase.ConfigureShopCourierUsecase
 }
 
 func NewCourierHandler(
+	listCouriers *usecase.ListCouriersUsecase,
 	configureShopCourier *usecase.ConfigureShopCourierUsecase,
 ) *CourierHandler {
 	return &CourierHandler{
+		listCouriers:         listCouriers,
 		configureShopCourier: configureShopCourier,
 	}
+}
+
+func (h *CourierHandler) ListAllCouriers(w http.ResponseWriter, r *http.Request) error {
+	code, err := h.listCouriers.Execute(r.Context())
+	if err != nil {
+		return err
+	}
+
+	response := map[string][]string{
+		"couriers": code,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
 func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Request) error {
@@ -43,7 +60,8 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	err = h.configureShopCourier.Execute(r.Context(), shopID, inputs)
+	err = h.configureShopCourier.
+		Execute(r.Context(), shopID, inputs)
 	if err != nil {
 		return err
 	}

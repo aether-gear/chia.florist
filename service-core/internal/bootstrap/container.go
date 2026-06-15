@@ -90,6 +90,7 @@ type Container struct {
 	CreatePaymentMethod  paymentUsecase.CreatePaymentMethodUsecase
 	ListPaymentMethod    paymentUsecase.ListPaymentMethodUsecase
 
+	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
 
 	EstimateShippingOptions shipmentUsecase.EstimateShippingOptionsUsecase
@@ -409,6 +410,10 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
+		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
+			infra.TransactionExecutor,
+			courierRepo,
+		),
 		ConfigureShopCourier: *courierUsecase.
 			NewConfigureShopCourierUsecase(
 				courierRepo,

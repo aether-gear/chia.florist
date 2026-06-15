@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"slices"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
@@ -319,6 +320,126 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 		},
 		Shops:    shopsResponse,
 		Subtotal: result.Subtotal,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) error {
+	var req checkoutRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	var addressID *uuid.UUID
+	if req.AddressID != nil {
+		parsed, err := uuid.Parse(*req.AddressID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid address id")
+		}
+
+		addressID = &parsed
+	}
+
+	var shopInput []usecase.CheckoutShopInput
+	for _, shopReq := range req.Shops {
+		shopID, err := uuid.Parse(shopReq.ShopID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid shop id")
+		}
+
+		var items []usecase.CheckoutItemInput
+		for _, itemReq := range shopReq.Items {
+			productID, err := uuid.Parse(itemReq.ProductID)
+			if err != nil {
+				return apperrors.NewBadRequest("invalid product id")
+			}
+			if itemReq.Quantity <= 0 {
+				return apperrors.NewBadRequest("invalid quantity")
+			}
+
+			items = append(items, usecase.CheckoutItemInput{
+				ProductID: productID,
+				Quantity:  itemReq.Quantity,
+			})
+		}
+
+		shopInput = append(shopInput, usecase.CheckoutShopInput{
+			ShopID: shopID,
+			Items:  items,
+		})
+	}
+
+	if len(req.Couriers) == 0 {
+		return apperrors.NewBadRequest("invalid courier codes")
+	}
+	if len(req.Couriers) != 0 {
+		if slices.Contains(req.Couriers, "") {
+			return apperrors.NewBadRequest("invalid courier codes")
+		}
+	}
+
+	checkoutInput := usecase.CheckoutInput{
+		AddressID: addressID,
+		Couriers:  req.Couriers,
+		ShopInput: shopInput,
+	}
+
+	result, err := h.checkout.
+		Execute(r.Context(), *authCtx, checkoutInput)
+	if err != nil {
+		return err
+	}
+
+	var shopsResponse []shopResponse
+	for _, shop := range result.Shops {
+		var itemsResponse []checkoutItemResponse
+		for _, item := range shop.Items {
+			itemsResponse = append(itemsResponse, checkoutItemResponse{
+				ProductID: item.ProductID,
+				ShopID:    item.ShopID,
+				Name:      item.Name,
+				Price:     item.Price,
+				Quantity:  item.Quantity,
+				Subtotal:  item.Subtotal,
+			})
+		}
+
+		var shippingResponse []checkoutCouriersResponse
+		for _, courier := range shop.ShippingFee {
+			shippingResponse = append(shippingResponse, checkoutCouriersResponse{
+				Code:    courier.Code,
+				Service: courier.Service,
+				ETD:     courier.ETD,
+				Fee:     courier.Fee,
+			})
+		}
+
+		shopsResponse = append(shopsResponse, shopResponse{
+			Items:       itemsResponse,
+			ShippingFee: shippingResponse,
+		})
+	}
+
+	response := checkoutResponse{
+		Address: checkoutAddressResponse{
+			ID:            result.Address.ID,
+			RecipientName: result.Address.RecipientName,
+			Phone:         result.Address.Phone,
+			FullAddress:   result.Address.FullAddress,
+		},
+		Shops:    shopsResponse,
+		Subtotal: result.Subtotal,
+	}
+	if result.TotalEstimation > 0 {
+		response.TotalEstimation = &result.TotalEstimation
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

@@ -67,6 +67,7 @@ type CheckoutShopInput struct {
 
 type CheckoutInput struct {
 	AddressID *uuid.UUID
+	Couriers  []string
 	ShopInput []CheckoutShopInput
 }
 
@@ -85,12 +86,13 @@ type CheckoutCouriersResult struct {
 }
 
 type CheckoutItemResult struct {
-	ProductID uuid.UUID
-	ShopID    uuid.UUID
-	Name      string
-	Price     int64
-	Quantity  int
-	Subtotal  int64
+	ProductID   uuid.UUID
+	ShopID      uuid.UUID
+	Name        string
+	Price       int64
+	Quantity    int
+	Subtotal    int64
+	TotalWeight int
 }
 
 type ShopResult struct {
@@ -99,10 +101,10 @@ type ShopResult struct {
 }
 
 type CheckoutResult struct {
-	Address  CheckoutAddressResult
-	Shops    []ShopResult
-	Subtotal int64
-	Total    int64
+	Address         CheckoutAddressResult
+	Shops           []ShopResult
+	Subtotal        int64
+	TotalEstimation int64
 }
 
 const defaultShippingWeightGrams = 1000
@@ -113,8 +115,7 @@ func (u *CheckoutUsecase) Execute(
 	input CheckoutInput,
 ) (*CheckoutResult, error) {
 	// Early fallback.
-	// Make sure default address is always exist - Deuterrr
-	var destAddress addressDomain.Address
+	// Make sure the default address exists
 	defAddress, err := u.addressRepo.
 		GetDefaultByUserID(ctx, u.exec, authCtx.UserID)
 	if err != nil {
@@ -124,6 +125,9 @@ func (u *CheckoutUsecase) Execute(
 		return nil, apperrors.NewConflict(addressDomain.ErrNotFoundDefaultAddress.Error())
 	}
 
+	// Fallback to the user's default address,
+	// if no ID was specified
+	var destAddress addressDomain.Address
 	if input.AddressID != nil {
 		address, err := u.addressRepo.
 			GetByID(ctx, u.exec, *input.AddressID)
@@ -137,6 +141,18 @@ func (u *CheckoutUsecase) Execute(
 		destAddress = *address
 	} else {
 		destAddress = *defAddress
+	}
+
+	destDistrictID, err := strconv.Atoi(destAddress.Detail.DistrictID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid destination district id: %w", err)
+	}
+
+	// Initialize couriers for cost estimation
+	// It will get skip if input is empty
+	var couriers []string
+	if len(input.Couriers) > 0 {
+		couriers = append(couriers, input.Couriers...)
 	}
 
 	var productIDs []uuid.UUID
@@ -166,29 +182,22 @@ func (u *CheckoutUsecase) Execute(
 		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
 	}
 
-	couriers, err := u.courierRepo.ListAll(ctx, u.exec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load couriers: %w", err)
-	}
-	if len(couriers) == 0 {
-		return nil, apperrors.NewInternal(errors.New("no courier service available at the moment"))
-	}
-
-	destDistrictID, err := strconv.Atoi(destAddress.Detail.DistrictID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid destination district id: %w", err)
-	}
-
-	var shopsResult []ShopResult
-	var totalSubtotal int64
+	// Calculate estimation, subtotal and weight
+	// based on shop item (giant loop)
+	var (
+		totalSubtotal        int64
+		shopsResult          []ShopResult
+		totalSubtotalWithEst int64
+		totalWeight          int = 0
+	)
 	for _, shopGroup := range input.ShopInput {
+		// Map shop items, so products consist of
+		// having inventory and are owned by a shop ID
+		//
+		// Include calculations of weight, total subtotal
+		// and estimation total
 		var shopItems []CheckoutItemResult
 		for _, shopItem := range shopGroup.Items {
-			product, ok := productMap[shopItem.ProductID]
-			if !ok {
-				return nil, apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
-			}
-
 			shopInventories := inventoryMap[shopItem.ProductID]
 
 			var available int
@@ -203,74 +212,94 @@ func (u *CheckoutUsecase) Execute(
 				return nil, apperrors.NewConflict(inventoryDomain.ErrInsufficientStock.Error())
 			}
 
+			product, ok := productMap[shopItem.ProductID]
+			if !ok {
+				return nil, apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
+			}
+
 			itemSubtotal := product.Price * int64(shopItem.Quantity)
-			shopItems = append(shopItems, CheckoutItemResult{
-				ProductID: product.ID,
-				ShopID:    shopGroup.ShopID,
-				Name:      product.Name,
-				Price:     product.Price,
-				Quantity:  shopItem.Quantity,
-				Subtotal:  itemSubtotal,
-			})
-
 			totalSubtotal += itemSubtotal
-		}
-
-		originAddr, err := u.shopAddressRepo.
-			GetDefaultByShopID(ctx, u.exec, shopGroup.ShopID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve origin address: %w", err)
-		}
-		if originAddr == nil {
-			return nil, apperrors.NewNotFound(errors.New("origin address not found").Error())
-		}
-
-		originDistrictID, err := strconv.Atoi(originAddr.Detail.DistrictID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid origin district id: %w", err)
-		}
-
-		totalWeight := 0
-		for _, item := range shopGroup.Items {
-			product := productMap[item.ProductID]
+			totalSubtotalWithEst += itemSubtotal
 
 			weight := defaultShippingWeightGrams
 			if product.Weight != nil {
 				weight = int(*product.Weight)
 			}
+			totalWeight += weight * shopItem.Quantity
 
-			totalWeight += weight * item.Quantity
-		}
-
-		costOptions, err := u.shipmentRepo.
-			CalculateCost(
-				ctx,
-				u.exec,
-				shipmentRepo.CalculateCostInput{
-					OriginID:      originDistrictID,
-					DestinationID: destDistrictID,
-					Weight:        totalWeight,
-					Couriers:      couriers,
-				},
-			)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate shipping cost: %w", err)
-		}
-
-		var checkoutCouriers []CheckoutCouriersResult
-		for _, option := range costOptions {
-			checkoutCouriers = append(checkoutCouriers, CheckoutCouriersResult{
-				Code:    option.Code,
-				Service: option.Service,
-				ETD:     option.Etd,
-				Fee:     option.Cost,
+			shopItems = append(shopItems, CheckoutItemResult{
+				ProductID:   product.ID,
+				ShopID:      shopGroup.ShopID,
+				Name:        product.Name,
+				Price:       product.Price,
+				Quantity:    shopItem.Quantity,
+				Subtotal:    itemSubtotal,
+				TotalWeight: weight * shopItem.Quantity,
 			})
 		}
 
-		shopsResult = append(shopsResult, ShopResult{
-			Items:       shopItems,
-			ShippingFee: checkoutCouriers,
-		})
+		// No default courier
+		// Assuming no estimation cost
+		if len(couriers) != 0 {
+			originAddr, err := u.shopAddressRepo.
+				GetDefaultByShopID(ctx, u.exec, shopGroup.ShopID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve origin address: %w", err)
+			}
+			if originAddr == nil {
+				return nil, apperrors.NewNotFound(errors.New("origin address not found").Error())
+			}
+
+			originDistrictID, err := strconv.Atoi(originAddr.Detail.DistrictID)
+			if err != nil {
+				return nil, fmt.Errorf("invalid origin district id: %w", err)
+			}
+
+			costOptions, err := u.shipmentRepo.
+				CalculateCost(
+					ctx,
+					u.exec,
+					shipmentRepo.CalculateCostInput{
+						OriginID:      originDistrictID,
+						DestinationID: destDistrictID,
+						Weight:        totalWeight,
+						Couriers:      couriers,
+					},
+				)
+			if err != nil {
+				return nil, fmt.Errorf("failed to calculate shipping cost: %w", err)
+			}
+
+			var leastFee int64
+			var checkoutCouriers []CheckoutCouriersResult
+			for i, option := range costOptions {
+				checkoutCouriers = append(checkoutCouriers, CheckoutCouriersResult{
+					Code:    option.Code,
+					Service: option.Service,
+					ETD:     option.Etd,
+					Fee:     option.Cost,
+				})
+
+				if i == 0 || option.Cost < leastFee {
+					leastFee = option.Cost
+				}
+			}
+
+			shopsResult = append(shopsResult, ShopResult{
+				Items:       shopItems,
+				ShippingFee: checkoutCouriers,
+			})
+
+			// Calculate based on how many estimation per shop.
+			// Even then, only take the least price
+			if len(costOptions) > 0 {
+				totalSubtotalWithEst += leastFee
+			}
+		} else {
+			shopsResult = append(shopsResult, ShopResult{
+				Items: shopItems,
+			})
+		}
 	}
 
 	address := CheckoutAddressResult{
@@ -280,9 +309,14 @@ func (u *CheckoutUsecase) Execute(
 		FullAddress:   destAddress.Detail.FullAddress,
 	}
 
-	return &CheckoutResult{
+	result := CheckoutResult{
 		Address:  address,
 		Shops:    shopsResult,
 		Subtotal: totalSubtotal,
-	}, nil
+	}
+	if len(couriers) != 0 {
+		result.TotalEstimation = totalSubtotalWithEst
+	}
+
+	return &result, nil
 }
