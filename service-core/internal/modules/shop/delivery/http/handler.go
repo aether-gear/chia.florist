@@ -6,6 +6,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/shop/usecase"
 )
 
@@ -52,8 +53,12 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
-	var req createShopRequest
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
 
+	var req createShopRequest
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
@@ -74,7 +79,11 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 		IsActive:    parsedIsActive,
 	}
 
-	err = h.createShop.Execute(r.Context(), input)
+	err = h.createShop.Execute(
+		r.Context(),
+		*actor,
+		input,
+	)
 	if err != nil {
 		return err
 	}
