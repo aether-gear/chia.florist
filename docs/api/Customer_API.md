@@ -91,6 +91,7 @@ These endpoints are accessible to anyone (no authentication required) or require
 - **Endpoint**: `/products/`
 - **Description**: Retrieve a list of products.
 - **Request Query**:
+  - `name`: for searching feature
   - `page`: index page
   - `limit`: how many product in each page
 - **Request Body**: None (Uses Query Parameters)
@@ -650,29 +651,39 @@ These endpoints require authentication and are restricted to users with the `Cus
     
 - **Request Body**:
   ```json
-  "shops": [
-    {
-      "shop_id": "string - uuid (required)",
-      "items": [
-        {
-          "product_id": "string - uuid (required)",
-          "quantity": "integer (required)"
-        }
-      ]
-    }
-  ]
+  {
+    "shops": [
+      {
+        "shop_id": "string - uuid (required)",
+        "items": [
+          {
+            "product_id": "string - uuid (required)",
+            "quantity": "integer (required)"
+          }
+        ]
+      }
+    ]
+  }
   ```
 - **Response**:
   ```json
   {
     "address": {
       "id": "95120305-02ad-468e-9103-2bb113d41cd7",
-      "recipient_name": "Alamat Istri Belle Gweh",
+      "recipient_name": "My Belle Gweh",
       "phone": "000",
       "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
     },
     "shops": [
       {
+        "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+        "subtotal": 21600000,
+        "total": 21850000,
+        "selected_courier": {
+            "code": "tiki",
+            "service": "T15",
+            "fee": 250000
+        },
         "items": [
           {
             "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
@@ -683,25 +694,108 @@ These endpoints require authentication and are restricted to users with the `Cus
             "subtotal": 21600000
           }
         ],
-        "shipping_fee": [
+        "cost_couriers": [
           {
-              "code": "tiki",
-              "service": "SDS",
-              "etd": "0 day",
-              "fee": 19440000
+            "code": "tiki",
+            "name": "Citra Van Titipan Kilat (TIKI)",
+            "service": "SDS",
+            "etd": "0 day",
+            "fee": 19440000
           },
           {
-            "code": "wahana",
-            "service": "Ekonomis",
-            "etd": "2 day",
-            "fee": 1944000
+            "code": "jne",
+            "name": "Jalur Nugraha Ekakurir (JNE)",
+            "service": "JTR",
+            "etd": "3 day",
+            "fee": 2592000
           }
         ]
       }
     ],
-    "subtotal": 21600000
+    "subtotal": 21600000,
+    "total_shipping": 250000,
+    "total": 21850000
   }
   ```
+- **Notes**:
+  - checkout must have **default** address
+  - `total_shipping` is based on courier service with least fee
+  - `total` is based on total estimation plus courier service with least fee
+
+#### Checkout Calculate
+- **Method**: `POST`
+- **Endpoint**: `/carts/checkout/calculate`
+- **Description**: For calculating exact cost for user selected courier and address under checkout session.
+- **Request Header**:
+  - **Cookie**: 
+
+    | Key | Value |
+    | --- | --- |
+    | Cookie | chast="value" |
+    
+- **Request Body**:
+  ```json
+  {
+    "address_id": "string - uuid (required)",
+    "shops": [
+      {
+        "shop_id": "string - uuid (required)",
+          "courier": {
+            "code": "string (required)",
+            "service": "string (required)"
+          },
+        "items": [
+          {
+            "product_id": "string - uuid (required)",
+            "quantity": "integer (required)"
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "address": {
+      "id": "cd0ce5ff-d5ed-4b1c-85a4-16fef4d19f01",
+      "recipient_name": "Dialyn UwU",
+      "phone": "000",
+      "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+    },
+    "shops": [
+      {
+        "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+        "subtotal": 21600000,
+        "total": 24192000,
+        "selected_courier": {
+            "code": "jne",
+            "service": "JTR",
+            "fee": 2592000
+        },
+        "items": [
+          {
+            "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
+            "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+            "name": "Grand Opening",
+            "price": 150000,
+            "quantity": 144,
+            "subtotal": 21600000
+          }
+        ],
+        "cost_couriers": null
+      }
+    ],
+    "subtotal": 21600000,
+    "total_shipping": 2592000,
+    "total": 24192000
+  }
+  ```
+- **Notes**:
+  - checkout must have **default** address, even addresses already exist
+  - checkout can work with selected address id (for calculating shipping fee)
+  - `total_shipping` is based on selected courier service from user
+  - cost courier options no longer exist
 
 ### Payments
 
