@@ -57,8 +57,13 @@ export const productService = {
    * Fetch catalog products directly from the API.
    * No mockup fallbacks.
    */
-  async getCatalogProducts(): Promise<CatalogProduct[]> {
-    const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products/')
+  async getCatalogProducts(params?: { name?: string; page?: number; limit?: number }): Promise<CatalogProduct[]> {
+    const query: Record<string, any> = {}
+    if (params?.name) query.name = params.name
+    if (params?.page) query.page = params.page
+    if (params?.limit) query.limit = params.limit
+
+    const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products/', { query })
     if (response && Array.isArray(response.products)) {
       return response.products
         .filter(p => p.is_available)

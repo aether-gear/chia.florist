@@ -1,29 +1,74 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, watch, onUnmounted, nextTick } from 'vue'
+import { productService } from '~/services/productService'
+import { formatRupiah } from '~/utils/formatter'
+import type { CatalogProduct } from '~/types/product'
 
 // --- STATE PENCARIAN ---
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
+const searchResults = ref<CatalogProduct[]>([])
+const isLoadingSearch = ref(false)
 
-// --- DATA PRODUK (Source of Truth) ---
-const productOfferings = ref([
-  { id: 'e0686de0-b1ce-4459-999c-ac1c69ada522', name: 'Wedding', image: '/images/wedding.jpeg', price: 8 },
-  { id: 'fab51949-5a26-48e7-bdeb-e3a5b51337fe', name: 'Congratulation', image: '/images/congratulations.jpeg', price: 8 },
-  { id: '799d0a71-7c88-4620-8ca0-27a827fbac07', name: 'Condolences', image: '/images/condolences.jpeg', price: 8 },
-  { id: '2ceea56c-352f-4a48-a262-f60e9ee85b1c', name: 'Grand Opening', image: '/images/grandop.jpeg', price: 8 },
-  { id: 'b40dcc46-8328-4fcd-af77-42ecc9511606', name: 'Birthday', image: '/images/birthday.jpeg', price: 8 },
-  { id: '71be3ee1-17b4-4bb8-8f80-eae6ad93a844', name: 'Graduate', image: '/images/graduate.jpeg', price: 8 },
-  { id: '9886edf6-087b-48e7-b00a-d79dd092e8d4', name: 'Anniversary', image: '/images/anniversary.jpeg', price: 8 },
-  { id: 'custom', name: 'Custom Board Simulator', image: '/images/custom-preview.png', price: 10 }
-])
+// Simulator card data (Frontend Interactive component)
+const customSimulatorCard: CatalogProduct = {
+  id: 'custom',
+  name: 'Custom Flower Board Simulator',
+  price: 150000,
+  rating: 5.0,
+  reviews: 89,
+  image: '/images/custom-preview.png',
+  tag: 'Interactive Game',
+  desc: 'Design your own professional flower board in real-time!',
+  isCustomRoute: true,
+  isAvailable: true
+}
 
-// --- LOGIKA PENCARIAN REAL-TIME ---
-const filteredResults = computed(() => {
-  if (!searchQuery.value) return []
-  return productOfferings.value.filter(product => 
-    product.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  )
+let debounceTimeout: ReturnType<typeof setTimeout> | null = null
+
+// --- LOGIKA PENCARIAN REAL-TIME DENGAN DEBOUNCE ---
+watch(searchQuery, (newQuery) => {
+  if (debounceTimeout) {
+    clearTimeout(debounceTimeout)
+  }
+
+  const query = newQuery.trim()
+  if (!query) {
+    searchResults.value = []
+    return
+  }
+
+  isLoadingSearch.value = true
+
+  debounceTimeout = setTimeout(async () => {
+    try {
+      // Fetch matching products from Go API backend
+      const apiResults = await productService.getCatalogProducts({ name: query })
+
+      // Check if user search matches our custom board simulator
+      const matchesCustom = customSimulatorCard.name.toLowerCase().includes(query.toLowerCase()) ||
+                            'custom'.includes(query.toLowerCase()) ||
+                            'simulator'.includes(query.toLowerCase())
+
+      if (matchesCustom) {
+        searchResults.value = [customSimulatorCard, ...apiResults]
+      } else {
+        searchResults.value = apiResults
+      }
+    } catch (err) {
+      console.error('Search failed:', err)
+      searchResults.value = []
+    } finally {
+      isLoadingSearch.value = false
+    }
+  }, 300) // 300ms debounce
+})
+
+onUnmounted(() => {
+  if (debounceTimeout) {
+    clearTimeout(debounceTimeout)
+  }
 })
 
 // --- FUNGSI KONTROL ---
@@ -36,6 +81,7 @@ const openSearch = async () => {
 const closeSearch = () => {
   isSearchOpen.value = false
   searchQuery.value = ''
+  searchResults.value = []
 }
 </script>
 
@@ -115,32 +161,37 @@ const closeSearch = () => {
             </div>
 
             <div class="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar">
-              <div v-if="searchQuery && filteredResults.length > 0" class="space-y-4">
+              <div v-if="isLoadingSearch" class="flex flex-col items-center justify-center py-12 space-y-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-700"></div>
+                <p class="text-xs text-gray-500 font-medium animate-pulse">Searching...</p>
+              </div>
+
+              <div v-else-if="searchQuery && searchResults.length > 0" class="space-y-4">
                 <div class="flex justify-between items-center mb-2">
                   <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Found Products</span>
-                  <span class="text-[10px] font-mono text-gray-400 uppercase">{{ filteredResults.length }} results</span>
+                  <span class="text-[10px] font-mono text-gray-400 uppercase">{{ searchResults.length }} results</span>
                 </div>
                 
                 <NuxtLink 
-                  v-for="product in filteredResults" 
+                  v-for="product in searchResults" 
                   :key="product.id"
-                  :to="product.id === 'custom' ? '/products/custom' : `/products/${product.id}`"
+                  :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.id}`"
                   @click="closeSearch"
                   class="flex gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-all group cursor-pointer border border-transparent hover:border-gray-100"
                 >
                   <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img :src="product.image" :alt="product.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    <img :src="product.image || '/images/birthday.jpeg'" :alt="product.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   </div>
                   <div class="flex flex-col justify-center">
                     <h4 class="text-xs font-bold text-gray-900 group-hover:text-[#1b4332] transition-colors leading-tight">
                       {{ product.name }}
                     </h4>
-                    <p class="text-[11px] font-semibold text-emerald-600 mt-1">From ${{ product.price }}</p>
+                    <p class="text-[11px] font-semibold text-emerald-600 mt-1">Starting From {{ formatRupiah(product.price) }}</p>
                   </div>
                 </NuxtLink>
               </div>
 
-              <div v-else-if="searchQuery && filteredResults.length === 0" class="h-full flex flex-col items-center justify-center opacity-40">
+              <div v-else-if="searchQuery && searchResults.length === 0" class="h-full flex flex-col items-center justify-center opacity-40">
                 <p class="text-4xl mb-2">🔍</p>
                 <p class="text-xs font-bold">No results found for "{{ searchQuery }}"</p>
               </div>
