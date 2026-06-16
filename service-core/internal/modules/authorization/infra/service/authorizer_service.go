@@ -10,7 +10,7 @@ import (
 	authendomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/authorization/repository"
-	"service-core/internal/shared/transaction"
+	transaction "service-core/internal/shared/transaction"
 )
 
 type actorContextKey struct{}
@@ -27,20 +27,30 @@ func NewAuthorizer(
 	}
 }
 
-func (s *authorizer) RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware {
-	return appmiddleware.RequireAccountType(
-		func(ctx context.Context) (authendomain.AccountType, bool) {
-			actor, ok := GetActor(ctx)
+func (s *authorizer) RequireAccountType(
+	allowedTypes ...authendomain.AccountType,
+) appmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			actor, ok := GetActor(r.Context())
 			if !ok {
-				return "", false
+				return apperrors.NewUnauthorized("actor unauthorized")
 			}
-			return actor.Type, true
-		},
-		allowedTypes...,
-	)
+
+			for _, allowed := range allowedTypes {
+				if actor.Type == allowed {
+					return next(w, r)
+				}
+			}
+
+			return apperrors.NewForbidden("insufficient account type")
+		}
+	}
 }
 
-func (s *authorizer) RequireMerchantRole(allowedRoles ...string) appmiddleware.Middleware {
+func (s *authorizer) RequireMerchantRole(
+	allowedRoles ...domain.RoleCode,
+) appmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			actor, ok := GetActor(r.Context())
@@ -84,15 +94,22 @@ func (s *authorizer) LoadActor(
 				return apperrors.NewUnauthorized("authentication required")
 			}
 
-			actor, err := s.actorSvc.Load(r.Context(), exec,
-				authCtx.UserID,
-				authCtx.MerchantID,
-			)
+			actor, err := s.actorSvc.
+				Load(
+					r.Context(),
+					exec,
+					authCtx.UserID,
+					authCtx.MerchantID,
+				)
 			if err != nil {
 				return err
 			}
 
-			ctx := context.WithValue(r.Context(), actorContextKey{}, actor)
+			ctx := context.WithValue(
+				r.Context(),
+				actorContextKey{},
+				actor,
+			)
 
 			return next(w, r.WithContext(ctx))
 		}

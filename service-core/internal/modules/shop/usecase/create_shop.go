@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	authorDomain "service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/repository"
-	"service-core/internal/shared/slug"
+	slug "service-core/internal/shared/slug"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -39,15 +40,26 @@ type CreateShopInput struct {
 
 func (u *CreateShopUsecase) Execute(
 	ctx context.Context,
+	actor authorDomain.Actor,
 	input CreateShopInput,
 ) error {
+	canSetActive := false
+	for _, actorRole := range actor.Roles {
+		if actorRole.Code == authorDomain.RoleMerchantAdmin {
+			canSetActive = true
+			break
+		}
+	}
+
 	shop := domain.Shop{
 		ID:          uuid.New(),
 		Name:        input.Name,
 		Slug:        u.slugGen.Generate(input.Name),
 		Description: input.Description,
-		IsActive:    input.IsActive,
 		CreatedAt:   time.Now(),
+	}
+	if canSetActive {
+		shop.IsActive = input.IsActive
 	}
 
 	err := u.shopRepo.Create(ctx, u.executor, shop)

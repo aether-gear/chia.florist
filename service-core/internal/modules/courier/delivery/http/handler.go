@@ -6,20 +6,35 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/courier/usecase"
-
-	"github.com/google/uuid"
 )
 
 type CourierHandler struct {
+	listCouriers         *usecase.ListCouriersUsecase
 	configureShopCourier *usecase.ConfigureShopCourierUsecase
 }
 
 func NewCourierHandler(
+	listCouriers *usecase.ListCouriersUsecase,
 	configureShopCourier *usecase.ConfigureShopCourierUsecase,
 ) *CourierHandler {
 	return &CourierHandler{
+		listCouriers:         listCouriers,
 		configureShopCourier: configureShopCourier,
 	}
+}
+
+func (h *CourierHandler) ListAllCouriers(w http.ResponseWriter, r *http.Request) error {
+	code, err := h.listCouriers.Execute(r.Context())
+	if err != nil {
+		return err
+	}
+
+	response := map[string][]string{
+		"couriers": code,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
 func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Request) error {
@@ -29,13 +44,12 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		return apperrors.NewBadRequest("invalid body request")
 	}
 
-	shopID, err := uuid.Parse(req.ShopID)
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	inputs := make([]usecase.ConfigureShopCourierInput, 0, len(req.Couriers))
-
 	for _, courier := range req.Couriers {
 		inputs = append(inputs, usecase.ConfigureShopCourierInput{
 			Code:   courier.Code,
@@ -43,7 +57,8 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	err = h.configureShopCourier.Execute(r.Context(), shopID, inputs)
+	err = h.configureShopCourier.
+		Execute(r.Context(), shopID, inputs)
 	if err != nil {
 		return err
 	}

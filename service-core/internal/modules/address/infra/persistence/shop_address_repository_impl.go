@@ -131,6 +131,91 @@ func (r *shopAddressRepositoryImpl) GetDefaultByShopID(
 	return &a, nil
 }
 
+func (r *shopAddressRepositoryImpl) GetDefaultsByShopIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopIDs []uuid.UUID,
+) (map[uuid.UUID]domain.ShopAddress, error) {
+	addressMap := make(map[uuid.UUID]domain.ShopAddress)
+	if len(shopIDs) == 0 {
+		return addressMap, nil
+	}
+
+	shopIDStrings := make([]string, len(shopIDs))
+	for i, id := range shopIDs {
+		shopIDStrings[i] = id.String()
+	}
+
+	query := `
+		SELECT
+			id,
+			shop_id,
+			label,
+			phone,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			is_active,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM
+			shop_addresses
+		WHERE
+			shop_id = ANY($1::uuid[])
+			AND is_active = true
+			AND deleted_at IS NULL
+		LIMIT 1
+	`
+
+	rows, err := exec.Query(ctx, query, shopIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query shop addresses by shop ids failed: %w", err)
+	}
+	defer rows.Close()
+
+	var shopAddresses []domain.ShopAddress
+	for rows.Next() {
+		var sC domain.ShopAddress
+		if err := rows.Scan(
+			&sC.ID,
+			&sC.ShopID,
+			&sC.Label,
+			&sC.Phone,
+			&sC.Detail.ProvinceID,
+			&sC.Detail.CityID,
+			&sC.Detail.DistrictID,
+			&sC.Detail.VillageID,
+			&sC.Detail.FullAddress,
+			&sC.Detail.PostalCode,
+			&sC.IsActive,
+			&sC.CreatedAt,
+			&sC.UpdatedAt,
+			&sC.DeletedAt,
+		); err != nil {
+			return nil, fmt.Errorf("mapping shop address model to domain failed: %w", err)
+		}
+
+		shopAddresses = append(shopAddresses, sC)
+	}
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query address default by shop id failed: %w", err)
+	}
+
+	for _, shopAddr := range shopAddresses {
+		addressMap[shopAddr.ShopID] = shopAddr
+	}
+
+	return addressMap, nil
+}
+
 func (r *shopAddressRepositoryImpl) FindByShopID(
 	ctx context.Context,
 	exec transaction.Executor,

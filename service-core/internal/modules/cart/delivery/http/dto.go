@@ -39,13 +39,20 @@ type checkoutItemRequest struct {
 	Quantity  int    `json:"quantity"`
 }
 
+type selectedCourierRequest struct {
+	Code    string `json:"code"`
+	Service string `json:"service"`
+}
+
 type checkoutShopRequest struct {
-	ShopID string                `json:"shop_id"`
-	Items  []checkoutItemRequest `json:"items"`
+	ShopID  string                  `json:"shop_id"`
+	Items   []checkoutItemRequest   `json:"items"`
+	Courier *selectedCourierRequest `json:"courier"`
 }
 
 type checkoutRequest struct {
-	Shops []checkoutShopRequest `json:"shops"`
+	AddressID *string               `json:"address_id"`
+	Shops     []checkoutShopRequest `json:"shops"`
 }
 
 type checkoutAddressResponse struct {
@@ -57,6 +64,7 @@ type checkoutAddressResponse struct {
 
 type checkoutCouriersResponse struct {
 	Code    string `json:"code"`
+	Name    string `json:"name"`
 	Service string `json:"service"`
 	ETD     string `json:"etd"`
 	Fee     int64  `json:"fee"`
@@ -71,14 +79,25 @@ type checkoutItemResponse struct {
 	Subtotal  int64     `json:"subtotal"`
 }
 
+type selectedCourierResponse struct {
+	Code    string `json:"code"`
+	Service string `json:"service"`
+	Fee     int64  `json:"fee"`
+}
+
 type shopResponse struct {
-	Items       []checkoutItemResponse     `json:"items"`
-	ShippingFee []checkoutCouriersResponse `json:"shipping_fee"`
+	ShopID          uuid.UUID                  `json:"shop_id"`
+	Subtotal        int64                      `json:"subtotal"`
+	Total           *int64                     `json:"total"`
+	SelectedCourier *selectedCourierResponse   `json:"selected_courier"`
+	Items           []checkoutItemResponse     `json:"items"`
+	CostCouriers    []checkoutCouriersResponse `json:"cost_couriers"`
 }
 
 type checkoutResponse struct {
-	Address  checkoutAddressResponse `json:"address"`
-	Shops    []shopResponse          `json:"shops"`
-	Subtotal int64                   `json:"subtotal"`
+	Address       checkoutAddressResponse `json:"address"`
+	Shops         []shopResponse          `json:"shops"`
+	Subtotal      int64                   `json:"subtotal"`
+	TotalShipping int64                   `json:"total_shipping"`
+	TotalAll      *int64                  `json:"total"`
 }
-

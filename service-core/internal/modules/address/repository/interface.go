@@ -67,6 +67,27 @@ type ShopAddressRepository interface {
 		shopID uuid.UUID,
 	) (*domain.ShopAddress, error)
 
+	// GetDefaultsByShopIDs retrieves default address grouped by shop IDs.
+	// The returned map uses the shop ID as the key and all associated
+	// default address record as the value.
+	//
+	// Example:
+	//
+	//	shopIDs := []uuid.UUID{shopA, shopB}
+	//
+	//	result := map[uuid.UUID][]domain.ShopAddress{
+	//		shopA: addressDefault,
+	//		shopB: addressDefault,
+	//	}
+	//
+	// This allows callers to efficiently look up default addresses
+	// belonging to a specific shop without additional filtering.
+	GetDefaultsByShopIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		shopIDs []uuid.UUID,
+	) (map[uuid.UUID]domain.ShopAddress, error)
+
 	FindByShopID(
 		ctx context.Context,
 		exec transaction.Executor,

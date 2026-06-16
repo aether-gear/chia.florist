@@ -8,6 +8,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	authorzDomain "service-core/internal/modules/authorization/domain"
 	authorRepo "service-core/internal/modules/authorization/repository"
 	merchantRepo "service-core/internal/modules/merchant/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -114,7 +115,7 @@ func (u *LoginMerchantUsecase) Execute(
 		return nil, apperrors.NewForbidden("no role associated with this account")
 	}
 
-	roleCodes := make([]string, len(roles))
+	roleCodes := make([]authorzDomain.RoleCode, len(roles))
 	for i, r := range roles {
 		roleCodes[i] = r.Code
 	}

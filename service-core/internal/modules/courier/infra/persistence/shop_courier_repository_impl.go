@@ -17,7 +17,7 @@ func NewShopCourierRepositoryImpl() repository.ShopCourierRepository {
 	return &shopCourierRepositoryImpl{}
 }
 
-func (r *shopCourierRepositoryImpl) GetByShopID(
+func (r *shopCourierRepositoryImpl) ListByShopID(
 	ctx context.Context,
 	exec transaction.Executor,
 	shopID uuid.UUID,
@@ -61,36 +61,72 @@ func (r *shopCourierRepositoryImpl) GetByShopID(
 	return shopCouriers, nil
 }
 
-func (r *shopCourierRepositoryImpl) SaveShopCouriers(
+func (r *shopCourierRepositoryImpl) ListsByShopIDs(
 	ctx context.Context,
 	exec transaction.Executor,
-	shopCouriers []domain.ShopCourier,
+	shopIDs []uuid.UUID,
+) (map[uuid.UUID][]domain.ShopCourier, error) {
+	courierShopMap := make(map[uuid.UUID][]domain.ShopCourier)
+	if len(shopIDs) == 0 {
+		return courierShopMap, nil
+	}
+
+	shopIDStrings := make([]string, len(shopIDs))
+	for i, id := range shopIDs {
+		shopIDStrings[i] = id.String()
+	}
+
+	query := `
+		SELECT
+			shop_id,
+			code,
+			active
+		FROM shop_couriers
+		WHERE shop_id = ANY($1::uuid[])
+	`
+
+	rows, err := exec.Query(ctx, query, shopIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query shop courier by shop id failed: %w", err)
+	}
+	defer rows.Close()
+
+	var shopCouriers []domain.ShopCourier
+	for rows.Next() {
+		var sC domain.ShopCourier
+		if err := rows.Scan(
+			&sC.ShopID,
+			&sC.Code,
+			&sC.Active,
+		); err != nil {
+			return nil, fmt.Errorf("mapping shop courier model to domain failed: %w", err)
+		}
+
+		shopCouriers = append(shopCouriers, sC)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate shop couriers failed: %w", err)
+	}
+
+	for _, courierShop := range shopCouriers {
+		courierShopMap[courierShop.ShopID] = append(courierShopMap[courierShop.ShopID], courierShop)
+	}
+
+	return courierShopMap, nil
+}
+
+func (r *shopCourierRepositoryImpl) SaveShopCourier(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopCourier domain.ShopCourier,
 ) error {
-	if len(shopCouriers) == 0 {
-		return nil
-	}
-
-	shopIDs := make([]uuid.UUID, len(shopCouriers))
-	codes := make([]string, len(shopCouriers))
-	actives := make([]bool, len(shopCouriers))
-
-	for i, sc := range shopCouriers {
-		shopIDs[i] = sc.ShopID
-		codes[i] = sc.Code
-		actives[i] = sc.Active
-	}
-
 	query := `
 		INSERT INTO shop_couriers (
 			shop_id,
 			code,
 			active
-		)
-		SELECT *
-		FROM UNNEST(
-			$1::uuid[],
-			$2::text[],
-			$3::boolean[]
+		) VALUES (
+		 	$1,$2,$3
 		)
 		ON CONFLICT (shop_id, code)
 		DO UPDATE SET
@@ -98,9 +134,9 @@ func (r *shopCourierRepositoryImpl) SaveShopCouriers(
 	`
 
 	_, err := exec.Exec(ctx, query,
-		shopIDs,
-		codes,
-		actives,
+		shopCourier.ShopID,
+		shopCourier.Code,
+		shopCourier.Active,
 	)
 	if err != nil {
 		return fmt.Errorf("save shop couriers failed: %w", err)

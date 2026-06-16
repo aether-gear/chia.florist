@@ -26,3 +26,13 @@ type Actor struct {
 	Roles       []Role
 	Permissions []Permission
 }
+
+func (a *Actor) HasRole(role RoleCode) bool {
+	for _, r := range a.Roles {
+		if r.Code == role {
+			return true
+		}
+	}
+
+	return false
+}
