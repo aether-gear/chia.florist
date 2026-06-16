@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCart } from '~/composables/useCart' // 1. Impor Composable Global Cart
 
 // Matikan layout bawaan agar footer/navbar web tidak muncul sama sekali
@@ -11,8 +11,8 @@ useHead({
   title: 'Chia Florist - Board Simulator'
 })
 
-// Ambil fungsi penambahan item keranjang
-const { addToCart } = useCart()
+// Ambil fungsi penambahan item keranjang dan helper formatter Rupiah dari store
+const { addToCart, formatRupiah } = useCart()
 
 // --- STATE NAVIGASI SIMULATOR ---
 const isGameStarted = ref(false)
@@ -24,7 +24,6 @@ interface SizeOption {
   label: string
   price: number
   desc: string
-  tip: string
   class: string
 }
 
@@ -33,7 +32,6 @@ interface ThemeOption {
   label: string
   color: string
   price: number
-  tip: string
 }
 
 interface FlowerOption {
@@ -41,7 +39,6 @@ interface FlowerOption {
   label: string
   price: number
   icon: string
-  tip: string
 }
 
 interface FontOption {
@@ -49,7 +46,6 @@ interface FontOption {
   label: string
   family: string
   price: number
-  tip: string
 }
 
 interface CustomSelection {
@@ -64,28 +60,28 @@ interface CustomSelection {
   }
 }
 
-// Data Master Simulator + Rekomendasi
+// Data Master Simulator + Rekomendasi (Dikonversi Menjadi Rupiah Murni)
 const options = {
   sizes: [
-    { id: 'small', label: '1.5m x 2.0m', price: 150, desc: 'Compact size', tip: 'Sangat cocok untuk ucapan di ruangan terbatas (indoor).', class: 'max-w-sm md:max-w-md' },
-    { id: 'medium', label: '1.8m x 2.5m', price: 200, desc: 'Most popular', tip: 'Rekomendasi paling pas untuk acara pernikahan/wedding.', class: 'max-w-md md:max-w-lg' },
-    { id: 'large', label: '2.0m x 3.0m', price: 280, desc: 'Premium Grand', tip: 'Sangat megah untuk acara Grand Opening perusahaan.', class: 'max-w-lg md:max-w-xl' }
+    { id: 'small', label: '1.5m x 2.0m', price: 150000, desc: 'Compact size', class: 'max-w-sm md:max-w-md' },
+    { id: 'medium', label: '1.8m x 2.5m', price: 200000, desc: 'Most popular', class: 'max-w-md md:max-w-lg' },
+    { id: 'large', label: '2.0m x 3.0m', price: 280000, desc: 'Premium Grand', class: 'max-w-lg md:max-w-xl' }
   ] as SizeOption[],
   themes: [
-    { id: 'emerald', label: 'Florist Emerald', color: '#114028', price: 0, tip: 'Melambangkan harapan dan kebahagiaan universal.' },
-    { id: 'navy', label: 'Royal Navy', color: '#0c1b30', price: 0, tip: 'Sangat elegan dan profesional untuk acara korporat.' },
-    { id: 'maroon', label: 'Wine Maroon', color: '#4c0519', price: 15, tip: 'Mewah dan romantis untuk ulang tahun pernikahan.' },
-    { id: 'black', label: 'Luxury Black', color: '#111111', price: 10, tip: 'Sangat tepat untuk duka cita/condolences.' }
+    { id: 'emerald', label: 'Florist Emerald', color: '#114028', price: 0 },
+    { id: 'navy', label: 'Royal Navy', color: '#0c1b30', price: 0 },
+    { id: 'maroon', label: 'Wine Maroon', color: '#4c0519', price: 25000 },
+    { id: 'black', label: 'Luxury Black', color: '#111111', price: 15000 }
   ] as ThemeOption[],
   flowers: [
-    { id: 'basic', label: 'Minimalist (Top)', price: 40, icon: '🌸', tip: 'Simpel namun tetap sopan untuk acara santai.' },
-    { id: 'standard', label: 'Corner Duo', price: 70, icon: '🌸🌸', tip: 'Pilihan seimbang dan estetik di dua sudut papan.' },
-    { id: 'luxury', label: 'Full Frame', price: 125, icon: '👑', tip: 'Tampak sangat mewah dengan bunga yang mengelilingi papan.' }
+    { id: 'basic', label: 'Minimalist (Top)', price: 40000, icon: '🌸' },
+    { id: 'standard', label: 'Corner Duo', price: 70000, icon: '🌸🌸' },
+    { id: 'luxury', label: 'Full Frame', price: 125000, icon: '👑' }
   ] as FlowerOption[],
   fonts: [
-    { id: 'serif', label: 'Classic Luxury', family: 'font-serif', price: 10, tip: 'Font resmi yang memberikan kesan megah.' },
-    { id: 'modern', label: 'Modern Sans', family: 'font-sans', price: 0, tip: 'Terbaca jelas dan cocok untuk segala jenis ucapan.' },
-    { id: 'script', label: 'Elegant Script', family: 'italic font-serif', price: 15, tip: 'Gaya tulisan tangan yang romantis dan personal.' }
+    { id: 'serif', label: 'Classic Luxury', family: 'font-serif', price: 15000 },
+    { id: 'modern', label: 'Modern Sans', family: 'font-sans', price: 0 },
+    { id: 'script', label: 'Elegant Script', family: 'italic font-serif', price: 20000 }
   ] as FontOption[]
 }
 
@@ -103,7 +99,7 @@ const selection = ref<CustomSelection>({
   }
 })
 
-// Kalkulasi Harga Otomatis
+// Kalkulasi Harga Otomatis Secara Numerik
 const totalPrice = computed(() => {
   return selection.value.size.price +
          selection.value.theme.price +
@@ -111,10 +107,10 @@ const totalPrice = computed(() => {
          selection.value.font.price
 })
 
-// 2. FUNGSI LOGIKA AKHIR SIMULATOR KE KERANJANG GLOBAL
+// LOGIKA AKHIR SIMULATOR KE KERANJANG GLOBAL
 const handleCustomAddToCart = () => {
   addToCart({
-    id: 'custom-' + Date.now(), // ID Unik agar desain kustom yang berbeda tidak saling menimpa
+    id: 'custom-' + Date.now(), // ID Unik agar tidak saling menimpa
     name: `Custom Board (${selection.value.text.header || 'Design'})`,
     price: totalPrice.value,
     image: '/images/custom-preview.png', // Fallback gambar preview simulator
@@ -127,7 +123,46 @@ const handleCustomAddToCart = () => {
   navigateTo('/cart')
 }
 
-// Fungsi Navigasi
+// Logic Auto Switch Background Hero
+const currentIndex = ref(0)
+let intervalTimer: any = null
+
+const backgrounds = [
+  '/florist.jpg',
+  '/flowerist.jpg',
+  '/flower.jpg'
+]
+
+const changeBg = (index: number) => {
+  currentIndex.value = index
+  resetTimer() 
+}
+
+const startTimer = () => {
+  intervalTimer = setInterval(() => {
+    currentIndex.value = (currentIndex.value + 1) % backgrounds.length
+  }, 5000)
+}
+
+const resetTimer = () => {
+  if (intervalTimer) clearInterval(intervalTimer)
+  startTimer()
+}
+
+onMounted(() => {
+  startTimer()
+})
+
+onUnmounted(() => {
+  if (intervalTimer) clearInterval(intervalTimer)
+})
+
+// Data Rekomendasi Tips Langkah
+const sizeTip = computed(() => selection.value.size.id === 'small' ? 'Sangat cocok untuk ucapan di ruangan terbatas (indoor).' : selection.value.size.id === 'medium' ? 'Rekomendasi paling pas untuk acara pernikahan/wedding.' : 'Sangat megah untuk acara Grand Opening perusahaan.')
+const themeTip = computed(() => selection.value.theme.id === 'emerald' ? 'Melambangkan harapan dan kebahagiaan universal.' : selection.value.theme.id === 'navy' ? 'Sangat elegan dan profesional untuk acara korporat.' : selection.value.theme.id === 'maroon' ? 'Mewah dan romantis untuk ulang tahun pernikahan.' : 'Sangat tepat untuk duka cita/condolences.')
+const flowerTip = computed(() => selection.value.flower.id === 'basic' ? 'Simpel namun tetap sopan untuk acara santai.' : selection.value.flower.id === 'standard' ? 'Pilihan seimbang dan estetik di dua sudut papan.' : 'Tampak sangat mewah dengan bunga yang mengelilingi papan.')
+const fontTip = computed(() => selection.value.font.id === 'serif' ? 'Font resmi yang memberikan kesan megah.' : selection.value.font.id === 'modern' ? 'Terbaca jelas dan cocok untuk segala jenis ucapan.' : 'Gaya tulisan tangan yang romantis dan personal.')
+
 const startGame = () => { isGameStarted.value = true }
 const completeTutorial = () => { hasSeenTutorial.value = true }
 const goToStep = (step: number) => { currentStep.value = step }
@@ -153,7 +188,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
         <div class="pt-6">
           <button 
             @click="startGame"
-            class="group bg-emerald-500 hover:bg-emerald-400 text-black text-base font-black px-10 py-4 rounded-2xl transition-all duration-300 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] flex items-center gap-3 mx-auto hover:scale-105 active:scale-95"
+            class="group bg-emerald-500 hover:bg-emerald-400 text-black text-base font-black px-10 py-4 rounded-2xl transition-all duration-300 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] flex items-center gap-3 mx-auto hover:scale-105 active:scale-95 cursor-pointer"
           >
             <span>START GAME</span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform transition group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -204,7 +239,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
         </div>
 
         <div class="pt-4">
-          <button @click="completeTutorial" class="bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black px-8 py-3.5 rounded-xl transition shadow-lg hover:scale-105">
+          <button @click="completeTutorial" class="bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black px-8 py-3.5 rounded-xl transition shadow-lg hover:scale-105 cursor-pointer">
             MULAI SIMULASI 🚀
           </button>
         </div>
@@ -275,7 +310,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
             </div>
             <div>
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Estimasi Harga</p>
-              <p class="text-2xl font-black text-emerald-400">${{ totalPrice }}</p>
+              <p class="text-2xl font-black text-emerald-400">{{ formatRupiah(totalPrice) }}</p>
             </div>
           </div>
         </div>
@@ -291,7 +326,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
               <button 
                 v-for="i in 4" :key="i"
                 @click="goToStep(i)"
-                :class="['h-1.5 flex-1 rounded-full transition-all duration-300', currentStep === i ? 'bg-emerald-400 scale-102' : currentStep > i ? 'bg-slate-700' : 'bg-slate-800']"
+                :class="['h-1.5 flex-1 rounded-full transition-all duration-300 cursor-pointer', currentStep === i ? 'bg-emerald-400 scale-102' : currentStep > i ? 'bg-slate-700' : 'bg-slate-800']"
               ></button>
             </div>
           </div>
@@ -307,13 +342,13 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
                 <button 
                   v-for="s in options.sizes" :key="s.id"
                   @click="selection.size = s"
-                  :class="['flex flex-col gap-1 p-4 rounded-xl border-2 transition text-left', selection.size.id === s.id ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/20']"
+                  :class="['flex flex-col gap-1 p-4 rounded-xl border-2 transition text-left cursor-pointer', selection.size.id === s.id ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/20']"
                 >
                   <div class="flex justify-between items-center w-full">
                     <span class="font-bold text-slate-100 text-sm">{{ s.label }} ({{ s.desc }})</span>
-                    <span :class="['font-black text-sm', selection.size.id === s.id ? 'text-emerald-400' : 'text-slate-300']">${{ s.price }}</span>
+                    <span :class="['font-black text-sm', selection.size.id === s.id ? 'text-emerald-400' : 'text-slate-300']">{{ formatRupiah(s.price) }}</span>
                   </div>
-                  <p class="text-[11px] text-emerald-300 mt-1 leading-normal font-medium">💡 {{ s.tip }}</p>
+                  <p class="text-[11px] text-emerald-300 mt-1 leading-normal font-medium">💡 {{ sizeTip }}</p>
                 </button>
               </div>
             </div>
@@ -327,16 +362,16 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
                 <button 
                   v-for="c in options.themes" :key="c.id"
                   @click="selection.theme = c"
-                  :class="['p-4 rounded-xl border-2 transition-all flex flex-col gap-2 text-left', selection.theme.id === c.id ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/20']"
+                  :class="['p-4 rounded-xl border-2 transition-all flex flex-col gap-2 text-left cursor-pointer', selection.theme.id === c.id ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/20']"
                 >
                   <div class="flex justify-between items-center w-full">
                     <div class="flex items-center gap-3">
                       <div :style="{ backgroundColor: c.color }" class="w-8 h-6 rounded border border-white/10 shadow-md"></div>
                       <span class="text-xs font-bold text-slate-100">{{ c.label }}</span>
                     </div>
-                    <span class="text-xs font-bold text-emerald-400">{{ c.price === 0 ? 'FREE' : `+$${c.price}` }}</span>
+                    <span class="text-xs font-bold text-emerald-400">{{ c.price === 0 ? 'FREE' : `+${formatRupiah(c.price)}` }}</span>
                   </div>
-                  <p class="text-[11px] text-emerald-300 mt-1 leading-normal font-medium">💡 {{ c.tip }}</p>
+                  <p class="text-[11px] text-emerald-300 mt-1 leading-normal font-medium">💡 {{ themeTip }}</p>
                 </button>
               </div>
             </div>
@@ -351,13 +386,13 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
                   <button 
                     v-for="f in options.flowers" :key="f.id"
                     @click="selection.flower = f"
-                    :class="['flex flex-col gap-1 p-3.5 rounded-xl border-2 transition text-left', selection.flower.id === f.id ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-white/5 bg-white/5 hover:border-white/20']"
+                    :class="['flex flex-col gap-1 p-3.5 rounded-xl border-2 transition text-left cursor-pointer', selection.flower.id === f.id ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-white/5 bg-white/5 hover:border-white/20']"
                   >
                     <div class="flex justify-between items-center w-full">
                       <span class="text-xs font-bold text-slate-100">{{ f.icon }} {{ f.label }}</span>
-                      <span class="text-xs font-bold text-emerald-400">+${{ f.price }}</span>
+                      <span class="text-xs font-bold text-emerald-400">+{{ formatRupiah(f.price) }}</span>
                     </div>
-                    <p class="text-[11px] text-emerald-200 mt-1 leading-normal font-medium">💡 {{ f.tip }}</p>
+                    <p class="text-[11px] text-emerald-200 mt-1 leading-normal font-medium">💡 {{ flowerTip }}</p>
                   </button>
                 </div>
               </div>
@@ -371,13 +406,13 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
                   <button 
                     v-for="font in options.fonts" :key="font.id"
                     @click="selection.font = font"
-                    :class="['flex justify-between items-center p-3.5 rounded-xl border-2 transition text-left', selection.font.id === font.id ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-white/5 bg-white/5 hover:border-white/20', font.family]"
+                    :class="['flex flex-col gap-1 p-3.5 rounded-xl border-2 transition text-left cursor-pointer', selection.font.id === font.id ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-white/5 bg-white/5 hover:border-white/20']"
                   >
                     <div class="flex justify-between items-center w-full">
-                      <span class="text-xs italic tracking-wider text-slate-100">Aa {{ font.label }}</span>
-                      <span class="text-xs font-bold text-emerald-400">+${{ font.price }}</span>
+                      <span :class="['text-xs italic tracking-wider text-slate-100', font.family]">Aa {{ font.label }}</span>
+                      <span class="text-xs font-bold text-emerald-400">+{{ formatRupiah(font.price) }}</span>
                     </div>
-                    <p class="text-[11px] text-emerald-200 mt-1 leading-normal font-medium">💡 {{ font.tip }}</p>
+                    <p class="text-[11px] text-emerald-200 mt-1 leading-normal font-medium">💡 {{ fontTip }}</p>
                   </button>
                 </div>
               </div>
@@ -410,7 +445,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
             <button 
               @click="prev" 
               :disabled="currentStep === 1"
-              class="py-4 rounded-xl font-bold text-sm bg-white/5 hover:bg-white/10 disabled:opacity-30 transition border border-white/5"
+              class="py-4 rounded-xl font-bold text-sm bg-white/5 hover:bg-white/10 disabled:opacity-30 transition border border-white/5 cursor-pointer"
             >
               BACK
             </button>
@@ -418,7 +453,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
             <button 
               v-if="currentStep < 4"
               @click="next"
-              class="py-4 rounded-xl font-bold text-sm bg-emerald-500 text-black hover:bg-emerald-400 transition shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+              class="py-4 rounded-xl font-bold text-sm bg-emerald-500 text-black hover:bg-emerald-400 transition shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
             >
               NEXT STEP
             </button>
@@ -426,7 +461,7 @@ const prev = () => { if (currentStep.value > 1) currentStep.value-- }
             <button 
               v-else
               @click="handleCustomAddToCart"
-              class="py-4 rounded-xl font-bold text-sm bg-yellow-500 text-black hover:bg-yellow-400 transition shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+              class="py-4 rounded-xl font-bold text-sm bg-yellow-500 text-black hover:bg-yellow-400 transition shadow-[0_0_20px_rgba(234,179,8,0.3)] cursor-pointer"
             >
               ADD TO CART
             </button>
