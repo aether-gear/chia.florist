@@ -78,10 +78,10 @@ type Container struct {
 	CreateUserAddress addressUsecase.SaveUserAddressUsecase
 	DeleteUserAddress addressUsecase.DeleteUserAddressUsecase
 
-	GetShopAddress    addressUsecase.GetShopAddressUsecase
 	ListShopAddresses addressUsecase.ListShopAddressesUsecase
 	SaveShopAddress   addressUsecase.CreateShopAddressUsecase
 
+	ListShops  shopUsecase.ListShopsUsecase
 	GetShop    shopUsecase.GetShopUsecase
 	CreateShop shopUsecase.CreateShopUsecase
 
@@ -358,11 +358,6 @@ func NewContainer(cfg Config,
 				addressRepo,
 			),
 
-		GetShopAddress: *addressUsecase.
-			NewGetShopAddressUsecase(
-				addressShopRepo,
-				infra.TransactionExecutor,
-			),
 		ListShopAddresses: *addressUsecase.
 			NewListShopAddressesUsecase(
 				addressShopRepo,
@@ -374,6 +369,11 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
+		ListShops: *shopUsecase.
+			NewListShopsUsecase(
+				infra.TransactionExecutor,
+				shopRepo,
+			),
 		GetShop: *shopUsecase.
 			NewGetShopUsecase(
 				shopRepo,

@@ -148,7 +148,6 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.ListUserAddresses,
 			&c.CreateUserAddress,
 			&c.DeleteUserAddress,
-			&c.GetShopAddress,
 			&c.ListShopAddresses,
 			&c.SaveShopAddress,
 		)
@@ -161,6 +160,7 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		shopHandler = shopH.NewAddressHandler(
+			&c.ListShops,
 			&c.GetShop,
 			&c.CreateShop,
 		)
@@ -247,22 +247,25 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/shops", func(r chi.Router) {
+			r.Get("/", chains.Core(shopHandler.ListShops))
 			r.Post("/", chains.MerchantOnly(shopHandler.CreateShop))
-			r.Get("/{shopID}", chains.Core(shopHandler.GetShopByID))
 
-			r.Route("/{shopID}/addresses", func(r chi.Router) {
-				r.Get("/", chains.Core(addressHandler.ListShopAddresses))
-				r.Post("/", chains.MerchantOnly(addressHandler.CreateShopAddress))
-				r.Get("/{addressID}", chains.Core(addressHandler.GetShopAddress))
-			})
+			r.Route("/{shopID}", func(r chi.Router) {
+				r.Get("/", chains.Core(shopHandler.GetShopByID))
 
-			r.Route("/{shopID}/couriers", func(r chi.Router) {
-				r.Post("/", chains.MerchantOnly(courierHandler.ConfigureCourierShop))
-			})
+				r.Route("/addresses", func(r chi.Router) {
+					r.Get("/", chains.Core(addressHandler.ListShopAddresses))
+					r.Post("/", chains.MerchantOnly(addressHandler.CreateShopAddress))
+				})
 
-			r.Route("/{shopID}/products", func(r chi.Router) {
-				r.Post("/{productID}/inventories",
-					chains.MerchantOnly(inventoryHandler.AddInventory))
+				r.Route("/couriers", func(r chi.Router) {
+					r.Post("/", chains.MerchantOnly(courierHandler.ConfigureCourierShop))
+				})
+
+				r.Route("/products", func(r chi.Router) {
+					r.Post("/{productID}/inventories",
+						chains.MerchantOnly(inventoryHandler.AddInventory))
+				})
 			})
 		})
 

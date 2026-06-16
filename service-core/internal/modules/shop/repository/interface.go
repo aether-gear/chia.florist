@@ -10,6 +10,12 @@ import (
 )
 
 type ShopRepository interface {
+	List(
+		ctx context.Context,
+		exec transaction.Executor,
+		params FindShopsParams,
+	) ([]domain.Shop, int, error)
+
 	GetByID(
 		ctx context.Context,
 		exec transaction.Executor,

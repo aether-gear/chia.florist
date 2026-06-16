@@ -11,18 +11,76 @@ import (
 )
 
 type ShopHandler struct {
+	listShops  *usecase.ListShopsUsecase
 	getShop    *usecase.GetShopUsecase
 	createShop *usecase.CreateShopUsecase
 }
 
 func NewAddressHandler(
+	listShops *usecase.ListShopsUsecase,
 	getShop *usecase.GetShopUsecase,
 	createShop *usecase.CreateShopUsecase,
 ) *ShopHandler {
 	return &ShopHandler{
+		listShops:  listShops,
 		getShop:    getShop,
 		createShop: createShop,
 	}
+}
+
+func (h *ShopHandler) ListShops(w http.ResponseWriter, r *http.Request) error {
+	page := apphttp.QueryIntDefault(r, "page", 1)
+	if page <= 0 {
+		page = 1
+	}
+	limit := apphttp.QueryIntDefault(r, "limit", 10)
+	if limit <= 0 {
+		limit = 10
+	}
+
+	name := apphttp.Query(r, "name")
+	id := apphttp.Query(r, "id")
+
+	input := usecase.ListShopsInput{
+		Page:  page,
+		Limit: limit,
+	}
+	if name != "" {
+		input.Name = &name
+	}
+	if id != "" {
+		input.ID = &id
+	}
+
+	shops, total, err := h.listShops.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	var shopsResponse []getShopResponse
+	for _, shop := range shops {
+		s := getShopResponse{
+			ID:          shop.ID,
+			Name:        shop.Name,
+			Slug:        shop.Slug,
+			Description: shop.Description,
+			IsActive:    shop.IsActive,
+			CreatedAt:   shop.CreatedAt,
+			UpdatedAt:   shop.UpdatedAt,
+		}
+
+		shopsResponse = append(shopsResponse, s)
+	}
+
+	response := map[string]any{
+		"shops": shopsResponse,
+		"page":  page,
+		"limit": limit,
+		"total": total,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
 func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error {
