@@ -416,10 +416,11 @@ func NewContainer(cfg Config,
 		),
 		ConfigureShopCourier: *courierUsecase.
 			NewConfigureShopCourierUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				courierRepo,
 				shopCourierRepo,
 				shopRepo,
-				infra.TransactionExecutor,
 			),
 
 		EstimateShippingOptions: *shipmentUsecase.

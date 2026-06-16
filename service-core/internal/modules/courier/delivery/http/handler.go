@@ -6,8 +6,6 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/courier/usecase"
-
-	"github.com/google/uuid"
 )
 
 type CourierHandler struct {
@@ -46,13 +44,12 @@ func (h *CourierHandler) ConfigureCourierShop(w http.ResponseWriter, r *http.Req
 		return apperrors.NewBadRequest("invalid body request")
 	}
 
-	shopID, err := uuid.Parse(req.ShopID)
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
 	inputs := make([]usecase.ConfigureShopCourierInput, 0, len(req.Couriers))
-
 	for _, courier := range req.Couriers {
 		inputs = append(inputs, usecase.ConfigureShopCourierInput{
 			Code:   courier.Code,

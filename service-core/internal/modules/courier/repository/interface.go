@@ -35,9 +35,9 @@ type ShopCourierRepository interface {
 		shopID uuid.UUID,
 	) ([]domain.ShopCourier, error)
 
-	SaveShopCouriers(
+	SaveShopCourier(
 		ctx context.Context,
 		exec transaction.Executor,
-		shopCouriers []domain.ShopCourier,
+		shopCouriers domain.ShopCourier,
 	) error
 }

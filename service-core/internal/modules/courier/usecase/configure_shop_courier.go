@@ -14,23 +14,26 @@ import (
 )
 
 type ConfigureShopCourierUsecase struct {
+	executor        transaction.Executor
+	transactor      transaction.Transactor
 	courierRepo     repository.CourierRepository
 	shopCourierRepo repository.ShopCourierRepository
 	shopRepo        shopRepo.ShopRepository
-	executor        transaction.Executor
 }
 
 func NewConfigureShopCourierUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	courierRepo repository.CourierRepository,
 	shopCourierRepo repository.ShopCourierRepository,
 	shopRepo shopRepo.ShopRepository,
-	executor transaction.Executor,
 ) *ConfigureShopCourierUsecase {
 	return &ConfigureShopCourierUsecase{
+		executor:        executor,
+		transactor:      transactor,
 		courierRepo:     courierRepo,
 		shopCourierRepo: shopCourierRepo,
 		shopRepo:        shopRepo,
-		executor:        executor,
 	}
 }
 
@@ -44,7 +47,8 @@ func (u *ConfigureShopCourierUsecase) Execute(
 	shopID uuid.UUID,
 	inputs []ConfigureShopCourierInput,
 ) error {
-	shop, err := u.shopRepo.GetByID(ctx, u.executor, shopID)
+	shop, err := u.shopRepo.
+		GetByID(ctx, u.executor, shopID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve shop: %w", err)
 	}
@@ -57,7 +61,8 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		codes[i] = input.Code
 	}
 
-	validCodes, err := u.courierRepo.ValidateCouriers(ctx, u.executor, codes)
+	validCodes, err := u.courierRepo.
+		ValidateCouriers(ctx, u.executor, codes)
 	if err != nil {
 		return fmt.Errorf("failed to validate couriers: %w", err)
 	}
@@ -71,7 +76,6 @@ func (u *ConfigureShopCourierUsecase) Execute(
 	}
 
 	var shopCouriers []domain.ShopCourier
-
 	for _, input := range inputs {
 		if _, ok := validMap[input.Code]; !ok {
 			return fmt.Errorf("invalid courier: %s", input.Code)
@@ -84,8 +88,25 @@ func (u *ConfigureShopCourierUsecase) Execute(
 		})
 	}
 
-	if err := u.shopCourierRepo.SaveShopCouriers(ctx, u.executor, shopCouriers); err != nil {
-		return fmt.Errorf("failed to save shop couriers: %w", err)
+	err = u.transactor.WithinTransaction(
+		ctx,
+		func(exec transaction.Executor) error {
+			for _, shopCourier := range shopCouriers {
+				if err := u.shopCourierRepo.
+					SaveShopCourier(
+						ctx,
+						exec,
+						shopCourier,
+					); err != nil {
+					return fmt.Errorf("failed to save shop couriers: %w", err)
+				}
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil
