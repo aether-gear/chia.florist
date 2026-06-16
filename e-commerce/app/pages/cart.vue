@@ -1,20 +1,21 @@
+<!-- app/pages/cart.vue -->
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useCart } from '~/composables/useCart'
 
 useHead({
   title: 'Your Shopping Cart - Chia Florist'
 })
 
-// Ambil fungsi & data dari global cart composable
-const { cart, removeFromCart, updateQuantity, cartSubtotal, flushCart } = useCart()
+// INTEGRASI: Ambil variabel formatted dan fungsi formatRupiah murni dari useCart()
+const { cart, removeFromCart, updateQuantity, cartSubtotal, cartSubtotalFormatted, flushCart, formatRupiah } = useCart()
 
 onMounted(async () => {
   await flushCart()
 })
 
-// Biaya pengiriman flat (simulasi)
-const shippingFee = ref(10)
+// SINKRONISASI KURS: Nilai diubah ke Rupiah murni agar sinkron dengan database Supabase/Golang
+const shippingFee = ref(20000) // Diubah ke nominal masuk akal (Rp20.000)
 const promoCode = ref('')
 const discount = ref(0)
 
@@ -24,14 +25,13 @@ const totalPayment = computed(() => {
 
 const applyPromo = () => {
   if (promoCode.value.toUpperCase() === 'CHIAFLORIST') {
-    discount.value = 15
-    alert('Promo code applied successfully! You got a $15 discount.')
+    discount.value = 50000 // Diubah ke nominal potongan Rupiah (Rp50.000)
+    alert(`Promo code applied successfully! You got a ${formatRupiah(50000)} discount.`)
   } else {
     alert('Invalid promo code.')
   }
 }
 
-// INTEGRASI: Fungsi Navigasi ke Halaman Checkout
 const handleCheckout = () => {
   navigateTo('/checkout')
 }
@@ -80,7 +80,9 @@ const handleCheckout = () => {
                     <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold">✨ Custom Board</span>
                   </div>
                 </div>
-                <div class="text-xl font-bold text-gray-900">${{ (item.price * item.quantity).toFixed(2) }}</div>
+                <div class="text-xl font-extrabold text-gray-900">
+                  {{ formatRupiah(item.price * item.quantity) }}
+                </div>
               </div>
 
               <div class="flex justify-between items-center mt-6 pt-4 border-t border-dashed border-gray-100">
@@ -90,7 +92,7 @@ const handleCheckout = () => {
                   <button @click="updateQuantity(item.id, item.size, item.color, 1)" class="px-3 py-1.5 hover:bg-gray-200 transition text-gray-600 font-bold">+</button>
                 </div>
 
-                <button @click="removeFromCart(item.id, item.size, item.color)" class="text-sm font-semibold text-red-500 hover:text-red-700 flex items-center gap-1.5 transition">
+                <button @click="removeFromCart(item.id, item.size, item.color)" class="text-sm font-semibold text-red-500 hover:text-red-700 flex items-center gap-1.5 transition cursor-pointer">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.34 9.149m-8.28 0L5.82 9m1.65-4.361a1.6 1.6 0 0 1 1.76-1.305h4.18c.83 0 1.53.551 1.76 1.305l.14 0.49M8.25 4.5h7.493M4.5 4.5h15M11.06 18h2.23" />
                   </svg>
@@ -106,21 +108,24 @@ const handleCheckout = () => {
             <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">Order Summary</h3>
             
             <div class="space-y-4 text-sm font-medium text-gray-600">
-              <div class="flex justify-between">
+              <div class="flex justify-between items-center">
                 <span>Subtotal</span>
-                <span class="text-gray-900 font-bold">${{ cartSubtotal.toFixed(2) }}</span>
+                <span class="text-gray-900 font-bold">{{ cartSubtotalFormatted }}</span>
               </div>
-              <div class="flex justify-between">
+              
+              <div class="flex justify-between items-center">
                 <span>Estimated Delivery</span>
-                <span class="text-gray-900 font-bold">${{ shippingFee.toFixed(2) }}</span>
+                <span class="text-gray-900 font-bold">{{ formatRupiah(shippingFee) }}</span>
               </div>
-              <div v-if="discount > 0" class="flex justify-between text-emerald-600">
+              
+              <div class="flex justify-between items-center text-emerald-600" v-if="discount > 0">
                 <span>Promo Discount</span>
-                <span class="font-bold">-${{ discount.toFixed(2) }}</span>
+                <span class="font-bold">-{{ formatRupiah(discount) }}</span>
               </div>
-              <div class="border-t border-gray-100 pt-4 flex justify-between text-base font-bold text-gray-900">
+              
+              <div class="border-t border-gray-100 pt-4 flex justify-between items-center text-base font-bold text-gray-900">
                 <span>Total Amount</span>
-                <span class="text-2xl font-black text-[#1b4332]">${{ totalPayment.toFixed(2) }}</span>
+                <span class="text-2xl font-extrabold text-[#1b4332]">{{ formatRupiah(totalPayment) }}</span>
               </div>
             </div>
 
@@ -128,13 +133,13 @@ const handleCheckout = () => {
               <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Do you have a promo code?</label>
               <div class="flex gap-2">
                 <input v-model="promoCode" type="text" placeholder="e.g. CHIAFLORIST" class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-[#1b4332] transition-all font-semibold" />
-                <button @click="applyPromo" class="bg-gray-900 hover:bg-black text-white px-5 py-3 rounded-xl text-xs font-bold transition">Apply</button>
+                <button @click="applyPromo" class="bg-gray-900 hover:bg-black text-white px-5 py-3 rounded-xl text-xs font-bold transition cursor-pointer">Apply</button>
               </div>
             </div>
 
             <button 
               @click="handleCheckout"
-              class="w-full bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide"
+              class="w-full bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide cursor-pointer"
             >
               Proceed to Checkout
             </button>
@@ -152,7 +157,6 @@ const handleCheckout = () => {
 </template>
 
 <style scoped>
-/* Animasi Slide dari Kanan */
 .slide-enter-active, .slide-leave-active {
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -160,7 +164,6 @@ const handleCheckout = () => {
   transform: translateX(100%);
 }
 
-/* Animasi Fade Backdrop */
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.4s ease;
 }
@@ -168,12 +171,11 @@ const handleCheckout = () => {
   opacity: 0;
 }
 
-/* Custom Scrollbar Mini */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--color-border-soft);
+  background: #e5e7eb;
   border-radius: 10px;
 }
 </style>

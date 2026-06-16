@@ -1,3 +1,4 @@
+<!-- app/pages/profile.vue -->
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useCart } from '~/composables/useCart'
@@ -136,8 +137,8 @@ const handleDeleteAddress = async (id: string) => {
   }
 }
 
-// Global orders from useCart
-const { orders } = useCart()
+// INTEGRASI: Ambil fungsi orders dan helper formatRupiah murni dari useCart()
+const { orders, formatRupiah } = useCart()
 
 // Logout
 const handleLogout = async () => {
@@ -347,13 +348,19 @@ const triggerAlert = (message: string) => {
                       <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-black">Custom UI Design</span>
                     </div>
                   </div>
-                  <div class="text-sm font-bold text-gray-900">${{ (item.price * item.quantity).toFixed(2) }}</div>
+                  <!-- FIX 1: Konversi harga per baris item menjadi Rupiah cantik -->
+                  <div class="text-sm font-bold text-gray-900">
+                    {{ formatRupiah(item.price * item.quantity) }}
+                  </div>
                 </div>
 
                 <div class="border-t border-gray-50 pt-4 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                   <div class="flex items-center gap-2 text-sm font-bold">
                     <span class="text-gray-400">Total Paid:</span>
-                    <span class="text-xl text-[#1b4332]">${{ order.total.toFixed(2) }}</span>
+                    <!-- FIX 2: Konversi kalkulasi total tagihan final menjadi Rupiah cantik -->
+                    <span class="text-xl text-[#1b4332] font-extrabold">
+                      {{ formatRupiah(order.total) }}
+                    </span>
                   </div>
 
                   <div class="flex justify-end">
@@ -368,7 +375,7 @@ const triggerAlert = (message: string) => {
                       </button>
                     </div>
                     <div v-else-if="order.status === 'pengiriman'">
-                      <button @click="contactDriver(order.orderId)" class="px-4 py-2 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl transition flex items-center gap-2">
+                      <button @click="contactDriver(order.orderId)" class="px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition flex items-center gap-2">
                         Hubungi Kurir (WA)
                       </button>
                     </div>

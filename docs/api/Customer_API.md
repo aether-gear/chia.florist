@@ -383,7 +383,7 @@ These endpoints are accessible to anyone (no authentication required) or require
 
 These endpoints require authentication and are restricted to users with the `Customer` account type.
 
-### Authentication
+### Authentication (Implemented)
 
 #### Me
 - **Method**: `GET`
@@ -410,7 +410,7 @@ These endpoints require authentication and are restricted to users with the `Cus
   ```
 
 
-### Users
+### Users (Implemented)
 
 #### Get Current User
 - **Method**: `GET`
@@ -517,7 +517,7 @@ These endpoints require authentication and are restricted to users with the `Cus
   }
   ```
 
-### Carts
+### Carts (Implemented)
 
 #### Get Cart
 - **Method**: `GET`
@@ -907,7 +907,7 @@ These endpoints require authentication and are restricted to users with the `Cus
   }
   ```
 
-### User Address
+### User Address (Implemented)
  
 #### List User Address
 - **Method**: `GET`
