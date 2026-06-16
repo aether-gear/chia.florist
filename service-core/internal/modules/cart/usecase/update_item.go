@@ -15,26 +15,26 @@ import (
 )
 
 type UpdateItemUsecase struct {
+	executor      transaction.Executor
+	transactor    transaction.Transactor
 	cartRepo      repository.CartRepository
 	inventoryRepo inventoryRepo.InventoryRepository
 	productRepo   productRepo.ProductRepository
-	transactor    transaction.Transactor
-	executor      transaction.Executor
 }
 
 func NewUpdateItemUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	cartRepo repository.CartRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productRepo productRepo.ProductRepository,
-	transactor transaction.Transactor,
-	executor transaction.Executor,
 ) *UpdateItemUsecase {
 	return &UpdateItemUsecase{
+		executor:      executor,
+		transactor:    transactor,
 		cartRepo:      cartRepo,
 		inventoryRepo: inventoryRepo,
 		productRepo:   productRepo,
-		transactor:    transactor,
-		executor:      executor,
 	}
 }
 
@@ -64,13 +64,15 @@ func (u *UpdateItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, input.UserID)
+	cart, err := u.cartRepo.
+		GetWithItemsByUserID(ctx, u.executor, input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(ctx, u.executor, input.UserID)
+		cart, err = u.cartRepo.
+			NewCart(ctx, u.executor, input.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to create cart: %w", err)
 		}
@@ -80,7 +82,8 @@ func (u *UpdateItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
-	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
+	product, err := u.productRepo.
+		GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve product: %w", err)
 	}
@@ -92,14 +95,20 @@ func (u *UpdateItemUsecase) Execute(
 		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
-	if err := cart.SetItem(input.ProductID, input.ShopID, input.Quantity); err != nil {
+	if err := cart.
+		SetItem(
+			input.ProductID,
+			input.ShopID,
+			input.Quantity,
+		); err != nil {
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
+			if err := u.cartRepo.
+				Save(ctx, exec, cart); err != nil {
 				return fmt.Errorf("failed to update cart item: %w", err)
 			}
 

@@ -191,13 +191,13 @@ func NewContainer(cfg Config,
 			),
 		AddProductImages: *productUsecase.
 			NewAddProductImagesUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				productRepo,
 				productImageRepo,
 				slugGen,
 				imageVariantProvider,
 				infra.StorageProvider,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		CreateInventory: *inventoryUsecase.
 			NewCreateInventoryUsecase(inventoryRepo,
@@ -212,24 +212,25 @@ func NewContainer(cfg Config,
 			actorSvc,
 		),
 		Logout: *authenUsecase.NewLogoutUsecase(
-			infra.TransactionExecutor,
 			infra.TransactionProvider,
 			refreshTokenRepo,
 			sessionRepo,
 		),
 		LoginCustomer: *authenUsecase.
 			NewLoginCustomerUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				tokenHasher,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		LoginMerchant: *authenUsecase.
 			NewLoginMerchantUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				tokenHasher,
@@ -238,8 +239,6 @@ func NewContainer(cfg Config,
 				refreshTokenRepo,
 				merchantRepo,
 				membershipRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 
 		CreateMerchant: *merchantUsecase.
@@ -249,28 +248,30 @@ func NewContainer(cfg Config,
 			),
 		AddMerchantAccount: *merchantUsecase.
 			NewAddMerchantAccountUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				userRepo,
 				membershipRepo,
 				roleRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 
 		RegisterCustomer: *authenUsecase.
 			NewRegisterCustomerUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				userRepo,
 				challengeRepo,
 				otpGen,
 				mailSender,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		VerifyAccount: *authenUsecase.
 			NewVerifyAccountUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				tokenHasher,
@@ -279,8 +280,6 @@ func NewContainer(cfg Config,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		GetAccount: *authenUsecase.
 			NewGetAccountUsecase(
@@ -299,25 +298,25 @@ func NewContainer(cfg Config,
 			),
 		AddItem: *cartUsecase.
 			NewAddItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				cartRepo,
 				inventoryRepo,
 				productRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		UpdateItem: *cartUsecase.
 			NewUpdateItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				cartRepo,
 				inventoryRepo,
 				productRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		RemoveItem: *cartUsecase.
 			NewRemoveItemUsecase(
-				cartRepo,
-				infra.TransactionProvider,
 				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
 			),
 		Checkout: *cartUsecase.
 			NewCheckoutUsecase(

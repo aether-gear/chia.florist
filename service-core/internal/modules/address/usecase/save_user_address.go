@@ -55,9 +55,6 @@ func (u *SaveUserAddressUsecase) Execute(
 	isCreate := input.ID == nil
 	isDefault := input.IsDefault != nil && *input.IsDefault
 
-	if !isCreate {
-		addressID = *input.ID
-	}
 	if isCreate {
 		addressID = uuid.New()
 
@@ -69,15 +66,15 @@ func (u *SaveUserAddressUsecase) Execute(
 
 		if count != nil {
 			if *count >= 10 {
-				return apperrors.NewConflict(
-					domain.ErrAddressLimitReached.Error(),
-				)
+				return apperrors.NewConflict(domain.ErrAddressLimitReached.Error())
 			}
 
 			if *count == 0 {
 				isDefault = true
 			}
 		}
+	} else {
+		addressID = *input.ID
 	}
 
 	address := domain.Address{

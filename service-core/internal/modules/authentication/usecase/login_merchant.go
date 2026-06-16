@@ -17,6 +17,8 @@ import (
 )
 
 type LoginMerchantUsecase struct {
+	executor         transaction.Executor
+	transactor       transaction.Transactor
 	accountRepo      repository.AccountRepository
 	pwHasher         repository.PasswordHasher
 	tokenHasher      repository.TokenHasher
@@ -25,11 +27,11 @@ type LoginMerchantUsecase struct {
 	refreshTokenRepo repository.RefreshTokenRepository
 	merchantRepo     merchantRepo.MerchantRepository
 	membershipRepo   authorRepo.MerchantMembershipRepository
-	transactor       transaction.Transactor
-	executor         transaction.Executor
 }
 
 func NewLoginMerchantUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	accountRepo repository.AccountRepository,
 	pwHasher repository.PasswordHasher,
 	tokenHasher repository.TokenHasher,
@@ -38,10 +40,10 @@ func NewLoginMerchantUsecase(
 	refreshTokenRepo repository.RefreshTokenRepository,
 	merchantRepo merchantRepo.MerchantRepository,
 	membershipRepo authorRepo.MerchantMembershipRepository,
-	transactor transaction.Transactor,
-	executor transaction.Executor,
 ) *LoginMerchantUsecase {
 	return &LoginMerchantUsecase{
+		executor:         executor,
+		transactor:       transactor,
 		accountRepo:      accountRepo,
 		pwHasher:         pwHasher,
 		tokenHasher:      tokenHasher,
@@ -50,8 +52,6 @@ func NewLoginMerchantUsecase(
 		refreshTokenRepo: refreshTokenRepo,
 		merchantRepo:     merchantRepo,
 		membershipRepo:   membershipRepo,
-		transactor:       transactor,
-		executor:         executor,
 	}
 }
 
@@ -67,9 +67,7 @@ func (u *LoginMerchantUsecase) Execute(
 	input LoginMerchantParams,
 ) (*LoginEmailResult, error) {
 	existing, err := u.accountRepo.
-		GetByEmail(ctx, u.executor,
-			input.Email,
-		)
+		GetByEmail(ctx, u.executor, input.Email)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
@@ -89,11 +87,8 @@ func (u *LoginMerchantUsecase) Execute(
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
-	memberMerchant, err := u.membershipRepo.GetByAccountID(
-		ctx,
-		u.executor,
-		existing.ID,
-	)
+	memberMerchant, err := u.membershipRepo.
+		GetByAccountID(ctx, u.executor, existing.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve membership: %w", err)
 	}
@@ -130,26 +125,28 @@ func (u *LoginMerchantUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
-		UserID:     existing.UserID,
-		SessionID:  session.ID,
-		MerchantID: &memberMerchant.MerchantID,
-		Roles:      roleCodes,
-		Type:       domain.TokenTypeAccess,
-		Duration:   30 * time.Minute,
-	})
+	accessTkn, err := u.tokenSvc.
+		Generate(repository.GenerateTokenParams{
+			UserID:     existing.UserID,
+			SessionID:  session.ID,
+			MerchantID: &memberMerchant.MerchantID,
+			Roles:      roleCodes,
+			Type:       domain.TokenTypeAccess,
+			Duration:   30 * time.Minute,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
-		UserID:     existing.UserID,
-		SessionID:  session.ID,
-		MerchantID: &memberMerchant.ID,
-		Roles:      roleCodes,
-		Type:       domain.TokenTypeRefresh,
-		Duration:   7 * 24 * time.Hour,
-	})
+	refreshTkn, err := u.tokenSvc.
+		Generate(repository.GenerateTokenParams{
+			UserID:     existing.UserID,
+			SessionID:  session.ID,
+			MerchantID: &memberMerchant.ID,
+			Roles:      roleCodes,
+			Type:       domain.TokenTypeRefresh,
+			Duration:   7 * 24 * time.Hour,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
@@ -166,12 +163,16 @@ func (u *LoginMerchantUsecase) Execute(
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.sessionRepo.Save(ctx, exec, session); err != nil {
+			if err := u.sessionRepo.
+				Save(ctx, exec, session); err != nil {
 				return fmt.Errorf("failed to save session: %w", err)
 			}
-			if err := u.refreshTokenRepo.Save(ctx, exec, refreshTknDomain); err != nil {
+
+			if err := u.refreshTokenRepo.
+				Save(ctx, exec, refreshTknDomain); err != nil {
 				return fmt.Errorf("failed to save refresh token: %w", err)
 			}
+
 			return nil
 		},
 	)

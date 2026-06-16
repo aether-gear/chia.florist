@@ -13,20 +13,20 @@ import (
 )
 
 type RemoveItemUsecase struct {
-	cartRepo   repository.CartRepository
-	transactor transaction.Transactor
 	executor   transaction.Executor
+	transactor transaction.Transactor
+	cartRepo   repository.CartRepository
 }
 
 func NewRemoveItemUsecase(
-	cartRepo repository.CartRepository,
-	transactor transaction.Transactor,
 	executor transaction.Executor,
+	transactor transaction.Transactor,
+	cartRepo repository.CartRepository,
 ) *RemoveItemUsecase {
 	return &RemoveItemUsecase{
-		cartRepo:   cartRepo,
-		transactor: transactor,
 		executor:   executor,
+		transactor: transactor,
+		cartRepo:   cartRepo,
 	}
 }
 
@@ -42,7 +42,8 @@ func (u *RemoveItemUsecase) Execute(
 		return apperrors.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
-	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, input.UserID)
+	cart, err := u.cartRepo.
+		GetWithItemsByUserID(ctx, u.executor, input.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
