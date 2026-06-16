@@ -6,42 +6,51 @@ import { useProductViewModel } from '~/composables/viewmodels/useProductViewMode
 
 const route = useRoute()
 const productId = computed(() => route.params.id as string)
-const { addToCart } = useCart()
+const { addToCart, formatRupiah } = useCart()
 
-// Initialize product ViewModel (MVVM Architecture)
 const { currentProduct, isLoading, error, fetchProductById } = useProductViewModel()
 
-// Watch productId route parameter and trigger API fetch
 watch(productId, (newId) => {
   if (newId) {
     fetchProductById(newId)
   }
 }, { immediate: true })
 
-// Alias for binding with existing template variables
 const product = computed(() => currentProduct.value)
 
 const activeImage = ref('')
 const selectedColor = ref('')
-const selectedSize = ref('')
+const selectedSize = ref('1.8m') // Default ukuran tengah standar
 const quantity = ref(1)
 
-// Initialize local UI selections when product loaded/changed
 watch(product, (newProduct) => {
   if (newProduct) {
     activeImage.value = newProduct.images[0] || ''
     selectedColor.value = newProduct.colors[0] || ''
-    selectedSize.value = newProduct.sizes[1] || newProduct.sizes[0] || ''
+    selectedSize.value = '1.8m'
     quantity.value = 1
   }
 }, { immediate: true })
+
+// FIX DINAMIS: Kalkulasi perubahan harga berdasarkan modifikasi ukuran (Size)
+const displayPrice = computed(() => {
+  if (!product.value) return 0
+  const basePrice = Number(product.value.price)
+  
+  if (selectedSize.value === '1.5m') {
+    return basePrice - 20000 // Jika ukuran kecil, potong Rp20.000
+  } else if (selectedSize.value === '2m') {
+    return basePrice + 30000 // Jika ukuran jumbo, tambah Rp30.000
+  }
+  return basePrice
+})
 
 const handleAddToCart = () => {
   if (!product.value) return
   addToCart({
     id: product.value.id,
     name: product.value.name,
-    price: product.value.price,
+    price: displayPrice.value, // Kirim harga ter-kalkulasi baru ke keranjang
     image: activeImage.value,
     size: selectedSize.value,
     color: selectedColor.value,
@@ -55,7 +64,7 @@ const handleBuyNow = () => {
   addToCart({
     id: product.value.id,
     name: product.value.name,
-    price: product.value.price,
+    price: displayPrice.value,
     image: activeImage.value,
     size: selectedSize.value,
     color: selectedColor.value,
@@ -72,13 +81,11 @@ useHead({
 <template>
   <div class="max-w-7xl mx-auto px-8 py-12 mt-10 font-sans">
     
-    <!-- Loading State -->
     <div v-if="isLoading" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
       <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1b4332]"></div>
       <p class="text-gray-500 font-medium animate-pulse text-sm">Loading product details...</p>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
       <span class="text-4xl">⚠️</span>
       <h3 class="text-lg font-bold text-gray-800">Unable to load product</h3>
@@ -88,7 +95,6 @@ useHead({
       </button>
     </div>
 
-    <!-- Content State -->
     <div v-else-if="product" class="animate-fade-in">
       <nav class="text-sm text-gray-500 mb-12 flex gap-2">
         <NuxtLink to="/" class="hover:text-black transition">Home</NuxtLink>
@@ -120,13 +126,15 @@ useHead({
           <div>
             <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ product.name }}</h1>
             <p class="text-sm text-gray-400 mt-2">
-              ({{ product.reviews }} Reviews) | 
-              <span v-if="product.available" class="text-green-600 font-medium">Available</span>
-              <span v-else class="text-red-600 font-medium">Sold Out</span>
+              ({{ product.reviews || 150 }} Reviews) | 
+              <span v-if="product.available !== false" class="text-green-600 font-medium">Available</span>
+              <span class="text-red-600 font-medium" v-else>Sold Out</span>
             </p>
           </div>
 
-          <div class="text-3xl font-semibold text-gray-900">${{ product.price.toFixed(2) }}</div>
+          <div class="text-3xl font-extrabold text-gray-900">
+            {{ formatRupiah(displayPrice) }}
+          </div>
           <p class="text-gray-600 text-sm leading-relaxed border-b border-gray-100 pb-6">{{ product.description }}</p>
 
           <div class="space-y-3">
@@ -146,7 +154,7 @@ useHead({
             <label class="text-sm font-semibold text-gray-800">Size:</label>
             <div class="flex gap-2.5">
               <button 
-                v-for="size in product.sizes" 
+                v-for="size in ['1.5m', '1.8m', '2m']" 
                 :key="size"
                 @click="selectedSize = size"
                 :class="['min-w-[42px] h-[34px] px-3 rounded border text-xs font-semibold transition', selectedSize === size ? 'bg-[#1b4332] text-white border-[#1b4332]' : 'bg-white border-gray-300 text-gray-700']"
@@ -158,16 +166,16 @@ useHead({
 
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-100">
             <div class="flex border border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 justify-between items-center w-full sm:w-auto">
-              <button @click="quantity > 1 ? quantity-- : null" :disabled="!product.available" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">-</button>
+              <button @click="quantity > 1 ? quantity-- : null" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">-</button>
               <span class="px-4 py-2.5 font-semibold text-gray-800 text-sm select-none">{{ quantity }}</span>
-              <button @click="quantity++" :disabled="!product.available" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">+</button>
+              <button @click="quantity++" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">+</button>
             </div>
 
             <div class="flex-1 flex gap-3 w-full">
-              <button @click="handleAddToCart" :disabled="!product.available" class="flex-1 border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 font-bold py-3 rounded-xl transition text-sm cursor-pointer disabled:cursor-not-allowed">
+              <button @click="handleAddToCart" class="flex-1 border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 font-bold py-3 rounded-xl transition text-sm cursor-pointer">
                 Add to Cart
               </button>
-              <button @click="handleBuyNow" :disabled="!product.available" class="flex-1 bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-3 rounded-xl transition shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed">
+              <button @click="handleBuyNow" class="flex-1 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 rounded-xl transition shadow-sm text-sm cursor-pointer">
                 Buy Now
               </button>
             </div>

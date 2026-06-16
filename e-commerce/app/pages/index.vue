@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useCart } from '~/composables/useCart' // <-- INTEGRASI: Ambil useCart untuk kurensi
 
 useHead({
   title: 'Chia Florist - Flower Boards',
@@ -8,7 +9,10 @@ useHead({
   ]
 })
 
-// 1. Array gambar background Hero (Sesuaikan dengan file yang kamu punya di folder public)
+// Ambil helper formatRupiah global agar bisa dipakai langsung di template bawah
+const { formatRupiah } = useCart()
+
+// Array gambar background Hero
 const backgrounds = [
   '/florist.jpg',          // Gambar 01
   '/flowerist.jpg',          // Gambar 02
@@ -19,13 +23,13 @@ const backgrounds = [
 const currentIndex = ref(0)
 let intervalTimer: any = null
 
-// 2. Fungsi untuk mengganti background saat diklik
+// Fungsi untuk mengganti background saat diklik
 const changeBg = (index: number) => {
   currentIndex.value = index
   resetTimer() 
 }
 
-// 3. Logic Auto Switch setiap 5 detik
+// Logic Auto Switch setiap 5 detik
 const startTimer = () => {
   intervalTimer = setInterval(() => {
     currentIndex.value = (currentIndex.value + 1) % backgrounds.length
@@ -45,15 +49,15 @@ onUnmounted(() => {
   if (intervalTimer) clearInterval(intervalTimer)
 })
 
-// Data Produk (Diberikan id agar bisa di-redirect secara dinamis)
+// Data Produk menggunakan UUID asli agar sinkron dengan database Supabase kelompok kalian
 const productOfferings = ref([
-  { id: 'e0686de0-b1ce-4459-999c-ac1c69ada522', name: 'Wedding', image: '/images/wedding.jpeg' },
-  { id: 'fab51949-5a26-48e7-bdeb-e3a5b51337fe', name: 'Congratulation', image: '/images/congratulations.jpeg' },
-  { id: '799d0a71-7c88-4620-8ca0-27a827fbac07', name: 'Condolences', image: '/images/condolences.jpeg' },
   { id: '2ceea56c-352f-4a48-a262-f60e9ee85b1c', name: 'Grand Opening', image: '/images/grandop.jpeg' },
-  { id: 'b40dcc46-8328-4fcd-af77-42ecc9511606', name: 'Birthday', image: '/images/birthday.jpeg' },
   { id: '71be3ee1-17b4-4bb8-8f80-eae6ad93a844', name: 'Graduate', image: '/images/graduate.jpeg' },
+  { id: '799d0a71-7c88-4620-8ca0-27a827fbac07', name: 'Condolences', image: '/images/condolences.jpeg' },
   { id: '9886edf6-087b-48e7-b00a-d79dd092e8d4', name: 'Anniversary', image: '/images/anniversary.jpeg' },
+  { id: 'b40dcc46-8328-4fcd-af77-42ecc9511606', name: 'Birthday', image: '/images/birthday.jpeg' },
+  { id: 'e0686de0-b1ce-4459-999c-ac1c69ada522', name: 'Wedding', image: '/images/wedding.jpeg' },
+  { id: 'fab51949-5a26-48e7-bdeb-e3a5b51337fe', name: 'Congratulations', image: '/images/congratulations.jpeg' },
   { id: 'custom', name: 'Custom', image: '' }
 ])
 </script>
@@ -87,20 +91,20 @@ const productOfferings = ref([
         </p>
         
         <div class="mt-10 flex flex-wrap justify-center gap-4">
-  <NuxtLink 
-    to="/catalog" 
-    class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 px-8 rounded-xl transition shadow-md text-sm text-center"
-  >
-    Order Now
-  </NuxtLink>
+          <NuxtLink 
+            to="/catalog" 
+            class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 px-8 rounded-xl transition shadow-md text-sm text-center"
+          >
+            Order Now
+          </NuxtLink>
 
-  <NuxtLink 
-    to="/catalog" 
-    class="border-2 border-white hover:bg-white/10 text-white font-bold py-3 px-8 rounded-xl transition text-sm text-center flex items-center justify-center gap-2"
-  >
-    <span>View Products</span>
-  </NuxtLink>
-</div>
+          <NuxtLink 
+            to="/catalog" 
+            class="border-2 border-white hover:bg-white/10 text-white font-bold py-3 px-8 rounded-xl transition text-sm text-center flex items-center justify-center gap-2"
+          >
+            <span>View Products</span>
+          </NuxtLink>
+        </div>
       </div>
 
       <div class="absolute right-8 top-1/2 transform -translate-y-1/2 flex flex-col gap-6 z-30 hidden lg:flex">
@@ -180,8 +184,8 @@ const productOfferings = ref([
             <h3 class="font-bold text-gray-800">{{ item.name }}</h3>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="text-gray-400 text-xs line-through">$10</span>
-                <span class="text-accent font-bold text-base">$8</span>
+                <span class="text-gray-400 text-xs line-through">{{ formatRupiah(175000) }}</span>
+                <span class="text-accent font-bold text-base">{{ formatRupiah(140000) }}</span>
               </div>
               <NuxtLink :to="`/products/${item.id}`" class="bg-accent text-white-base text-xs px-3 py-1.5 rounded hover-bg-accent-strong transition">
                 Buy
@@ -290,3 +294,5 @@ const productOfferings = ref([
 
   </div>
 </template>
+
+<style scoped></style>
