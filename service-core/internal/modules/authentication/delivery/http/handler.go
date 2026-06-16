@@ -81,7 +81,7 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 	roles := make([]roleResponse, 0, len(me.Actor.Roles))
 	for _, role := range me.Actor.Roles {
 		roles = append(roles, roleResponse{
-			Code: role.Code,
+			Code: string(role.Code),
 			Name: role.Name,
 		})
 	}
@@ -89,7 +89,7 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 	permissions := make([]permissionResponse, 0, len(me.Actor.Permissions))
 	for _, role := range me.Actor.Roles {
 		permissions = append(permissions, permissionResponse{
-			Code: role.Code,
+			Code: string(role.Code),
 		})
 	}
 

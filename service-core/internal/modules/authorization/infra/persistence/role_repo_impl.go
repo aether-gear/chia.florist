@@ -65,7 +65,7 @@ func (r *roleRepositoryImpl) GetRolesByAccountAndMerchant(
 func (r *roleRepositoryImpl) GetByCode(
 	ctx context.Context,
 	exec transaction.Executor,
-	code string,
+	code domain.RoleCode,
 ) (*domain.Role, error) {
 	query := `
 		SELECT id, code, name

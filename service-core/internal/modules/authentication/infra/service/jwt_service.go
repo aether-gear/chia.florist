@@ -41,7 +41,11 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 		merchantIDStr = params.MerchantID.String()
 	}
 
-	rolesStr := strings.Join(params.Roles, ",")
+	roles := make([]string, len(params.Roles))
+	for i, role := range params.Roles {
+		roles[i] = string(role)
+	}
+	rolesStr := strings.Join(roles, ",")
 
 	claims := jwtClaims{
 		UserID:     params.UserID.String(),

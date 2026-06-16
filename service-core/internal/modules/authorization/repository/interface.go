@@ -42,7 +42,7 @@ type RoleRepository interface {
 	GetByCode(
 		ctx context.Context,
 		exec transaction.Executor,
-		code string,
+		code domain.RoleCode,
 	) (*domain.Role, error)
 }
 
@@ -59,6 +59,11 @@ type Authorizer interface {
 	LoadActor(
 		exec transaction.Executor,
 	) appmiddleware.Middleware
-	RequireAccountType(allowedTypes ...authendomain.AccountType) appmiddleware.Middleware
-	RequireMerchantRole(allowedRoles ...string) appmiddleware.Middleware
+
+	RequireAccountType(
+		allowedTypes ...authendomain.AccountType,
+	) appmiddleware.Middleware
+	RequireMerchantRole(
+		allowedRoles ...domain.RoleCode,
+	) appmiddleware.Middleware
 }

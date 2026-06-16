@@ -49,7 +49,7 @@ func (s *authorizer) RequireAccountType(
 }
 
 func (s *authorizer) RequireMerchantRole(
-	allowedRoles ...string,
+	allowedRoles ...domain.RoleCode,
 ) appmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {

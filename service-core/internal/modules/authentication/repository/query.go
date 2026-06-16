@@ -1,8 +1,10 @@
 package repository
 
 import (
-	"service-core/internal/modules/authentication/domain"
 	"time"
+
+	"service-core/internal/modules/authentication/domain"
+	authorzDomain "service-core/internal/modules/authorization/domain"
 
 	"github.com/google/uuid"
 )
@@ -16,7 +18,7 @@ type GenerateTokenParams struct {
 	Type     domain.TokenType
 	Duration time.Duration
 
-	Roles []string
+	Roles []authorzDomain.RoleCode
 }
 
 type GeneratedToken struct {
