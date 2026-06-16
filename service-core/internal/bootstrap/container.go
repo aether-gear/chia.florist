@@ -323,12 +323,11 @@ func NewContainer(cfg Config,
 			NewCheckoutUsecase(
 				infra.TransactionExecutor,
 				addressRepo,
-				courierRepo,
+				shopCourierRepo,
 				inventoryRepo,
 				productRepo,
 				infra.ShippingCostProvider,
 				addressShopRepo,
-				shopRepo,
 			),
 
 		ListLocations: *locationUsecase.

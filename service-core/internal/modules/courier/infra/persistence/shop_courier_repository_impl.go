@@ -17,7 +17,7 @@ func NewShopCourierRepositoryImpl() repository.ShopCourierRepository {
 	return &shopCourierRepositoryImpl{}
 }
 
-func (r *shopCourierRepositoryImpl) GetByShopID(
+func (r *shopCourierRepositoryImpl) ListByShopID(
 	ctx context.Context,
 	exec transaction.Executor,
 	shopID uuid.UUID,
@@ -59,6 +59,60 @@ func (r *shopCourierRepositoryImpl) GetByShopID(
 	}
 
 	return shopCouriers, nil
+}
+
+func (r *shopCourierRepositoryImpl) ListsByShopIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopIDs []uuid.UUID,
+) (map[uuid.UUID][]domain.ShopCourier, error) {
+	courierShopMap := make(map[uuid.UUID][]domain.ShopCourier)
+	if len(shopIDs) == 0 {
+		return courierShopMap, nil
+	}
+
+	shopIDStrings := make([]string, len(shopIDs))
+	for i, id := range shopIDs {
+		shopIDStrings[i] = id.String()
+	}
+
+	query := `
+		SELECT
+			shop_id,
+			code,
+			active
+		FROM shop_couriers
+		WHERE shop_id = ANY($1::uuid[])
+	`
+
+	rows, err := exec.Query(ctx, query, shopIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query shop courier by shop id failed: %w", err)
+	}
+	defer rows.Close()
+
+	var shopCouriers []domain.ShopCourier
+	for rows.Next() {
+		var sC domain.ShopCourier
+		if err := rows.Scan(
+			&sC.ShopID,
+			&sC.Code,
+			&sC.Active,
+		); err != nil {
+			return nil, fmt.Errorf("mapping shop courier model to domain failed: %w", err)
+		}
+
+		shopCouriers = append(shopCouriers, sC)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate shop couriers failed: %w", err)
+	}
+
+	for _, courierShop := range shopCouriers {
+		courierShopMap[courierShop.ShopID] = append(courierShopMap[courierShop.ShopID], courierShop)
+	}
+
+	return courierShopMap, nil
 }
 
 func (r *shopCourierRepositoryImpl) SaveShopCourier(

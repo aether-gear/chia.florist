@@ -204,8 +204,11 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/carts", func(r chi.Router) {
 			r.Get("/", chains.CustomerOnly(cartHandler.GetCart))
-			r.Post("/checkout", chains.CustomerOnly(cartHandler.Checkout))
-			r.Post("/checkout-estimate", chains.CustomerOnly(cartHandler.CheckoutEstimate))
+
+			r.Route("/checkout", func(r chi.Router) {
+				r.Post("/", chains.CustomerOnly(cartHandler.Checkout))
+				r.Post("/calculate", chains.CustomerOnly(cartHandler.CheckoutEstimate))
+			})
 
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", chains.CustomerOnly(cartHandler.AddItem))

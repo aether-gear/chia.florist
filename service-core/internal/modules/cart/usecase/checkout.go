@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -10,48 +9,45 @@ import (
 	addressDomain "service-core/internal/modules/address/domain"
 	addressRepo "service-core/internal/modules/address/repository"
 	authenDomain "service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/cart/domain"
 	courierRepo "service-core/internal/modules/courier/repository"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
 	shipmentRepo "service-core/internal/modules/shipment/repository"
-	shopRepository "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type CheckoutUsecase struct {
-	exec            transaction.Executor
+	executor        transaction.Executor
 	addressRepo     addressRepo.UserAddressRepository
-	courierRepo     courierRepo.CourierRepository
+	courierShopRepo courierRepo.ShopCourierRepository
 	inventoryRepo   inventoryRepo.InventoryRepository
 	productRepo     productRepo.ProductRepository
 	shipmentRepo    shipmentRepo.ShippingCostProvider
 	shopAddressRepo addressRepo.ShopAddressRepository
-	shopRepo        shopRepository.ShopRepository
 }
 
 func NewCheckoutUsecase(
-	exec transaction.Executor,
+	executor transaction.Executor,
 	addressRepo addressRepo.UserAddressRepository,
-	courierRepo courierRepo.CourierRepository,
+	courierShopRepo courierRepo.ShopCourierRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productRepo productRepo.ProductRepository,
 	shipmentRepo shipmentRepo.ShippingCostProvider,
 	shopAddressRepo addressRepo.ShopAddressRepository,
-	shopRepo shopRepository.ShopRepository,
 ) *CheckoutUsecase {
 	return &CheckoutUsecase{
-		exec:            exec,
+		executor:        executor,
 		addressRepo:     addressRepo,
-		courierRepo:     courierRepo,
+		courierShopRepo: courierShopRepo,
 		inventoryRepo:   inventoryRepo,
 		productRepo:     productRepo,
 		shipmentRepo:    shipmentRepo,
 		shopAddressRepo: shopAddressRepo,
-		shopRepo:        shopRepo,
 	}
 }
 
@@ -60,14 +56,19 @@ type CheckoutItemInput struct {
 	Quantity  int
 }
 
+type SelectedCourierInput struct {
+	Code    string
+	Service string
+}
+
 type CheckoutShopInput struct {
-	ShopID uuid.UUID
-	Items  []CheckoutItemInput
+	ShopID  uuid.UUID
+	Items   []CheckoutItemInput
+	Courier *SelectedCourierInput
 }
 
 type CheckoutInput struct {
 	AddressID *uuid.UUID
-	Couriers  []string
 	ShopInput []CheckoutShopInput
 }
 
@@ -81,6 +82,7 @@ type CheckoutAddressResult struct {
 type CheckoutCouriersResult struct {
 	Code    string
 	Service string
+	Name    string
 	ETD     string
 	Fee     int64
 }
@@ -95,16 +97,27 @@ type CheckoutItemResult struct {
 	TotalWeight int
 }
 
+type SelectedCourierResult struct {
+	Code    string
+	Service string
+	Fee     int64
+}
+
 type ShopResult struct {
-	Items       []CheckoutItemResult
-	ShippingFee []CheckoutCouriersResult
+	ShopID          uuid.UUID
+	Items           []CheckoutItemResult
+	SelectedCourier *SelectedCourierResult
+	CostCouriers    []CheckoutCouriersResult
+	Subtotal        int64
+	Total           int64
 }
 
 type CheckoutResult struct {
-	Address         CheckoutAddressResult
-	Shops           []ShopResult
-	Subtotal        int64
-	TotalEstimation int64
+	Address          CheckoutAddressResult
+	Shops            []ShopResult
+	Subtotal         int64
+	TotalShippingFee int64
+	TotalAll         int64
 }
 
 const defaultShippingWeightGrams = 1000
@@ -117,7 +130,7 @@ func (u *CheckoutUsecase) Execute(
 	// Early fallback.
 	// Make sure the default address exists
 	defAddress, err := u.addressRepo.
-		GetDefaultByUserID(ctx, u.exec, authCtx.UserID)
+		GetDefaultByUserID(ctx, u.executor, authCtx.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve destination address: %w", err)
 	}
@@ -125,12 +138,58 @@ func (u *CheckoutUsecase) Execute(
 		return nil, apperrors.NewConflict(addressDomain.ErrNotFoundDefaultAddress.Error())
 	}
 
-	// Fallback to the user's default address,
-	// if no ID was specified
+	// Collect IDs upfront to avoid per-item database queries.
+	// Products are loaded for inventory checks,
+	// and shops are loaded for origin address
+	// and courier availability.
+	var productIDs []uuid.UUID
+	var shopIDs []uuid.UUID
+	for _, shopGroup := range input.ShopInput {
+		for _, item := range shopGroup.Items {
+			productIDs = append(productIDs, item.ProductID)
+		}
+
+		shopIDs = append(shopIDs, shopGroup.ShopID)
+	}
+
+	products, err := u.productRepo.
+		FindByIDs(ctx, u.executor, productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load products: %w", err)
+	}
+
+	productMap := make(
+		map[uuid.UUID]productDomain.Product,
+		len(products),
+	)
+	for _, p := range products {
+		productMap[p.ID] = p
+	}
+
+	inventoryMap, err := u.inventoryRepo.
+		ListByProductIDs(ctx, u.executor, productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
+	}
+
+	courierShopMap, err := u.courierShopRepo.
+		ListsByShopIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve shop courier: %w", err)
+	}
+
+	originAddresses, err := u.shopAddressRepo.
+		GetDefaultsByShopIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve origin addresses: %w", err)
+	}
+
+	// Checkout shipping destination defaults to the user's
+	// primary address unless a specific address is requested.
 	var destAddress addressDomain.Address
 	if input.AddressID != nil {
 		address, err := u.addressRepo.
-			GetByID(ctx, u.exec, *input.AddressID)
+			GetByID(ctx, u.executor, *input.AddressID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve destination address: %w", err)
 		}
@@ -148,47 +207,13 @@ func (u *CheckoutUsecase) Execute(
 		return nil, fmt.Errorf("invalid destination district id: %w", err)
 	}
 
-	// Initialize couriers for cost estimation
-	// It will get skip if input is empty
-	var couriers []string
-	if len(input.Couriers) > 0 {
-		couriers = append(couriers, input.Couriers...)
-	}
-
-	var productIDs []uuid.UUID
-	for _, shopGroup := range input.ShopInput {
-		for _, item := range shopGroup.Items {
-			productIDs = append(productIDs, item.ProductID)
-		}
-	}
-
-	products, err := u.productRepo.
-		FindByIDs(ctx, u.exec, productIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load products: %w", err)
-	}
-
-	productMap := make(
-		map[uuid.UUID]productDomain.Product,
-		len(products),
-	)
-	for _, p := range products {
-		productMap[p.ID] = p
-	}
-
-	inventoryMap, err := u.inventoryRepo.
-		ListByProductIDs(ctx, u.exec, productIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
-	}
-
 	// Calculate estimation, subtotal and weight
 	// based on shop item (giant loop)
 	var (
-		totalSubtotal        int64
-		shopsResult          []ShopResult
-		totalSubtotalWithEst int64
-		totalWeight          int = 0
+		totalWeight      int = 0
+		totalSubtotal    int64
+		totalShippingFee int64
+		shopsResult      []ShopResult
 	)
 	for _, shopGroup := range input.ShopInput {
 		// Map shop items, so products consist of
@@ -196,7 +221,8 @@ func (u *CheckoutUsecase) Execute(
 		//
 		// Include calculations of weight, total subtotal
 		// and estimation total
-		var shopItems []CheckoutItemResult
+		var shopSubtotal int64
+		var checkoutItems []CheckoutItemResult
 		for _, shopItem := range shopGroup.Items {
 			shopInventories := inventoryMap[shopItem.ProductID]
 
@@ -219,7 +245,7 @@ func (u *CheckoutUsecase) Execute(
 
 			itemSubtotal := product.Price * int64(shopItem.Quantity)
 			totalSubtotal += itemSubtotal
-			totalSubtotalWithEst += itemSubtotal
+			shopSubtotal = itemSubtotal
 
 			weight := defaultShippingWeightGrams
 			if product.Weight != nil {
@@ -227,7 +253,7 @@ func (u *CheckoutUsecase) Execute(
 			}
 			totalWeight += weight * shopItem.Quantity
 
-			shopItems = append(shopItems, CheckoutItemResult{
+			checkoutItems = append(checkoutItems, CheckoutItemResult{
 				ProductID:   product.ID,
 				ShopID:      shopGroup.ShopID,
 				Name:        product.Name,
@@ -238,68 +264,119 @@ func (u *CheckoutUsecase) Execute(
 			})
 		}
 
-		// No default courier
-		// Assuming no estimation cost
-		if len(couriers) != 0 {
-			originAddr, err := u.shopAddressRepo.
-				GetDefaultByShopID(ctx, u.exec, shopGroup.ShopID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve origin address: %w", err)
-			}
-			if originAddr == nil {
-				return nil, apperrors.NewNotFound(errors.New("origin address not found").Error())
-			}
+		// Shipping estimation requires at least one active courier
+		// Reject checkout when the shop cannot ship orders
+		couriers := courierShopMap[shopGroup.ShopID]
+		if couriers == nil {
+			return nil, apperrors.NewConflict(domain.ErrShopCouriersNotFound.Error())
+		}
 
-			originDistrictID, err := strconv.Atoi(originAddr.Detail.DistrictID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid origin district id: %w", err)
+		// Calculate shipping for the selected courier,
+		// or all available couriers when none is selected yet
+		var codes []string
+		if shopGroup.Courier != nil {
+			codes = append(codes, shopGroup.Courier.Code)
+		} else {
+			for _, courier := range couriers {
+				codes = append(codes, courier.Code)
 			}
+		}
 
-			costOptions, err := u.shipmentRepo.
-				CalculateCost(
-					ctx,
-					u.exec,
-					shipmentRepo.CalculateCostInput{
-						OriginID:      originDistrictID,
-						DestinationID: destDistrictID,
-						Weight:        totalWeight,
-						Couriers:      couriers,
-					},
-				)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate shipping cost: %w", err)
-			}
+		originAddr := originAddresses[shopGroup.ShopID]
+		originDistrictID, err := strconv.Atoi(originAddr.Detail.DistrictID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid origin district id: %w", err)
+		}
 
-			var leastFee int64
-			var checkoutCouriers []CheckoutCouriersResult
-			for i, option := range costOptions {
-				checkoutCouriers = append(checkoutCouriers, CheckoutCouriersResult{
-					Code:    option.Code,
-					Service: option.Service,
-					ETD:     option.Etd,
-					Fee:     option.Cost,
-				})
+		costOptions, err := u.shipmentRepo.
+			CalculateCost(
+				ctx,
+				u.executor,
+				shipmentRepo.CalculateCostInput{
+					OriginID:      originDistrictID,
+					DestinationID: destDistrictID,
+					Weight:        totalWeight,
+					Couriers:      codes,
+				},
+			)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate shipping cost: %w", err)
+		}
 
-				if i == 0 || option.Cost < leastFee {
-					leastFee = option.Cost
-				}
-			}
-
-			shopsResult = append(shopsResult, ShopResult{
-				Items:       shopItems,
-				ShippingFee: checkoutCouriers,
+		var (
+			leastFee         int64
+			selectedFee      int64
+			leastFeeCode     string
+			leastFeeService  string
+			hasSelected      bool
+			checkoutCouriers = make([]CheckoutCouriersResult, 0, len(costOptions))
+		)
+		for i, option := range costOptions {
+			checkoutCouriers = append(checkoutCouriers, CheckoutCouriersResult{
+				Code:    option.Code,
+				Service: option.Service,
+				Name:    option.Name,
+				ETD:     option.Etd,
+				Fee:     option.Cost,
 			})
 
-			// Calculate based on how many estimation per shop.
-			// Even then, only take the least price
-			if len(costOptions) > 0 {
-				totalSubtotalWithEst += leastFee
+			if i == 0 || option.Cost < leastFee {
+				leastFee = option.Cost
+				leastFeeCode = option.Code
+				leastFeeService = option.Service
+			}
+
+			if shopGroup.Courier != nil &&
+				option.Code == shopGroup.Courier.Code &&
+				option.Service == shopGroup.Courier.Service {
+
+				// Capture the fee of the customer-selected courier
+				// so it can be used in the final checkout total.
+				selectedFee = option.Cost
+
+				hasSelected = true
+			}
+		}
+
+		// Use the selected courier fee when specified
+		// Otherwise, fall back to the cheapest available option
+		shippingFee := leastFee
+		if shopGroup.Courier != nil {
+			if !hasSelected {
+				return nil, apperrors.NewBadRequest("selected courier service is unavailable")
+			}
+
+			shippingFee = selectedFee
+		}
+
+		totalShippingFee += shippingFee
+
+		shopResult := ShopResult{
+			ShopID:   shopGroup.ShopID,
+			Items:    checkoutItems,
+			Subtotal: shopSubtotal,
+			Total:    shopSubtotal + shippingFee,
+		}
+
+		if shopGroup.Courier == nil {
+			// No courier has been selected yet
+			// Return available shipping options for customer selection
+			shopResult.CostCouriers = checkoutCouriers
+			shopResult.SelectedCourier = &SelectedCourierResult{
+				Code:    leastFeeCode,
+				Service: leastFeeService,
+				Fee:     shippingFee,
 			}
 		} else {
-			shopsResult = append(shopsResult, ShopResult{
-				Items: shopItems,
-			})
+			// Persist the selected courier and its resolved shipping fee
+			shopResult.SelectedCourier = &SelectedCourierResult{
+				Code:    shopGroup.Courier.Code,
+				Service: shopGroup.Courier.Service,
+				Fee:     shippingFee,
+			}
 		}
+
+		shopsResult = append(shopsResult, shopResult)
 	}
 
 	address := CheckoutAddressResult{
@@ -310,12 +387,11 @@ func (u *CheckoutUsecase) Execute(
 	}
 
 	result := CheckoutResult{
-		Address:  address,
-		Shops:    shopsResult,
-		Subtotal: totalSubtotal,
-	}
-	if len(couriers) != 0 {
-		result.TotalEstimation = totalSubtotalWithEst
+		Address:          address,
+		Shops:            shopsResult,
+		Subtotal:         totalSubtotal,
+		TotalShippingFee: totalShippingFee,
+		TotalAll:         totalSubtotal + totalShippingFee,
 	}
 
 	return &result, nil

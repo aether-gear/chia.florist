@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"slices"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
@@ -220,131 +219,63 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
-	var req checkoutRequest
-
-	if err := apphttp.DecodeJSON(r, &req); err != nil {
-		return apperrors.NewBadRequest("invalid request body")
-	}
-
-	authCtx, ok := authdomain.GetAuthContext(r.Context())
-	if !ok || !authCtx.IsAuthenticated {
-		return apperrors.NewUnauthorized("authentication required")
-	}
-
-	var addressID *uuid.UUID
-	if req.AddressID != nil {
-		parsed, err := uuid.Parse(*req.AddressID)
-		if err != nil {
-			return apperrors.NewBadRequest("invalid address id")
-		}
-
-		addressID = &parsed
-	}
-
-	var shopInput []usecase.CheckoutShopInput
-	for _, shopReq := range req.Shops {
-		shopID, err := uuid.Parse(shopReq.ShopID)
-		if err != nil {
-			return apperrors.NewBadRequest("invalid shop id")
-		}
-
-		var items []usecase.CheckoutItemInput
-		for _, itemReq := range shopReq.Items {
-			productID, err := uuid.Parse(itemReq.ProductID)
-			if err != nil {
-				return apperrors.NewBadRequest("invalid product id")
-			}
-			if itemReq.Quantity <= 0 {
-				return apperrors.NewBadRequest("invalid quantity")
-			}
-
-			items = append(items, usecase.CheckoutItemInput{
-				ProductID: productID,
-				Quantity:  itemReq.Quantity,
-			})
-		}
-
-		shopInput = append(shopInput, usecase.CheckoutShopInput{
-			ShopID: shopID,
-			Items:  items,
-		})
-	}
-
-	checkoutInput := usecase.CheckoutInput{
-		AddressID: addressID,
-		ShopInput: shopInput,
-	}
-
-	result, err := h.checkout.
-		Execute(r.Context(), *authCtx, checkoutInput)
+	authCtx, input, err := h.parseCheckoutInput(r, false)
 	if err != nil {
 		return err
 	}
 
-	var shopsResponse []shopResponse
-	for _, shop := range result.Shops {
-		var itemsResponse []checkoutItemResponse
-		for _, item := range shop.Items {
-			itemsResponse = append(itemsResponse, checkoutItemResponse{
-				ProductID: item.ProductID,
-				ShopID:    item.ShopID,
-				Name:      item.Name,
-				Price:     item.Price,
-				Quantity:  item.Quantity,
-				Subtotal:  item.Subtotal,
-			})
-		}
-
-		var shippingResponse []checkoutCouriersResponse
-		for _, courier := range shop.ShippingFee {
-			shippingResponse = append(shippingResponse, checkoutCouriersResponse{
-				Code:    courier.Code,
-				Service: courier.Service,
-				ETD:     courier.ETD,
-				Fee:     courier.Fee,
-			})
-		}
-
-		shopsResponse = append(shopsResponse, shopResponse{
-			Items:       itemsResponse,
-			ShippingFee: shippingResponse,
-		})
+	result, err := h.checkout.Execute(
+		r.Context(),
+		*authCtx,
+		input,
+	)
+	if err != nil {
+		return err
 	}
 
-	response := checkoutResponse{
-		Address: checkoutAddressResponse{
-			ID:            result.Address.ID,
-			RecipientName: result.Address.RecipientName,
-			Phone:         result.Address.Phone,
-			FullAddress:   result.Address.FullAddress,
-		},
-		Shops:    shopsResponse,
-		Subtotal: result.Subtotal,
-	}
-
-	apphttp.WriteJSON(w, http.StatusOK, response)
+	apphttp.WriteJSON(w, http.StatusOK, toCheckoutResponse(*result))
 	return nil
 }
 
 func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) error {
-	var req checkoutRequest
+	authCtx, input, err := h.parseCheckoutInput(r, true)
+	if err != nil {
+		return err
+	}
 
+	result, err := h.checkout.Execute(
+		r.Context(),
+		*authCtx,
+		input,
+	)
+	if err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, toCheckoutResponse(*result))
+	return nil
+}
+
+func (h *CartHandler) parseCheckoutInput(
+	r *http.Request,
+	requireCourier bool,
+) (*authdomain.AuthContext, usecase.CheckoutInput, error) {
+	var req checkoutRequest
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
-		return apperrors.NewBadRequest("invalid request body")
+		return nil, usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid request body")
 	}
 
 	authCtx, ok := authdomain.GetAuthContext(r.Context())
 	if !ok || !authCtx.IsAuthenticated {
-		return apperrors.NewUnauthorized("authentication required")
+		return nil, usecase.CheckoutInput{}, apperrors.NewUnauthorized("authentication required")
 	}
 
 	var addressID *uuid.UUID
 	if req.AddressID != nil {
 		parsed, err := uuid.Parse(*req.AddressID)
 		if err != nil {
-			return apperrors.NewBadRequest("invalid address id")
+			return nil, usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid address id")
 		}
-
 		addressID = &parsed
 	}
 
@@ -352,17 +283,18 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 	for _, shopReq := range req.Shops {
 		shopID, err := uuid.Parse(shopReq.ShopID)
 		if err != nil {
-			return apperrors.NewBadRequest("invalid shop id")
+			return nil, usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid shop id")
 		}
 
 		var items []usecase.CheckoutItemInput
 		for _, itemReq := range shopReq.Items {
 			productID, err := uuid.Parse(itemReq.ProductID)
 			if err != nil {
-				return apperrors.NewBadRequest("invalid product id")
+				return nil, usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid product id")
 			}
+
 			if itemReq.Quantity <= 0 {
-				return apperrors.NewBadRequest("invalid quantity")
+				return nil, usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid quantity")
 			}
 
 			items = append(items, usecase.CheckoutItemInput{
@@ -371,33 +303,32 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 			})
 		}
 
+		var courier *usecase.SelectedCourierInput
+		if shopReq.Courier != nil {
+			courier = &usecase.SelectedCourierInput{
+				Code:    shopReq.Courier.Code,
+				Service: shopReq.Courier.Service,
+			}
+		}
+
+		if requireCourier && courier == nil {
+			return nil, usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid courier")
+		}
+
 		shopInput = append(shopInput, usecase.CheckoutShopInput{
-			ShopID: shopID,
-			Items:  items,
+			ShopID:  shopID,
+			Items:   items,
+			Courier: courier,
 		})
 	}
 
-	if len(req.Couriers) == 0 {
-		return apperrors.NewBadRequest("invalid courier codes")
-	}
-	if len(req.Couriers) != 0 {
-		if slices.Contains(req.Couriers, "") {
-			return apperrors.NewBadRequest("invalid courier codes")
-		}
-	}
-
-	checkoutInput := usecase.CheckoutInput{
+	return authCtx, usecase.CheckoutInput{
 		AddressID: addressID,
-		Couriers:  req.Couriers,
 		ShopInput: shopInput,
-	}
+	}, nil
+}
 
-	result, err := h.checkout.
-		Execute(r.Context(), *authCtx, checkoutInput)
-	if err != nil {
-		return err
-	}
-
+func toCheckoutResponse(result usecase.CheckoutResult) checkoutResponse {
 	var shopsResponse []shopResponse
 	for _, shop := range result.Shops {
 		var itemsResponse []checkoutItemResponse
@@ -413,35 +344,48 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 		}
 
 		var shippingResponse []checkoutCouriersResponse
-		for _, courier := range shop.ShippingFee {
+		for _, courier := range shop.CostCouriers {
 			shippingResponse = append(shippingResponse, checkoutCouriersResponse{
 				Code:    courier.Code,
+				Name:    courier.Name,
 				Service: courier.Service,
 				ETD:     courier.ETD,
 				Fee:     courier.Fee,
 			})
 		}
 
-		shopsResponse = append(shopsResponse, shopResponse{
-			Items:       itemsResponse,
-			ShippingFee: shippingResponse,
-		})
+		shopReponse := shopResponse{
+			ShopID:       shop.ShopID,
+			Subtotal:     shop.Subtotal,
+			Total:        &shop.Total,
+			Items:        itemsResponse,
+			CostCouriers: shippingResponse,
+		}
+		if shop.SelectedCourier != nil {
+			shopReponse.SelectedCourier = &selectedCourierResponse{
+				Code:    shop.SelectedCourier.Code,
+				Service: shop.SelectedCourier.Service,
+				Fee:     shop.SelectedCourier.Fee,
+			}
+		}
+		shopsResponse = append(shopsResponse, shopReponse)
 	}
 
-	response := checkoutResponse{
+	resp := checkoutResponse{
 		Address: checkoutAddressResponse{
 			ID:            result.Address.ID,
 			RecipientName: result.Address.RecipientName,
 			Phone:         result.Address.Phone,
 			FullAddress:   result.Address.FullAddress,
 		},
-		Shops:    shopsResponse,
-		Subtotal: result.Subtotal,
-	}
-	if result.TotalEstimation > 0 {
-		response.TotalEstimation = &result.TotalEstimation
+		Shops:         shopsResponse,
+		TotalShipping: result.TotalShippingFee,
+		Subtotal:      result.Subtotal,
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, response)
-	return nil
+	if result.TotalAll > 0 {
+		resp.TotalAll = &result.TotalAll
+	}
+
+	return resp
 }

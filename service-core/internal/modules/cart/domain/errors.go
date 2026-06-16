@@ -10,6 +10,8 @@ var (
 
 	ErrInsufficientStock = errors.New("insufficient stock")
 
+	ErrShopCouriersNotFound = errors.New("shop has no active courier service available")
+
 	ErrProductNotFound  = errors.New("product not found")
 	ErrCartNotFound     = errors.New("cart not found")
 	ErrCartItemNotFound = errors.New("cart item not found")
