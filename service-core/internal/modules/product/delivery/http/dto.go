@@ -25,20 +25,28 @@ type createProductRequest struct {
 }
 
 type productImageResponse struct {
-	Thumbnail *string `json:"thumbnail,omitempty"`
-	Preview   *string `json:"preview,omitempty"`
-	Detail    *string `json:"detail,omitempty"`
+	Thumbnail *string `json:"thumbnail"`
+	Preview   *string `json:"preview"`
+	Detail    *string `json:"detail"`
 }
 
 type productCatalogResponse struct {
-	ID          uuid.UUID            `json:"id"`
-	SKU         string               `json:"sku"`
-	Name        string               `json:"name"`
-	Slug        string               `json:"slug"`
-	IsAvailable bool                 `json:"is_available"`
-	Price       int64                `json:"price"`
-	TotalStock  int                  `json:"stock"`
-	Image       productImageResponse `json:"images"`
+	ID           uuid.UUID                     `json:"id"`
+	SKU          string                        `json:"sku"`
+	Name         string                        `json:"name"`
+	Slug         string                        `json:"slug"`
+	Status       string                        `json:"status"`
+	IsAvailable  bool                          `json:"is_available"`
+	Price        int64                         `json:"price"`
+	TotalStock   int                           `json:"stock"`
+	Image        productImageResponse          `json:"images"`
+	Availability []productAvailabilityResponse `json:"availability"`
+}
+
+type productAvailabilityResponse struct {
+	Slug  string `json:"slug"`
+	Name  string `json:"name"`
+	Stock int    `json:"stock"`
 }
 
 type productDetailResponse struct {

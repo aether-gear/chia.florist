@@ -17,14 +17,15 @@ var (
 	ProductSortStatus   query.SortKey = "status"
 	ProductSortModified query.SortKey = "modified"
 	ProductSortArchived query.SortKey = "archived"
+	ProductSortStock    query.SortKey = "stock"
 )
 
 type FindProductParams struct {
 	ID   *string
 	Name *string
 
-	Pagination query.Pagination
-	Sorts      query.Sorts
+	query.Pagination
+	query.Sorts
 }
 
 type UploadProductImagesParams struct {

@@ -31,6 +31,12 @@ type Product struct {
 	DeletedAt  *time.Time
 }
 
+type ProductWithInventory struct {
+	Product       Product
+	TotalStock    int
+	ReservedStock int
+}
+
 func (p *Product) Validate() error {
 	if p.Name == "" {
 		return ErrInvalidProductName

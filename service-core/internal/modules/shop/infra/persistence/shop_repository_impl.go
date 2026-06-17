@@ -210,6 +210,65 @@ func (r *shopRepositoryImpl) GetByID(
 	return &s, nil
 }
 
+func (r *shopRepositoryImpl) FindByIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	ids []uuid.UUID,
+) ([]domain.Shop, error) {
+	if len(ids) == 0 {
+		return []domain.Shop{}, nil
+	}
+
+	query := `
+		SELECT
+			s.id,
+			s.name,
+			s.slug,
+			s.description,
+			s.is_active,
+			s.created_at,
+			s.updated_at
+		FROM shops s
+		WHERE s.id = ANY($1::uuid[])
+	`
+
+	shopIDStrings := make([]string, len(ids))
+	for i, id := range ids {
+		shopIDStrings[i] = id.String()
+	}
+
+	rows, err := exec.Query(ctx, query, shopIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query shops by many ids failed: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.Shop
+	for rows.Next() {
+		var s domain.Shop
+		err := rows.Scan(
+			&s.ID,
+			&s.Name,
+			&s.Slug,
+			&s.Description,
+			&s.IsActive,
+			&s.CreatedAt,
+			&s.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("mapping shop model to domain failed: %w", err)
+		}
+
+		results = append(results, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate shops failed: %w", err)
+	}
+
+	return results, nil
+}
+
 func (r *shopRepositoryImpl) Create(
 	ctx context.Context,
 	exec transaction.Executor,

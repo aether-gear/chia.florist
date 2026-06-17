@@ -21,6 +21,13 @@ type ProductRepository interface {
 		exec transaction.Executor,
 		params FindProductParams,
 	) ([]domain.Product, int, error)
+
+	FindProductsWithInventory(
+		ctx context.Context,
+		exec transaction.Executor,
+		params FindProductParams,
+	) ([]domain.ProductWithInventory, int, error)
+
 	FindByIDs(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -46,6 +53,7 @@ type ProductImageRepository interface {
 		exec transaction.Executor,
 		productIDs []uuid.UUID,
 	) (map[uuid.UUID][]domain.ProductImage, error)
+
 	ListByProductID(
 		ctx context.Context,
 		exec transaction.Executor,

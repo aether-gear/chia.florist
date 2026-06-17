@@ -10,6 +10,8 @@ import (
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	shopDomain "service-core/internal/modules/shop/domain"
+	shopRepo "service-core/internal/modules/shop/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
@@ -20,6 +22,7 @@ type FindProductsUsecase struct {
 	productRepo    repository.ProductRepository
 	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
+	shopRepo       shopRepo.ShopRepository
 	fileStore      storage.Provider
 	executor       transaction.Executor
 }
@@ -28,6 +31,7 @@ func NewFindProductsUsecase(
 	productRepo repository.ProductRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
+	shopRepo shopRepo.ShopRepository,
 	fileStore storage.Provider,
 	executor transaction.Executor,
 ) *FindProductsUsecase {
@@ -35,12 +39,19 @@ func NewFindProductsUsecase(
 		productRepo:    productRepo,
 		inventoryRepo:  inventoryRepo,
 		productImgRepo: productImgRepo,
+		shopRepo:       shopRepo,
 		fileStore:      fileStore,
 		executor:       executor,
 	}
 }
 
-type ProductCatalogResponse struct {
+type ShopAvailabilityResult struct {
+	ShopName string
+	ShopSlug string
+	Stock    int
+}
+
+type ProductCatalogResult struct {
 	Product   domain.Product
 	Inventory struct {
 		TotalStock    int
@@ -50,6 +61,7 @@ type ProductCatalogResponse struct {
 	Images          struct {
 		Thumbnail string
 	}
+	Availability []ShopAvailabilityResult
 }
 
 type FindProductsInput struct {
@@ -64,7 +76,7 @@ func (u *FindProductsUsecase) Execute(
 	ctx context.Context,
 	input FindProductsInput,
 ) (
-	[]ProductCatalogResponse,
+	[]ProductCatalogResult,
 	int,
 	error,
 ) {
@@ -77,6 +89,7 @@ func (u *FindProductsUsecase) Execute(
 		"status":   repository.ProductSortStatus,
 		"modified": repository.ProductSortModified,
 		"archived": repository.ProductSortArchived,
+		"stock":    repository.ProductSortStock,
 	}
 
 	var sorts query.Sorts
@@ -129,23 +142,50 @@ func (u *FindProductsUsecase) Execute(
 	}
 
 	products, total, err := u.productRepo.
-		FindProducts(ctx, u.executor, params)
+		FindProductsWithInventory(ctx, u.executor, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load products: %w", err)
 	}
 	if len(products) == 0 {
-		return []ProductCatalogResponse{}, total, nil
+		return []ProductCatalogResult{}, total, nil
 	}
 
 	productIDs := make([]uuid.UUID, 0, len(products))
 	for _, product := range products {
-		productIDs = append(productIDs, product.ID)
+		productIDs = append(productIDs, product.Product.ID)
 	}
 
+	// Shop data is derived from product inventory records
+	// Products are not queried directly by shop;
+	// instead shops are inferred via inventory ownership
 	inventoryMap, err := u.inventoryRepo.
 		ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
+	}
+
+	// Deduplicate shop IDs from product inventories
+	shopIDsMap := make(map[uuid.UUID]bool)
+	for _, inventories := range inventoryMap {
+		for _, inv := range inventories {
+			shopIDsMap[inv.ShopID] = true
+		}
+	}
+
+	shopIDs := make([]uuid.UUID, 0, len(shopIDsMap))
+	for id := range shopIDsMap {
+		shopIDs = append(shopIDs, id)
+	}
+
+	shops, err := u.shopRepo.
+		FindByIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load shops for inventories: %w", err)
+	}
+
+	shopsMap := make(map[uuid.UUID]shopDomain.Shop)
+	for _, s := range shops {
+		shopsMap[s.ID] = s
 	}
 
 	imagesMap, err := u.productImgRepo.
@@ -154,13 +194,13 @@ func (u *FindProductsUsecase) Execute(
 		return nil, 0, fmt.Errorf("failed to load images for products: %w", err)
 	}
 
-	results := make([]ProductCatalogResponse, 0, len(products))
-	for _, product := range products {
-		inventories := inventoryMap[product.ID]
-		images := imagesMap[product.ID]
+	results := make([]ProductCatalogResult, 0, len(products))
+	for _, p := range products {
+		inventories := inventoryMap[p.Product.ID]
+		images := imagesMap[p.Product.ID]
 
-		result := ProductCatalogResponse{
-			Product:         product,
+		result := ProductCatalogResult{
+			Product:         p.Product,
 			ShopInventories: inventories,
 		}
 
@@ -169,10 +209,20 @@ func (u *FindProductsUsecase) Execute(
 			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
 		}
 
+		var availability []ShopAvailabilityResult
 		for _, inventory := range inventories {
 			result.Inventory.TotalStock += inventory.TotalStock
 			result.Inventory.ReservedStock += inventory.ReservedStock
+
+			if shop, ok := shopsMap[inventory.ShopID]; ok {
+				availability = append(availability, ShopAvailabilityResult{
+					ShopName: shop.Name,
+					ShopSlug: shop.Slug,
+					Stock:    inventory.TotalStock,
+				})
+			}
 		}
+		result.Availability = availability
 
 		results = append(results, result)
 	}

@@ -21,7 +21,12 @@ type ShopRepository interface {
 		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.Shop, error)
-	// GetByIDs(ids []uuid.UUID) ([]domain.Shop, error)
+
+	FindByIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		IDs []uuid.UUID,
+	) ([]domain.Shop, error)
 	// GetActive() ([]domain.Shop, error)
 
 	Create(

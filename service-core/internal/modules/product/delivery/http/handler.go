@@ -65,21 +65,38 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 
 	results := make([]productCatalogResponse, 0, len(products))
 	for _, p := range products {
-		result := productCatalogResponse{
+		availabilities := make([]productAvailabilityResponse, 0, len(p.Availability))
+		for _, avail := range p.Availability {
+			availabilities = append(availabilities, productAvailabilityResponse{
+				Slug:  avail.ShopName,
+				Name:  avail.ShopSlug,
+				Stock: avail.Stock,
+			})
+		}
+
+		var result productCatalogResponse
+
+		result = productCatalogResponse{
 			ID:         p.Product.ID,
 			SKU:        p.Product.SKU,
 			Name:       p.Product.Name,
 			Slug:       p.Product.Slug,
 			Price:      p.Product.Price,
 			TotalStock: p.Inventory.TotalStock,
+			IsAvailable: productStatusDTO(p.Product.Status) == ProductStatusActive &&
+				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0,
+			Status: string(p.Product.Status),
 			Image: productImageResponse{
 				Thumbnail: &p.Images.Thumbnail,
 			},
+			Availability: availabilities,
 		}
 
-		result.IsAvailable =
-			productStatusDTO(p.Product.Status) == ProductStatusActive &&
-				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0
+		if *result.Image.Thumbnail == "" {
+			result.Image = productImageResponse{
+				Thumbnail: nil,
+			}
+		}
 
 		results = append(results, result)
 	}

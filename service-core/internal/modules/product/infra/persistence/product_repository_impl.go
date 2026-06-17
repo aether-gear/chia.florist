@@ -200,6 +200,191 @@ func (r *productRepositoryImpl) FindProducts(
 	return results, total, nil
 }
 
+func (r *productRepositoryImpl) FindProductsWithInventory(
+	ctx context.Context,
+	exec transaction.Executor,
+	params repository.FindProductParams,
+) ([]domain.ProductWithInventory, int, error) {
+	baseQuery := `
+		FROM products p
+		LEFT JOIN inventory i ON p.id = i.product_id
+	`
+
+	selectQuery := `
+		SELECT
+			p.id,
+			p.sku,
+			p.name,
+			p.slug,
+			p.description,
+			p.status,
+			p.base_price,
+			p.weight,
+			p.created_at,
+			p.updated_at,
+			p.archived_at,
+			p.deleted_at,
+			COALESCE(SUM(i.stock), 0)::integer AS total_stock,
+			COALESCE(SUM(i.reserved_stock), 0)::integer AS total_reserved_stock
+	`
+
+	// Build filters
+	// Apply search criteria and soft-delete constraints
+	whereClause := ""
+	notDeletedCondition := "p.deleted_at IS NULL"
+
+	var (
+		conditions []string
+		args       []any
+		argPos     = 1
+	)
+
+	conditions = append(conditions, notDeletedCondition)
+
+	if params.ID != nil {
+		conditions = append(
+			conditions,
+			fmt.Sprintf("p.id = $%d", argPos),
+		)
+		args = append(args, *params.ID)
+		argPos++
+	}
+
+	if params.Name != nil {
+		conditions = append(
+			conditions,
+			fmt.Sprintf("p.name ILIKE $%d", argPos),
+		)
+		args = append(args, "%"+*params.Name+"%")
+		argPos++
+	}
+
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Count matching products
+	// Used for pagination metadata
+	countQuery := `
+		SELECT COUNT(DISTINCT p.id)
+	` + baseQuery + whereClause
+
+	countArgs := append([]any{}, args...)
+
+	var total int
+	err := exec.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query count products failed: %w", err)
+	}
+
+	// Build sorting expressions
+	// Convert requested sort keys into SQL ORDER BY clauses
+	var productSortKeys = map[query.SortKey]string{
+		repository.ProductSortLatest:   "p.created_at",
+		repository.ProductSortName:     "p.name",
+		repository.ProductSortPrice:    "p.base_price",
+		repository.ProductSortWeight:   "p.weight",
+		repository.ProductSortStatus:   "p.status",
+		repository.ProductSortModified: "p.updated_at",
+		repository.ProductSortArchived: "p.archived_at",
+		repository.ProductSortStock:    "COALESCE(SUM(i.stock), 0)",
+	}
+
+	var sortClauses []string
+	for _, sort := range params.Sorts {
+		colName, exists := productSortKeys[sort.By]
+		if !exists {
+			continue
+		}
+
+		direction := "DESC"
+		if sort.Direction == query.SortAsc {
+			direction = "ASC"
+		}
+
+		sortClauses = append(
+			sortClauses,
+			fmt.Sprintf("%s %s", colName, direction),
+		)
+	}
+
+	orderBy := "ORDER BY p.created_at DESC"
+	if len(sortClauses) > 0 {
+		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
+	}
+
+	// Apply pagination
+	// Calculate limit and offset values
+	limitPos := argPos
+	offsetPos := argPos + 1
+
+	limit := params.Pagination.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	page := params.Pagination.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+	args = append(args, limit, offset)
+
+	// The execution
+	query := selectQuery +
+		baseQuery +
+		whereClause +
+		" GROUP BY p.id " +
+		orderBy +
+		fmt.Sprintf(
+			" LIMIT $%d OFFSET $%d",
+			limitPos,
+			offsetPos,
+		)
+
+	rows, err := exec.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query products failed: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.ProductWithInventory
+	for rows.Next() {
+		var item domain.ProductWithInventory
+		err := rows.Scan(
+			&item.Product.ID,
+			&item.Product.SKU,
+			&item.Product.Name,
+			&item.Product.Slug,
+			&item.Product.Description,
+			&item.Product.Status,
+			&item.Product.Price,
+			&item.Product.Weight,
+			&item.Product.CreatedAt,
+			&item.Product.UpdatedAt,
+			&item.Product.ArchivedAt,
+			&item.Product.DeletedAt,
+			&item.TotalStock,
+			&item.ReservedStock,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf(
+				"mapping product model to domain failed: %w",
+				err,
+			)
+		}
+
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate products failed: %w", err)
+	}
+
+	return results, total, nil
+}
+
 func (r *productRepositoryImpl) GetByID(
 	ctx context.Context,
 	exec transaction.Executor,
