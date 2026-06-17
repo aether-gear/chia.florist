@@ -40,10 +40,12 @@ func (h *ShopHandler) ListShops(w http.ResponseWriter, r *http.Request) error {
 
 	name := apphttp.Query(r, "name")
 	id := apphttp.Query(r, "id")
+	sort := apphttp.Query(r, "sort")
 
 	input := usecase.ListShopsInput{
 		Page:  page,
 		Limit: limit,
+		Sort:  sort,
 	}
 	if name != "" {
 		input.Name = &name

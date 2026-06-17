@@ -8,6 +8,7 @@ import (
 
 	"service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -40,13 +41,18 @@ func (r *shopRepositoryImpl) List(
 			s.updated_at
 	`
 
+	// Build filters
+	// Apply search criteria and soft-delete constraints
+	whereClause := ""
+	notDeletedCondition := "s.deleted_at IS NULL"
+
 	var (
 		conditions []string
 		args       []any
 		argPos     = 1
 	)
 
-	conditions = append(conditions, "s.deleted_at IS NULL")
+	conditions = append(conditions, notDeletedCondition)
 
 	if params.ID != nil {
 		conditions = append(conditions, fmt.Sprintf("s.id = $%d", argPos))
@@ -60,13 +66,17 @@ func (r *shopRepositoryImpl) List(
 		argPos++
 	}
 
-	whereClause := ""
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
+	// Count matching products
+	// Used for pagination metadata
+	countQuery := `
+		SELECT COUNT(DISTINCT s.id)
+	` + baseQuery + whereClause
+
 	countArgs := append([]any{}, args...)
-	countQuery := "SELECT COUNT(DISTINCT s.id) " + baseQuery + whereClause
 
 	var total int
 	err := exec.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
@@ -74,12 +84,49 @@ func (r *shopRepositoryImpl) List(
 		return nil, 0, fmt.Errorf("query count shops failed: %w", err)
 	}
 
-	limit := params.Limit
+	// Build sorting expressions
+	// Convert requested sort keys into SQL ORDER BY clauses
+	var shopSortKeys = map[query.SortKey]string{
+		repository.ShopSortName:   "name",
+		repository.ShopSortActive: "is_active",
+		repository.ShopSortLatest: "created_at",
+		repository.ShopSortModify: "updated_at",
+	}
+
+	var sortClauses []string
+	for _, sort := range params.Sorts {
+		colName, exists := shopSortKeys[sort.By]
+		if !exists {
+			continue
+		}
+
+		dir := "DESC"
+		if sort.Direction == query.SortAsc {
+			dir = "ASC"
+		}
+
+		sortClauses = append(
+			sortClauses,
+			fmt.Sprintf("s.%s %s", colName, dir),
+		)
+	}
+
+	orderBy := "ORDER BY s.created_at DESC"
+	if len(sortClauses) > 0 {
+		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
+	}
+
+	// Apply pagination
+	// Calculate limit and offset values
+	limitPos := argPos
+	offsetPos := argPos + 1
+
+	limit := params.Pagination.Limit
 	if limit <= 0 {
 		limit = 10
 	}
 
-	page := params.Page
+	page := params.Pagination.Page
 	if page <= 0 {
 		page = 1
 	}
@@ -87,11 +134,9 @@ func (r *shopRepositoryImpl) List(
 	offset := (page - 1) * limit
 	args = append(args, limit, offset)
 
-	limitPos := argPos
-	offsetPos := argPos + 1
-
-	query := selectQuery + baseQuery + whereClause +
-		fmt.Sprintf(" ORDER BY s.created_at DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
+	// The execution
+	query := selectQuery + baseQuery + whereClause + " " + orderBy +
+		fmt.Sprintf(" LIMIT $%d OFFSET $%d", limitPos, offsetPos)
 
 	rows, err := exec.Query(ctx, query, args...)
 	if err != nil {
@@ -111,7 +156,6 @@ func (r *shopRepositoryImpl) List(
 			&s.CreatedAt,
 			&s.UpdatedAt,
 		)
-
 		if err != nil {
 			return nil, 0, fmt.Errorf("mapping shop model to domain failed: %w", err)
 		}

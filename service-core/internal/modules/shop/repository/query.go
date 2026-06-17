@@ -1,8 +1,18 @@
 package repository
 
+import query "service-core/internal/shared/query"
+
+var (
+	ShopSortLatest query.SortKey = "latest"
+	ShopSortName   query.SortKey = "name"
+	ShopSortActive query.SortKey = "active"
+	ShopSortModify query.SortKey = "modify"
+)
+
 type FindShopsParams struct {
-	Page  int
-	Limit int
-	ID    *string
-	Name  *string
+	ID   *string
+	Name *string
+
+	Pagination query.Pagination
+	Sorts      query.Sorts
 }

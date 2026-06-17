@@ -8,6 +8,7 @@ import (
 
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -25,12 +26,6 @@ func (r *productRepositoryImpl) FindProducts(
 	exec transaction.Executor,
 	params repository.FindProductParams,
 ) ([]domain.Product, int, error) {
-	var (
-		conditions []string
-		args       []any
-		argPos     = 1
-	)
-
 	baseQuery := `
 		FROM products p
 	`
@@ -51,27 +46,48 @@ func (r *productRepositoryImpl) FindProducts(
 			p.deleted_at
 	`
 
-	conditions = append(conditions, "p.deleted_at IS NULL")
+	// Build filters
+	// Apply search criteria and soft-delete constraints
+	whereClause := ""
+	notDeletedCondition := "p.deleted_at IS NULL"
+
+	var (
+		conditions []string
+		args       []any
+		argPos     = 1
+	)
+
+	conditions = append(conditions, notDeletedCondition)
 
 	if params.ID != nil {
-		conditions = append(conditions, fmt.Sprintf("p.id = $%d", argPos))
+		conditions = append(
+			conditions,
+			fmt.Sprintf("p.id = $%d", argPos),
+		)
 		args = append(args, *params.ID)
 		argPos++
 	}
 
 	if params.Name != nil {
-		conditions = append(conditions, fmt.Sprintf("p.name ILIKE $%d", argPos))
+		conditions = append(
+			conditions,
+			fmt.Sprintf("p.name ILIKE $%d", argPos),
+		)
 		args = append(args, "%"+*params.Name+"%")
 		argPos++
 	}
 
-	whereClause := ""
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
+	// Count matching products
+	// Used for pagination metadata
+	countQuery := `
+		SELECT COUNT(DISTINCT p.id)
+	` + baseQuery + whereClause
+
 	countArgs := append([]any{}, args...)
-	countQuery := "SELECT COUNT(DISTINCT p.id) " + baseQuery + whereClause
 
 	var total int
 	err := exec.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
@@ -79,25 +95,70 @@ func (r *productRepositoryImpl) FindProducts(
 		return nil, 0, fmt.Errorf("query count products failed: %w", err)
 	}
 
-	limit := params.Limit
+	// Build sorting expressions
+	// Convert requested sort keys into SQL ORDER BY clauses
+	var productSortKeys = map[query.SortKey]string{
+		repository.ProductSortLatest:   "created_at",
+		repository.ProductSortName:     "name",
+		repository.ProductSortPrice:    "base_price",
+		repository.ProductSortWeight:   "weight",
+		repository.ProductSortStatus:   "status",
+		repository.ProductSortModified: "updated_at",
+		repository.ProductSortArchived: "archived_at",
+	}
+
+	var sortClauses []string
+	for _, sort := range params.Sorts {
+		colName, exists := productSortKeys[sort.By]
+		if !exists {
+			continue
+		}
+
+		direction := "DESC"
+		if sort.Direction == query.SortAsc {
+			direction = "ASC"
+		}
+
+		sortClauses = append(
+			sortClauses,
+			fmt.Sprintf("p.%s %s", colName, direction),
+		)
+	}
+
+	orderBy := "ORDER BY p.created_at DESC"
+	if len(sortClauses) > 0 {
+		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
+	}
+
+	// Apply pagination
+	// Calculate limit and offset values
+	limitPos := argPos
+	offsetPos := argPos + 1
+
+	limit := params.Pagination.Limit
 	if limit <= 0 {
 		limit = 10
 	}
 
-	page := params.Page
+	page := params.Pagination.Page
 	if page <= 0 {
 		page = 1
 	}
 
 	offset := (page - 1) * limit
-
-	limitPos := argPos
-	offsetPos := argPos + 1
-
-	query := selectQuery + baseQuery + whereClause +
-		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
-
 	args = append(args, limit, offset)
+
+	// The execution
+	query := selectQuery +
+		baseQuery +
+		whereClause +
+		" " +
+		orderBy +
+		fmt.Sprintf(
+			" LIMIT $%d OFFSET $%d",
+			limitPos,
+			offsetPos,
+		)
 
 	rows, err := exec.Query(ctx, query, args...)
 	if err != nil {
@@ -108,7 +169,6 @@ func (r *productRepositoryImpl) FindProducts(
 	var results []domain.Product
 	for rows.Next() {
 		var item domain.Product
-
 		err := rows.Scan(
 			&item.ID,
 			&item.SKU,
@@ -124,7 +184,10 @@ func (r *productRepositoryImpl) FindProducts(
 			&item.DeletedAt,
 		)
 		if err != nil {
-			return nil, 0, fmt.Errorf("mapping product model to domain failed: %w", err)
+			return nil, 0, fmt.Errorf(
+				"mapping product model to domain failed: %w",
+				err,
+			)
 		}
 
 		results = append(results, item)
@@ -274,7 +337,7 @@ func (r *productRepositoryImpl) CreateProduct(
 			base_price,
 			weight,
 			created_at
-		) 
+		)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	`
 

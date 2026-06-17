@@ -44,10 +44,12 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 
 	name := apphttp.Query(r, "name")
 	id := apphttp.Query(r, "id")
+	sort := apphttp.Query(r, "sort")
 
 	input := usecase.FindProductsInput{
 		Page:  page,
 		Limit: limit,
+		Sort:  sort,
 	}
 	if name != "" {
 		input.Name = &name
