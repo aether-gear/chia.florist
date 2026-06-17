@@ -61,6 +61,7 @@ type Container struct {
 	GetAccount       authenUsecase.GetAccountUsecase
 	Logout           authenUsecase.LogoutUsecase
 
+	FindMerchants      merchantUsecase.FindMerchantsUsecase
 	CreateMerchant     merchantUsecase.CreateMerchantUsecase
 	AddMerchantAccount merchantUsecase.AddMerchantAccountUsecase
 
@@ -73,6 +74,8 @@ type Container struct {
 	ListLocations locationUsecase.ListLocationUsecase
 
 	GetUser userUsecase.GetUserUsecase
+
+	FindCustomers userUsecase.FindCustomersUsecase
 
 	ListUserAddresses addressUsecase.ListUserAddressUsecase
 	CreateUserAddress addressUsecase.SaveUserAddressUsecase
@@ -247,6 +250,11 @@ func NewContainer(cfg Config,
 				membershipRepo,
 			),
 
+		FindMerchants: *merchantUsecase.
+			NewFindMerchantsUsecase(
+				infra.TransactionExecutor,
+				merchantRepo,
+			),
 		CreateMerchant: *merchantUsecase.
 			NewCreateMerchantUsecase(
 				merchantRepo,
@@ -345,6 +353,12 @@ func NewContainer(cfg Config,
 			NewGetUserUsecase(
 				userRepo,
 				infra.TransactionExecutor,
+			),
+
+		FindCustomers: *userUsecase.
+			NewFindCustomersUsecase(
+				infra.TransactionExecutor,
+				userRepo,
 			),
 
 		ListUserAddresses: *addressUsecase.

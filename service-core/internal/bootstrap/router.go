@@ -126,6 +126,7 @@ func NewRouter(c *Container) *chi.Mux {
 		merchantHandler = merchantH.NewMerchantHandler(
 			&c.AddMerchantAccount,
 			&c.CreateMerchant,
+			&c.FindMerchants,
 		)
 
 		cartHandler = cartH.NewCartHandler(
@@ -142,6 +143,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		userHandler = userH.NewUserHandler(
 			&c.GetUser,
+			&c.FindCustomers,
 		)
 
 		addressHandler = addressH.NewAddressHandler(
@@ -201,10 +203,15 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/merchants", func(r chi.Router) {
+			r.Get("/", chains.MerchantAdminOnly(merchantHandler.FindMerchants))
 			r.Post("/", chains.MerchantAdminOnly(merchantHandler.CreateMerchant))
 			r.Route("/{merchantID}/accounts", func(r chi.Router) {
 				r.Post("/", chains.MerchantAdminOnly(merchantHandler.AddMerchantAccount))
 			})
+		})
+
+		r.Route("/customers", func(r chi.Router) {
+			r.Get("/", chains.MerchantAdminOnly(userHandler.FindCustomers))
 		})
 
 		r.Route("/carts", func(r chi.Router) {

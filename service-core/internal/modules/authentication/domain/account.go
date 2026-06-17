@@ -3,6 +3,8 @@ package domain
 import (
 	"time"
 
+	query "service-core/internal/shared/query"
+
 	"github.com/google/uuid"
 )
 
@@ -21,6 +23,14 @@ const (
 const (
 	AccountTypeCustomer AccountType = "customer"
 	AccountTypeMerchant AccountType = "merchant"
+)
+
+var (
+	AccountSortLatest    query.SortKey = "latest"
+	AccountSortEmail     query.SortKey = "email"
+	AccountSortStatus    query.SortKey = "status"
+	AccountSortType      query.SortKey = "type"
+	AccountSortLastLogin query.SortKey = "last_login"
 )
 
 type Account struct {

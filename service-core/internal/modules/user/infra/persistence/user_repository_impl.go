@@ -8,6 +8,7 @@ import (
 
 	"service-core/internal/modules/user/domain"
 	"service-core/internal/modules/user/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -20,18 +21,17 @@ func NewUserRepositoryImpl() repository.UserRepository {
 	return &userRepositoryImpl{}
 }
 
-func (r *userRepositoryImpl) FindUsers(
+func (r *userRepositoryImpl) FindCustomers(
 	ctx context.Context,
 	exec transaction.Executor,
 	params repository.FindUserParams,
 ) ([]domain.User, int, error) {
-	var (
-		conditions []string
-		args       []any
-		argPos     = 1
-	)
+	baseQuery := `
+		FROM users u
+		LEFT JOIN accounts a ON a.user_id = u.id
+	`
 
-	query := `
+	selectQuery := `
 		SELECT 
 			u.id, 
 			u.name, 
@@ -41,30 +41,107 @@ func (r *userRepositoryImpl) FindUsers(
 			u.updated_at, 
 			u.deleted_at,
 			a.last_login_at
-		FROM users u
-		LEFT JOIN accounts a ON a.user_id = u.id
 	`
 
+	// Build filters
+	// Apply search criteria and soft-delete constraints
+	whereClause := ""
+	notDeletedCondition := "u.deleted_at IS NULL"
+	onlyCustomerCondition := "a.type = 'customer'"
+
+	var (
+		conditions []string
+		args       []any
+		argPos     = 1
+	)
+
+	conditions = append(conditions,
+		notDeletedCondition,
+		onlyCustomerCondition,
+	)
+
 	if params.ID != nil {
-		conditions = append(conditions, fmt.Sprintf("id = $%d", argPos))
+		conditions = append(conditions, fmt.Sprintf("u.id = $%d", argPos))
 		args = append(args, *params.ID)
 		argPos++
 	}
 
+	if params.Name != nil {
+		conditions = append(conditions, fmt.Sprintf("u.name ILIKE $%d", argPos))
+		args = append(args, "%"+*params.Name+"%")
+		argPos++
+	}
+
 	if params.Username != nil {
-		conditions = append(conditions, fmt.Sprintf("username ILIKE $%d", argPos))
+		conditions = append(conditions, fmt.Sprintf("u.username ILIKE $%d", argPos))
 		args = append(args, "%"+*params.Username+"%")
 		argPos++
 	}
 
-	if len(conditions) > 0 {
-		query += " WHERE " + strings.Join(conditions, " AND ")
+	if params.Email != nil {
+		conditions = append(conditions, fmt.Sprintf("a.email ILIKE $%d", argPos))
+		args = append(args, "%"+*params.Email+"%")
+		argPos++
 	}
 
-	countQuery := "SELECT COUNT(*) FROM users"
 	if len(conditions) > 0 {
-		countQuery += " WHERE " + strings.Join(conditions, " AND ")
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
+
+	// Count matching products
+	// Used for pagination metadata
+	countQuery := `
+		SELECT COUNT(*)
+	` + baseQuery + whereClause
+
+	countArgs := append([]any{}, args...)
+
+	var total int
+	err := exec.
+		QueryRow(ctx, countQuery, countArgs...).
+		Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query count users failed: %w", err)
+	}
+
+	// Build sorting expressions
+	// Convert requested sort keys into SQL ORDER BY clauses
+	var userSortKeys = map[query.SortKey]string{
+		repository.UserSortLatest:    "u.created_at",
+		repository.UserSortName:      "u.name",
+		repository.UserSortUsername:  "u.username",
+		repository.UserSortPhone:     "u.phone",
+		repository.UserSortModify:    "u.updated_at",
+		repository.UserSortLastLogin: "a.last_login_at",
+	}
+
+	var sortClauses []string
+	for _, sort := range params.Sorts {
+		colName, exists := userSortKeys[sort.By]
+		if !exists {
+			continue
+		}
+
+		dir := "DESC"
+		if sort.Direction == query.SortAsc {
+			dir = "ASC"
+		}
+
+		sortClauses = append(
+			sortClauses,
+			fmt.Sprintf("%s %s", colName, dir),
+		)
+	}
+
+	orderBy := "ORDER BY u.created_at DESC"
+	if len(sortClauses) > 0 {
+		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
+	}
+
+	// Apply pagination
+	// Calculate limit and offset values
+	limitPos := argPos
+	offsetPos := argPos + 1
 
 	limit := params.Limit
 	if limit <= 0 {
@@ -77,26 +154,21 @@ func (r *userRepositoryImpl) FindUsers(
 	}
 
 	offset := (page - 1) * limit
+	args = append(args, limit, offset)
 
-	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d OFFSET %d", limit, offset)
+	// The execution
+	finalQuery := selectQuery + baseQuery + whereClause + " " + orderBy +
+		fmt.Sprintf(" LIMIT $%d OFFSET $%d", limitPos, offsetPos)
 
-	var total int
-	err := exec.QueryRow(ctx, countQuery, args...).Scan(&total)
-	if err != nil {
-		return nil, 0, fmt.Errorf("query count users failed: %w", err)
-	}
-
-	rows, err := exec.Query(ctx, query, args...)
+	rows, err := exec.Query(ctx, finalQuery, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query users failed: %w", err)
 	}
 	defer rows.Close()
 
 	var results []domain.User
-
 	for rows.Next() {
 		var m domain.User
-
 		err := rows.Scan(
 			&m.ID,
 			&m.Name,

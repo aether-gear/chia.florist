@@ -10,7 +10,7 @@ import (
 )
 
 type UserRepository interface {
-	FindUsers(
+	FindCustomers(
 		ctx context.Context,
 		exec transaction.Executor,
 		params FindUserParams,

@@ -16,15 +16,18 @@ import (
 type merchantHandler struct {
 	addMerchantAccount *usecase.AddMerchantAccountUsecase
 	createMerchant     *usecase.CreateMerchantUsecase
+	findMerchants      *usecase.FindMerchantsUsecase
 }
 
 func NewMerchantHandler(
 	addMerchantAccount *usecase.AddMerchantAccountUsecase,
 	createMerchant *usecase.CreateMerchantUsecase,
+	findMerchants *usecase.FindMerchantsUsecase,
 ) *merchantHandler {
 	return &merchantHandler{
 		addMerchantAccount: addMerchantAccount,
 		createMerchant:     createMerchant,
+		findMerchants:      findMerchants,
 	}
 }
 
@@ -121,6 +124,64 @@ func (h *merchantHandler) CreateMerchant(w http.ResponseWriter, r *http.Request)
 
 	response := map[string]string{
 		"message": "merchant successfully created",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *merchantHandler) FindMerchants(w http.ResponseWriter, r *http.Request) error {
+	page := apphttp.QueryIntDefault(r, "page", 1)
+	if page <= 0 {
+		page = 1
+	}
+	limit := apphttp.QueryIntDefault(r, "limit", 10)
+	if limit <= 0 {
+		limit = 10
+	}
+
+	name := apphttp.Query(r, "name")
+	idStr := apphttp.Query(r, "id")
+	sort := apphttp.Query(r, "sort")
+
+	input := usecase.FindMerchantsInput{
+		Page:  page,
+		Limit: limit,
+		Sort:  sort,
+	}
+	if name != "" {
+		input.Name = &name
+	}
+	if idStr != "" {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid merchant id")
+		}
+		input.ID = &id
+	}
+
+	merchants, total, err := h.findMerchants.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	results := make([]merchantResponse, 0, len(merchants))
+	for _, m := range merchants {
+		results = append(results, merchantResponse{
+			ID:          m.ID,
+			Name:        m.Name,
+			Description: m.Description,
+			LogoUrl:     m.LogoUrl,
+			BannerUrl:   m.BannerUrl,
+			CreatedAt:   m.CreatedAt,
+		})
+	}
+
+	response := map[string]interface{}{
+		"merchants": results,
+		"page":      page,
+		"limit":     limit,
+		"total":     total,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
