@@ -47,18 +47,37 @@ export const useCart = () => {
       try {
         const response = await cartService.getCart()
         if (response && Array.isArray(response.items)) {
-          const backendItems: CartItem[] = response.items.map((item: any) => ({
-            id: item.product_id,
-            name: item.name,
-            price: Number(item.price),
-            image: item.images?.thumbnail || '/images/birthday.jpeg',
-            quantity: Number(item.quantity),
-            shopId: item.shop_id,
-            isCustom: false,
-            // FIX SUCCESS: Gunakan as any atau safe fallback jika backend mengembalikan null / properti tidak terdefinisi
-            size: item.size || '1.8m', 
-            color: item.color || '#1b4332'
-          }))
+          const backendItems: CartItem[] = response.items.map((item: any) => {
+            let size = '1.8m'
+            let color = '#1b4332'
+            let price = Number(item.price)
+
+            if (import.meta.client) {
+              const savedAttr = localStorage.getItem(`cart_attr_${item.product_id}`)
+              if (savedAttr) {
+                try {
+                  const parsed = JSON.parse(savedAttr)
+                  if (parsed.size) size = parsed.size
+                  if (parsed.color) color = parsed.color
+                  if (parsed.price) price = Number(parsed.price)
+                } catch (e) {
+                  console.error('Failed to parse saved cart attributes:', e)
+                }
+              }
+            }
+
+            return {
+              id: item.product_id,
+              name: item.name,
+              price: price,
+              image: item.images?.thumbnail || '/images/birthday.jpeg',
+              quantity: Number(item.quantity),
+              shopId: item.shop_id,
+              isCustom: false,
+              size: size, 
+              color: color
+            }
+          })
 
           const customItems = cart.value.filter(i => i.isCustom)
           cart.value = [...backendItems, ...customItems]
@@ -104,6 +123,14 @@ export const useCart = () => {
   }
 
   const addToCart = async (item: Omit<CartItem, 'quantity'>, qty = 1) => {
+    if (import.meta.client && !item.isCustom) {
+      localStorage.setItem(`cart_attr_${item.id}`, JSON.stringify({
+        size: item.size,
+        color: item.color,
+        price: item.price
+      }))
+    }
+
     if (item.isCustom) {
       const existingItem = cart.value.find(
         i => i.id === item.id || (i.isCustom && i.name === item.name && i.size === item.size && i.color === item.color)
@@ -142,6 +169,9 @@ export const useCart = () => {
   }
 
   const removeFromCart = async (id: string, size?: string, color?: string) => {
+    if (import.meta.client) {
+      localStorage.removeItem(`cart_attr_${id}`)
+    }
     const item = cart.value.find(i => i.id === id)
     if (!item) return
 
@@ -207,17 +237,56 @@ export const useCart = () => {
   const cartSubtotalFormatted = computed(() => formatRupiah(cartSubtotal.value))
   const cartCount = computed(() => cart.value.reduce((total, item) => total + Number(item.quantity), 0))
 
-  const checkoutToOrder = (totalAmount: number) => {
-    if (cart.value.length === 0) return
+  const checkoutToOrder = async (totalAmount: number, itemsToOrder?: CartItem[]) => {
+    const orderItems = itemsToOrder || [...cart.value]
+    if (orderItems.length === 0) return
+
+    // Clear backend cart for checked out items
+    if (isLoggedIn.value === 'true') {
+      await flushCart() // Ensure no race condition with pending additions/updates
+      for (const item of orderItems) {
+        if (import.meta.client) {
+          localStorage.removeItem(`cart_attr_${item.id}`)
+        }
+        if (!item.isCustom) {
+          try {
+            const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+            await cartService.removeItem(shopId, item.id)
+          } catch (err) {
+            console.error(`Failed to remove item ${item.id} from backend cart on checkout:`, err)
+          }
+        }
+      }
+    } else {
+      for (const item of orderItems) {
+        if (import.meta.client) {
+          localStorage.removeItem(`cart_attr_${item.id}`)
+        }
+      }
+    }
+
     const newOrder: Order = {
       orderId: 'CHIA-' + Date.now().toString().slice(-6),
       date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-      items: [...cart.value],
+      items: orderItems,
       total: totalAmount,
       status: 'pembayaran'
     }
+
     orders.value.push(newOrder)
-    cart.value = []
+
+    if (!itemsToOrder) {
+      cart.value = []
+    } else {
+      // Filter out the items that were ordered
+      cart.value = cart.value.filter(cartItem => 
+        !orderItems.some(ordered => 
+          ordered.id === cartItem.id && 
+          ordered.size === cartItem.size && 
+          ordered.color === cartItem.color
+        )
+      )
+    }
   }
 
   return {
