@@ -115,12 +115,10 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 }
 
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) error {
-	productID, err := apphttp.ParamUUID(r, "id")
-	if err != nil {
-		return apperrors.NewBadRequest("invalid product id")
-	}
+	productSlug := apphttp.Param(r, "slug")
 
-	productDetail, err := h.getProduct.Execute(r.Context(), productID)
+	productDetail, err := h.getProduct.
+		Execute(r.Context(), productSlug)
 	if err != nil {
 		return err
 	}
@@ -270,14 +268,10 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	productID, err := apphttp.ParamUUID(r, "id")
-	if err != nil {
-		return apperrors.NewBadRequest("invalid product id")
-	}
-
+	productSlug := apphttp.Param(r, "slug")
 	input := usecase.AddProductImageInput{
-		ProductID: productID,
-		Images:    images,
+		ProductSlug: productSlug,
+		Images:      images,
 	}
 
 	err = h.addProductImage.Execute(r.Context(), input)

@@ -16,6 +16,12 @@ type ProductRepository interface {
 		id uuid.UUID,
 	) (*domain.Product, error)
 
+	GetBySlug(
+		ctx context.Context,
+		exec transaction.Executor,
+		string string,
+	) (*domain.Product, error)
+
 	FindProducts(
 		ctx context.Context,
 		exec transaction.Executor,

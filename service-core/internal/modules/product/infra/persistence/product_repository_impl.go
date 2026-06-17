@@ -435,6 +435,56 @@ func (r *productRepositoryImpl) GetByID(
 	return &result, nil
 }
 
+func (r *productRepositoryImpl) GetBySlug(
+	ctx context.Context,
+	exec transaction.Executor,
+	slug string,
+) (*domain.Product, error) {
+	query := `
+		SELECT
+			p.id,
+			p.sku,
+			p.name,
+			p.slug,
+			p.description,
+			p.status,
+			p.base_price,
+			p.weight,
+			p.created_at,
+			p.updated_at,
+			p.archived_at,
+			p.deleted_at
+		FROM products p
+		WHERE p.slug = $1
+		LIMIT 1
+	`
+
+	var result domain.Product
+	err := exec.QueryRow(ctx, query, slug).Scan(
+		&result.ID,
+		&result.SKU,
+		&result.Name,
+		&result.Slug,
+		&result.Description,
+		&result.Status,
+		&result.Price,
+		&result.Weight,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+		&result.ArchivedAt,
+		&result.DeletedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query product by id failed: %w", err)
+	}
+
+	return &result, nil
+}
+
 func (r *productRepositoryImpl) FindByIDs(
 	ctx context.Context,
 	exec transaction.Executor,

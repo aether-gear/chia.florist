@@ -62,8 +62,8 @@ type ProductImageInput struct {
 }
 
 type AddProductImageInput struct {
-	ProductID uuid.UUID
-	Images    []ProductImageInput
+	ProductSlug string
+	Images      []ProductImageInput
 }
 
 type productToVariants struct {
@@ -76,7 +76,7 @@ func (u *AddProductImagesUsecase) Execute(
 	input AddProductImageInput,
 ) error {
 	product, err := u.productRepo.
-		GetByID(ctx, u.executor, input.ProductID)
+		GetBySlug(ctx, u.executor, input.ProductSlug)
 	if err != nil {
 		return fmt.Errorf("failed to get product: %w", err)
 	}
@@ -135,19 +135,13 @@ func (u *AddProductImagesUsecase) Execute(
 				specs,
 			)
 		if err != nil {
-			return fmt.Errorf("failed to create variants of %s: %w",
-				img.OriginalName,
-				err,
-			)
+			return fmt.Errorf("failed to create variants of %s: %w", img.OriginalName, err)
 		}
 
 		for _, variant := range variants {
 			key, err := productImage.BuildObjectKey()
 			if err != nil {
-				return fmt.Errorf("failed to build %s key: %w",
-					variant.Type,
-					err,
-				)
+				return fmt.Errorf("failed to build %s key: %w", variant.Type, err)
 			}
 
 			uploadImages = append(uploadImages, storage.UploadInput{

@@ -62,9 +62,10 @@ type ProductDetailResult struct {
 
 func (u *GetProductUsecase) Execute(
 	ctx context.Context,
-	id uuid.UUID,
+	slug string,
 ) (*ProductDetailResult, error) {
-	product, err := u.productRepo.GetByID(ctx, u.executor, id)
+	product, err := u.productRepo.
+		GetBySlug(ctx, u.executor, slug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products with inventory: %w", err)
 	}
@@ -73,7 +74,7 @@ func (u *GetProductUsecase) Execute(
 	}
 
 	inventories, err := u.inventoryRepo.
-		ListByProductID(ctx, u.executor, id)
+		ListByProductID(ctx, u.executor, product.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory by product: %w", err)
 	}
@@ -95,7 +96,7 @@ func (u *GetProductUsecase) Execute(
 	}
 
 	images, err := u.productImgRepo.
-		ListByProductID(ctx, u.executor, id)
+		ListByProductID(ctx, u.executor, product.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images by product: %w", err)
 	}
