@@ -21,7 +21,7 @@ func NewShopRepositoryImpl() repository.ShopRepository {
 	return &shopRepositoryImpl{}
 }
 
-func (r *shopRepositoryImpl) List(
+func (r *shopRepositoryImpl) FindByParams(
 	ctx context.Context,
 	exec transaction.Executor,
 	params repository.FindShopsParams,

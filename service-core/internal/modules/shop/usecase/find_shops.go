@@ -12,22 +12,22 @@ import (
 	transaction "service-core/internal/shared/transaction"
 )
 
-type ListShopsUsecase struct {
+type FindShopsUsecase struct {
 	executor transaction.Executor
 	shopRepo repository.ShopRepository
 }
 
-func NewListShopsUsecase(
+func NewFindShopsUsecase(
 	executor transaction.Executor,
 	shopRepo repository.ShopRepository,
-) *ListShopsUsecase {
-	return &ListShopsUsecase{
+) *FindShopsUsecase {
+	return &FindShopsUsecase{
 		executor: executor,
 		shopRepo: shopRepo,
 	}
 }
 
-type ListShopsInput struct {
+type FindShopsInput struct {
 	Page  int
 	Limit int
 	ID    *string
@@ -35,9 +35,9 @@ type ListShopsInput struct {
 	Sort  string
 }
 
-func (u *ListShopsUsecase) Execute(
+func (u *FindShopsUsecase) Execute(
 	ctx context.Context,
-	input ListShopsInput,
+	input FindShopsInput,
 ) ([]domain.Shop, int, error) {
 	var shopSortKeys = map[string]query.SortKey{
 		"name":     repository.ShopSortName,
@@ -96,7 +96,7 @@ func (u *ListShopsUsecase) Execute(
 	}
 
 	shops, total, err := u.shopRepo.
-		List(ctx, u.executor, params)
+		FindByParams(ctx, u.executor, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load shops: %w", err)
 	}

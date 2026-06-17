@@ -10,7 +10,7 @@ import (
 )
 
 type ShopRepository interface {
-	List(
+	FindByParams(
 		ctx context.Context,
 		exec transaction.Executor,
 		params FindShopsParams,

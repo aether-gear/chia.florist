@@ -11,24 +11,24 @@ import (
 )
 
 type ShopHandler struct {
-	listShops  *usecase.ListShopsUsecase
+	findShops  *usecase.FindShopsUsecase
 	getShop    *usecase.GetShopUsecase
 	createShop *usecase.CreateShopUsecase
 }
 
 func NewAddressHandler(
-	listShops *usecase.ListShopsUsecase,
+	findShops *usecase.FindShopsUsecase,
 	getShop *usecase.GetShopUsecase,
 	createShop *usecase.CreateShopUsecase,
 ) *ShopHandler {
 	return &ShopHandler{
-		listShops:  listShops,
+		findShops:  findShops,
 		getShop:    getShop,
 		createShop: createShop,
 	}
 }
 
-func (h *ShopHandler) ListShops(w http.ResponseWriter, r *http.Request) error {
+func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 	page := apphttp.QueryIntDefault(r, "page", 1)
 	if page <= 0 {
 		page = 1
@@ -42,7 +42,7 @@ func (h *ShopHandler) ListShops(w http.ResponseWriter, r *http.Request) error {
 	id := apphttp.Query(r, "id")
 	sort := apphttp.Query(r, "sort")
 
-	input := usecase.ListShopsInput{
+	input := usecase.FindShopsInput{
 		Page:  page,
 		Limit: limit,
 		Sort:  sort,
@@ -54,7 +54,7 @@ func (h *ShopHandler) ListShops(w http.ResponseWriter, r *http.Request) error {
 		input.ID = &id
 	}
 
-	shops, total, err := h.listShops.Execute(r.Context(), input)
+	shops, total, err := h.findShops.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
