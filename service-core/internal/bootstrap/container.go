@@ -85,6 +85,10 @@ type Container struct {
 	GetShop    shopUsecase.GetShopUsecase
 	CreateShop shopUsecase.CreateShopUsecase
 
+	GetShopAddresses shopUsecase.GetShopAddressesUsecase
+	GetShopCouriers  shopUsecase.GetShopCouriersUsecase
+	GetShopProducts  shopUsecase.GetShopProductsUsecase
+
 	CreatePaymentAccount paymentUsecase.CreatePaymentAccountUsecase
 	ListPaymentAccount   paymentUsecase.ListPaymentAccountUsecase
 	CreatePaymentMethod  paymentUsecase.CreatePaymentMethodUsecase
@@ -385,6 +389,23 @@ func NewContainer(cfg Config,
 			NewCreateShopUsecase(
 				shopRepo,
 				slugGen,
+				infra.TransactionExecutor,
+			),
+
+		GetShopAddresses: *shopUsecase.
+			NewGetShopAddressesUsecase(
+				addressShopRepo,
+				infra.TransactionExecutor,
+			),
+		GetShopCouriers: *shopUsecase.
+			NewGetShopCouriersUsecase(
+				shopCourierRepo,
+				infra.TransactionExecutor,
+			),
+		GetShopProducts: *shopUsecase.
+			NewGetShopProductsUsecase(
+				inventoryRepo,
+				productRepo,
 				infra.TransactionExecutor,
 			),
 

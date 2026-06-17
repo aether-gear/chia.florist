@@ -11,20 +11,29 @@ import (
 )
 
 type ShopHandler struct {
-	findShops  *usecase.FindShopsUsecase
-	getShop    *usecase.GetShopUsecase
-	createShop *usecase.CreateShopUsecase
+	findShops        *usecase.FindShopsUsecase
+	getShop          *usecase.GetShopUsecase
+	createShop       *usecase.CreateShopUsecase
+	getShopAddresses *usecase.GetShopAddressesUsecase
+	getShopCouriers  *usecase.GetShopCouriersUsecase
+	getShopProducts  *usecase.GetShopProductsUsecase
 }
 
-func NewAddressHandler(
+func NewShopHandler(
 	findShops *usecase.FindShopsUsecase,
 	getShop *usecase.GetShopUsecase,
 	createShop *usecase.CreateShopUsecase,
+	getShopAddresses *usecase.GetShopAddressesUsecase,
+	getShopCouriers *usecase.GetShopCouriersUsecase,
+	getShopProducts *usecase.GetShopProductsUsecase,
 ) *ShopHandler {
 	return &ShopHandler{
-		findShops:  findShops,
-		getShop:    getShop,
-		createShop: createShop,
+		findShops:        findShops,
+		getShop:          getShop,
+		createShop:       createShop,
+		getShopAddresses: getShopAddresses,
+		getShopCouriers:  getShopCouriers,
+		getShopProducts:  getShopProducts,
 	}
 }
 
@@ -153,5 +162,106 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *ShopHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) error {
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	result, err := h.getShopAddresses.Execute(r.Context(), shopID)
+	if err != nil {
+		return err
+	}
+
+	addresses := make([]shopAddressResponse, 0, len(result))
+	for _, a := range result {
+		addresses = append(addresses, shopAddressResponse{
+			ID:          a.ID,
+			Label:       a.Label,
+			Phone:       a.Phone,
+			IsActive:    a.IsActive,
+			ProvinceID:  a.Detail.ProvinceID,
+			CityID:      a.Detail.CityID,
+			DistrictID:  a.Detail.DistrictID,
+			VillageID:   a.Detail.VillageID,
+			FullAddress: a.Detail.FullAddress,
+			PostalCode:  a.Detail.PostalCode,
+			CreatedAt:   a.CreatedAt,
+			UpdatedAt:   a.UpdatedAt,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":   shopID,
+		"addresses": addresses,
+	})
+	return nil
+}
+
+func (h *ShopHandler) GetShopCouriers(w http.ResponseWriter, r *http.Request) error {
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	result, err := h.getShopCouriers.Execute(r.Context(), shopID)
+	if err != nil {
+		return err
+	}
+
+	couriers := make([]shopCourierResponse, 0, len(result))
+	for _, c := range result {
+		couriers = append(couriers, shopCourierResponse{
+			Code:   c.Code,
+			Active: c.Active,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":  shopID,
+		"couriers": couriers,
+	})
+	return nil
+}
+
+func (h *ShopHandler) GetShopProducts(w http.ResponseWriter, r *http.Request) error {
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	result, err := h.getShopProducts.Execute(r.Context(), shopID)
+	if err != nil {
+		return err
+	}
+
+	products := make([]shopProductResponse, 0, len(result))
+	for _, item := range result {
+		products = append(products, shopProductResponse{
+			ID:          item.Product.ID,
+			SKU:         item.Product.SKU,
+			Name:        item.Product.Name,
+			Slug:        item.Product.Slug,
+			Description: item.Product.Description,
+			Status:      string(item.Product.Status),
+			Price:       item.Product.Price,
+			Weight:      item.Product.Weight,
+			Inventory: shopProductInventoryResponse{
+				TotalStock:    item.Inventory.TotalStock,
+				ReservedStock: item.Inventory.ReservedStock,
+				Available:     item.Inventory.Available(),
+			},
+			CreatedAt: item.Product.CreatedAt,
+			UpdatedAt: item.Product.UpdatedAt,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":  shopID,
+		"products": products,
+	})
 	return nil
 }
