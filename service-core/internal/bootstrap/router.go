@@ -14,6 +14,7 @@ import (
 	authH "service-core/internal/modules/authentication/delivery/http"
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
+	customerH "service-core/internal/modules/customer/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
 	locationH "service-core/internal/modules/location/delivery/http"
 	merchantH "service-core/internal/modules/merchant/delivery/http"
@@ -129,6 +130,10 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.FindMerchants,
 		)
 
+		customerHandler = customerH.NewCustomerHandler(
+			&c.FindCustomers,
+		)
+
 		cartHandler = cartH.NewCartHandler(
 			&c.AddItem,
 			&c.GetCart,
@@ -143,7 +148,6 @@ func NewRouter(c *Container) *chi.Mux {
 
 		userHandler = userH.NewUserHandler(
 			&c.GetUser,
-			&c.FindCustomers,
 		)
 
 		addressHandler = addressH.NewAddressHandler(
@@ -211,7 +215,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/customers", func(r chi.Router) {
-			r.Get("/", chains.MerchantAdminOnly(userHandler.FindCustomers))
+			r.Get("/", chains.MerchantAdminOnly(customerHandler.FindCustomers))
 		})
 
 		r.Route("/carts", func(r chi.Router) {

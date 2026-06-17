@@ -14,6 +14,7 @@ import (
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
 	cartPersistence "service-core/internal/modules/cart/infra/persistence"
 	courierPersistence "service-core/internal/modules/courier/infra/persistence"
+	customerPersistence "service-core/internal/modules/customer/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
 	merchantPersistence "service-core/internal/modules/merchant/infra/persistence"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
@@ -30,6 +31,7 @@ import (
 	authenUsecase "service-core/internal/modules/authentication/usecase"
 	cartUsecase "service-core/internal/modules/cart/usecase"
 	courierUsecase "service-core/internal/modules/courier/usecase"
+	customerUsecase "service-core/internal/modules/customer/usecase"
 	inventoryUsecase "service-core/internal/modules/inventory/usecase"
 	locationUsecase "service-core/internal/modules/location/usecase"
 	merchantUsecase "service-core/internal/modules/merchant/usecase"
@@ -75,7 +77,7 @@ type Container struct {
 
 	GetUser userUsecase.GetUserUsecase
 
-	FindCustomers userUsecase.FindCustomersUsecase
+	FindCustomers customerUsecase.FindCustomersUsecase
 
 	ListUserAddresses addressUsecase.ListUserAddressUsecase
 	CreateUserAddress addressUsecase.SaveUserAddressUsecase
@@ -127,6 +129,7 @@ func NewContainer(cfg Config,
 		courierRepo       = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo   = courierPersistence.NewShopCourierRepositoryImpl()
 		merchantRepo      = merchantPersistence.NewMerchantRepositoryImpl()
+		customerRepo      = customerPersistence.NewCustomerRepositoryImpl()
 		membershipRepo    = authorPersistence.NewMerchantMembershipRepositoryImpl()
 		roleRepo          = authorPersistence.NewRoleRepositoryImpl()
 	)
@@ -355,10 +358,10 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
-		FindCustomers: *userUsecase.
+		FindCustomers: *customerUsecase.
 			NewFindCustomersUsecase(
 				infra.TransactionExecutor,
-				userRepo,
+				customerRepo,
 			),
 
 		ListUserAddresses: *addressUsecase.

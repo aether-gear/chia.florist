@@ -33,6 +33,8 @@ var (
 	AccountSortLastLogin query.SortKey = "last_login"
 )
 
+// Account represents authentication credentials
+// and access control for a user.
 type Account struct {
 	ID     uuid.UUID
 	UserID uuid.UUID

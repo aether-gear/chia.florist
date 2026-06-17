@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	apperrors "service-core/internal/common/errors"
-	"service-core/internal/modules/user/domain"
-	"service-core/internal/modules/user/repository"
+	"service-core/internal/modules/customer/domain"
+	"service-core/internal/modules/customer/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
@@ -15,17 +15,17 @@ import (
 )
 
 type FindCustomersUsecase struct {
-	executor transaction.Executor
-	userRepo repository.UserRepository
+	executor     transaction.Executor
+	customerRepo repository.CustomerRepository
 }
 
 func NewFindCustomersUsecase(
 	executor transaction.Executor,
-	userRepo repository.UserRepository,
+	customerRepo repository.CustomerRepository,
 ) *FindCustomersUsecase {
 	return &FindCustomersUsecase{
-		executor: executor,
-		userRepo: userRepo,
+		executor:     executor,
+		customerRepo: customerRepo,
 	}
 }
 
@@ -42,14 +42,14 @@ type FindCustomersInput struct {
 func (u *FindCustomersUsecase) Execute(
 	ctx context.Context,
 	input FindCustomersInput,
-) ([]domain.User, int, error) {
+) ([]domain.Customer, int, error) {
 	var userSortKeys = map[string]query.SortKey{
-		"latest":     repository.UserSortLatest,
-		"name":       repository.UserSortName,
-		"username":   repository.UserSortUsername,
-		"phone":      repository.UserSortPhone,
-		"modify":     repository.UserSortModify,
-		"last_login": repository.UserSortLastLogin,
+		"latest":     repository.CustomerSortLatest,
+		"name":       repository.CustomerSortName,
+		"username":   repository.CustomerSortUsername,
+		"phone":      repository.CustomerSortPhone,
+		"modify":     repository.CustomerSortModify,
+		"last_login": repository.CustomerSortLastLogin,
 	}
 
 	var sorts query.Sorts
@@ -85,13 +85,13 @@ func (u *FindCustomersUsecase) Execute(
 	if len(sorts) == 0 {
 		sorts = query.Sorts{
 			{
-				By:        repository.UserSortLatest,
+				By:        repository.CustomerSortLatest,
 				Direction: query.SortDesc,
 			},
 		}
 	}
 
-	params := repository.FindUserParams{
+	params := repository.FindCustomerParams{
 		ID:       input.ID,
 		Name:     input.Name,
 		Username: input.Username,
@@ -103,7 +103,7 @@ func (u *FindCustomersUsecase) Execute(
 		Sorts: sorts,
 	}
 
-	users, total, err := u.userRepo.
+	users, total, err := u.customerRepo.
 		FindCustomers(ctx, u.executor, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load users: %w", err)
