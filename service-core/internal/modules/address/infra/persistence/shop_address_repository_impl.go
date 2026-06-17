@@ -168,7 +168,6 @@ func (r *shopAddressRepositoryImpl) GetDefaultsByShopIDs(
 			shop_id = ANY($1::uuid[])
 			AND is_active = true
 			AND deleted_at IS NULL
-		LIMIT 1
 	`
 
 	rows, err := exec.Query(ctx, query, shopIDStrings)

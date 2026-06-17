@@ -1,6 +1,7 @@
 // app/services/cartService.ts
 import { bootstrapConfig } from '~/utils/bootstrap'
 import type { BackendCartResponse } from '~/types/cart'
+import type { CheckoutRequest, CheckoutResponse } from '~/types/checkout'
 
 export const cartService = {
   async getCart(): Promise<BackendCartResponse> {
@@ -26,6 +27,20 @@ export const cartService = {
   async removeItem(shopId: string, productId: string): Promise<{ message: string }> {
     return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${shopId}/${productId}`, {
       method: 'DELETE'
+    })
+  },
+
+  async checkout(data: CheckoutRequest): Promise<CheckoutResponse> {
+    return bootstrapConfig.fetchApi<CheckoutResponse>('/carts/checkout/', {
+      method: 'POST',
+      body: data
+    })
+  },
+
+  async checkoutCalculate(data: CheckoutRequest): Promise<CheckoutResponse> {
+    return bootstrapConfig.fetchApi<CheckoutResponse>('/carts/checkout/calculate', {
+      method: 'POST',
+      body: data
     })
   }
 }
