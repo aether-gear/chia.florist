@@ -201,11 +201,8 @@ func (r *shopAddressRepositoryImpl) GetDefaultsByShopIDs(
 		shopAddresses = append(shopAddresses, sC)
 	}
 
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("query address default by shop id failed: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate shop addresses failed: %w", err)
 	}
 
 	for _, shopAddr := range shopAddresses {
