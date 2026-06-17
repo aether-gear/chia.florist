@@ -23,32 +23,32 @@ var specs = []image.VariantSpec{
 }
 
 type AddProductImagesUsecase struct {
+	executor       transaction.Executor
+	transactor     transaction.Transactor
 	productRepo    repository.ProductRepository
 	productImgRepo repository.ProductImageRepository
 	slugGen        slug.Generator
 	resolutionGen  image.VariantCreator
 	fileStore      storage.Provider
-	transactor     transaction.Transactor
-	executor       transaction.Executor
 }
 
 func NewAddProductImagesUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	productRepo repository.ProductRepository,
 	productImgRepo repository.ProductImageRepository,
 	slugGen slug.Generator,
 	resolutionGen image.VariantCreator,
 	fileStore storage.Provider,
-	transactor transaction.Transactor,
-	executor transaction.Executor,
 ) *AddProductImagesUsecase {
 	return &AddProductImagesUsecase{
+		executor:       executor,
+		transactor:     transactor,
 		productRepo:    productRepo,
 		productImgRepo: productImgRepo,
 		slugGen:        slugGen,
 		resolutionGen:  resolutionGen,
 		fileStore:      fileStore,
-		transactor:     transactor,
-		executor:       executor,
 	}
 }
 
@@ -62,8 +62,8 @@ type ProductImageInput struct {
 }
 
 type AddProductImageInput struct {
-	ProductID uuid.UUID
-	Images    []ProductImageInput
+	ProductSlug string
+	Images      []ProductImageInput
 }
 
 type productToVariants struct {
@@ -75,7 +75,8 @@ func (u *AddProductImagesUsecase) Execute(
 	ctx context.Context,
 	input AddProductImageInput,
 ) error {
-	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
+	product, err := u.productRepo.
+		GetBySlug(ctx, u.executor, input.ProductSlug)
 	if err != nil {
 		return fmt.Errorf("failed to get product: %w", err)
 	}
@@ -127,25 +128,20 @@ func (u *AddProductImagesUsecase) Execute(
 		productImageIndex := len(productImages)
 		productImages = append(productImages, productImage)
 
-		variants, err := u.resolutionGen.GenerateVariants(
-			img.Data,
-			image.MIME(img.MIMEType),
-			specs,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create variants of %s: %w",
-				img.OriginalName,
-				err,
+		variants, err := u.resolutionGen.
+			GenerateVariants(
+				img.Data,
+				image.MIME(img.MIMEType),
+				specs,
 			)
+		if err != nil {
+			return fmt.Errorf("failed to create variants of %s: %w", img.OriginalName, err)
 		}
 
 		for _, variant := range variants {
 			key, err := productImage.BuildObjectKey()
 			if err != nil {
-				return fmt.Errorf("failed to build %s key: %w",
-					variant.Type,
-					err,
-				)
+				return fmt.Errorf("failed to build %s key: %w", variant.Type, err)
 			}
 
 			uploadImages = append(uploadImages, storage.UploadInput{
@@ -191,7 +187,8 @@ func (u *AddProductImagesUsecase) Execute(
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.productImgRepo.Create(ctx, exec, productImages); err != nil {
+			if err := u.productImgRepo.
+				Create(ctx, exec, productImages); err != nil {
 				return fmt.Errorf("failed to save product image: %w", err)
 			}
 

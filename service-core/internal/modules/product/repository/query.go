@@ -4,15 +4,28 @@ import (
 	"io"
 
 	"service-core/internal/modules/product/domain"
+	query "service-core/internal/shared/query"
 
 	"github.com/google/uuid"
 )
 
+var (
+	ProductSortLatest   query.SortKey = "latest"
+	ProductSortName     query.SortKey = "name"
+	ProductSortPrice    query.SortKey = "price"
+	ProductSortWeight   query.SortKey = "weight"
+	ProductSortStatus   query.SortKey = "status"
+	ProductSortModified query.SortKey = "modified"
+	ProductSortArchived query.SortKey = "archived"
+	ProductSortStock    query.SortKey = "stock"
+)
+
 type FindProductParams struct {
-	Page  int
-	Limit int
-	ID    *string
-	Name  *string
+	ID   *string
+	Name *string
+
+	query.Pagination
+	query.Sorts
 }
 
 type UploadProductImagesParams struct {

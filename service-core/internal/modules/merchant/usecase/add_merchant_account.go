@@ -17,45 +17,44 @@ import (
 )
 
 type AddMerchantAccountUsecase struct {
+	executor       transaction.Executor
+	transactor     transaction.Transactor
 	accountRepo    authenRepo.AccountRepository
 	pwHasher       authenRepo.PasswordHasher
 	userRepo       userRepo.UserRepository
 	membershipRepo authzRepo.MerchantMembershipRepository
 	roleRepo       authzRepo.RoleRepository
-	transactor     transaction.Transactor
-	executor       transaction.Executor
 }
 
 func NewAddMerchantAccountUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	accountRepo authenRepo.AccountRepository,
 	pwHasher authenRepo.PasswordHasher,
 	userRepo userRepo.UserRepository,
 	membershipRepo authzRepo.MerchantMembershipRepository,
 	roleRepo authzRepo.RoleRepository,
-	transactor transaction.Transactor,
-	executor transaction.Executor,
 ) *AddMerchantAccountUsecase {
 	return &AddMerchantAccountUsecase{
+		executor:       executor,
+		transactor:     transactor,
 		accountRepo:    accountRepo,
 		pwHasher:       pwHasher,
 		userRepo:       userRepo,
 		membershipRepo: membershipRepo,
 		roleRepo:       roleRepo,
-		transactor:     transactor,
-		executor:       executor,
 	}
 }
 
 type AddMerchantAccountParams struct {
 	ActorAccountID  uuid.UUID
 	ActorMerchantID uuid.UUID
-
-	MerchantID uuid.UUID
-	Email      string
-	Name       string
-	Username   string
-	Password   string
-	Phone      *string
+	MerchantID      uuid.UUID
+	Email           string
+	Name            string
+	Username        string
+	Password        string
+	Phone           *string
 }
 
 type AddMerchantAccountResult struct {
@@ -102,11 +101,8 @@ func (u *AddMerchantAccountUsecase) Execute(
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
-	existing, err := u.accountRepo.GetByEmail(
-		ctx,
-		u.executor,
-		input.Email,
-	)
+	existing, err := u.accountRepo.
+		GetByEmail(ctx, u.executor, input.Email)
 	if err != nil {
 		return fmt.Errorf("failed to check existing account: %w", err)
 	}
@@ -114,11 +110,8 @@ func (u *AddMerchantAccountUsecase) Execute(
 		return apperrors.NewConflict("an account with this email already exists")
 	}
 
-	staffRole, err := u.roleRepo.GetByCode(
-		ctx,
-		u.executor,
-		authzDomain.RoleMerchantStaff,
-	)
+	staffRole, err := u.roleRepo.
+		GetByCode(ctx, u.executor, authzDomain.RoleMerchantStaff)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve staff role: %w", err)
 	}
@@ -165,13 +158,16 @@ func (u *AddMerchantAccountUsecase) Execute(
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.userRepo.CreateUser(ctx, exec, newUser); err != nil {
+			if err := u.userRepo.
+				CreateUser(ctx, exec, newUser); err != nil {
 				return fmt.Errorf("failed to create user: %w", err)
 			}
-			if err := u.accountRepo.Create(ctx, exec, newAccount); err != nil {
+			if err := u.accountRepo.
+				Create(ctx, exec, newAccount); err != nil {
 				return fmt.Errorf("failed to create account: %w", err)
 			}
-			if err := u.membershipRepo.Save(ctx, exec, newMembership); err != nil {
+			if err := u.membershipRepo.
+				Save(ctx, exec, newMembership); err != nil {
 				return fmt.Errorf("failed to save membership: %w", err)
 			}
 			return nil

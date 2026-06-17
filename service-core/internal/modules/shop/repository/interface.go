@@ -10,15 +10,26 @@ import (
 )
 
 type ShopRepository interface {
+	FindByParams(
+		ctx context.Context,
+		exec transaction.Executor,
+		params FindShopsParams,
+	) ([]domain.Shop, int, error)
+
 	GetByID(
 		ctx context.Context,
 		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.Shop, error)
-	// GetByIDs(ids []uuid.UUID) ([]domain.Shop, error)
+
+	FindByIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		IDs []uuid.UUID,
+	) ([]domain.Shop, error)
 	// GetActive() ([]domain.Shop, error)
 
-	Create(
+	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		shop domain.Shop,

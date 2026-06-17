@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
@@ -33,7 +32,7 @@ func (u *ListCouriersUsecase) Execute(
 		return nil, fmt.Errorf("failed to load couriers: %w", err)
 	}
 	if len(codes) == 0 {
-		return nil, apperrors.NewInternal(errors.New("no courier service available at the moment"))
+		return nil, apperrors.NewNotFound("no courier service available at the moment")
 	}
 
 	return codes, nil

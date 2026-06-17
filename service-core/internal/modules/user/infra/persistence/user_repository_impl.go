@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"service-core/internal/modules/user/domain"
 	"service-core/internal/modules/user/repository"
@@ -18,107 +17,6 @@ type userRepositoryImpl struct{}
 
 func NewUserRepositoryImpl() repository.UserRepository {
 	return &userRepositoryImpl{}
-}
-
-func (r *userRepositoryImpl) FindUsers(
-	ctx context.Context,
-	exec transaction.Executor,
-	params repository.FindUserParams,
-) ([]domain.User, int, error) {
-	var (
-		conditions []string
-		args       []any
-		argPos     = 1
-	)
-
-	query := `
-		SELECT 
-			u.id, 
-			u.name, 
-			u.username, 
-			u.phone,
-			u.created_at, 
-			u.updated_at, 
-			u.deleted_at,
-			a.last_login_at
-		FROM users u
-		LEFT JOIN accounts a ON a.user_id = u.id
-	`
-
-	if params.ID != nil {
-		conditions = append(conditions, fmt.Sprintf("id = $%d", argPos))
-		args = append(args, *params.ID)
-		argPos++
-	}
-
-	if params.Username != nil {
-		conditions = append(conditions, fmt.Sprintf("username ILIKE $%d", argPos))
-		args = append(args, "%"+*params.Username+"%")
-		argPos++
-	}
-
-	if len(conditions) > 0 {
-		query += " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	countQuery := "SELECT COUNT(*) FROM users"
-	if len(conditions) > 0 {
-		countQuery += " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	limit := params.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-
-	page := params.Page
-	if page <= 0 {
-		page = 1
-	}
-
-	offset := (page - 1) * limit
-
-	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d OFFSET %d", limit, offset)
-
-	var total int
-	err := exec.QueryRow(ctx, countQuery, args...).Scan(&total)
-	if err != nil {
-		return nil, 0, fmt.Errorf("query count users failed: %w", err)
-	}
-
-	rows, err := exec.Query(ctx, query, args...)
-	if err != nil {
-		return nil, 0, fmt.Errorf("query users failed: %w", err)
-	}
-	defer rows.Close()
-
-	var results []domain.User
-
-	for rows.Next() {
-		var m domain.User
-
-		err := rows.Scan(
-			&m.ID,
-			&m.Name,
-			&m.Username,
-			&m.Phone,
-			&m.CreatedAt,
-			&m.UpdatedAt,
-			&m.DeletedAt,
-			&m.LastLoginAt,
-		)
-		if err != nil {
-			return nil, 0, fmt.Errorf("mapping user model to domain failed: %w", err)
-		}
-
-		results = append(results, m)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterate users failed: %w", err)
-	}
-
-	return results, total, nil
 }
 
 func (r *userRepositoryImpl) GetByID(

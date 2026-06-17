@@ -3,6 +3,8 @@ package domain
 import (
 	"time"
 
+	query "service-core/internal/shared/query"
+
 	"github.com/google/uuid"
 )
 
@@ -23,6 +25,16 @@ const (
 	AccountTypeMerchant AccountType = "merchant"
 )
 
+var (
+	AccountSortLatest    query.SortKey = "latest"
+	AccountSortEmail     query.SortKey = "email"
+	AccountSortStatus    query.SortKey = "status"
+	AccountSortType      query.SortKey = "type"
+	AccountSortLastLogin query.SortKey = "last_login"
+)
+
+// Account represents authentication credentials
+// and access control for a user.
 type Account struct {
 	ID     uuid.UUID
 	UserID uuid.UUID

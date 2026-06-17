@@ -13,7 +13,9 @@ type UserHandler struct {
 	getUser *usecase.GetUserUsecase
 }
 
-func NewUserHandler(getUser *usecase.GetUserUsecase) *UserHandler {
+func NewUserHandler(
+	getUser *usecase.GetUserUsecase,
+) *UserHandler {
 	return &UserHandler{
 		getUser: getUser,
 	}

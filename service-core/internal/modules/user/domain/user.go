@@ -6,6 +6,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// User represents shared profile information used across account types.
+// A user may be associated with customer or merchant roles through
+// an authenticated account.
 type User struct {
 	ID       uuid.UUID
 	Name     string

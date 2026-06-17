@@ -13,4 +13,10 @@ type MerchantRepository interface {
 		exec transaction.Executor,
 		merchant domain.Merchant,
 	) error
+
+	FindMerchants(
+		ctx context.Context,
+		exec transaction.Executor,
+		params FindMerchantParams,
+	) ([]domain.Merchant, int, error)
 }

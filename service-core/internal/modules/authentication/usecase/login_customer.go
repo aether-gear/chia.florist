@@ -14,35 +14,35 @@ import (
 )
 
 type LoginCustomerUsecase struct {
+	executor         transaction.Executor
+	transactor       transaction.Transactor
 	accountRepo      repository.AccountRepository
 	pwHasher         repository.PasswordHasher
 	tokenHasher      repository.TokenHasher
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
-	transactor       transaction.Transactor
-	executor         transaction.Executor
 }
 
 func NewLoginCustomerUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	accountRepo repository.AccountRepository,
 	pwHasher repository.PasswordHasher,
 	tokenHasher repository.TokenHasher,
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
-	transactor transaction.Transactor,
-	executor transaction.Executor,
 ) *LoginCustomerUsecase {
 	return &LoginCustomerUsecase{
+		executor:         executor,
+		transactor:       transactor,
 		accountRepo:      accountRepo,
 		pwHasher:         pwHasher,
 		tokenHasher:      tokenHasher,
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
-		transactor:       transactor,
-		executor:         executor,
 	}
 }
 
@@ -61,7 +61,8 @@ func (u *LoginCustomerUsecase) Execute(
 	ctx context.Context,
 	input LoginCustomerParams,
 ) (*LoginEmailResult, error) {
-	existing, err := u.accountRepo.GetByEmail(ctx, u.executor, input.Email)
+	existing, err := u.accountRepo.
+		GetByEmail(ctx, u.executor, input.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -87,22 +88,24 @@ func (u *LoginCustomerUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
-		UserID:    existing.UserID,
-		SessionID: session.ID,
-		Type:      domain.TokenTypeAccess,
-		Duration:  30 * time.Minute,
-	})
+	accessTkn, err := u.tokenSvc.
+		Generate(repository.GenerateTokenParams{
+			UserID:    existing.UserID,
+			SessionID: session.ID,
+			Type:      domain.TokenTypeAccess,
+			Duration:  30 * time.Minute,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
-		UserID:    existing.UserID,
-		SessionID: session.ID,
-		Type:      domain.TokenTypeRefresh,
-		Duration:  7 * 24 * time.Hour,
-	})
+	refreshTkn, err := u.tokenSvc.
+		Generate(repository.GenerateTokenParams{
+			UserID:    existing.UserID,
+			SessionID: session.ID,
+			Type:      domain.TokenTypeRefresh,
+			Duration:  7 * 24 * time.Hour,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -119,10 +122,12 @@ func (u *LoginCustomerUsecase) Execute(
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.sessionRepo.Save(ctx, u.executor, session); err != nil {
+			if err := u.sessionRepo.
+				Save(ctx, exec, session); err != nil {
 				return fmt.Errorf("failed to save session %w", err)
 			}
-			if err := u.refreshTokenRepo.Save(ctx, u.executor, refreshTknDomain); err != nil {
+			if err := u.refreshTokenRepo.
+				Save(ctx, exec, refreshTknDomain); err != nil {
 				return fmt.Errorf("failed to save refresh token %w", err)
 			}
 

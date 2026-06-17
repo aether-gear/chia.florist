@@ -10,20 +10,17 @@ import (
 )
 
 type LogoutUsecase struct {
-	executor       transaction.Executor
 	transactor     transaction.Transactor
 	refreshTknRepo repository.RefreshTokenRepository
 	sessionRepo    repository.SessionRepository
 }
 
 func NewLogoutUsecase(
-	executor transaction.Executor,
 	transactor transaction.Transactor,
 	refreshTknRepo repository.RefreshTokenRepository,
 	sessionRepo repository.SessionRepository,
 ) *LogoutUsecase {
 	return &LogoutUsecase{
-		executor:       executor,
 		transactor:     transactor,
 		refreshTknRepo: refreshTknRepo,
 		sessionRepo:    sessionRepo,
@@ -36,19 +33,22 @@ func (u *LogoutUsecase) Execute(
 ) error {
 	err := u.transactor.WithinTransaction(
 		ctx,
-		func(e transaction.Executor) error {
-			if err := u.refreshTknRepo.RevokeBySessionID(
-				ctx,
-				u.executor,
-				authCtx.SessionID,
-			); err != nil {
+		func(exec transaction.Executor) error {
+			if err := u.refreshTknRepo.
+				RevokeBySessionID(
+					ctx,
+					exec,
+					authCtx.SessionID,
+				); err != nil {
 				return fmt.Errorf("failed to revoke refresh token %w", err)
 			}
-			if err := u.sessionRepo.RevokeByID(
-				ctx,
-				u.executor,
-				authCtx.SessionID,
-			); err != nil {
+
+			if err := u.sessionRepo.
+				RevokeByID(
+					ctx,
+					exec,
+					authCtx.SessionID,
+				); err != nil {
 				return fmt.Errorf("failed to revoke refresh token %w", err)
 			}
 

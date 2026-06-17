@@ -3,12 +3,16 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 
-	"service-core/internal/infra/storage"
+	storage "service-core/internal/infra/storage"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	shopDomain "service-core/internal/modules/shop/domain"
+	shopRepo "service-core/internal/modules/shop/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -18,6 +22,7 @@ type FindProductsUsecase struct {
 	productRepo    repository.ProductRepository
 	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
+	shopRepo       shopRepo.ShopRepository
 	fileStore      storage.Provider
 	executor       transaction.Executor
 }
@@ -26,6 +31,7 @@ func NewFindProductsUsecase(
 	productRepo repository.ProductRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
+	shopRepo shopRepo.ShopRepository,
 	fileStore storage.Provider,
 	executor transaction.Executor,
 ) *FindProductsUsecase {
@@ -33,12 +39,19 @@ func NewFindProductsUsecase(
 		productRepo:    productRepo,
 		inventoryRepo:  inventoryRepo,
 		productImgRepo: productImgRepo,
+		shopRepo:       shopRepo,
 		fileStore:      fileStore,
 		executor:       executor,
 	}
 }
 
-type ProductCatalogResponse struct {
+type ShopAvailabilityResult struct {
+	ShopName string
+	ShopSlug string
+	Stock    int
+}
+
+type ProductCatalogResult struct {
 	Product   domain.Product
 	Inventory struct {
 		TotalStock    int
@@ -48,6 +61,7 @@ type ProductCatalogResponse struct {
 	Images          struct {
 		Thumbnail string
 	}
+	Availability []ShopAvailabilityResult
 }
 
 type FindProductsInput struct {
@@ -55,65 +69,167 @@ type FindProductsInput struct {
 	Limit int
 	ID    *string
 	Name  *string
+	Sort  string
 }
 
 func (u *FindProductsUsecase) Execute(
 	ctx context.Context,
 	input FindProductsInput,
 ) (
-	[]ProductCatalogResponse,
+	[]ProductCatalogResult,
 	int,
 	error,
 ) {
-	products, total, err := u.productRepo.FindProducts(
-		ctx,
-		u.executor,
-		repository.FindProductParams{
+	var productSortKeys = map[string]query.SortKey{
+		"latest":   repository.ProductSortLatest,
+		"date":     repository.ProductSortLatest,
+		"name":     repository.ProductSortName,
+		"price":    repository.ProductSortPrice,
+		"weight":   repository.ProductSortWeight,
+		"status":   repository.ProductSortStatus,
+		"modified": repository.ProductSortModified,
+		"archived": repository.ProductSortArchived,
+		"stock":    repository.ProductSortStock,
+	}
+
+	var sorts query.Sorts
+	if input.Sort != "" {
+		parts := strings.SplitSeq(input.Sort, ",")
+		for part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+
+			subparts := strings.Split(part, ":")
+			key := strings.TrimSpace(subparts[0])
+
+			var dir query.SortDirection = query.SortDesc
+			if len(subparts) > 1 {
+				d := strings.ToLower(strings.TrimSpace(subparts[1]))
+				if d == "asc" {
+					dir = query.SortAsc
+				}
+			}
+
+			sortKey, exists := productSortKeys[key]
+			if exists {
+				sorts = append(sorts, query.Sort{
+					By:        sortKey,
+					Direction: dir,
+				})
+			}
+		}
+	}
+
+	if len(sorts) == 0 {
+		sorts = query.Sorts{
+			{
+				By:        repository.ProductSortLatest,
+				Direction: query.SortDesc,
+			},
+		}
+	}
+
+	params := repository.FindProductParams{
+		ID:   input.ID,
+		Name: input.Name,
+		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,
-			ID:    input.ID,
-			Name:  input.Name,
-		})
+		},
+		Sorts: sorts,
+	}
+
+	products, total, err := u.productRepo.
+		FindProductsWithInventory(ctx, u.executor, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load products: %w", err)
 	}
 	if len(products) == 0 {
-		return []ProductCatalogResponse{}, total, nil
+		return []ProductCatalogResult{}, total, nil
 	}
 
 	productIDs := make([]uuid.UUID, 0, len(products))
 	for _, product := range products {
-		productIDs = append(productIDs, product.ID)
+		productIDs = append(productIDs, product.Product.ID)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, u.executor, productIDs)
+	// Shop data is derived from product inventory records
+	// Products are not queried directly by shop;
+	// instead shops are inferred via inventory ownership
+	inventoryMap, err := u.inventoryRepo.
+		ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load inventory for products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, u.executor, productIDs)
+	// Deduplicate shop IDs from product inventories
+	shopIDsMap := make(map[uuid.UUID]bool)
+	for _, inventories := range inventoryMap {
+		for _, inv := range inventories {
+			shopIDsMap[inv.ShopID] = true
+		}
+	}
+
+	shopIDs := make([]uuid.UUID, 0, len(shopIDsMap))
+	for id := range shopIDsMap {
+		shopIDs = append(shopIDs, id)
+	}
+
+	shops, err := u.shopRepo.
+		FindByIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load shops for inventories: %w", err)
+	}
+
+	shopsMap := make(map[uuid.UUID]shopDomain.Shop)
+	for _, s := range shops {
+		shopsMap[s.ID] = s
+	}
+
+	imagesMap, err := u.productImgRepo.
+		ListByProductIDs(ctx, u.executor, productIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to load images for products: %w", err)
 	}
 
-	results := make([]ProductCatalogResponse, 0, len(products))
-	for _, product := range products {
-		inventories := inventoryMap[product.ID]
-		images := imagesMap[product.ID]
+	results := make([]ProductCatalogResult, 0, len(products))
+	for _, p := range products {
+		inventories := inventoryMap[p.Product.ID]
 
-		result := ProductCatalogResponse{
-			Product:         product,
+		result := ProductCatalogResult{
+			Product:         p.Product,
 			ShopInventories: inventories,
 		}
 
+		var (
+			totalStock    = 0
+			reservedStock = 0
+			availability  []ShopAvailabilityResult
+		)
+
+		for _, inventory := range inventories {
+			totalStock += inventory.TotalStock
+			reservedStock += inventory.ReservedStock
+
+			if shop, ok := shopsMap[inventory.ShopID]; ok {
+				availability = append(availability, ShopAvailabilityResult{
+					ShopName: shop.Name,
+					ShopSlug: shop.Slug,
+					Stock:    inventory.TotalStock,
+				})
+			}
+		}
+
+		result.Inventory.TotalStock = totalStock
+		result.Inventory.ReservedStock = reservedStock
+		result.Availability = availability
+
+		images := imagesMap[p.Product.ID]
 		if len(images) > 0 {
 			key := images[0].Variants[domain.ResolutionThumbnail].Key
 			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
-		}
-
-		for _, inventory := range inventories {
-			result.Inventory.TotalStock += inventory.TotalStock
-			result.Inventory.ReservedStock += inventory.ReservedStock
 		}
 
 		results = append(results, result)

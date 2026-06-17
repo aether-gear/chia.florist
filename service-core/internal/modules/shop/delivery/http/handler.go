@@ -8,21 +8,92 @@ import (
 	apphttp "service-core/internal/common/http"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/shop/usecase"
+
+	"github.com/google/uuid"
 )
 
 type ShopHandler struct {
-	getShop    *usecase.GetShopUsecase
-	createShop *usecase.CreateShopUsecase
+	findShops        *usecase.FindShopsUsecase
+	getShop          *usecase.GetShopUsecase
+	createShop       *usecase.SaveShopUsecase
+	getShopAddresses *usecase.GetShopAddressesUsecase
+	getShopCouriers  *usecase.GetShopCouriersUsecase
+	getShopProducts  *usecase.GetShopProductsUsecase
 }
 
-func NewAddressHandler(
+func NewShopHandler(
+	findShops *usecase.FindShopsUsecase,
 	getShop *usecase.GetShopUsecase,
-	createShop *usecase.CreateShopUsecase,
+	createShop *usecase.SaveShopUsecase,
+	getShopAddresses *usecase.GetShopAddressesUsecase,
+	getShopCouriers *usecase.GetShopCouriersUsecase,
+	getShopProducts *usecase.GetShopProductsUsecase,
 ) *ShopHandler {
 	return &ShopHandler{
-		getShop:    getShop,
-		createShop: createShop,
+		findShops:        findShops,
+		getShop:          getShop,
+		createShop:       createShop,
+		getShopAddresses: getShopAddresses,
+		getShopCouriers:  getShopCouriers,
+		getShopProducts:  getShopProducts,
 	}
+}
+
+func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
+	page := apphttp.QueryIntDefault(r, "page", 1)
+	if page <= 0 {
+		page = 1
+	}
+	limit := apphttp.QueryIntDefault(r, "limit", 10)
+	if limit <= 0 {
+		limit = 10
+	}
+
+	name := apphttp.Query(r, "name")
+	id := apphttp.Query(r, "id")
+	sort := apphttp.Query(r, "sort")
+
+	input := usecase.FindShopsInput{
+		Page:  page,
+		Limit: limit,
+		Sort:  sort,
+	}
+	if name != "" {
+		input.Name = &name
+	}
+	if id != "" {
+		input.ID = &id
+	}
+
+	shops, total, err := h.findShops.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	var shopsResponse []getShopResponse
+	for _, shop := range shops {
+		s := getShopResponse{
+			ID:          shop.ID,
+			Name:        shop.Name,
+			Slug:        shop.Slug,
+			Description: shop.Description,
+			IsActive:    shop.IsActive,
+			CreatedAt:   shop.CreatedAt,
+			UpdatedAt:   shop.UpdatedAt,
+		}
+
+		shopsResponse = append(shopsResponse, s)
+	}
+
+	response := map[string]any{
+		"shops": shopsResponse,
+		"page":  page,
+		"limit": limit,
+		"total": total,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
 func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error {
@@ -52,13 +123,13 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
+func (h *ShopHandler) SaveShop(w http.ResponseWriter, r *http.Request) error {
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	var req createShopRequest
+	var req saveShopRequest
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
@@ -67,13 +138,24 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid name")
 	}
 
+	var shopID *uuid.UUID
+	if req.ShopID != nil {
+		parsed, err := uuid.Parse(*req.ShopID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid shop id")
+		}
+
+		shopID = &parsed
+	}
+
 	var parsedIsActive bool
 	parsedIsActive, err := strconv.ParseBool(req.IsActive)
 	if err != nil {
 		return apperrors.NewBadRequest("invalid active status")
 	}
 
-	input := usecase.CreateShopInput{
+	input := usecase.SaveShopInput{
+		ID:          shopID,
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    parsedIsActive,
@@ -89,9 +171,110 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	response := map[string]string{
-		"message": "shop successfully created",
+		"message": "shop successfully saved",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *ShopHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) error {
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	result, err := h.getShopAddresses.Execute(r.Context(), shopID)
+	if err != nil {
+		return err
+	}
+
+	addresses := make([]shopAddressResponse, 0, len(result))
+	for _, a := range result {
+		addresses = append(addresses, shopAddressResponse{
+			ID:          a.ID,
+			Label:       a.Label,
+			Phone:       a.Phone,
+			IsActive:    a.IsActive,
+			ProvinceID:  a.Detail.ProvinceID,
+			CityID:      a.Detail.CityID,
+			DistrictID:  a.Detail.DistrictID,
+			VillageID:   a.Detail.VillageID,
+			FullAddress: a.Detail.FullAddress,
+			PostalCode:  a.Detail.PostalCode,
+			CreatedAt:   a.CreatedAt,
+			UpdatedAt:   a.UpdatedAt,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":   shopID,
+		"addresses": addresses,
+	})
+	return nil
+}
+
+func (h *ShopHandler) GetShopCouriers(w http.ResponseWriter, r *http.Request) error {
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	result, err := h.getShopCouriers.Execute(r.Context(), shopID)
+	if err != nil {
+		return err
+	}
+
+	couriers := make([]shopCourierResponse, 0, len(result))
+	for _, c := range result {
+		couriers = append(couriers, shopCourierResponse{
+			Code:   c.Code,
+			Active: c.Active,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":  shopID,
+		"couriers": couriers,
+	})
+	return nil
+}
+
+func (h *ShopHandler) GetShopProducts(w http.ResponseWriter, r *http.Request) error {
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	result, err := h.getShopProducts.Execute(r.Context(), shopID)
+	if err != nil {
+		return err
+	}
+
+	products := make([]shopProductResponse, 0, len(result))
+	for _, item := range result {
+		products = append(products, shopProductResponse{
+			ID:          item.Product.ID,
+			SKU:         item.Product.SKU,
+			Name:        item.Product.Name,
+			Slug:        item.Product.Slug,
+			Description: item.Product.Description,
+			Status:      string(item.Product.Status),
+			Price:       item.Product.Price,
+			Weight:      item.Product.Weight,
+			Inventory: shopProductInventoryResponse{
+				TotalStock:    item.Inventory.TotalStock,
+				ReservedStock: item.Inventory.ReservedStock,
+				Available:     item.Inventory.Available(),
+			},
+			CreatedAt: item.Product.CreatedAt,
+			UpdatedAt: item.Product.UpdatedAt,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":  shopID,
+		"products": products,
+	})
 	return nil
 }

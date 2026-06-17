@@ -14,6 +14,7 @@ import (
 	authH "service-core/internal/modules/authentication/delivery/http"
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
+	customerH "service-core/internal/modules/customer/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
 	locationH "service-core/internal/modules/location/delivery/http"
 	merchantH "service-core/internal/modules/merchant/delivery/http"
@@ -126,6 +127,11 @@ func NewRouter(c *Container) *chi.Mux {
 		merchantHandler = merchantH.NewMerchantHandler(
 			&c.AddMerchantAccount,
 			&c.CreateMerchant,
+			&c.FindMerchants,
+		)
+
+		customerHandler = customerH.NewCustomerHandler(
+			&c.FindCustomers,
 		)
 
 		cartHandler = cartH.NewCartHandler(
@@ -148,7 +154,6 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.ListUserAddresses,
 			&c.CreateUserAddress,
 			&c.DeleteUserAddress,
-			&c.GetShopAddress,
 			&c.ListShopAddresses,
 			&c.SaveShopAddress,
 		)
@@ -160,9 +165,13 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.ListPaymentMethod,
 		)
 
-		shopHandler = shopH.NewAddressHandler(
+		shopHandler = shopH.NewShopHandler(
+			&c.FindShops,
 			&c.GetShop,
-			&c.CreateShop,
+			&c.SaveShop,
+			&c.GetShopAddresses,
+			&c.GetShopCouriers,
+			&c.GetShopProducts,
 		)
 
 		courierHandler = courierH.NewCourierHandler(
@@ -181,25 +190,32 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
 			r.Post("/", chains.MerchantOnly(productHandler.CreateProduct))
-			r.Get("/{id}", chains.Core(productHandler.GetProduct))
 
-			r.Post("/{id}/images", chains.MerchantOnly(productHandler.AddProductImages))
+			r.Route("/{slug}", func(r chi.Router) {
+				r.Get("/", chains.Core(productHandler.GetProduct))
+				r.Post("/images", chains.MerchantOnly(productHandler.AddProductImages))
+			})
 		})
 
 		r.Route("/auth", func(r chi.Router) {
-			r.Get("/me", chains.CoreAuth(authHandler.Me))
-			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
 			r.Post("/signin", chains.Core(authHandler.SignInEmail))
 			r.Post("/merchant/signin", chains.Core(authHandler.SignInMerchantEmail))
 			r.Post("/signup", chains.Core(authHandler.SignUpAccount))
 			r.Post("/verify", chains.Core(authHandler.VerifyAccount))
+			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
+			r.Get("/me", chains.CoreAuth(authHandler.Me))
 		})
 
 		r.Route("/merchants", func(r chi.Router) {
+			r.Get("/", chains.MerchantAdminOnly(merchantHandler.FindMerchants))
 			r.Post("/", chains.MerchantAdminOnly(merchantHandler.CreateMerchant))
 			r.Route("/{merchantID}/accounts", func(r chi.Router) {
 				r.Post("/", chains.MerchantAdminOnly(merchantHandler.AddMerchantAccount))
 			})
+		})
+
+		r.Route("/customers", func(r chi.Router) {
+			r.Get("/", chains.MerchantAdminOnly(customerHandler.FindCustomers))
 		})
 
 		r.Route("/carts", func(r chi.Router) {
@@ -218,7 +234,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/couriers", func(r chi.Router) {
-			r.Get("/", chains.CustomerOnly(courierHandler.ListAllCouriers))
+			r.Get("/", chains.CoreAuth(courierHandler.ListAllCouriers))
 		})
 
 		r.Route("/provinces", func(r chi.Router) {
@@ -233,7 +249,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users", func(r chi.Router) {
-			r.Get("/{id}", chains.MerchantOnly(userHandler.GetUserByID))
+			r.Get("/{id}", chains.MerchantAdminOnly(userHandler.GetUserByID))
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
@@ -247,39 +263,44 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/shops", func(r chi.Router) {
-			r.Post("/", chains.MerchantOnly(shopHandler.CreateShop))
-			r.Get("/{shopID}", chains.Core(shopHandler.GetShopByID))
+			r.Get("/", chains.Core(shopHandler.FindShops))
+			r.Post("/", chains.MerchantOnly(shopHandler.SaveShop))
 
-			r.Route("/{shopID}/addresses", func(r chi.Router) {
-				r.Get("/", chains.Core(addressHandler.ListShopAddresses))
-				r.Post("/", chains.MerchantOnly(addressHandler.CreateShopAddress))
-				r.Get("/{addressID}", chains.Core(addressHandler.GetShopAddress))
-			})
+			r.Route("/{shopID}", func(r chi.Router) {
+				r.Get("/", chains.Core(shopHandler.GetShopByID))
 
-			r.Route("/{shopID}/couriers", func(r chi.Router) {
-				r.Post("/", chains.MerchantOnly(courierHandler.ConfigureCourierShop))
-			})
+				r.Route("/addresses", func(r chi.Router) {
+					r.Get("/", chains.Core(shopHandler.GetShopAddresses))
+					r.Post("/", chains.MerchantOnly(addressHandler.CreateShopAddress))
+				})
 
-			r.Route("/{shopID}/products", func(r chi.Router) {
-				r.Post("/{productID}/inventories",
-					chains.MerchantOnly(inventoryHandler.AddInventory))
+				r.Route("/couriers", func(r chi.Router) {
+					r.Get("/", chains.Core(shopHandler.GetShopCouriers))
+					r.Post("/", chains.MerchantOnly(courierHandler.ConfigureCourierShop))
+				})
+
+				r.Route("/products", func(r chi.Router) {
+					r.Get("/", chains.Core(shopHandler.GetShopProducts))
+					r.Post("/{productID}/inventories",
+						chains.MerchantOnly(inventoryHandler.AddInventory))
+				})
 			})
 		})
 
 		r.Route("/payments", func(r chi.Router) {
 			r.Route("/accounts", func(r chi.Router) {
-				r.Get("/", chains.CustomerOnly(paymentHandler.ListPaymentAccount))
-				r.Post("/", chains.MerchantOnly(paymentHandler.CreatePaymentAccount))
+				r.Get("/", chains.MerchantOnly(paymentHandler.ListPaymentAccount))
+				r.Post("/", chains.MerchantAdminOnly(paymentHandler.CreatePaymentAccount))
 			})
 
 			r.Route("/methods", func(r chi.Router) {
-				r.Get("/", chains.Core(paymentHandler.ListPaymentMethod))
-				r.Post("/", chains.MerchantOnly(paymentHandler.CreatePaymentMethod))
+				r.Get("/", chains.CoreAuth(paymentHandler.ListPaymentMethod))
+				r.Post("/", chains.MerchantAdminOnly(paymentHandler.CreatePaymentMethod))
 			})
 		})
 
 		r.Route("/shipping", func(r chi.Router) {
-			r.Post("/cost", chains.CustomerOnly(shipmentHandler.EstimateShippingOptions))
+			r.Post("/cost", chains.CoreAuth(shipmentHandler.EstimateShippingOptions))
 		})
 	})
 

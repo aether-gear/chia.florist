@@ -9,32 +9,37 @@ import (
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
+	shopDomain "service-core/internal/modules/shop/domain"
+	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type GetProductUsecase struct {
+	executor       transaction.Executor
+	fileStore      storage.Provider
 	productRepo    repository.ProductRepository
 	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
-	fileStore      storage.Provider
-	executor       transaction.Executor
+	shopRepo       shopRepo.ShopRepository
 }
 
 func NewGetProductUsecase(
+	executor transaction.Executor,
+	fileStore storage.Provider,
 	productRepo repository.ProductRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
-	fileStore storage.Provider,
-	executor transaction.Executor,
+	shopRepo shopRepo.ShopRepository,
 ) *GetProductUsecase {
 	return &GetProductUsecase{
+		executor:       executor,
+		fileStore:      fileStore,
 		productRepo:    productRepo,
 		inventoryRepo:  inventoryRepo,
 		productImgRepo: productImgRepo,
-		fileStore:      fileStore,
-		executor:       executor,
+		shopRepo:       shopRepo,
 	}
 }
 
@@ -44,7 +49,7 @@ type ImageProductDetail struct {
 	Preview   string
 }
 
-type ProductDetailResponse struct {
+type ProductDetailResult struct {
 	Product   domain.Product
 	Inventory struct {
 		TotalStock    int
@@ -52,13 +57,15 @@ type ProductDetailResponse struct {
 	}
 	ShopInventories []inventoryDomain.Inventory
 	Images          []ImageProductDetail
+	Availability    []ShopAvailabilityResult
 }
 
 func (u *GetProductUsecase) Execute(
 	ctx context.Context,
-	id uuid.UUID,
-) (*ProductDetailResponse, error) {
-	product, err := u.productRepo.GetByID(ctx, u.executor, id)
+	slug string,
+) (*ProductDetailResult, error) {
+	product, err := u.productRepo.
+		GetBySlug(ctx, u.executor, slug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products with inventory: %w", err)
 	}
@@ -66,20 +73,64 @@ func (u *GetProductUsecase) Execute(
 		return nil, nil
 	}
 
-	inventories, err := u.inventoryRepo.ListByProductID(ctx, u.executor, id)
+	inventories, err := u.inventoryRepo.
+		ListByProductID(ctx, u.executor, product.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory by product: %w", err)
 	}
 
-	images, err := u.productImgRepo.ListByProductID(ctx, u.executor, id)
+	var shopIDs []uuid.UUID
+	for _, inv := range inventories {
+		shopIDs = append(shopIDs, inv.ShopID)
+	}
+
+	shops, err := u.shopRepo.
+		FindByIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load shops: %w", err)
+	}
+
+	shopsMap := make(map[uuid.UUID]shopDomain.Shop)
+	for _, s := range shops {
+		shopsMap[s.ID] = s
+	}
+
+	images, err := u.productImgRepo.
+		ListByProductID(ctx, u.executor, product.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images by product: %w", err)
 	}
 
-	result := ProductDetailResponse{
+	result := ProductDetailResult{
 		Product:         *product,
 		ShopInventories: inventories,
 	}
+
+	var (
+		totalStock    = 0
+		reservedStock = 0
+		availability  []ShopAvailabilityResult
+	)
+
+	for _, inventory := range inventories {
+		totalStock += inventory.TotalStock
+		reservedStock += inventory.ReservedStock
+
+		shop, ok := shopsMap[inventory.ShopID]
+		if !ok {
+			continue
+		}
+
+		availability = append(availability, ShopAvailabilityResult{
+			ShopName: shop.Name,
+			ShopSlug: shop.Slug,
+			Stock:    inventory.TotalStock,
+		})
+	}
+
+	result.Inventory.TotalStock = totalStock
+	result.Inventory.ReservedStock = reservedStock
+	result.Availability = availability
 
 	if len(images) > 0 {
 		result.Images = make([]ImageProductDetail, 0, len(images))
@@ -110,11 +161,6 @@ func (u *GetProductUsecase) Execute(
 
 			result.Images = append(result.Images, imageDetail)
 		}
-	}
-
-	for _, inventory := range inventories {
-		result.Inventory.TotalStock += inventory.TotalStock
-		result.Inventory.ReservedStock += inventory.ReservedStock
 	}
 
 	return &result, nil

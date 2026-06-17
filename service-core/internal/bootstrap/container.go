@@ -14,6 +14,7 @@ import (
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
 	cartPersistence "service-core/internal/modules/cart/infra/persistence"
 	courierPersistence "service-core/internal/modules/courier/infra/persistence"
+	customerPersistence "service-core/internal/modules/customer/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
 	merchantPersistence "service-core/internal/modules/merchant/infra/persistence"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
@@ -30,6 +31,7 @@ import (
 	authenUsecase "service-core/internal/modules/authentication/usecase"
 	cartUsecase "service-core/internal/modules/cart/usecase"
 	courierUsecase "service-core/internal/modules/courier/usecase"
+	customerUsecase "service-core/internal/modules/customer/usecase"
 	inventoryUsecase "service-core/internal/modules/inventory/usecase"
 	locationUsecase "service-core/internal/modules/location/usecase"
 	merchantUsecase "service-core/internal/modules/merchant/usecase"
@@ -61,6 +63,7 @@ type Container struct {
 	GetAccount       authenUsecase.GetAccountUsecase
 	Logout           authenUsecase.LogoutUsecase
 
+	FindMerchants      merchantUsecase.FindMerchantsUsecase
 	CreateMerchant     merchantUsecase.CreateMerchantUsecase
 	AddMerchantAccount merchantUsecase.AddMerchantAccountUsecase
 
@@ -74,16 +77,22 @@ type Container struct {
 
 	GetUser userUsecase.GetUserUsecase
 
+	FindCustomers customerUsecase.FindCustomersUsecase
+
 	ListUserAddresses addressUsecase.ListUserAddressUsecase
 	CreateUserAddress addressUsecase.SaveUserAddressUsecase
 	DeleteUserAddress addressUsecase.DeleteUserAddressUsecase
 
-	GetShopAddress    addressUsecase.GetShopAddressUsecase
 	ListShopAddresses addressUsecase.ListShopAddressesUsecase
 	SaveShopAddress   addressUsecase.CreateShopAddressUsecase
 
-	GetShop    shopUsecase.GetShopUsecase
-	CreateShop shopUsecase.CreateShopUsecase
+	FindShops shopUsecase.FindShopsUsecase
+	GetShop   shopUsecase.GetShopUsecase
+	SaveShop  shopUsecase.SaveShopUsecase
+
+	GetShopAddresses shopUsecase.GetShopAddressesUsecase
+	GetShopCouriers  shopUsecase.GetShopCouriersUsecase
+	GetShopProducts  shopUsecase.GetShopProductsUsecase
 
 	CreatePaymentAccount paymentUsecase.CreatePaymentAccountUsecase
 	ListPaymentAccount   paymentUsecase.ListPaymentAccountUsecase
@@ -120,6 +129,7 @@ func NewContainer(cfg Config,
 		courierRepo       = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo   = courierPersistence.NewShopCourierRepositoryImpl()
 		merchantRepo      = merchantPersistence.NewMerchantRepositoryImpl()
+		customerRepo      = customerPersistence.NewCustomerRepositoryImpl()
 		membershipRepo    = authorPersistence.NewMerchantMembershipRepositoryImpl()
 		roleRepo          = authorPersistence.NewRoleRepositoryImpl()
 	)
@@ -172,16 +182,18 @@ func NewContainer(cfg Config,
 				productRepo,
 				inventoryRepo,
 				productImageRepo,
+				shopRepo,
 				infra.StorageProvider,
 				infra.TransactionExecutor,
 			),
 		GetProduct: *productUsecase.
 			NewGetProductUsecase(
+				infra.TransactionExecutor,
+				infra.StorageProvider,
 				productRepo,
 				inventoryRepo,
 				productImageRepo,
-				infra.StorageProvider,
-				infra.TransactionExecutor,
+				shopRepo,
 			),
 		CreateProduct: *productUsecase.
 			NewCreateProductUsecase(
@@ -191,13 +203,13 @@ func NewContainer(cfg Config,
 			),
 		AddProductImages: *productUsecase.
 			NewAddProductImagesUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				productRepo,
 				productImageRepo,
 				slugGen,
 				imageVariantProvider,
 				infra.StorageProvider,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		CreateInventory: *inventoryUsecase.
 			NewCreateInventoryUsecase(inventoryRepo,
@@ -212,24 +224,25 @@ func NewContainer(cfg Config,
 			actorSvc,
 		),
 		Logout: *authenUsecase.NewLogoutUsecase(
-			infra.TransactionExecutor,
 			infra.TransactionProvider,
 			refreshTokenRepo,
 			sessionRepo,
 		),
 		LoginCustomer: *authenUsecase.
 			NewLoginCustomerUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				tokenHasher,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		LoginMerchant: *authenUsecase.
 			NewLoginMerchantUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				tokenHasher,
@@ -238,10 +251,13 @@ func NewContainer(cfg Config,
 				refreshTokenRepo,
 				merchantRepo,
 				membershipRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 
+		FindMerchants: *merchantUsecase.
+			NewFindMerchantsUsecase(
+				infra.TransactionExecutor,
+				merchantRepo,
+			),
 		CreateMerchant: *merchantUsecase.
 			NewCreateMerchantUsecase(
 				merchantRepo,
@@ -249,28 +265,30 @@ func NewContainer(cfg Config,
 			),
 		AddMerchantAccount: *merchantUsecase.
 			NewAddMerchantAccountUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				userRepo,
 				membershipRepo,
 				roleRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 
 		RegisterCustomer: *authenUsecase.
 			NewRegisterCustomerUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				userRepo,
 				challengeRepo,
 				otpGen,
 				mailSender,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		VerifyAccount: *authenUsecase.
 			NewVerifyAccountUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				accountRepo,
 				pwHasher,
 				tokenHasher,
@@ -279,8 +297,6 @@ func NewContainer(cfg Config,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		GetAccount: *authenUsecase.
 			NewGetAccountUsecase(
@@ -299,25 +315,25 @@ func NewContainer(cfg Config,
 			),
 		AddItem: *cartUsecase.
 			NewAddItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				cartRepo,
 				inventoryRepo,
 				productRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		UpdateItem: *cartUsecase.
 			NewUpdateItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
 				cartRepo,
 				inventoryRepo,
 				productRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
 			),
 		RemoveItem: *cartUsecase.
 			NewRemoveItemUsecase(
-				cartRepo,
-				infra.TransactionProvider,
 				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
 			),
 		Checkout: *cartUsecase.
 			NewCheckoutUsecase(
@@ -342,6 +358,12 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
+		FindCustomers: *customerUsecase.
+			NewFindCustomersUsecase(
+				infra.TransactionExecutor,
+				customerRepo,
+			),
+
 		ListUserAddresses: *addressUsecase.
 			NewListUserAddressUsecase(
 				addressRepo,
@@ -359,11 +381,6 @@ func NewContainer(cfg Config,
 				addressRepo,
 			),
 
-		GetShopAddress: *addressUsecase.
-			NewGetShopAddressUsecase(
-				addressShopRepo,
-				infra.TransactionExecutor,
-			),
 		ListShopAddresses: *addressUsecase.
 			NewListShopAddressesUsecase(
 				addressShopRepo,
@@ -375,15 +392,37 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
+		FindShops: *shopUsecase.
+			NewFindShopsUsecase(
+				infra.TransactionExecutor,
+				shopRepo,
+			),
 		GetShop: *shopUsecase.
 			NewGetShopUsecase(
 				shopRepo,
 				infra.TransactionExecutor,
 			),
-		CreateShop: *shopUsecase.
-			NewCreateShopUsecase(
+		SaveShop: *shopUsecase.
+			NewSaveShopUsecase(
 				shopRepo,
 				slugGen,
+				infra.TransactionExecutor,
+			),
+
+		GetShopAddresses: *shopUsecase.
+			NewGetShopAddressesUsecase(
+				addressShopRepo,
+				infra.TransactionExecutor,
+			),
+		GetShopCouriers: *shopUsecase.
+			NewGetShopCouriersUsecase(
+				shopCourierRepo,
+				infra.TransactionExecutor,
+			),
+		GetShopProducts: *shopUsecase.
+			NewGetShopProductsUsecase(
+				inventoryRepo,
+				productRepo,
 				infra.TransactionExecutor,
 			),
 

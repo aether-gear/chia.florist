@@ -17,35 +17,35 @@ import (
 )
 
 type RegisterCustomerUsecase struct {
+	executor      transaction.Executor
+	transactor    transaction.Transactor
 	accountRepo   repository.AccountRepository
 	hasher        domain.PasswordHasher
 	userRepo      userRepo.UserRepository
 	challengeRepo repository.VerificationChallengeRepository
 	otpGen        otp.Generator
 	mailer        mailer.Sender
-	transactor    transaction.Transactor
-	executor      transaction.Executor
 }
 
 func NewRegisterCustomerUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
 	accountRepo repository.AccountRepository,
 	hasher domain.PasswordHasher,
 	userRepo userRepo.UserRepository,
 	challengeRepo repository.VerificationChallengeRepository,
 	otpGen otp.Generator,
 	mailer mailer.Sender,
-	transactor transaction.Transactor,
-	executor transaction.Executor,
 ) *RegisterCustomerUsecase {
 	return &RegisterCustomerUsecase{
+		executor:      executor,
+		transactor:    transactor,
 		accountRepo:   accountRepo,
 		hasher:        hasher,
 		userRepo:      userRepo,
 		challengeRepo: challengeRepo,
 		otpGen:        otpGen,
 		mailer:        mailer,
-		transactor:    transactor,
-		executor:      executor,
 	}
 }
 
@@ -63,11 +63,13 @@ func (u *RegisterCustomerUsecase) Execute(
 ) (*uuid.UUID, error) {
 	now := time.Now()
 
-	existUsr, err := u.userRepo.GetByUsername(ctx, u.executor, params.Username)
+	existUsr, err := u.userRepo.
+		GetByUsername(ctx, u.executor, params.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user: %w", err)
 	}
-	existAcc, err := u.accountRepo.GetByEmail(ctx, u.executor, params.Email)
+	existAcc, err := u.accountRepo.
+		GetByEmail(ctx, u.executor, params.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check account: %w", err)
 	}
@@ -124,13 +126,18 @@ func (u *RegisterCustomerUsecase) Execute(
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
-			if err := u.userRepo.CreateUser(ctx, exec, user); err != nil {
+			if err := u.userRepo.
+				CreateUser(ctx, exec, user); err != nil {
 				return fmt.Errorf("failed to register: %w", err)
 			}
-			if err := u.accountRepo.Create(ctx, exec, acc); err != nil {
+
+			if err := u.accountRepo.
+				Create(ctx, exec, acc); err != nil {
 				return fmt.Errorf("failed to register: %w", err)
 			}
-			if err := u.challengeRepo.Save(ctx, exec, challenge); err != nil {
+
+			if err := u.challengeRepo.
+				Save(ctx, exec, challenge); err != nil {
 				return fmt.Errorf("failed to save challenge: %w", err)
 			}
 

@@ -16,7 +16,6 @@ type AddressHandler struct {
 	listUserAddresses *usecase.ListUserAddressUsecase
 	saveUserAddress   *usecase.SaveUserAddressUsecase
 	deleteUserAddress *usecase.DeleteUserAddressUsecase
-	getShopAddress    *usecase.GetShopAddressUsecase
 	listShopAddresses *usecase.ListShopAddressesUsecase
 	createShopAddress *usecase.CreateShopAddressUsecase
 }
@@ -25,7 +24,6 @@ func NewAddressHandler(
 	listUserAddresses *usecase.ListUserAddressUsecase,
 	saveUserAddress *usecase.SaveUserAddressUsecase,
 	deleteUserAddress *usecase.DeleteUserAddressUsecase,
-	getShopAddress *usecase.GetShopAddressUsecase,
 	listShopAddresses *usecase.ListShopAddressesUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
@@ -33,7 +31,6 @@ func NewAddressHandler(
 		listUserAddresses: listUserAddresses,
 		saveUserAddress:   saveUserAddress,
 		deleteUserAddress: deleteUserAddress,
-		getShopAddress:    getShopAddress,
 		listShopAddresses: listShopAddresses,
 		createShopAddress: createShopAddress,
 	}
@@ -174,36 +171,6 @@ func (h *AddressHandler) DeleteUserAddress(w http.ResponseWriter, r *http.Reques
 
 	response := map[string]string{
 		"message": "address deleted successfully",
-	}
-
-	apphttp.WriteJSON(w, http.StatusOK, response)
-	return nil
-}
-
-func (h *AddressHandler) GetShopAddress(w http.ResponseWriter, r *http.Request) error {
-	addressID, err := apphttp.ParamUUID(r, "addressID")
-	if err != nil {
-		return apperrors.NewBadRequest("invalid address id")
-	}
-
-	result, err := h.getShopAddress.GetByID(r.Context(), addressID)
-	if err != nil {
-		return err
-	}
-
-	response := shopAddressResponse{
-		ShopID:      result.ShopID,
-		Label:       result.Label,
-		Phone:       result.Phone,
-		IsActive:    result.IsActive,
-		ProvinceID:  result.Detail.ProvinceID,
-		CityID:      result.Detail.CityID,
-		DistrictID:  result.Detail.DistrictID,
-		VillageID:   result.Detail.VillageID,
-		FullAddress: result.Detail.FullAddress,
-		PostalCode:  result.Detail.PostalCode,
-		CreatedAt:   result.CreatedAt,
-		UpdatedAt:   result.UpdatedAt,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
