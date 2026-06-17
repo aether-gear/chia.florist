@@ -1,1010 +1,1047 @@
-# Public and Customer API Documentation
+﻿# Customer API Documentation
 
-This document outlines the public (core) and customer-facing APIs based on the current routing configuration. Each endpoint includes its method, path, request details, and a placeholder for the response.
+This document covers the customer-facing APIs for the Chia Florist service.
+Endpoints are organized by access level: **Public** and **Authenticated Customer**.
 
-## Public API (Core)
+## TODO
 
-These endpoints are accessible to anyone (no authentication required) or require core/public access logic.
+- [ ] Public API
+  - [ ] Authentication
+    - [ ] Sign Up
+    - [ ] Verify Account
+    - [ ] Sign In
+  - [ ] Products
+    - [ ] Find Products
+    - [ ] Get Product Detail
+  - [ ] Shops
+    - [ ] Find Shops
+    - [ ] Get Shop
+    - [ ] Get Shop Addresses
+    - [ ] Get Shop Couriers
+    - [ ] Get Shop Products
+  - [ ] Locations
+    - [ ] List Provinces
+    - [ ] List Cities by Province
+    - [ ] List Districts by City
+    - [ ] List Villages by District
+- [ ] Authenticated Customer API
+  - [ ] Authentication
+    - [ ] Me
+    - [ ] Log Out
+  - [ ] Profile
+    - [ ] Get Current User
+  - [ ] Addresses
+    - [ ] List My Addresses
+    - [ ] Save My Address
+    - [ ] Delete My Address
+  - [ ] Cart
+    - [ ] Get Cart
+    - [ ] Add Item
+    - [ ] Update Item
+    - [ ] Remove Item
+  - [ ] Checkout
+    - [ ] Estimate Checkout
+    - [ ] Checkout
 
-### Authentication
+# Public API
 
-#### Sign Up
+No authentication is required for these endpoints.
+
+## Authentication
+
+### Sign Up
+
 - **Method**: `POST`
 - **Endpoint**: `/auth/signup`
-- **Description**: Register a new user account.
+- **Description**: Register a new customer account. A verification OTP is sent to the provided email. The returned `challenge_id` is required to complete registration via the Verify Account endpoint.
+- **Authentication**: None
 - **Request Body**:
   ```json
   {
-    "name": "string (required)",
+    "name":     "string (optional)",
     "username": "string (required)",
-    "email": "string (required)",
+    "email":    "string (required)",
     "password": "string (required)",
-    "phone": "string"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "message": "verification code sent",
-    "challenge_id": "0379abef-4745-40b6-bf7b-04cc750e8f25"
+    "phone":    "string (optional)"
   }
   ```
 
-#### Verify Account
+#### Response `201 Created`
+
+```json
+{
+  "message":      "verification code sent",
+  "challenge_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
+#### Error Responses
+
+| Status            | Condition |
+|-------------------|-----------|
+| `400 Bad Request` | `email`, `password`, or `username` is missing or empty. |
+
+### Verify Account
+
 - **Method**: `POST`
 - **Endpoint**: `/auth/verify`
-- **Description**: Verify a newly created account using an OTP challenge.
+- **Description**: Complete account registration by submitting the OTP received via email. Sets a session cookie on success.
+- **Authentication**: None
 - **Request Body**:
   ```json
   {
-    "user_agent": "string",
-    "ip_address": "string",
-    "challenge_id": "string (required)",
-    "otp": "integer (required)"
+    "challenge_id": "string (UUID, required)",
+    "otp":          123456,
+    "user_agent":   "string (optional)",
+    "ip_address":   "string (optional)"
   }
   ```
-- **Response**:
-  - **Cookie**: 
 
-    | Key | Value |
-    | --- | --- |
-    | Set-Cookie | chast="value" |
+#### Important Notes
 
-  - **Body**
-    ```json
-    {
-        "message": "verify success"
-    }
-    ```
+> `otp` must be exactly **6 digits** as an integer (e.g. `123456`).
+> `challenge_id` is the UUID returned from the Sign Up response.
 
-#### Sign In
+#### Response `201 Created`
+
+- **Set-Cookie**: `<access_token_cookie>=<value>`
+- **Body**:
+  ```json
+  { "message": "verify success" }
+  ```
+
+#### Error Responses
+
+| Status            | Condition |
+|-------------------|-----------|
+| `400 Bad Request` | `challenge_id` is missing, not a valid UUID, or `otp` is not a 6-digit number. |
+| `404 Not Found`   | No pending verification challenge found for the given `challenge_id`. |
+
+### Sign In
+
 - **Method**: `POST`
 - **Endpoint**: `/auth/signin`
-- **Description**: Authenticate a user via email.
+- **Description**: Authenticate an existing customer account using email and password. Sets a session cookie on success.
+- **Authentication**: None
 - **Request Body**:
   ```json
   {
-    "email": "string (required)",
-    "password": "string (required)",
-    "user_agent": "string",
-    "ip_address": "string"
+    "email":      "string (required)",
+    "password":   "string (required)",
+    "user_agent": "string (optional)",
+    "ip_address": "string (optional)"
   }
   ```
-- **Response**:
-  - **Cookie**: 
 
-    | Key | Value |
-    | --- | --- |
-    | Set-Cookie | chast="value" |
+#### Response `200 OK`
 
-  - **Body**
-    ```json
+- **Set-Cookie**: `<access_token_cookie>=<value>`
+- **Body**:
+  ```json
+  { "message": "login success" }
+  ```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `email` or `password` is missing or empty. |
+| `401 Unauthorized` | Invalid email or password. |
+
+## Products
+
+### Find Products
+
+- **Method**: `GET`
+- **Endpoint**: `/products`
+- **Description**: Retrieve a paginated list of products with optional filtering and sorting.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | UUID   | No       | Filter products by product ID. |
+| `name`    | string | No       | Search products by name. |
+| `page`    | int    | No       | Page number. Defaults to `1`. |
+| `limit`   | int    | No       | Number of results per page. |
+| `sort`    | string | No       | Comma-separated sort expressions. Format: `<field>:<direction>`. |
+
+#### Sort Fields
+
+| Field      | Example              | Description                       |
+|------------|----------------------|-----------------------------------|
+| `date`     | `sort=date:desc`     | Sort by creation date.            |
+| `name`     | `sort=name:asc`      | Sort by product name.             |
+| `price`    | `sort=price:asc`     | Sort by product price.            |
+| `weight`   | `sort=weight:desc`   | Sort by product weight.           |
+| `status`   | `sort=status:asc`    | Sort by product status.           |
+| `modified` | `sort=modified:desc` | Sort by last modified date.       |
+| `archived` | `sort=archived:asc`  | Sort by archived status.          |
+| `stock`    | `sort=stock:desc`    | Sort by available stock quantity. |
+
+**Examples**:
+- `GET /products?page=1&limit=10`
+- `GET /products?name=anniversary`
+- `GET /products?sort=price:asc`
+
+#### Response `200 OK`
+
+```json
+{
+  "limit": 10,
+  "page": 1,
+  "total": 2,
+  "products": [
     {
-      "message": "login success"
+      "id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+      "sku": "EVT-ANV-001",
+      "name": "Anniversary",
+      "slug": "anniversary",
+      "status": "active",
+      "is_available": true,
+      "price": 85000,
+      "stock": 1291,
+      "banner": {
+        "thumbnail": "https://example.com/thumbnail.jpg",
+        "preview": null,
+        "detail": null
+      },
+      "availability": [
+        { "slug": "Chia Medan Satria", "name": "chia-medan-satria", "stock": 981 },
+        { "slug": "Chia Cikarang",     "name": "chia-cikarang",     "stock": 310 }
+      ]
     }
-    ```
+  ]
+}
+```
 
-### Products
+### Get Product Detail
 
-#### Find Products
 - **Method**: `GET`
-- **Endpoint**: `/products/`
-- **Description**: Retrieve a list of products.
-- **Request Query**:
-  - `name`: for searching feature
-  - `page`: index page
-  - `limit`: how many product in each page
-- **Request Body**: None (Uses Query Parameters)
-- **Response**:
-  ```json
-  {
-    "limit": 10,
-    "page": 1,
-    "total": 2,
-    "products": [
-      {
-        "id": "ac788034-bd4c-476a-97d1-9c1def714042",
-        "sku": "EVT-BNR-002",
-        "name": "Grand Celebration Vinyl Banner",
-        "slug": "grand-celebration-vinyl-banner",
-        "is_available": false,
-        "price": 45000,
-        "stock": 0,
-        "images": {
-          "thumbnail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/ac788034-bd4c-476a-97d1-9c1def714042/ee820e14-4bd9-46a3-8482-24ec3151a4ac.jpg"
-        }
-      },
-      {
-          "id": "b40dcc46-8328-4fcd-af77-42ecc9511606",
-          "sku": "EVT-BDY-003",
-          "name": "Confetti & Blooms Basket",
-          "slug": "confetti-blooms-basket",
-          "is_available": true,
-          "price": 60000,
-          "stock": 561,
-          "images": {
-              "thumbnail": ""
-        }
-      }
-    ]
-  }
-  ```
-
-#### Get Product Detail
-- **Method**: `GET`
-- **Endpoint**: `/products/{id}`
-- **Description**: Retrieve details of a specific product.
-- **Request Parameters**:
-  - `id`: Product UUID in path
+- **Endpoint**: `/products/{slug}`
+- **Description**: Retrieve full details of a specific product by its slug.
+- **Authentication**: None
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "id": "71be3ee1-17b4-4bb8-8f80-eae6ad93a844",
-    "sku": "EVT-GRAD-006",
-    "name": "The Scholar’s Cap Arrangement",
-    "slug": "the-scholar-s-cap-arrangement",
-    "description": "A modern, bold mix of blue irises and yellow tulips, complete with a commemorative graduation pick.",
-    "is_available": true,
-    "price": 55000,
-    "weight": 1000,
-    "stock": 72,
-    "updated_at": null,
-    "images": [
-      {
-        "thumbnail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/4c39bfb4-330b-47a5-8ae2-2066c841c43c.jpg",
-        "preview": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/4c39bfb4-330b-47a5-8ae2-2066c841c43c.jpg",
-        "detail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/4c39bfb4-330b-47a5-8ae2-2066c841c43c.jpg"
-      },
-      {
-        "thumbnail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/ecd9dd18-6008-4af8-91d6-c13029fb15bf.png",
-        "preview": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/ecd9dd18-6008-4af8-91d6-c13029fb15bf.png",
-        "detail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/ecd9dd18-6008-4af8-91d6-c13029fb15bf.png"
-      }
-    ]
-  }
-  ```
 
-### Locations
+#### Path Parameters
 
-#### List Provinces
+| Parameter | Type   | Description       |
+|-----------|--------|-------------------|
+| `slug`    | string | The product slug. |
+
+#### Response `200 OK`
+
+```json
+{
+  "id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
+  "sku": "EVT-GOP-007",
+  "name": "Grand Opening",
+  "slug": "grand-opening",
+  "status": "active",
+  "is_available": true,
+  "price": 150000,
+  "stock": 837,
+  "description": "A towering two-tier floral stand featuring red anthuriums.",
+  "weight": 4500,
+  "updated_at": null,
+  "banner": {
+    "thumbnail": "https://example.com/thumbnail.jpg",
+    "preview": "https://example.com/preview.jpg",
+    "detail": "https://example.com/detail.jpg"
+  },
+  "gallery": [
+    {
+      "thumbnail": "https://example.com/thumbnail.jpg",
+      "preview": "https://example.com/preview.jpg",
+      "detail": "https://example.com/detail.jpg"
+    }
+  ],
+  "availability": [
+    { "slug": "Chia Cipinang",     "name": "chia-cipinang",     "stock": 109 },
+    { "slug": "Chia Medan Satria", "name": "chia-medan-satria", "stock": 728 }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status          | Condition                          |
+|-----------------|------------------------------------|
+| `404 Not Found` | No product found for the given slug. |
+
+## Shops
+
+### Find Shops
+
 - **Method**: `GET`
-- **Endpoint**: `/provinces/`
-- **Description**: Retrieve a list of all provinces.
+- **Endpoint**: `/shops`
+- **Description**: Retrieve a paginated list of shops.
+- **Authentication**: None
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "provinces": [
-      {
-        "id": "1",
-        "name": "NUSA TENGGARA BARAT (NTB)"
-      },
-      {
-        "id": "2",
-        "name": "MALUKU"
-      },
-      {
-        "id": "3",
-        "name": "KALIMANTAN SELATAN"
-      },
-      {
-        "id": "4",
-        "name": "KALIMANTAN TENGAH"
-      },
-      {
-        "id": "5",
-        "name": "JAWA BARAT"
-      }
-    ]
-  }
-  ```
 
-#### List Cities in Province
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | UUID   | No       | Filter by exact shop ID. |
+| `name`    | string | No       | Filter by shop name. |
+| `page`    | int    | No       | Page number. Defaults to `1`. |
+| `limit`   | int    | No       | Number of results per page. Defaults to `10`. |
+| `sort`    | string | No       | Comma-separated sort expressions. |
+
+#### Response `200 OK`
+
+```json
+{
+  "page": 1,
+  "limit": 10,
+  "total": 1,
+  "shops": [
+    {
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Chia Medan Satria",
+      "slug": "chia-medan-satria",
+      "description": "Our Medan Satria branch.",
+      "is_active": true,
+      "created_at": "2026-01-01T08:00:00Z",
+      "updated_at": "2026-05-10T09:00:00Z"
+    }
+  ]
+}
+```
+
+### Get Shop
+
+- **Method**: `GET`
+- **Endpoint**: `/shops/{shopID}`
+- **Description**: Retrieve details of a specific shop by its ID.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                |
+|-----------|---------------|----------------------------|
+| `shopID`  | UUID (string) | The unique ID of the shop. |
+
+#### Response `200 OK`
+
+```json
+{
+  "shop": {
+    "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "name": "Chia Medan Satria",
+    "slug": "chia-medan-satria",
+    "description": "Our Medan Satria branch.",
+    "is_active": true,
+    "created_at": "2026-01-01T08:00:00Z",
+    "updated_at": "2026-05-10T09:00:00Z"
+  }
+}
+```
+
+#### Error Responses
+
+| Status            | Condition                                 |
+|-------------------|-------------------------------------------|
+| `400 Bad Request` | `shopID` in the path is not a valid UUID. |
+| `404 Not Found`   | No shop found for the given ID.           |
+
+### Get Shop Addresses
+
+- **Method**: `GET`
+- **Endpoint**: `/shops/{shopID}/addresses`
+- **Description**: Retrieve all addresses registered for a specific shop.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                |
+|-----------|---------------|----------------------------|
+| `shopID`  | UUID (string) | The unique ID of the shop. |
+
+#### Response `200 OK`
+
+```json
+{
+  "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "addresses": [
+    {
+      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "label": "Main Branch",
+      "phone": "+6281234567890",
+      "is_active": true,
+      "province_id": "32",
+      "city_id": "3204",
+      "district_id": "320401",
+      "village_id": "3204010001",
+      "full_address": "Jl. Bunga Indah No. 10, Bekasi",
+      "postal_code": "17520",
+      "created_at": "2026-01-15T09:00:00Z",
+      "updated_at": "2026-05-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status            | Condition                                 |
+|-------------------|-------------------------------------------|
+| `400 Bad Request` | `shopID` in the path is not a valid UUID. |
+
+### Get Shop Couriers
+
+- **Method**: `GET`
+- **Endpoint**: `/shops/{shopID}/couriers`
+- **Description**: Retrieve the list of courier services configured for a specific shop.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                |
+|-----------|---------------|----------------------------|
+| `shopID`  | UUID (string) | The unique ID of the shop. |
+
+#### Response `200 OK`
+
+```json
+{
+  "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "couriers": [
+    { "code": "jne",     "active": true  },
+    { "code": "sicepat", "active": false }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status            | Condition                                 |
+|-------------------|-------------------------------------------|
+| `400 Bad Request` | `shopID` in the path is not a valid UUID. |
+
+### Get Shop Products
+
+- **Method**: `GET`
+- **Endpoint**: `/shops/{shopID}/products`
+- **Description**: Retrieve all products listed in a specific shop along with their current inventory levels.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                |
+|-----------|---------------|----------------------------|
+| `shopID`  | UUID (string) | The unique ID of the shop. |
+
+#### Response `200 OK`
+
+```json
+{
+  "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "products": [
+    {
+      "id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+      "sku": "EVT-ANV-001",
+      "name": "Anniversary",
+      "slug": "anniversary",
+      "description": "A beautiful anniversary bouquet.",
+      "status": "active",
+      "price": 85000,
+      "weight": 1.5,
+      "inventory": {
+        "total_stock": 100,
+        "reserved_stock": 19,
+        "available": 81
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-06-01T10:30:00Z"
+    }
+  ]
+}
+```
+
+#### Inventory Fields
+
+| Field            | Type | Description                                        |
+|------------------|------|----------------------------------------------------|
+| `total_stock`    | int  | Total units in stock.                              |
+| `reserved_stock` | int  | Units reserved for pending orders.                 |
+| `available`      | int  | Units available for purchase (`total - reserved`). |
+
+**Product `status` values**: `"active"`, `"inactive"`, `"archived"`.
+
+#### Error Responses
+
+| Status            | Condition                                 |
+|-------------------|-------------------------------------------|
+| `400 Bad Request` | `shopID` in the path is not a valid UUID. |
+
+## Locations
+
+> All location endpoints follow a cascading hierarchy: **Province → City → District → Village**.
+> Use the `id` from each response as the path parameter for the next level.
+
+### List Provinces
+
+- **Method**: `GET`
+- **Endpoint**: `/provinces`
+- **Description**: Retrieve all available provinces.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+  "provinces": [
+    { "id": "32", "name": "Jawa Barat" },
+    { "id": "31", "name": "DKI Jakarta" }
+  ]
+}
+```
+
+### List Cities by Province
+
 - **Method**: `GET`
 - **Endpoint**: `/provinces/{id}/cities`
-- **Description**: Retrieve a list of cities for a specific province.
-- **Request Parameters**:
-  - `id`: Province ID in path
+- **Description**: Retrieve all cities within a given province.
+- **Authentication**: None
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "cities": [
-      {
-        "id": "135",
-        "province_id": "",
-        "name": "JAKARTA BARAT"
-      },
-      {
-        "id": "136",
-        "province_id": "",
-        "name": "JAKARTA SELATAN"
-      },
-      {
-        "id": "137",
-        "province_id": "",
-        "name": "JAKARTA PUSAT"
-      },
-      {
-        "id": "138",
-        "province_id": "",
-        "name": "JAKARTA UTARA"
-      },
-      {
-        "id": "139",
-        "province_id": "",
-        "name": "JAKARTA TIMUR"
-      },
-      {
-        "id": "141",
-        "province_id": "",
-        "name": "KEPULAUAN SERIBU"
-      }
-    ]
-  }
-  ```
 
-#### List Districts in City
+#### Path Parameters
+
+| Parameter | Type   | Description                          |
+|-----------|--------|--------------------------------------|
+| `id`      | string | Province ID from List Provinces. |
+
+#### Response `200 OK`
+
+```json
+{
+  "cities": [
+    { "id": "3204", "province_id": "32", "name": "Kabupaten Bandung" }
+  ]
+}
+```
+
+### List Districts by City
+
 - **Method**: `GET`
 - **Endpoint**: `/cities/{id}/districts`
-- **Description**: Retrieve a list of districts for a specific city.
-- **Request Parameters**:
-  - `id`: City ID in path
+- **Description**: Retrieve all districts within a given city.
+- **Authentication**: None
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "districts": [
-      {
-        "id": "1354",
-        "city_id": "",
-        "name": "CAKUNG"
-      },
-      {
-        "id": "1355",
-        "city_id": "",
-        "name": "CIPAYUNG"
-      },
-      {
-        "id": "1356",
-        "city_id": "",
-        "name": "CIRACAS"
-      },
-      {
-        "id": "1357",
-        "city_id": "",
-        "name": "DUREN SAWIT"
-      },
-      {
-        "id": "1358",
-        "city_id": "",
-        "name": "JATINEGARA"
-      },
-      {
-        "id": "1359",
-        "city_id": "",
-        "name": "KRAMAT JATI"
-      },
-      {
-        "id": "1360",
-        "city_id": "",
-        "name": "MAKASAR"
-      },
-      {
-        "id": "1361",
-        "city_id": "",
-        "name": "MATRAMAN"
-      },
-      {
-        "id": "1362",
-        "city_id": "",
-        "name": "PASAR REBO"
-      },
-      {
-        "id": "1363",
-        "city_id": "",
-        "name": "PULO GADUNG"
-      }
-    ]
-  }
-  ```
 
-#### List Villages in District
+#### Path Parameters
+
+| Parameter | Type   | Description                       |
+|-----------|--------|-----------------------------------|
+| `id`      | string | City ID from List Cities. |
+
+#### Response `200 OK`
+
+```json
+{
+  "districts": [
+    { "id": "320401", "city_id": "3204", "name": "Ciwidey" }
+  ]
+}
+```
+
+### List Villages by District
+
 - **Method**: `GET`
 - **Endpoint**: `/districts/{id}/villages`
-- **Description**: Retrieve a list of villages for a specific district.
-- **Request Parameters**:
-  - `id`: District ID in path
+- **Description**: Retrieve all villages within a given district.
+- **Authentication**: None
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "villages": [
-      {
-        "id": "17700",
-        "district_id": "",
-        "name": "BALI MESTER"
-      },
-      {
-        "id": "17701",
-        "district_id": "",
-        "name": "BIDARACINA"
-      },
-      {
-        "id": "17702",
-        "district_id": "",
-        "name": "CIPINANG BESAR SELATAN"
-      },
-      {
-        "id": "17703",
-        "district_id": "",
-        "name": "CIPINANG BESAR UTARA"
-      },
-      {
-        "id": "17704",
-        "district_id": "",
-        "name": "CIPINANG CEMPEDAK"
-      },
-      {
-        "id": "17705",
-        "district_id": "",
-        "name": "CIPINANG MUARA"
-      },
-      {
-        "id": "17706",
-        "district_id": "",
-        "name": "KAMPUNG MELAYU"
-      },
-      {
-        "id": "17707",
-        "district_id": "",
-        "name": "RAWA BUNGA"
-      }
-    ]
-  }
-  ```
 
-### Payments
+#### Path Parameters
 
-#### List Payment Methods
-- **Method**: `GET`
-- **Endpoint**: `/payments/methods/`
-- **Description**: Retrieve available payment methods.
-- **Request Body**: None
-- **Response**:
-  ```json
-  // On Progress
-  ```
+| Parameter | Type   | Description                             |
+|-----------|--------|-----------------------------------------|
+| `id`      | string | District ID from List Districts. |
 
----
+#### Response `200 OK`
 
-## Customer API
+```json
+{
+  "villages": [
+    { "id": "3204010001", "district_id": "320401", "name": "Panyocokan" }
+  ]
+}
+```
 
-These endpoints require authentication and are restricted to users with the `Customer` account type.
+# Authenticated Customer API
 
-### Authentication (Implemented)
+These endpoints require a valid customer session set via the Sign In or Verify Account cookie.
 
-#### Me
+## Authentication
+
+### Me
+
 - **Method**: `GET`
 - **Endpoint**: `/auth/me`
-- **Description**: Get the information of current user.
-- **Response**:
-  ```json
-  {
-    "account_id": "8b477309-1492-48b0-b9ac-f493aea10cc6",
-    "account_type": "customer",
-    "is_authenticated": true
-  }
-  ```
+- **Description**: Return the identity and roles of the currently authenticated account.
+- **Authentication**: Customer
+- **Request Body**: None
 
-#### Log Out
+#### Response `200 OK`
+
+```json
+{
+  "account_id": "51e20db6-5bdb-4f6a-b2b7-8d40c0db857d",
+  "account_type": "customer",
+  "is_authenticated": true,
+  "roles": [
+    { "code": "customer", "name": "Customer" }
+  ],
+  "permissions": [
+    { "code": "customer" }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition                       |
+|--------------------|---------------------------------|
+| `401 Unauthorized` | Missing or invalid session.     |
+
+### Log Out
+
 - **Method**: `POST`
 - **Endpoint**: `/auth/logout`
-- **Description**: For log out. It will clear session and refresh token of the user.
-- **Response**:
-  ```json
-  {
-    "message": "logout success"
-  }
-  ```
-
-
-### Users (Implemented)
-
-#### Get Current User
-- **Method**: `GET`
-- **Endpoint**: `/users/me/`
-- **Description**: Retrieve profile of the currently logged-in customer.
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-
+- **Description**: Invalidate the current session and clear the access token cookie.
+- **Authentication**: Customer
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "me": {
-      "id": "73fe7af7-1ad9-4a7c-aa73-091272af2856",
-      "name": "Deu",
-      "username": "deu3321",
-      "phone": "021",
-      "last_login_at": null
+
+#### Response `200 OK`
+
+```json
+{ "message": "logout success" }
+```
+
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+
+## Profile
+
+### Get Current User
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me`
+- **Description**: Retrieve the profile of the currently authenticated customer.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+  "me": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Jane Doe",
+    "username": "janedoe",
+    "phone": "+6281234567890",
+    "last_login_at": "2026-06-17T10:00:00Z"
+  }
+}
+```
+
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | User profile not found.     |
+
+## Addresses
+
+### List My Addresses
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me/addresses`
+- **Description**: Retrieve all saved delivery addresses for the authenticated customer.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+  "addresses": [
+    {
+      "address_id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "user_id":    "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "receiver_name": "Jane Doe",
+      "phone":      "+6281234567890",
+      "is_default": true,
+      "province_id": "32",
+      "city_id":     "3204",
+      "district_id": "320401",
+      "village_id":  "3204010001",
+      "full_address": "Jl. Bunga Indah No. 10",
+      "postal_code": "17520",
+      "created_at":  "2026-01-15T09:00:00Z",
+      "updated_at":  "2026-05-01T12:00:00Z"
     }
-  }
-  ```
+  ]
+}
+```
 
-#### List User Addresses
-- **Method**: `GET`
-- **Endpoint**: `/users/me/addresses/`
-- **Description**: Retrieve addresses for the current user.
-- **Request Header**:
-  - **Cookie**: 
+#### Error Responses
 
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
-- **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "addresses": [
-      {
-        "user_id": "28be4cae-6ad9-4ca4-a5b4-7c1d924139c0",
-        "receiver_name": "Iam",
-        "phone": "000",
-        "is_default": false,
-        "province_id": "5",
-        "city_id": "63",
-        "district_id": "611",
-        "village_id": "6555",
-        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan",
-        "postal_code": "17131",
-        "created_at": "0001-01-01T00:00:00Z",
-        "updated_at": null
-      },
-      {
-        "user_id": "28be4cae-6ad9-4ca4-a5b4-7c1d924139c0",
-        "receiver_name": "Iam",
-        "phone": "000",
-        "is_default": true,
-        "province_id": "5",
-        "city_id": "63",
-        "district_id": "611",
-        "village_id": "6555",
-        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan",
-        "postal_code": "17131",
-        "created_at": "0001-01-01T00:00:00Z",
-        "updated_at": null
-      }
-    ]
-  }
-  ```
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
 
-#### Create User Address
+### Save My Address
+
 - **Method**: `POST`
-- **Endpoint**: `/users/me/addresses/`
-- **Description**: Add a new address for the current user.
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
+- **Endpoint**: `/users/me/addresses`
+- **Description**: Create a new delivery address or update an existing one. Omit `address_id` to create; supply it to update.
+- **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "receiver_name": "string (required)",
-    "phone": "string",
-    "is_default": "string",
-    "province_id": "string (required)",
-    "city_id": "string (required)",
-    "district_id": "string (required)",
-    "village_id": "string (required)",
-    "full_address": "string (required)",
-    "postal_code": "string (required)"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "message": "address successfully created"
+    "address_id":    "string (UUID, optional — omit to create, supply to update)",
+    "receiver_name": "string (optional)",
+    "phone":         "string (optional)",
+    "is_default":    "string (optional, e.g. \"true\" or \"false\")",
+    "province_id":   "string (required)",
+    "city_id":       "string (required)",
+    "district_id":   "string (required)",
+    "village_id":    "string (required)",
+    "full_address":  "string (required)",
+    "postal_code":   "string (required)"
   }
   ```
 
-### Carts (Implemented)
+#### Important Notes
 
-#### Get Cart
-- **Method**: `GET`
-- **Endpoint**: `/carts/`
-- **Description**: Retrieve the current user's shopping cart.
-- **Request Header**:
-  - **Cookie**: 
+> `is_default` is a string-encoded boolean (`"true"` / `"false"`).
+> Parsed with `strconv.ParseBool`, so `"1"`, `"0"`, `"TRUE"`, `"FALSE"` are also accepted.
+>
+> Use the Locations endpoints to look up valid `province_id`, `city_id`, `district_id`, and `village_id` values.
 
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
+#### Response `200 OK`
+
+```json
+{ "message": "address saved successfully" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Any required location field is empty, `address_id` is not a valid UUID, or `is_default` cannot be parsed. |
+| `401 Unauthorized` | Missing or invalid session. |
+
+### Delete My Address
+
+- **Method**: `DELETE`
+- **Endpoint**: `/users/me/addresses/{addressID}`
+- **Description**: Delete a saved delivery address belonging to the authenticated customer.
+- **Authentication**: Customer
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "cart_id": "c49227fa-4e52-4545-a179-e94c83eb7edf",
-    "items": [
-      {
-        "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
-        "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-        "name": "Prosperity Grand Opening Stand",
-        "price": 150000,
-        "subtotal": 21600000,
-        "quantity": 144,
-        "images": {
-            "thumbnail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/2ceea56c-352f-4a48-a262-f60e9ee85b1c/321e530c-b31e-49e8-8054-c6c85984d386.jpg"
-        }
-      },
-      {
-        "product_id": "71be3ee1-17b4-4bb8-8f80-eae6ad93a844",
-        "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
-        "name": "The Scholar’s Cap Arrangement",
-        "price": 55000,
-        "subtotal": 825000,
-        "quantity": 15,
-        "images": {
-            "thumbnail": "https://mqolpawlannysqjokzoq.supabase.co/storage/v1/object/public/public-assets/products/71be3ee1-17b4-4bb8-8f80-eae6ad93a844/4c39bfb4-330b-47a5-8ae2-2066c841c43c.jpg"
-        }
+
+#### Path Parameters
+
+| Parameter   | Type          | Description                       |
+|-------------|---------------|-----------------------------------|
+| `addressID` | UUID (string) | The ID of the address to delete.  |
+
+#### Response `200 OK`
+
+```json
+{ "message": "address deleted successfully" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `addressID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Address not found. |
+
+## Cart
+
+### Get Cart
+
+- **Method**: `GET`
+- **Endpoint**: `/carts`
+- **Description**: Retrieve the current cart of the authenticated customer, including all items with subtotals and a grand total.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+  "cart_id": "f1e2d3c4-b5a6-7890-fedc-ba0987654321",
+  "total": 170000,
+  "items": [
+    {
+      "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+      "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name":       "Anniversary",
+      "price":      85000,
+      "quantity":   2,
+      "subtotal":   170000,
+      "images": {
+        "thumbnail": "https://example.com/thumbnail.jpg"
       }
-    ],
-    "total": 22425000
-  }
-  ```
+    }
+  ]
+}
+```
 
-#### Add Item to Cart
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Cart not found.             |
+
+### Add Item
+
 - **Method**: `POST`
-- **Endpoint**: `/carts/items/`
-- **Description**: Add a product to the cart.
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
+- **Endpoint**: `/carts/items`
+- **Description**: Add a product to the cart. If the item already exists, quantity is incremented.
+- **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "product_id": "string (required)",
-    "shop_id": "string (required)",
-    "quantity": "integer (required)"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "message": "item added"
+    "product_id": "string (UUID, required)",
+    "shop_id":    "string (UUID, required)",
+    "quantity":   1
   }
   ```
 
-#### Update Cart Item
+#### Response `200 OK`
+
+```json
+{ "message": "item added" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `product_id` or `shop_id` is not a valid UUID, or `quantity` is `<= 0`. |
+| `401 Unauthorized` | Missing or invalid session. |
+
+### Update Item
+
 - **Method**: `PUT`
 - **Endpoint**: `/carts/items/{shopID}/{productID}`
-- **Description**: Update the quantity of a cart item.
-- **Request Parameters**:
-  - `shopID`: Shop ID in path
-  - `productID`: Product ID in path
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
+- **Description**: Update the quantity of a specific item in the cart. Setting quantity to `0` is treated as removal depending on the usecase implementation.
+- **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "quantity": "integer (required)"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "message": "item updated"
+    "quantity": 3
   }
   ```
 
-#### Remove Cart Item
+#### Path Parameters
+
+| Parameter   | Type          | Description            |
+|-------------|---------------|------------------------|
+| `shopID`    | UUID (string) | The shop ID of the item.    |
+| `productID` | UUID (string) | The product ID of the item. |
+
+#### Response `200 OK`
+
+```json
+{ "message": "item updated" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `shopID` or `productID` is not a valid UUID, or `quantity` is `< 0`. |
+| `401 Unauthorized` | Missing or invalid session. |
+
+### Remove Item
+
 - **Method**: `DELETE`
 - **Endpoint**: `/carts/items/{shopID}/{productID}`
-- **Description**: Remove an item from the cart.
-- **Request Parameters**:
-  - `shopID`: Shop ID in path
-  - `productID`: Product ID in path
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
+- **Description**: Remove a specific item from the cart entirely.
+- **Authentication**: Customer
 - **Request Body**: None
-- **Response**:
-  ```json
-  {
-    "message": "item removed"
-  }
-  ```
 
-#### Checkout
-- **Method**: `POST`
-- **Endpoint**: `/carts/checkout/`
-- **Description**: For checkout products from cart.
-- **Request Header**:
-  - **Cookie**: 
+#### Path Parameters
 
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
-- **Request Body**:
-  ```json
-  {
-    "shops": [
-      {
-        "shop_id": "string - uuid (required)",
-        "items": [
-          {
-            "product_id": "string - uuid (required)",
-            "quantity": "integer (required)"
-          }
-        ]
-      }
-    ]
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "address": {
-      "id": "95120305-02ad-468e-9103-2bb113d41cd7",
-      "recipient_name": "My Belle Gweh",
-      "phone": "000",
-      "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
-    },
-    "shops": [
-      {
-        "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-        "subtotal": 21600000,
-        "total": 21850000,
-        "selected_courier": {
-            "code": "tiki",
-            "service": "T15",
-            "fee": 250000
-        },
-        "items": [
-          {
-            "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
-            "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-            "name": "Grand Opening",
-            "price": 150000,
-            "quantity": 144,
-            "subtotal": 21600000
-          }
-        ],
-        "cost_couriers": [
-          {
-            "code": "tiki",
-            "name": "Citra Van Titipan Kilat (TIKI)",
-            "service": "SDS",
-            "etd": "0 day",
-            "fee": 19440000
-          },
-          {
-            "code": "jne",
-            "name": "Jalur Nugraha Ekakurir (JNE)",
-            "service": "JTR",
-            "etd": "3 day",
-            "fee": 2592000
-          }
-        ]
-      }
-    ],
-    "subtotal": 21600000,
-    "total_shipping": 250000,
-    "total": 21850000
-  }
-  ```
-- **Notes**:
-  - checkout must have **default** address
-  - `total_shipping` is based on courier service with least fee
-  - `total` is based on total estimation plus courier service with least fee
+| Parameter   | Type          | Description                 |
+|-------------|---------------|-----------------------------|
+| `shopID`    | UUID (string) | The shop ID of the item.    |
+| `productID` | UUID (string) | The product ID of the item. |
 
-#### Checkout Calculate
+#### Response `200 OK`
+
+```json
+{ "message": "item removed" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `shopID` or `productID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+
+## Checkout
+
+### Estimate Checkout
+
 - **Method**: `POST`
 - **Endpoint**: `/carts/checkout/calculate`
-- **Description**: For calculating exact cost for user selected courier and address under checkout session.
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
+- **Description**: Calculate shipping costs and order totals for a given set of items and shops without placing an order. A courier must be provided for each shop.
+- **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "address_id": "string - uuid (required)",
+    "address_id": "string (UUID, optional)",
     "shops": [
       {
-        "shop_id": "string - uuid (required)",
-          "courier": {
-            "code": "string (required)",
-            "service": "string (required)"
-          },
+        "shop_id": "string (UUID, required)",
         "items": [
           {
-            "product_id": "string - uuid (required)",
-            "quantity": "integer (required)"
-          }
-        ]
-      }
-    ]
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "address": {
-      "id": "cd0ce5ff-d5ed-4b1c-85a4-16fef4d19f01",
-      "recipient_name": "Dialyn UwU",
-      "phone": "000",
-      "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
-    },
-    "shops": [
-      {
-        "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-        "subtotal": 21600000,
-        "total": 24192000,
-        "selected_courier": {
-            "code": "jne",
-            "service": "JTR",
-            "fee": 2592000
-        },
-        "items": [
-          {
-            "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
-            "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-            "name": "Grand Opening",
-            "price": 150000,
-            "quantity": 144,
-            "subtotal": 21600000
+            "product_id": "string (UUID, required)",
+            "quantity":   1
           }
         ],
-        "cost_couriers": null
+        "courier": {
+          "code":    "jne",
+          "service": "REG"
+        }
       }
-    ],
-    "subtotal": 21600000,
-    "total_shipping": 2592000,
-    "total": 24192000
+    ]
   }
   ```
-- **Notes**:
-  - checkout must have **default** address, even addresses already exist
-  - checkout can work with selected address id (for calculating shipping fee)
-  - `total_shipping` is based on selected courier service from user
-  - cost courier options no longer exist
 
-### Payments
+#### Important Notes
 
-#### List Payment Accounts
-- **Method**: `GET`
-- **Endpoint**: `/payments/accounts/`
-- **Description**: Retrieve the user's saved payment accounts.
-- **Request Header**:
-  - **Cookie**: 
+> A `courier` object is **required** for every shop entry in this endpoint.
+> Use `GET /shops/{shopID}/couriers` to retrieve available courier codes for each shop.
 
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-    
-- **Request Body**: None
-- **Response**:
-  ```json
-  // On Progress
-  ```
+#### Response `200 OK`
 
-### Shipping
-
-#### Estimate Shipping Options
-- **Method**: `POST`
-- **Endpoint**: `/shipping/cost`
-- **Description**: Calculate estimated shipping costs based on weight and destination.
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-
-- **Request Body**:
-  ```json
-  {
-    "origin": "integer (required)",
-    "destination": "integer (required)",
-    "weight": "integer (required)",
-    "couriers": ["string"] (required),
-    "price_filter": "string"
-  }
-  ```
-  **Example**:
-  ```json
-  {
-    "origin": 1358,
-    "destination": 1119,
-    "weight": 10000,
-    "couriers": ["tiki", "ncs", "sentral", "wahana", "wahana"],
-    "price_filter": "highest"
-  }
-  ```
-  **Courier Availability**
-    | Courier            | Code      | Checking Domestic Cost | Checking International Cost | Checking AWB |
-    | ------------------ | --------- | ---------------------- | --------------------------- | ------------ |
-    | JNE                | `jne`     | ✅                      | ✅                           | ✅            |
-    | SiCepat            | `sicepat` | ✅                      | ❌                           | ✅            |
-    | IDExpress          | `ide`     | ✅                      | ❌                           | ❌            |
-    | SAP Express        | `sap`     | ✅                      | ❌                           | ✅            |
-    | Ninja              | `ninja`   | ✅                      | ❌                           | ✅            |
-    | J&T Express        | `jnt`     | ✅                      | ❌                           | ✅            |
-    | TIKI               | `tiki`    | ✅                      | ✅                           | ✅            |
-    | Wahana Express     | `wahana`  | ✅                      | ❌                           | ✅            |
-    | POS Indonesia      | `pos`     | ✅                      | ✅                           | ✅            |
-    | Sentral Cargo      | `sentral` | ✅                      | ❌                           | ❌            |
-    | Lion Parcel        | `lion`    | ✅                      | ❌                           | ✅            |
-    | Royal Express Asia | `rex`     | ✅                      | ❌                           | ❌            |
-
-
-
-- **Response**:
-  ```json
-  {
-    "couriers": [
-      {
-        "name": "Nusantara Card Semesta",
-        "code": "ncs",
-        "service": "NRS",
-        "description": "Regular Service",
-        "cost": 805000,
-        "etd": "5-6 day"
-      },
-      {
-        "name": "Citra Van Titipan Kilat (TIKI)",
-        "code": "tiki",
+```json
+{
+  "address": {
+    "id":             "d4e5f6a7-b8c9-0123-defa-234567890123",
+    "recipient_name": "Jane Doe",
+    "phone":          "+6281234567890",
+    "full_address":   "Jl. Bunga Indah No. 10, Bekasi"
+  },
+  "shops": [
+    {
+      "shop_id":  "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "subtotal": 85000,
+      "total":    93000,
+      "selected_courier": {
+        "code":    "jne",
         "service": "REG",
-        "description": "Reguler Service",
-        "cost": 680000,
-        "etd": "5 day"
+        "fee":     8000
       },
-      {
-        "name": "Wahana",
-        "code": "wahana",
-        "service": "Kargo",
-        "description": "Layanan Pengiriman Dengan Minimal Berat 10 Kg",
-        "cost": 600000,
-        "etd": "11 day"
-      },
-      {
-        "name": "Sentral Cargo",
-        "code": "sentral",
-        "service": "DARAT NON ELEKTRONIK",
-        "description": "Darat Non Elektronik",
-        "cost": 200000,
-        "etd": "10-12 day"
-      }
-    ]
-  }
-  ```
+      "items": [
+        {
+          "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+          "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
+          "name":       "Anniversary",
+          "price":      85000,
+          "quantity":   1,
+          "subtotal":   85000
+        }
+      ],
+      "cost_couriers": [
+        {
+          "code":    "jne",
+          "name":    "Jalur Nugraha Ekakurir",
+          "service": "REG",
+          "etd":     "2-3",
+          "fee":     8000
+        }
+      ]
+    }
+  ],
+  "subtotal":       85000,
+  "total_shipping": 8000,
+  "total":          93000
+}
+```
 
-### User Address (Implemented)
- 
-#### List User Address
-- **Method**: `GET`
-- **Endpoint**: `/users/me/addresses/`
-- **Description**: List all user addresses.
-- **Request Header**:
-  - **Cookie**: 
+#### Checkout Response Fields
 
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-- **Response**:
-  ```json
-  {
-    "addresses": [
-      {
-        "address_id": "e0c240b0-9259-493a-80e1-ac02358be59f",
-        "user_id": "28be4cae-6ad9-4ca4-a5b4-7c1d924139c0",
-        "receiver_name": "Iam",
-        "phone": "000",
-        "is_default": false,
-        "province_id": "5",
-        "city_id": "63",
-        "district_id": "611",
-        "village_id": "6555",
-        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan",
-        "postal_code": "17131",
-        "created_at": "0001-01-01T00:00:00Z"
-      },
-      {
-        "address_id": "cd0ce5ff-d5ed-4b1c-85a4-16fef4d19f01",
-        "user_id": "28be4cae-6ad9-4ca4-a5b4-7c1d924139c0",
-        "receiver_name": "Dialyn UwU",
-        "phone": "000",
-        "is_default": true,
-        "province_id": "5",
-        "city_id": "63",
-        "district_id": "611",
-        "village_id": "6555",
-        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan",
-        "postal_code": "17131",
-        "created_at": "0001-01-01T00:00:00Z"
-      }
-    ]
-  }
-  ```
+| Field            | Type   | Description |
+|------------------|--------|-------------|
+| `address`        | object | Delivery address details. |
+| `shops`          | array  | Per-shop breakdown of items, couriers, and totals. |
+| `subtotal`       | int64  | Sum of all item prices before shipping. |
+| `total_shipping` | int64  | Total shipping fee across all shops. |
+| `total`          | int64  | Grand total including shipping (only present when courier is selected). |
 
-#### Save User Address - Update and Create
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Missing or invalid UUIDs, `quantity <= 0`, or courier missing for any shop. |
+| `401 Unauthorized` | Missing or invalid session. |
+
+### Checkout
+
 - **Method**: `POST`
-- **Endpoint**: `/users/me/addresses/`
-- **Description**: Register a new user account.
-- **Request Header**:
-  - **Cookie**: 
-
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
+- **Endpoint**: `/carts/checkout`
+- **Description**: Place an order for the selected items. Courier selection per shop is optional at this stage.
+- **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "address_id": "b4e4c76c-c017-4896-a086-0b1316e99457",
-    "receiver_name": "Dialyn UwU",
-    "phone": "000",
-    "is_default": "True",
-    "province_id": "5",
-    "city_id": "63",
-    "district_id": "611",
-    "village_id": "6555",
-    "postal_code": "17131",
-    "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+    "address_id": "string (UUID, optional)",
+    "shops": [
+      {
+        "shop_id": "string (UUID, required)",
+        "items": [
+          {
+            "product_id": "string (UUID, required)",
+            "quantity":   1
+          }
+        ],
+        "courier": {
+          "code":    "jne",
+          "service": "REG"
+        }
+      }
+    ]
   }
   ```
-- **Response**:
-  ```json
-  {
-    "message": "address saved successfully",
-  }
-  ```
-- **Notes**: 
-  - Request body with address id will be assumed of updating while without one will be assumed creating.
-  - Max. address per account is 10.
 
-#### Delete User Address
-- **Method**: `Delete`
-- **Endpoint**: `/users/me/addresses/{addressID}`
-- **Description**: Register a new user account.
-- **Request Header**:
-  - **Cookie**: 
+#### Important Notes
 
-    | Key | Value |
-    | --- | --- |
-    | Cookie | chast="value" |
-- **Response**:
-  ```json
-  {
-    "message": "address deleted successfully",
-  }
-  ```
-- **Notes**:
-  - Can only delete non default address.
+> Unlike Estimate Checkout, `courier` is **optional** per shop in this endpoint.
+> The response shape is identical to Estimate Checkout.
+
+#### Response `200 OK`
+
+Same structure as the [Estimate Checkout response](#estimate-checkout).
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Missing or invalid UUIDs, or `quantity <= 0`. |
+| `401 Unauthorized` | Missing or invalid session. |
