@@ -8,12 +8,14 @@ import (
 	apphttp "service-core/internal/common/http"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/shop/usecase"
+
+	"github.com/google/uuid"
 )
 
 type ShopHandler struct {
 	findShops        *usecase.FindShopsUsecase
 	getShop          *usecase.GetShopUsecase
-	createShop       *usecase.CreateShopUsecase
+	createShop       *usecase.SaveShopUsecase
 	getShopAddresses *usecase.GetShopAddressesUsecase
 	getShopCouriers  *usecase.GetShopCouriersUsecase
 	getShopProducts  *usecase.GetShopProductsUsecase
@@ -22,7 +24,7 @@ type ShopHandler struct {
 func NewShopHandler(
 	findShops *usecase.FindShopsUsecase,
 	getShop *usecase.GetShopUsecase,
-	createShop *usecase.CreateShopUsecase,
+	createShop *usecase.SaveShopUsecase,
 	getShopAddresses *usecase.GetShopAddressesUsecase,
 	getShopCouriers *usecase.GetShopCouriersUsecase,
 	getShopProducts *usecase.GetShopProductsUsecase,
@@ -121,13 +123,13 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
+func (h *ShopHandler) SaveShop(w http.ResponseWriter, r *http.Request) error {
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	var req createShopRequest
+	var req saveShopRequest
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
@@ -136,13 +138,24 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid name")
 	}
 
+	var shopID *uuid.UUID
+	if req.ShopID != nil {
+		parsed, err := uuid.Parse(*req.ShopID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid shop id")
+		}
+
+		shopID = &parsed
+	}
+
 	var parsedIsActive bool
 	parsedIsActive, err := strconv.ParseBool(req.IsActive)
 	if err != nil {
 		return apperrors.NewBadRequest("invalid active status")
 	}
 
-	input := usecase.CreateShopInput{
+	input := usecase.SaveShopInput{
+		ID:          shopID,
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    parsedIsActive,
@@ -158,7 +171,7 @@ func (h *ShopHandler) CreateShop(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	response := map[string]string{
-		"message": "shop successfully created",
+		"message": "shop successfully saved",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

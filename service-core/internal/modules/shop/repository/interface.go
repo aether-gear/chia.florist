@@ -29,7 +29,7 @@ type ShopRepository interface {
 	) ([]domain.Shop, error)
 	// GetActive() ([]domain.Shop, error)
 
-	Create(
+	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		shop domain.Shop,

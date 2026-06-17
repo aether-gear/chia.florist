@@ -6,7 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type createShopRequest struct {
+type saveShopRequest struct {
+	ShopID      *string `json:"id"`
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	IsActive    string  `json:"is_active"`

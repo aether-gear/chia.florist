@@ -269,7 +269,7 @@ func (r *shopRepositoryImpl) FindByIDs(
 	return results, nil
 }
 
-func (r *shopRepositoryImpl) Create(
+func (r *shopRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
 	shop domain.Shop,
@@ -277,18 +277,26 @@ func (r *shopRepositoryImpl) Create(
 	query := `
 		INSERT INTO shops (
 			id,
-			name,
 			slug,
+			name,
 			description,
 			is_active,
 			created_at
-		) VALUES ($1,$2,$3,$4,$5,$6)
+		) VALUES (
+			$1,$2,$3,$4,$5,$6
+		)
+		ON CONFLICT (id)
+		DO UPDATE SET
+			slug = EXCLUDED.slug,
+			name = EXCLUDED.name,
+			description = EXCLUDED.description,
+			is_active = EXCLUDED.is_active
 	`
 
 	_, err := exec.Exec(ctx, query,
 		shop.ID,
-		shop.Name,
 		shop.Slug,
+		shop.Name,
 		shop.Description,
 		shop.IsActive,
 		shop.CreatedAt,

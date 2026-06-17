@@ -14,34 +14,35 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreateShopUsecase struct {
+type SaveShopUsecase struct {
 	shopRepo repository.ShopRepository
 	slugGen  slug.Generator
 	executor transaction.Executor
 }
 
-func NewCreateShopUsecase(
+func NewSaveShopUsecase(
 	shopRepo repository.ShopRepository,
 	slugGen slug.Generator,
 	executor transaction.Executor,
-) *CreateShopUsecase {
-	return &CreateShopUsecase{
+) *SaveShopUsecase {
+	return &SaveShopUsecase{
 		shopRepo: shopRepo,
 		slugGen:  slugGen,
 		executor: executor,
 	}
 }
 
-type CreateShopInput struct {
+type SaveShopInput struct {
+	ID          *uuid.UUID
 	Name        string
 	Description *string
 	IsActive    bool
 }
 
-func (u *CreateShopUsecase) Execute(
+func (u *SaveShopUsecase) Execute(
 	ctx context.Context,
 	actor authorDomain.Actor,
-	input CreateShopInput,
+	input SaveShopInput,
 ) error {
 	canSetActive := false
 	for _, actorRole := range actor.Roles {
@@ -51,8 +52,16 @@ func (u *CreateShopUsecase) Execute(
 		}
 	}
 
+	var shopID uuid.UUID
+	isCreate := input.ID == nil
+	if isCreate {
+		shopID = uuid.New()
+	} else {
+		shopID = *input.ID
+	}
+
 	shop := domain.Shop{
-		ID:          uuid.New(),
+		ID:          shopID,
 		Name:        input.Name,
 		Slug:        u.slugGen.Generate(input.Name),
 		Description: input.Description,
@@ -62,7 +71,8 @@ func (u *CreateShopUsecase) Execute(
 		shop.IsActive = input.IsActive
 	}
 
-	err := u.shopRepo.Create(ctx, u.executor, shop)
+	err := u.shopRepo.
+		Save(ctx, u.executor, shop)
 	if err != nil {
 		return fmt.Errorf("failed to create shop: %w", err)
 	}
