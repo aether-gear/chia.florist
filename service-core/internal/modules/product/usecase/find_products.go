@@ -197,22 +197,21 @@ func (u *FindProductsUsecase) Execute(
 	results := make([]ProductCatalogResult, 0, len(products))
 	for _, p := range products {
 		inventories := inventoryMap[p.Product.ID]
-		images := imagesMap[p.Product.ID]
 
 		result := ProductCatalogResult{
 			Product:         p.Product,
 			ShopInventories: inventories,
 		}
 
-		if len(images) > 0 {
-			key := images[0].Variants[domain.ResolutionThumbnail].Key
-			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
-		}
+		var (
+			totalStock    = 0
+			reservedStock = 0
+			availability  []ShopAvailabilityResult
+		)
 
-		var availability []ShopAvailabilityResult
 		for _, inventory := range inventories {
-			result.Inventory.TotalStock += inventory.TotalStock
-			result.Inventory.ReservedStock += inventory.ReservedStock
+			totalStock += inventory.TotalStock
+			reservedStock += inventory.ReservedStock
 
 			if shop, ok := shopsMap[inventory.ShopID]; ok {
 				availability = append(availability, ShopAvailabilityResult{
@@ -222,7 +221,16 @@ func (u *FindProductsUsecase) Execute(
 				})
 			}
 		}
+
+		result.Inventory.TotalStock = totalStock
+		result.Inventory.ReservedStock = reservedStock
 		result.Availability = availability
+
+		images := imagesMap[p.Product.ID]
+		if len(images) > 0 {
+			key := images[0].Variants[domain.ResolutionThumbnail].Key
+			result.Images.Thumbnail = u.fileStore.PublicURL(key, "public-assets")
+		}
 
 		results = append(results, result)
 	}

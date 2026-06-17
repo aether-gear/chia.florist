@@ -77,23 +77,25 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 		var result productCatalogResponse
 
 		result = productCatalogResponse{
-			ID:         p.Product.ID,
-			SKU:        p.Product.SKU,
-			Name:       p.Product.Name,
-			Slug:       p.Product.Slug,
-			Price:      p.Product.Price,
-			TotalStock: p.Inventory.TotalStock,
-			IsAvailable: productStatusDTO(p.Product.Status) == ProductStatusActive &&
-				(p.Inventory.TotalStock-p.Inventory.ReservedStock) > 0,
-			Status: string(p.Product.Status),
-			Image: productImageResponse{
-				Thumbnail: &p.Images.Thumbnail,
+			productBaseResponse: productBaseResponse{
+				ID:     p.Product.ID,
+				SKU:    p.Product.SKU,
+				Name:   p.Product.Name,
+				Slug:   p.Product.Slug,
+				Status: string(p.Product.Status),
+				IsAvailable: productStatusDTO(p.Product.Status) == ProductStatusActive &&
+					p.Inventory.TotalStock > 0,
+				Price:      p.Product.Price,
+				TotalStock: p.Inventory.TotalStock,
+				Banner: productImageResponse{
+					Thumbnail: &p.Images.Thumbnail,
+				},
 			},
 			Availability: availabilities,
 		}
 
-		if *result.Image.Thumbnail == "" {
-			result.Image = productImageResponse{
+		if *result.Banner.Thumbnail == "" {
+			result.Banner = productImageResponse{
 				Thumbnail: nil,
 			}
 		}
@@ -118,17 +120,17 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		return apperrors.NewBadRequest("invalid product id")
 	}
 
-	product, err := h.getProduct.Execute(r.Context(), productID)
+	productDetail, err := h.getProduct.Execute(r.Context(), productID)
 	if err != nil {
 		return err
 	}
-	if product == nil {
+	if productDetail == nil {
 		return apperrors.NewNotFound("product not found")
 	}
 
 	var available int
-	inventories := make([]productInventoryView, 0, len(product.ShopInventories))
-	for _, inventory := range product.ShopInventories {
+	inventories := make([]productInventoryView, 0, len(productDetail.ShopInventories))
+	for _, inventory := range productDetail.ShopInventories {
 		available += inventory.Available()
 
 		inventories = append(inventories, productInventoryView{
@@ -139,8 +141,8 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		})
 	}
 
-	images := make([]productImageResponse, 0, len(product.Images))
-	for _, img := range product.Images {
+	images := make([]productImageResponse, 0, len(productDetail.Images))
+	for _, img := range productDetail.Images {
 		image := productImageResponse{}
 
 		if img.Thumbnail != "" {
@@ -158,20 +160,40 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		images = append(images, image)
 	}
 
+	availabilities := make(
+		[]productAvailabilityResponse,
+		0,
+		len(productDetail.Availability),
+	)
+	for _, avail := range productDetail.Availability {
+		availabilities = append(availabilities, productAvailabilityResponse{
+			Slug:  avail.ShopName,
+			Name:  avail.ShopSlug,
+			Stock: avail.Stock,
+		})
+	}
+
 	response := productDetailResponse{
-		ID:          product.Product.ID,
-		SKU:         product.Product.SKU,
-		Name:        product.Product.Name,
-		Slug:        product.Product.Slug,
-		Description: product.Product.Description,
-		Price:       product.Product.Price,
-		Weight:      product.Product.Weight,
-		TotalStock:  available,
-		UpdatedAt:   product.Product.UpdatedAt,
-		Images:      images,
+		productBaseResponse: productBaseResponse{
+			ID:     productDetail.Product.ID,
+			SKU:    productDetail.Product.SKU,
+			Name:   productDetail.Product.Name,
+			Slug:   productDetail.Product.Slug,
+			Status: string(productDetail.Product.Status),
+			IsAvailable: productStatusDTO(productDetail.Product.Status) == ProductStatusActive &&
+				available > 0,
+			Price:      productDetail.Product.Price,
+			TotalStock: available,
+			Banner:     images[0],
+		},
+		Description:  productDetail.Product.Description,
+		Weight:       productDetail.Product.Weight,
+		UpdatedAt:    productDetail.Product.UpdatedAt,
+		Gallery:      images,
+		Availability: availabilities,
 	}
 	response.IsAvailable =
-		productStatusDTO(product.Product.Status) == ProductStatusActive &&
+		productStatusDTO(productDetail.Product.Status) == ProductStatusActive &&
 			available > 0
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

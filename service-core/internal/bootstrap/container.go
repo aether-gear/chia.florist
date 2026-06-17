@@ -178,11 +178,12 @@ func NewContainer(cfg Config,
 			),
 		GetProduct: *productUsecase.
 			NewGetProductUsecase(
+				infra.TransactionExecutor,
+				infra.StorageProvider,
 				productRepo,
 				inventoryRepo,
 				productImageRepo,
-				infra.StorageProvider,
-				infra.TransactionExecutor,
+				shopRepo,
 			),
 		CreateProduct: *productUsecase.
 			NewCreateProductUsecase(

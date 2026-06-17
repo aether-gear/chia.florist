@@ -30,37 +30,38 @@ type productImageResponse struct {
 	Detail    *string `json:"detail"`
 }
 
-type productCatalogResponse struct {
-	ID           uuid.UUID                     `json:"id"`
-	SKU          string                        `json:"sku"`
-	Name         string                        `json:"name"`
-	Slug         string                        `json:"slug"`
-	Status       string                        `json:"status"`
-	IsAvailable  bool                          `json:"is_available"`
-	Price        int64                         `json:"price"`
-	TotalStock   int                           `json:"stock"`
-	Image        productImageResponse          `json:"images"`
-	Availability []productAvailabilityResponse `json:"availability"`
-}
-
 type productAvailabilityResponse struct {
 	Slug  string `json:"slug"`
 	Name  string `json:"name"`
 	Stock int    `json:"stock"`
 }
 
+type productBaseResponse struct {
+	ID          uuid.UUID            `json:"id"`
+	SKU         string               `json:"sku"`
+	Name        string               `json:"name"`
+	Slug        string               `json:"slug"`
+	Status      string               `json:"status"`
+	IsAvailable bool                 `json:"is_available"`
+	Price       int64                `json:"price"`
+	TotalStock  int                  `json:"stock"`
+	Banner      productImageResponse `json:"banner"`
+}
+
+type productCatalogResponse struct {
+	productBaseResponse
+
+	Availability []productAvailabilityResponse `json:"availability"`
+}
+
 type productDetailResponse struct {
-	ID          uuid.UUID              `json:"id"`
-	SKU         string                 `json:"sku"`
-	Name        string                 `json:"name"`
-	Slug        string                 `json:"slug"`
-	Description *string                `json:"description"`
-	IsAvailable bool                   `json:"is_available"`
-	Price       int64                  `json:"price"`
-	Weight      *float64               `json:"weight"`
-	TotalStock  int                    `json:"stock"`
-	UpdatedAt   *time.Time             `json:"updated_at"`
-	Images      []productImageResponse `json:"images"`
+	productBaseResponse
+
+	Description  *string                       `json:"description"`
+	Weight       *float64                      `json:"weight"`
+	UpdatedAt    *time.Time                    `json:"updated_at"`
+	Gallery      []productImageResponse        `json:"gallery"`
+	Availability []productAvailabilityResponse `json:"availability"`
 }
 
 type productInventoryView struct {
