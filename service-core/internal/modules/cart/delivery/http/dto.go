@@ -87,6 +87,8 @@ type selectedCourierResponse struct {
 
 type shopResponse struct {
 	ShopID          uuid.UUID                  `json:"shop_id"`
+	ShopName        string                     `json:"name"`
+	ShopSlug        string                     `json:"slug"`
 	Subtotal        int64                      `json:"subtotal"`
 	Total           *int64                     `json:"total"`
 	SelectedCourier *selectedCourierResponse   `json:"selected_courier"`

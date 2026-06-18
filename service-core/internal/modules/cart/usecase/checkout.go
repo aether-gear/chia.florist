@@ -16,6 +16,8 @@ import (
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
 	shipmentRepo "service-core/internal/modules/shipment/repository"
+	shopDomain "service-core/internal/modules/shop/domain"
+	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -29,6 +31,7 @@ type CheckoutUsecase struct {
 	productRepo     productRepo.ProductRepository
 	shipmentRepo    shipmentRepo.ShippingCostProvider
 	shopAddressRepo addressRepo.ShopAddressRepository
+	shopRepo        shopRepo.ShopRepository
 }
 
 func NewCheckoutUsecase(
@@ -39,6 +42,7 @@ func NewCheckoutUsecase(
 	productRepo productRepo.ProductRepository,
 	shipmentRepo shipmentRepo.ShippingCostProvider,
 	shopAddressRepo addressRepo.ShopAddressRepository,
+	shopRepo shopRepo.ShopRepository,
 ) *CheckoutUsecase {
 	return &CheckoutUsecase{
 		executor:        executor,
@@ -48,6 +52,7 @@ func NewCheckoutUsecase(
 		productRepo:     productRepo,
 		shipmentRepo:    shipmentRepo,
 		shopAddressRepo: shopAddressRepo,
+		shopRepo:        shopRepo,
 	}
 }
 
@@ -105,6 +110,8 @@ type SelectedCourierResult struct {
 
 type ShopResult struct {
 	ShopID          uuid.UUID
+	ShopSlug        string
+	ShopName        string
 	Items           []CheckoutItemResult
 	SelectedCourier *SelectedCourierResult
 	CostCouriers    []CheckoutCouriersResult
@@ -182,6 +189,20 @@ func (u *CheckoutUsecase) Execute(
 		GetDefaultsByShopIDs(ctx, u.executor, shopIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve origin addresses: %w", err)
+	}
+
+	shops, err := u.shopRepo.
+		FindByIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load products: %w", err)
+	}
+
+	shopMap := make(
+		map[uuid.UUID]shopDomain.Shop,
+		len(shops),
+	)
+	for _, s := range shops {
+		shopMap[s.ID] = s
 	}
 
 	// Checkout shipping destination defaults to the user's
@@ -353,6 +374,8 @@ func (u *CheckoutUsecase) Execute(
 
 		shopResult := ShopResult{
 			ShopID:   shopGroup.ShopID,
+			ShopSlug: shopMap[shopGroup.ShopID].Slug,
+			ShopName: shopMap[shopGroup.ShopID].Name,
 			Items:    checkoutItems,
 			Subtotal: shopSubtotal,
 			Total:    shopSubtotal + shippingFee,

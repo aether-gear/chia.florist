@@ -356,6 +356,8 @@ func toCheckoutResponse(result usecase.CheckoutResult) checkoutResponse {
 
 		shopReponse := shopResponse{
 			ShopID:       shop.ShopID,
+			ShopSlug:     shop.ShopSlug,
+			ShopName:     shop.ShopName,
 			Subtotal:     shop.Subtotal,
 			Total:        &shop.Total,
 			Items:        itemsResponse,

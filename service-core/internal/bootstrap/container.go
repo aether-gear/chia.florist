@@ -344,6 +344,7 @@ func NewContainer(cfg Config,
 				productRepo,
 				infra.ShippingCostProvider,
 				addressShopRepo,
+				shopRepo,
 			),
 
 		ListLocations: *locationUsecase.
