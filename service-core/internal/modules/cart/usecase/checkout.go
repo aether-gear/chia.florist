@@ -13,6 +13,7 @@ import (
 	courierRepo "service-core/internal/modules/courier/repository"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
+	paymentRepo "service-core/internal/modules/payment/repository"
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
 	shipmentRepo "service-core/internal/modules/shipment/repository"
@@ -24,14 +25,15 @@ import (
 )
 
 type CheckoutUsecase struct {
-	executor        transaction.Executor
-	addressRepo     addressRepo.UserAddressRepository
-	courierShopRepo courierRepo.ShopCourierRepository
-	inventoryRepo   inventoryRepo.InventoryRepository
-	productRepo     productRepo.ProductRepository
-	shipmentRepo    shipmentRepo.ShippingCostProvider
-	shopAddressRepo addressRepo.ShopAddressRepository
-	shopRepo        shopRepo.ShopRepository
+	executor          transaction.Executor
+	addressRepo       addressRepo.UserAddressRepository
+	courierShopRepo   courierRepo.ShopCourierRepository
+	inventoryRepo     inventoryRepo.InventoryRepository
+	paymentMethodRepo paymentRepo.PaymentMethodRepository
+	productRepo       productRepo.ProductRepository
+	shipmentRepo      shipmentRepo.ShippingCostProvider
+	shopAddressRepo   addressRepo.ShopAddressRepository
+	shopRepo          shopRepo.ShopRepository
 }
 
 func NewCheckoutUsecase(
@@ -39,20 +41,22 @@ func NewCheckoutUsecase(
 	addressRepo addressRepo.UserAddressRepository,
 	courierShopRepo courierRepo.ShopCourierRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
+	paymentMethodRepo paymentRepo.PaymentMethodRepository,
 	productRepo productRepo.ProductRepository,
 	shipmentRepo shipmentRepo.ShippingCostProvider,
 	shopAddressRepo addressRepo.ShopAddressRepository,
 	shopRepo shopRepo.ShopRepository,
 ) *CheckoutUsecase {
 	return &CheckoutUsecase{
-		executor:        executor,
-		addressRepo:     addressRepo,
-		courierShopRepo: courierShopRepo,
-		inventoryRepo:   inventoryRepo,
-		productRepo:     productRepo,
-		shipmentRepo:    shipmentRepo,
-		shopAddressRepo: shopAddressRepo,
-		shopRepo:        shopRepo,
+		executor:          executor,
+		addressRepo:       addressRepo,
+		courierShopRepo:   courierShopRepo,
+		inventoryRepo:     inventoryRepo,
+		paymentMethodRepo: paymentMethodRepo,
+		productRepo:       productRepo,
+		shipmentRepo:      shipmentRepo,
+		shopAddressRepo:   shopAddressRepo,
+		shopRepo:          shopRepo,
 	}
 }
 
@@ -73,8 +77,9 @@ type CheckoutShopInput struct {
 }
 
 type CheckoutInput struct {
-	AddressID *uuid.UUID
-	ShopInput []CheckoutShopInput
+	PaymentMethodID *uuid.UUID
+	AddressID       *uuid.UUID
+	ShopInput       []CheckoutShopInput
 }
 
 type CheckoutAddressResult struct {
@@ -119,12 +124,24 @@ type ShopResult struct {
 	Total           int64
 }
 
+type CheckoutPaymentMethodResult struct {
+	ID          uuid.UUID
+	Name        string
+	Type        string
+	Description string
+	Fee         int64
+	Subtotal    int64
+	Total       int64
+}
+
 type CheckoutResult struct {
-	Address          CheckoutAddressResult
-	Shops            []ShopResult
-	Subtotal         int64
-	TotalShippingFee int64
-	TotalAll         int64
+	Address               CheckoutAddressResult
+	PaymentMethods        []CheckoutPaymentMethodResult
+	SelectedPaymentMethod *CheckoutPaymentMethodResult
+	Shops                 []ShopResult
+	Subtotal              int64
+	TotalShippingFee      int64
+	TotalAll              int64
 }
 
 const defaultShippingWeightGrams = 1000
@@ -134,7 +151,7 @@ func (u *CheckoutUsecase) Execute(
 	authCtx authenDomain.AuthContext,
 	input CheckoutInput,
 ) (*CheckoutResult, error) {
-	// Early fallback.
+	// Early fallback
 	// Make sure the default address exists
 	defAddress, err := u.addressRepo.
 		GetDefaultByUserID(ctx, u.executor, authCtx.UserID)
@@ -194,7 +211,7 @@ func (u *CheckoutUsecase) Execute(
 	shops, err := u.shopRepo.
 		FindByIDs(ctx, u.executor, shopIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load products: %w", err)
+		return nil, fmt.Errorf("failed to load shops: %w", err)
 	}
 
 	shopMap := make(
@@ -231,7 +248,6 @@ func (u *CheckoutUsecase) Execute(
 	// Calculate estimation, subtotal and weight
 	// based on shop item (giant loop)
 	var (
-		totalWeight      int = 0
 		totalSubtotal    int64
 		totalShippingFee int64
 		shopsResult      []ShopResult
@@ -242,8 +258,11 @@ func (u *CheckoutUsecase) Execute(
 		//
 		// Include calculations of weight, total subtotal
 		// and estimation total
-		var shopSubtotal int64
-		var checkoutItems []CheckoutItemResult
+		var (
+			shopSubtotal    int64
+			shopItemsWeight int
+			checkoutItems   []CheckoutItemResult
+		)
 		for _, shopItem := range shopGroup.Items {
 			shopInventories := inventoryMap[shopItem.ProductID]
 
@@ -265,14 +284,16 @@ func (u *CheckoutUsecase) Execute(
 			}
 
 			itemSubtotal := product.Price * int64(shopItem.Quantity)
+			shopSubtotal += itemSubtotal
 			totalSubtotal += itemSubtotal
-			shopSubtotal = itemSubtotal
 
 			weight := defaultShippingWeightGrams
 			if product.Weight != nil {
 				weight = int(*product.Weight)
 			}
-			totalWeight += weight * shopItem.Quantity
+
+			itemWeight := weight * shopItem.Quantity
+			shopItemsWeight += itemWeight
 
 			checkoutItems = append(checkoutItems, CheckoutItemResult{
 				ProductID:   product.ID,
@@ -281,7 +302,7 @@ func (u *CheckoutUsecase) Execute(
 				Price:       product.Price,
 				Quantity:    shopItem.Quantity,
 				Subtotal:    itemSubtotal,
-				TotalWeight: weight * shopItem.Quantity,
+				TotalWeight: itemWeight,
 			})
 		}
 
@@ -316,7 +337,7 @@ func (u *CheckoutUsecase) Execute(
 				shipmentRepo.CalculateCostInput{
 					OriginID:      originDistrictID,
 					DestinationID: destDistrictID,
-					Weight:        totalWeight,
+					Weight:        shopItemsWeight,
 					Couriers:      codes,
 				},
 			)
@@ -409,12 +430,90 @@ func (u *CheckoutUsecase) Execute(
 		FullAddress:   destAddress.Detail.FullAddress,
 	}
 
+	var (
+		paymentMethods        []CheckoutPaymentMethodResult
+		selectedPaymentMethod *CheckoutPaymentMethodResult
+
+		totalAll = totalSubtotal + totalShippingFee
+	)
+
+	if input.PaymentMethodID != nil {
+		pm, err := u.paymentMethodRepo.
+			GetByID(ctx, u.executor, *input.PaymentMethodID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve selected payment method: %w", err)
+		}
+
+		if pm == nil {
+			return nil, apperrors.NewNotFound("selected payment method is not available")
+		}
+
+		fee := pm.CalculateFee(totalAll)
+		selectedPaymentMethod = &CheckoutPaymentMethodResult{
+			ID:          pm.ID,
+			Name:        pm.Name,
+			Type:        string(pm.Type),
+			Description: pm.Description,
+			Fee:         fee,
+			Subtotal:    totalAll,
+			Total:       totalAll + fee,
+		}
+	} else {
+		pms, err := u.paymentMethodRepo.
+			ListAll(ctx, u.executor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load payment methods: %w", err)
+		}
+
+		if len(pms) == 0 {
+			return nil, apperrors.NewNotFound("payment method is not available")
+		}
+
+		paymentMethods = make(
+			[]CheckoutPaymentMethodResult,
+			0,
+			len(pms),
+		)
+
+		for _, pm := range pms {
+			fee := pm.CalculateFee(totalAll)
+
+			paymentMethods = append(
+				paymentMethods,
+				CheckoutPaymentMethodResult{
+					ID:          pm.ID,
+					Name:        pm.Name,
+					Type:        string(pm.Type),
+					Description: pm.Description,
+					Fee:         fee,
+					Subtotal:    totalAll,
+					Total:       totalAll + fee,
+				},
+			)
+		}
+	}
+
+	// When a payment method is already selected, use its fee directly.
+	// Otherwise, use the cheapest available option to estimate the grand total.
+	var leastFeePayMethod int64
+	if selectedPaymentMethod != nil {
+		leastFeePayMethod = selectedPaymentMethod.Fee
+	} else {
+		for i, method := range paymentMethods {
+			if i == 0 || method.Fee < leastFeePayMethod {
+				leastFeePayMethod = method.Fee
+			}
+		}
+	}
+
 	result := CheckoutResult{
-		Address:          address,
-		Shops:            shopsResult,
-		Subtotal:         totalSubtotal,
-		TotalShippingFee: totalShippingFee,
-		TotalAll:         totalSubtotal + totalShippingFee,
+		Address:               address,
+		Shops:                 shopsResult,
+		Subtotal:              totalSubtotal,
+		TotalShippingFee:      totalShippingFee,
+		TotalAll:              totalAll + leastFeePayMethod,
+		PaymentMethods:        paymentMethods,
+		SelectedPaymentMethod: selectedPaymentMethod,
 	}
 
 	return &result, nil

@@ -51,8 +51,13 @@ type checkoutShopRequest struct {
 }
 
 type checkoutRequest struct {
-	AddressID *string               `json:"address_id"`
-	Shops     []checkoutShopRequest `json:"shops"`
+	Shops []checkoutShopRequest `json:"shops"`
+}
+
+type checkoutCalculateRequest struct {
+	PaymentMethodID *string               `json:"payment_method_id"`
+	AddressID       *string               `json:"address_id"`
+	Shops           []checkoutShopRequest `json:"shops"`
 }
 
 type checkoutAddressResponse struct {
@@ -86,20 +91,49 @@ type selectedCourierResponse struct {
 }
 
 type shopResponse struct {
-	ShopID          uuid.UUID                  `json:"shop_id"`
-	ShopName        string                     `json:"name"`
-	ShopSlug        string                     `json:"slug"`
-	Subtotal        int64                      `json:"subtotal"`
-	Total           *int64                     `json:"total"`
-	SelectedCourier *selectedCourierResponse   `json:"selected_courier"`
-	Items           []checkoutItemResponse     `json:"items"`
-	CostCouriers    []checkoutCouriersResponse `json:"cost_couriers"`
+	ShopID       uuid.UUID                  `json:"shop_id"`
+	ShopName     string                     `json:"name"`
+	ShopSlug     string                     `json:"slug"`
+	Subtotal     int64                      `json:"subtotal"`
+	Total        *int64                     `json:"total"`
+	Items        []checkoutItemResponse     `json:"items"`
+	CostCouriers []checkoutCouriersResponse `json:"cost_couriers"`
+}
+
+type paymentMethodResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Type        string    `json:"type"`
+	Description string    `json:"description"`
+	Fee         int64     `json:"fee"`
+	Subtotal    int64     `json:"subtotal"`
+	Total       int64     `json:"total"`
 }
 
 type checkoutResponse struct {
-	Address       checkoutAddressResponse `json:"address"`
-	Shops         []shopResponse          `json:"shops"`
-	Subtotal      int64                   `json:"subtotal"`
-	TotalShipping int64                   `json:"total_shipping"`
-	TotalAll      *int64                  `json:"total"`
+	Address        checkoutAddressResponse `json:"address"`
+	Shops          []shopResponse          `json:"shops"`
+	Subtotal       int64                   `json:"subtotal"`
+	TotalShipping  int64                   `json:"total_shipping"`
+	TotalAll       *int64                  `json:"total"`
+	PaymentMethods []paymentMethodResponse `json:"payment_methods"`
+}
+
+type shopCalculateResponse struct {
+	ShopID          uuid.UUID               `json:"shop_id"`
+	ShopName        string                  `json:"name"`
+	ShopSlug        string                  `json:"slug"`
+	Subtotal        int64                   `json:"subtotal"`
+	Total           *int64                  `json:"total"`
+	SelectedCourier selectedCourierResponse `json:"selected_courier"`
+	Items           []checkoutItemResponse  `json:"items"`
+}
+
+type checkoutCalculateResponse struct {
+	Address                checkoutAddressResponse `json:"address"`
+	Shops                  []shopCalculateResponse `json:"shops"`
+	Subtotal               int64                   `json:"subtotal"`
+	TotalShipping          int64                   `json:"total_shipping"`
+	TotalAll               *int64                  `json:"total"`
+	SelectedPaymentMethods paymentMethodResponse   `json:"selected_payment_methods"`
 }
