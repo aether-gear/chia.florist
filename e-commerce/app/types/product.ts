@@ -7,40 +7,63 @@ export interface ProductImage {
 }
 
 /**
- * Raw API Response structure for Product Detail (GET /products/{id})
+ * Raw API Response structure for Product Detail (GET /products/{slug})
  */
 export interface ApiProductDetail {
   id: string
   sku: string
   name: string
   slug: string
-  description?: string
+  status: string
   is_available: boolean
   price: number
-  weight?: number
   stock: number
+  description?: string
+  weight?: number
   updated_at?: string | null
-  images: ProductImage[]
+  banner: {
+    thumbnail: string | null
+    preview: string | null
+    detail: string | null
+  }
+  gallery: {
+    thumbnail: string | null
+    preview: string | null
+    detail: string | null
+  }[]
+  availability: {
+    slug: string
+    name: string
+    stock: number
+  }[]
 }
 
 /**
- * Raw API Response structure for Product List Item (GET /products/)
+ * Raw API Response structure for Product List Item (GET /products)
  */
 export interface ApiProductListItem {
   id: string
   sku: string
   name: string
   slug: string
+  status: string
   is_available: boolean
   price: number
   stock: number
-  images: {
-    thumbnail: string
+  banner: {
+    thumbnail: string | null
+    preview: string | null
+    detail: string | null
   }
+  availability: {
+    slug: string
+    name: string
+    stock: number
+  }[]
 }
 
 /**
- * Raw API Response structure for Product Search List (GET /products/)
+ * Raw API Response structure for Product Search List (GET /products)
  */
 export interface ApiProductListResponse {
   limit: number
@@ -84,4 +107,5 @@ export interface CatalogProduct {
   desc: string
   isCustomRoute?: boolean
   isAvailable: boolean
+  slug?: string
 }

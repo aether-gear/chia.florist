@@ -13,11 +13,11 @@ export const useProductViewModel = () => {
   /**
    * Fetch all products for the catalog page and map them.
    */
-  const fetchCatalogProducts = async () => {
+  const fetchCatalogProducts = async (params?: { name?: string; id?: string; page?: number; limit?: number; sort?: string }) => {
     isLoading.value = true
     error.value = null
     try {
-      catalogProducts.value = await productService.getCatalogProducts()
+      catalogProducts.value = await productService.getCatalogProducts(params)
       if (catalogProducts.value.length === 0) {
         error.value = 'Produk sedang tidak tersedia'
       }

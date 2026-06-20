@@ -30,10 +30,14 @@ export default defineEventHandler(async (event) => {
 
   try {
     await client.connect()
-    const res = await client.query(
-      'SELECT shop_id FROM inventory WHERE product_id = $1 ORDER BY stock DESC LIMIT 1;',
-      [id]
-    )
+    
+    // Support lookup by UUID or slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')
+    const queryStr = isUuid
+      ? 'SELECT shop_id FROM inventory WHERE product_id = $1 ORDER BY stock DESC LIMIT 1;'
+      : 'SELECT i.shop_id FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.slug = $1 ORDER BY i.stock DESC LIMIT 1;'
+
+    const res = await client.query(queryStr, [id])
     if (res.rows.length > 0) {
       shopId = res.rows[0].shop_id
     }
