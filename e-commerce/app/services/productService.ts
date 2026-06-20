@@ -7,10 +7,19 @@ export const productService = {
    * Helper function to map API product detail to UI Product domain model.
    */
   mapApiProduct(apiProduct: ApiProductDetail): Product {
-    // Map list of image URLs from ProductImage array
-    const images = Array.isArray(apiProduct.images)
-      ? apiProduct.images.map(img => img.preview || img.detail || img.thumbnail)
-      : []
+    // Map list of image URLs from banner and gallery
+    const images: string[] = []
+    if (apiProduct.banner?.preview || apiProduct.banner?.detail || apiProduct.banner?.thumbnail) {
+      images.push((apiProduct.banner.preview || apiProduct.banner.detail || apiProduct.banner.thumbnail)!)
+    }
+    if (Array.isArray(apiProduct.gallery)) {
+      apiProduct.gallery.forEach(img => {
+        const url = img.preview || img.detail || img.thumbnail
+        if (url && !images.includes(url)) {
+          images.push(url)
+        }
+      })
+    }
 
     // Fallback image if empty
     if (images.length === 0) {
@@ -46,10 +55,11 @@ export const productService = {
       price: apiProduct.price,
       rating: 4.8,
       reviews: 180,
-      image: apiProduct.images?.thumbnail || '/images/birthday.jpeg',
+      image: apiProduct.banner?.thumbnail || '/images/birthday.jpeg',
       tag: apiProduct.sku ? apiProduct.sku.split('-')[1] || 'Collection' : 'Collection',
       desc: `Premium quality ${apiProduct.name} crafted for your special moments.`,
-      isAvailable: apiProduct.is_available
+      isAvailable: apiProduct.is_available,
+      slug: apiProduct.slug
     }
   },
 
@@ -57,13 +67,15 @@ export const productService = {
    * Fetch catalog products directly from the API.
    * No mockup fallbacks.
    */
-  async getCatalogProducts(params?: { name?: string; page?: number; limit?: number }): Promise<CatalogProduct[]> {
+  async getCatalogProducts(params?: { name?: string; id?: string; page?: number; limit?: number; sort?: string }): Promise<CatalogProduct[]> {
     const query: Record<string, any> = {}
     if (params?.name) query.name = params.name
+    if (params?.id) query.id = params.id
     if (params?.page) query.page = params.page
     if (params?.limit) query.limit = params.limit
+    if (params?.sort) query.sort = params.sort
 
-    const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products/', { query })
+    const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products', { query })
     if (response && Array.isArray(response.products)) {
       return response.products
         .filter(p => p.is_available)
@@ -73,11 +85,11 @@ export const productService = {
   },
 
   /**
-   * Fetch specific product details by ID directly from the API.
+   * Fetch specific product details by ID or slug directly from the API.
    * No mockup fallbacks.
    */
-  async getProductById(id: string): Promise<Product | null> {
-    const response = await $fetch<ApiProductDetail & { shop_id?: string }>(`/api/products/${id}`)
+  async getProductById(idOrSlug: string): Promise<Product | null> {
+    const response = await $fetch<ApiProductDetail & { shop_id?: string }>(`/api/products/${idOrSlug}`)
 
     if (response && response.id) {
       return this.mapApiProduct(response)

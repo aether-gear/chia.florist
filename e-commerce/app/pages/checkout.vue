@@ -1,11 +1,11 @@
 <!-- app/pages/checkout.vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useCart, type CartItem } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
 import { cartService } from '~/services/cartService'
-import type { CheckoutResponse, CheckoutCourierOption } from '~/types/checkout'
+import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod } from '~/types/checkout'
 
 useHead({
   title: 'Secure Checkout - Chia Florist'
@@ -22,6 +22,10 @@ const isLoadingCalculate = ref(false)
 const discount = ref(0)
 const selectedAddressId = ref('')
 const isProcessing = ref(false)
+
+// State Management untuk Payment Methods
+const paymentMethods = ref<PaymentMethod[]>([])
+const selectedPaymentMethodId = ref('')
 
 // Map untuk menyimpan opsi kurir per toko
 const courierOptionsMap = ref<Record<string, CheckoutCourierOption[]>>({})
@@ -75,7 +79,36 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       shops: [],
       subtotal: 0,
       total_shipping: 0,
-      total: 0
+      total: 0,
+      payment_methods: [
+        {
+          id: "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
+          name: "GoPay",
+          type: "ewallet",
+          description: "GoPay via Midtrans",
+          fee: 0,
+          subtotal: 0,
+          total: 0
+        },
+        {
+          id: "074b02e4-e047-4f60-bdb0-cfeb5481d002",
+          name: "DANA",
+          type: "ewallet",
+          description: "DANA via Midtrans",
+          fee: 0,
+          subtotal: 0,
+          total: 0
+        },
+        {
+          id: "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
+          name: "Mandiri",
+          type: "bank_transfer",
+          description: "Mandiri Bill Payment via Midtrans",
+          fee: 0,
+          subtotal: 0,
+          total: 0
+        }
+      ]
     }
   } else {
     merged = JSON.parse(JSON.stringify(res))
@@ -235,9 +268,6 @@ onMounted(async () => {
     let res: CheckoutResponse | null = null
     if (shopsPayload.length > 0) {
       const payload: any = { shops: shopsPayload }
-      if (selectedAddressId.value) {
-        payload.address_id = selectedAddressId.value
-      }
       res = await cartService.checkout(payload)
     }
 
@@ -249,9 +279,20 @@ onMounted(async () => {
         selectedAddressId.value = mergedData.address.id
       }
 
+      if (mergedData.payment_methods && mergedData.payment_methods.length > 0) {
+        paymentMethods.value = mergedData.payment_methods
+        selectedPaymentMethodId.value = mergedData.payment_methods[0].id
+      }
+
       mergedData.shops.forEach(shop => {
         if (shop.cost_couriers) {
           courierOptionsMap.value[shop.shop_id] = shop.cost_couriers
+          if (!selectedCouriers.value[shop.shop_id] && shop.cost_couriers.length > 0) {
+            selectedCouriers.value[shop.shop_id] = {
+              code: shop.cost_couriers[0].code,
+              service: shop.cost_couriers[0].service
+            }
+          }
         }
         if (shop.selected_courier) {
           selectedCouriers.value[shop.shop_id] = {
@@ -273,6 +314,7 @@ onMounted(async () => {
 // 2. Fungsi Hitung Ulang Biaya Pengiriman (Saat Kurir / Alamat Berubah)
 const runCalculate = async () => {
   if (!checkoutData.value) return
+  if (!selectedAddressId.value || !selectedPaymentMethodId.value) return
   isLoadingCalculate.value = true
 
   try {
@@ -286,10 +328,21 @@ const runCalculate = async () => {
 
       if (nonCustomItems.length > 0) {
         const courier = selectedCouriers.value[shop.shop_id]
-        const courierPayload = courier || (shop.selected_courier ? {
+        let courierPayload = courier || (shop.selected_courier ? {
           code: shop.selected_courier.code,
           service: shop.selected_courier.service
         } : undefined)
+
+        if (!courierPayload) {
+          const options = courierOptionsMap.value[shop.shop_id]
+          if (options && options.length > 0) {
+            courierPayload = { code: options[0].code, service: options[0].service }
+            selectedCouriers.value[shop.shop_id] = { code: options[0].code, service: options[0].service }
+          } else {
+            courierPayload = { code: 'jne', service: 'REG' }
+            selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
+          }
+        }
 
         backendShopsPayload.push({
           shop_id: shop.shop_id,
@@ -306,6 +359,7 @@ const runCalculate = async () => {
     if (backendShopsPayload.length > 0) {
       const payload = {
         address_id: selectedAddressId.value,
+        payment_method_id: selectedPaymentMethodId.value,
         shops: backendShopsPayload
       }
       res = await cartService.checkoutCalculate(payload)
@@ -347,10 +401,45 @@ const runCalculate = async () => {
   }
 }
 
+let addressTimeout: ReturnType<typeof setTimeout> | null = null
+
 // Pantau perubahan alamat untuk kalkulasi ulang ongkir
 watch(selectedAddressId, (newId, oldId) => {
   if (newId && oldId && newId !== oldId) {
-    runCalculate()
+    if (addressTimeout) {
+      clearTimeout(addressTimeout)
+    }
+    addressTimeout = setTimeout(() => {
+      runCalculate()
+    }, 300)
+  }
+})
+
+let paymentMethodTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Pantau perubahan metode pembayaran untuk kalkulasi ulang ongkir
+watch(selectedPaymentMethodId, (newId, oldId) => {
+  if (newId && oldId && newId !== oldId) {
+    if (paymentMethodTimeout) {
+      clearTimeout(paymentMethodTimeout)
+    }
+    paymentMethodTimeout = setTimeout(() => {
+      runCalculate()
+    }, 300)
+  }
+})
+
+let courierTimeout: ReturnType<typeof setTimeout> | null = null
+
+onUnmounted(() => {
+  if (paymentMethodTimeout) {
+    clearTimeout(paymentMethodTimeout)
+  }
+  if (addressTimeout) {
+    clearTimeout(addressTimeout)
+  }
+  if (courierTimeout) {
+    clearTimeout(courierTimeout)
   }
 })
 
@@ -373,7 +462,12 @@ const handleCourierChange = (shopId: string, event: Event) => {
     const [code, service] = val.split('|')
     if (code && service) {
       selectedCouriers.value[shopId] = { code, service }
-      runCalculate()
+      if (courierTimeout) {
+        clearTimeout(courierTimeout)
+      }
+      courierTimeout = setTimeout(() => {
+        runCalculate()
+      }, 300)
     }
   }
 }
@@ -455,12 +549,13 @@ const handlePlaceOrder = async () => {
               <label 
                 v-for="addr in addressVm.addresses.value" 
                 :key="addr.address_id"
-                :class="['border rounded-2xl p-4 flex items-start gap-4 cursor-pointer transition-all', selectedAddressId === addr.address_id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300']"
+                :class="['border rounded-2xl p-4 flex items-start gap-4 cursor-pointer transition-all', selectedAddressId === addr.address_id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300', (isLoadingCalculate || isLoadingCheckout) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '']"
               >
                 <input 
                   type="radio" 
                   v-model="selectedAddressId" 
                   :value="addr.address_id" 
+                  :disabled="isLoadingCalculate || isLoadingCheckout"
                   class="mt-1 accent-[#1b4332]" 
                 />
                 <div class="flex-1 text-xs">
@@ -530,7 +625,8 @@ const handlePlaceOrder = async () => {
                     <select 
                       :value="getCourierSelectValue(shop.shop_id)"
                       @change="handleCourierChange(shop.shop_id, $event)"
-                      class="bg-white border border-gray-200 rounded-xl text-xs p-2.5 outline-none focus:border-emerald-700 transition-all font-bold cursor-pointer text-gray-700"
+                      :disabled="isLoadingCalculate || isLoadingCheckout"
+                      class="bg-white border border-gray-200 rounded-xl text-xs p-2.5 outline-none focus:border-emerald-700 transition-all font-bold cursor-pointer text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option 
                         v-for="courier in getCourierOptions(shop.shop_id)" 
@@ -559,6 +655,40 @@ const handlePlaceOrder = async () => {
                   {{ formatRupiah(item.price * item.quantity) }}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- 3. Payment Method -->
+          <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+            <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">3. Payment Method</h3>
+            
+            <div v-if="paymentMethods.length === 0" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4">
+              <p class="text-sm text-gray-500">No payment methods available.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" v-else>
+              <label 
+                v-for="method in paymentMethods" 
+                :key="method.id"
+                :class="['border rounded-2xl p-4 flex items-start gap-4 cursor-pointer transition-all', selectedPaymentMethodId === method.id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300', (isLoadingCalculate || isLoadingCheckout) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '']"
+              >
+                <input 
+                  type="radio" 
+                  v-model="selectedPaymentMethodId" 
+                  :value="method.id" 
+                  :disabled="isLoadingCalculate || isLoadingCheckout"
+                  class="mt-1 accent-[#1b4332]" 
+                />
+                <div class="flex-1 text-xs">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="font-bold text-gray-900">{{ method.name }}</span>
+                    <span class="bg-emerald-100 text-emerald-800 font-bold text-[9px] px-2 py-0.2 rounded-full uppercase">{{ method.type.replace('_', ' ') }}</span>
+                  </div>
+                  <p class="text-gray-500 leading-normal mb-1 font-semibold">{{ method.description }}</p>
+                  <p class="text-emerald-700 font-bold" v-if="method.fee > 0">Fee: {{ formatRupiah(method.fee) }}</p>
+                  <p class="text-emerald-700 font-bold text-[10px]" v-else>Free Transaction Fee</p>
+                </div>
+              </label>
             </div>
           </div>
         </div>
@@ -594,7 +724,7 @@ const handlePlaceOrder = async () => {
 
             <button 
               @click="handlePlaceOrder"
-              :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate"
+              :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || !selectedPaymentMethodId"
               class="w-full bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
             >
               <span v-if="isProcessing">Processing Order...</span>
