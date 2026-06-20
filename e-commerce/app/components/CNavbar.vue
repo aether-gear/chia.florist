@@ -3,6 +3,9 @@ import { ref, watch, onUnmounted, nextTick } from 'vue'
 import { productService } from '~/services/productService'
 import { formatRupiah } from '~/utils/formatter'
 import type { CatalogProduct } from '~/types/product'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+
+const authVm = useAuthViewModel()
 
 // --- STATE PENCARIAN ---
 const isSearchOpen = ref(false)
@@ -117,16 +120,48 @@ const closeSearch = () => {
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.25M16.5 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm3 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
         </svg>
       </NuxtLink>
+      
+      <!-- Profile & Auth status indicator -->
+      <div class="flex items-center gap-1 sm:gap-2 border-l border-gray-100 pl-2 sm:pl-4">
+        <template v-if="authVm.isAuthenticated.value">
+          <NuxtLink 
+            to="/profile" 
+            class="flex items-center gap-2 py-1 px-2.5 hover:bg-gray-50 rounded-full transition-all duration-300 group"
+            title="Profile Settings"
+          >
+            <div class="relative w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#1b4332] group-hover:bg-[#1b4332] group-hover:text-white transition-all duration-300">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <!-- Green online dot overlay -->
+              <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+            </div>
+            <span class="hidden sm:inline text-xs font-bold text-gray-700 group-hover:text-[#1b4332] transition-colors max-w-[90px] truncate">
+              {{ authVm.currentUser.value?.name || 'Customer' }}
+            </span>
+          </NuxtLink>
+          
+          <button 
+            @click="authVm.logout" 
+            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-300 cursor-pointer"
+            title="Sign Out"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        </template>
 
-      <NuxtLink 
-        to="/profile" 
-        class="p-2 text-gray-500 hover:text-[#1b4332] hover:bg-gray-50 rounded-full transition-all duration-300"
-        title="Profile"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      </NuxtLink>
+        <template v-else>
+          <NuxtLink 
+            to="/login" 
+            class="flex items-center gap-1.5 py-1.5 px-4 bg-[#1b4332] hover:bg-[#143326] text-white rounded-full text-xs font-bold transition-all duration-300 shadow-sm hover:shadow cursor-pointer"
+            title="Sign In"
+          >
+            <span>Sign In</span>
+          </NuxtLink>
+        </template>
+      </div>
     </div>
 
     <Teleport to="body">
@@ -175,12 +210,15 @@ const closeSearch = () => {
                 <NuxtLink 
                   v-for="product in searchResults" 
                   :key="product.id"
-                  :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.id}`"
+                  :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.slug || product.id}`"
                   @click="closeSearch"
                   class="flex gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-all group cursor-pointer border border-transparent hover:border-gray-100"
                 >
-                  <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img :src="product.image || '/images/birthday.jpeg'" :alt="product.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                    <img v-if="product.image" :src="product.image" :alt="product.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
                   </div>
                   <div class="flex flex-col justify-center">
                     <h4 class="text-xs font-bold text-gray-900 group-hover:text-[#1b4332] transition-colors leading-tight">

@@ -21,10 +21,7 @@ export const productService = {
       })
     }
 
-    // Fallback image if empty
-    if (images.length === 0) {
-      images.push('/images/birthday.jpeg')
-    }
+
 
     return {
       id: apiProduct.id,
@@ -55,7 +52,7 @@ export const productService = {
       price: apiProduct.price,
       rating: 4.8,
       reviews: 180,
-      image: apiProduct.banner?.thumbnail || '/images/birthday.jpeg',
+      image: apiProduct.banner?.thumbnail || '',
       tag: apiProduct.sku ? apiProduct.sku.split('-')[1] || 'Collection' : 'Collection',
       desc: `Premium quality ${apiProduct.name} crafted for your special moments.`,
       isAvailable: apiProduct.is_available,
@@ -78,7 +75,6 @@ export const productService = {
     const response = await bootstrapConfig.fetchApi<ApiProductListResponse>('/products', { query })
     if (response && Array.isArray(response.products)) {
       return response.products
-        .filter(p => p.is_available)
         .map(p => this.mapApiCatalogProduct(p))
     }
     return []

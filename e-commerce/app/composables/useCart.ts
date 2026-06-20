@@ -39,8 +39,23 @@ export const useCart = () => {
   const orders = useState<Order[]>('chia-florist-orders', () => [])
   const isLoggedIn = useCookie('is_logged_in')
 
-  const loadCart = (): Promise<void> => {
+  const loadCart = (force = false): Promise<void> => {
     if (isLoggedIn.value !== 'true') return Promise.resolve()
+
+    if (!force && import.meta.client) {
+      const cached = localStorage.getItem('chia-florist-cart-cache')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          const customItems = cart.value.filter(i => i.isCustom)
+          cart.value = [...parsed, ...customItems]
+          return Promise.resolve()
+        } catch (e) {
+          console.error('Failed to parse cart cache:', e)
+        }
+      }
+    }
+
     if (loadCartPromise) return loadCartPromise
 
     loadCartPromise = (async () => {
@@ -70,7 +85,7 @@ export const useCart = () => {
               id: item.product_id,
               name: item.name,
               price: price,
-              image: item.images?.thumbnail || '/images/birthday.jpeg',
+              image: item.images?.thumbnail || '',
               quantity: Number(item.quantity),
               shopId: item.shop_id,
               isCustom: false,
@@ -81,6 +96,10 @@ export const useCart = () => {
 
           const customItems = cart.value.filter(i => i.isCustom)
           cart.value = [...backendItems, ...customItems]
+
+          if (import.meta.client) {
+            localStorage.setItem('chia-florist-cart-cache', JSON.stringify(backendItems))
+          }
         }
       } catch (err) {
         console.error('Failed to load cart from backend:', err)
@@ -94,11 +113,13 @@ export const useCart = () => {
 
   if (import.meta.client && !cartWatcherInitialized) {
     cartWatcherInitialized = true
-    watch(isLoggedIn, (newVal) => {
+    watch(isLoggedIn, (newVal, oldVal) => {
       if (newVal === 'true') {
-        loadCart()
+        const shouldForce = oldVal !== undefined && oldVal !== 'true'
+        loadCart(shouldForce)
       } else {
         cart.value = cart.value.filter(i => i.isCustom)
+        localStorage.removeItem('chia-florist-cart-cache')
       }
     }, { immediate: true })
   }
@@ -157,7 +178,7 @@ export const useCart = () => {
           color: item.color || '#1b4332'
         } as any)
         
-        await loadCart()
+        await loadCart(true)
       } catch (err) {
         console.error(err)
       }
@@ -184,7 +205,7 @@ export const useCart = () => {
       try {
         const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
         await cartService.removeItem(shopId, id)
-        await loadCart()
+        await loadCart(true)
       } catch (err) {
         console.error(err)
       }
@@ -220,6 +241,7 @@ export const useCart = () => {
         timeoutId: setTimeout(async () => {
           try {
             await cartService.updateItem(shopId, id, newQty)
+            await loadCart(true)
           } catch (err) {
             console.error('Backend sync failed:', err)
           } finally {
@@ -257,6 +279,7 @@ export const useCart = () => {
           }
         }
       }
+      await loadCart(true)
     } else {
       for (const item of orderItems) {
         if (import.meta.client) {

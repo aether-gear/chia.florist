@@ -6,6 +6,8 @@ import { useCart, type CartItem } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
 import { cartService } from '~/services/cartService'
 import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod } from '~/types/checkout'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { triggerAuthAlert } from '~/composables/useSessionState'
 
 useHead({
   title: 'Secure Checkout - Chia Florist'
@@ -14,6 +16,7 @@ useHead({
 const route = useRoute()
 const { cart, cartSubtotal, cartSubtotalFormatted, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
+const authVm = useAuthViewModel()
 
 // State Management untuk Checkout & Shipping
 const checkoutData = ref<CheckoutResponse | null>(null)
@@ -41,7 +44,7 @@ const buyNowItem = computed<CartItem | null>(() => {
     id: route.query.id as string,
     name: route.query.name as string,
     price: Number(route.query.price || 0),
-    image: (route.query.image as string) || '/images/birthday.jpeg',
+    image: (route.query.image as string) || '',
     quantity: Number(route.query.qty || 1),
     size: (route.query.size as string) || undefined,
     color: (route.query.color as string) || undefined,
@@ -233,6 +236,13 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
 // Muat data checkout saat halaman dibuka
 onMounted(async () => {
+  await authVm.fetchCurrentUser()
+  if (!authVm.isAuthenticated.value) {
+    triggerAuthAlert('warning', 'Please sign in to proceed with checkout.')
+    navigateTo('/login')
+    return
+  }
+
   if (checkoutItems.value.length === 0) {
     navigateTo('/catalog')
     return

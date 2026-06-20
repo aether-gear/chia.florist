@@ -79,22 +79,6 @@ func (u *GetProductUsecase) Execute(
 		return nil, fmt.Errorf("failed to load inventory by product: %w", err)
 	}
 
-	var shopIDs []uuid.UUID
-	for _, inv := range inventories {
-		shopIDs = append(shopIDs, inv.ShopID)
-	}
-
-	shops, err := u.shopRepo.
-		FindByIDs(ctx, u.executor, shopIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load shops: %w", err)
-	}
-
-	shopsMap := make(map[uuid.UUID]shopDomain.Shop)
-	for _, s := range shops {
-		shopsMap[s.ID] = s
-	}
-
 	images, err := u.productImgRepo.
 		ListByProductID(ctx, u.executor, product.ID)
 	if err != nil {
@@ -105,32 +89,6 @@ func (u *GetProductUsecase) Execute(
 		Product:         *product,
 		ShopInventories: inventories,
 	}
-
-	var (
-		totalStock    = 0
-		reservedStock = 0
-		availability  []ShopAvailabilityResult
-	)
-
-	for _, inventory := range inventories {
-		totalStock += inventory.TotalStock
-		reservedStock += inventory.ReservedStock
-
-		shop, ok := shopsMap[inventory.ShopID]
-		if !ok {
-			continue
-		}
-
-		availability = append(availability, ShopAvailabilityResult{
-			ShopName: shop.Name,
-			ShopSlug: shop.Slug,
-			Stock:    inventory.TotalStock,
-		})
-	}
-
-	result.Inventory.TotalStock = totalStock
-	result.Inventory.ReservedStock = reservedStock
-	result.Availability = availability
 
 	if len(images) > 0 {
 		result.Images = make([]ImageProductDetail, 0, len(images))
@@ -162,6 +120,52 @@ func (u *GetProductUsecase) Execute(
 			result.Images = append(result.Images, imageDetail)
 		}
 	}
+
+	if len(inventories) == 0 {
+		return &result, nil
+	}
+
+	var shopIDs []uuid.UUID
+	for _, inv := range inventories {
+		shopIDs = append(shopIDs, inv.ShopID)
+	}
+
+	shops, err := u.shopRepo.
+		FindByIDs(ctx, u.executor, shopIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load shops: %w", err)
+	}
+
+	shopsMap := make(map[uuid.UUID]shopDomain.Shop)
+	for _, s := range shops {
+		shopsMap[s.ID] = s
+	}
+
+	var (
+		totalStock    = 0
+		reservedStock = 0
+		availability  []ShopAvailabilityResult
+	)
+
+	for _, inventory := range inventories {
+		totalStock += inventory.TotalStock
+		reservedStock += inventory.ReservedStock
+
+		shop, ok := shopsMap[inventory.ShopID]
+		if !ok {
+			continue
+		}
+
+		availability = append(availability, ShopAvailabilityResult{
+			ShopName: shop.Name,
+			ShopSlug: shop.Slug,
+			Stock:    inventory.TotalStock,
+		})
+	}
+
+	result.Inventory.TotalStock = totalStock
+	result.Inventory.ReservedStock = reservedStock
+	result.Availability = availability
 
 	return &result, nil
 }

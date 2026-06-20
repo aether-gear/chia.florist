@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useCart } from '~/composables/useCart' // <-- INTEGRASI: Ambil useCart untuk kurensi
+import { productService } from '~/services/productService'
 
 useHead({
   title: 'Chia Florist - Flower Boards',
@@ -41,25 +42,40 @@ const resetTimer = () => {
   startTimer()
 }
 
-onMounted(() => {
+const productOfferings = ref<any[]>([])
+const isLoading = ref(false)
+
+onMounted(async () => {
   startTimer()
+  isLoading.value = true
+  try {
+    const list = await productService.getCatalogProducts()
+    productOfferings.value = [
+      ...list.map(p => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug || '',
+        price: p.price,
+        image: p.image,
+        isAvailable: p.isAvailable
+      })),
+      { id: 'custom', name: 'Custom Board Simulator', slug: 'custom', price: 150000, image: '/images/custom-preview.png', isAvailable: true }
+    ]
+  } catch (err) {
+    console.error('Failed to load homepage offerings:', err)
+  } finally {
+    isLoading.value = false
+  }
 })
+
+const getProductImageBySlug = (slug: string) => {
+  const prod = productOfferings.value.find(p => p.slug === slug)
+  return prod?.image || ''
+}
 
 onUnmounted(() => {
   if (intervalTimer) clearInterval(intervalTimer)
 })
-
-// Data Produk menggunakan UUID asli agar sinkron dengan database Supabase kelompok kalian
-const productOfferings = ref([
-  { id: '2ceea56c-352f-4a48-a262-f60e9ee85b1c', name: 'Grand Opening', image: '/images/grandop.jpeg' },
-  { id: '71be3ee1-17b4-4bb8-8f80-eae6ad93a844', name: 'Graduate', image: '/images/graduate.jpeg' },
-  { id: '799d0a71-7c88-4620-8ca0-27a827fbac07', name: 'Condolences', image: '/images/condolences.jpeg' },
-  { id: '9886edf6-087b-48e7-b00a-d79dd092e8d4', name: 'Anniversary', image: '/images/anniversary.jpeg' },
-  { id: 'b40dcc46-8328-4fcd-af77-42ecc9511606', name: 'Birthday', image: '/images/birthday.jpeg' },
-  { id: 'e0686de0-b1ce-4459-999c-ac1c69ada522', name: 'Wedding', image: '/images/wedding.jpeg' },
-  { id: 'fab51949-5a26-48e7-bdeb-e3a5b51337fe', name: 'Congratulations', image: '/images/congratulations.jpeg' },
-  { id: 'custom', name: 'Custom', image: '' }
-])
 </script>
 
 <template>
@@ -175,21 +191,35 @@ const productOfferings = ref([
         
         <div v-for="(item, idx) in productOfferings" :key="idx" class="bg-white-base rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition">
           <div class="h-64 relative bg-gray-50">
-            <div v-if="item.name === 'Custom'" class="w-full h-full bg-accent flex items-center justify-center">
+            <div v-if="item.id === 'custom'" class="w-full h-full bg-[#1b4332] flex items-center justify-center">
               <span class="text-white-base text-4xl font-bold">?</span>
             </div>
             <img v-else :src="item.image" :alt="item.name" class="w-full h-full object-cover" />
+            <span v-if="!item.isAvailable" class="absolute top-3 right-3 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-lg border border-red-200 shadow-sm z-20">
+              Sold Out
+            </span>
           </div>
           <div class="p-4 flex flex-col gap-3">
             <h3 class="font-bold text-gray-800">{{ item.name }}</h3>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="text-gray-400 text-xs line-through">{{ formatRupiah(175000) }}</span>
-                <span class="text-accent font-bold text-base">{{ formatRupiah(140000) }}</span>
+                <span class="text-gray-400 text-xs line-through" v-if="item.id !== 'custom'">{{ formatRupiah(item.price + 35000) }}</span>
+                <span class="text-accent font-bold text-base">{{ formatRupiah(item.price) }}</span>
               </div>
-              <NuxtLink :to="`/products/${item.id}`" class="bg-accent text-white-base text-xs px-3 py-1.5 rounded hover-bg-accent-strong transition">
+              <NuxtLink 
+                v-if="item.isAvailable" 
+                :to="`/products/${item.slug || item.id}`" 
+                class="bg-accent text-white-base text-xs px-3 py-1.5 rounded hover:bg-accent/90 transition"
+              >
                 Buy
               </NuxtLink>
+              <button 
+                v-else 
+                disabled 
+                class="bg-gray-100 text-gray-400 text-xs px-3 py-1.5 rounded cursor-not-allowed border border-gray-200"
+              >
+                Sold Out
+              </button>
             </div>
           </div>
         </div>
@@ -249,14 +279,87 @@ const productOfferings = ref([
     <section class="max-w-7xl mx-auto px-8 py-20">
       <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">Our Gallery View</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="h-[600px]">
-          <img src="/images/graduate.jpeg" alt="Gallery 1" class="w-full h-full object-cover rounded-xl shadow-sm" />
+        <!-- Main Large Gallery Item -->
+        <div class="h-[600px] rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
+          <img 
+            v-if="getProductImageBySlug('graduate')" 
+            :src="getProductImageBySlug('graduate')" 
+            alt="Graduate Gallery" 
+            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+          />
+          <div v-else class="text-center text-gray-400 p-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span class="text-xs font-black uppercase tracking-wider block">Graduate</span>
+          </div>
         </div>
+
+        <!-- 2x2 Grid of Smaller Items -->
         <div class="md:col-span-2 grid grid-cols-2 grid-rows-2 gap-6 h-[600px]">
-          <img src="/images/wedding.jpeg" alt="Gallery 2" class="w-full h-full object-cover rounded-xl" />
-          <img src="/images/birthday.jpeg" alt="Gallery 3" class="w-full h-full object-cover rounded-xl" />
-          <img src="/images/anniversary.jpeg" alt="Gallery 4" class="w-full h-full object-cover rounded-xl" />
-          <img src="/images/condolences.jpeg" alt="Gallery 5" class="w-full h-full object-cover rounded-xl" />
+          <!-- Wedding -->
+          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
+            <img 
+              v-if="getProductImageBySlug('wedding')" 
+              :src="getProductImageBySlug('wedding')" 
+              alt="Wedding Gallery" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
+            <div v-else class="text-center text-gray-400 p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-[10px] font-black uppercase tracking-wider block">Wedding</span>
+            </div>
+          </div>
+
+          <!-- Birthday -->
+          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
+            <img 
+              v-if="getProductImageBySlug('birthday')" 
+              :src="getProductImageBySlug('birthday')" 
+              alt="Birthday Gallery" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
+            <div v-else class="text-center text-gray-400 p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-[10px] font-black uppercase tracking-wider block">Birthday</span>
+            </div>
+          </div>
+
+          <!-- Anniversary -->
+          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
+            <img 
+              v-if="getProductImageBySlug('anniversary')" 
+              :src="getProductImageBySlug('anniversary')" 
+              alt="Anniversary Gallery" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
+            <div v-else class="text-center text-gray-400 p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-[10px] font-black uppercase tracking-wider block">Anniversary</span>
+            </div>
+          </div>
+
+          <!-- Condolences -->
+          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
+            <img 
+              v-if="getProductImageBySlug('condolences')" 
+              :src="getProductImageBySlug('condolences')" 
+              alt="Condolences Gallery" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
+            <div v-else class="text-center text-gray-400 p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-[10px] font-black uppercase tracking-wider block">Condolences</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
