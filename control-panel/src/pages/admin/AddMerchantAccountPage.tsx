@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ type FormData = z.infer<typeof schema>;
 
 export default function AddMerchantAccountPage() {
   const { merchantId: paramMerchantId } = useParams();
-  const navigate = useNavigate();
+
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function AddMerchantAccountPage() {
           phone: data.phone,
         }),
       });
-      setSuccess(response.message || 'Account successfully added!');
+      setSuccess(response?.message || 'Account successfully added!');
       reset({ merchantId: data.merchantId }); // Keep merchantId, reset the rest
     } catch (err: any) {
       setError(err.message || 'Failed to add merchant account');

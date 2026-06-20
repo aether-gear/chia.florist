@@ -1,0 +1,126 @@
+import { Store, Search, Loader2 } from 'lucide-react';
+import { Input } from '../../components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { useMerchantsViewModel } from '../../viewmodels/useMerchantsViewModel';
+
+export default function MerchantsListPage() {
+  const { data, loading, error } = useMerchantsViewModel();
+
+  if (loading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-destructive">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-col md:flex">
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between space-y-2">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Merchants</h2>
+            <p className="text-muted-foreground">
+              Manage merchants registered on the platform
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>All Merchants</CardTitle>
+            <CardDescription>
+              Showing {data?.merchants.length || 0} of {data?.total || 0} merchants.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-center gap-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search merchants..."
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">Logo</TableHead>
+                    <TableHead>Merchant Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Registered On</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.merchants.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center">
+                        No merchants found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data?.merchants.map((merchant) => (
+                      <TableRow key={merchant.id}>
+                        <TableCell>
+                          <div className="h-10 w-10 overflow-hidden rounded-md border">
+                            {merchant.logo_url ? (
+                              <img
+                                src={merchant.logo_url}
+                                alt={merchant.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-muted">
+                                <Store className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {merchant.name}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {merchant.id}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {merchant.description || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {new Date(merchant.created_at).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

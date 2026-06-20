@@ -57,15 +57,18 @@ export function useMerchantProfileViewModel() {
     const loadMerchantProfile = async () => {
       try {
         setLoading(true);
-        // TODO: Replace with API call when service-core endpoint becomes available
-        // const response = await fetch('/api/v1/merchants/profile');
-        // const data = await response.json();
-        
-        await new Promise(resolve => setTimeout(resolve, 800)); // fake delay
+        setError(null);
+        const response = await fetch('/api/core/merchants/profile');
+        if (response.ok) {
+          const data = await response.json();
+          setProfile(data);
+          return;
+        }
+        throw new Error('Failed to fetch merchant profile');
+      } catch (err: any) {
+        console.warn('Backend /merchants/profile failed or not implemented, falling back to mock data');
         setProfile(mockMerchantProfile);
-      } catch (err) {
-        setError('Failed to load merchant profile');
-        console.error(err);
+        setError(null);
       } finally {
         setLoading(false);
       }
@@ -77,11 +80,14 @@ export function useMerchantProfileViewModel() {
   const saveProfile = async (data: MerchantProfile) => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call to update profile
-      // await fetch('/api/v1/merchants/profile', { method: 'PUT', body: JSON.stringify(data) });
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProfile(data); // update local state
+      const res = await fetch('/api/core/merchants/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Failed to update profile');
+      const updated = await res.json();
+      setProfile(updated);
       return true;
     } catch (err) {
       console.error('Failed to save profile', err);

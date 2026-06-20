@@ -28,6 +28,8 @@ export default function LoginPage() {
           ip_address: '127.0.0.1' // In a real app, backend determines this or use a 3rd party service
         })
       });
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userEmail', email);
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Login failed');
