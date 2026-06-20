@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useCart } from '~/composables/useCart' // Import useCart untuk mengambil formatRupiah global
 import { useProductViewModel } from '~/composables/viewmodels/useProductViewModel'
 
@@ -16,8 +16,45 @@ const { formatRupiah } = useCart()
 // Initialize product ViewModel (MVVM Architecture)
 const { catalogProducts, isLoading, error, fetchCatalogProducts } = useProductViewModel()
 
+const searchQuery = ref('')
+const selectedSort = ref('date:desc')
+
+const sortOptions = [
+  { value: 'date:desc', label: 'Newest First' },
+  { value: 'date:asc', label: 'Oldest First' },
+  { value: 'name:asc', label: 'Name (A-Z)' },
+  { value: 'name:desc', label: 'Name (Z-A)' },
+  { value: 'price:asc', label: 'Price (Low to High)' },
+  { value: 'price:desc', label: 'Price (High to Low)' },
+  { value: 'stock:desc', label: 'Stock (High to Low)' },
+  { value: 'stock:asc', label: 'Stock (Low to High)' },
+  { value: 'weight:desc', label: 'Weight (High to Low)' },
+  { value: 'weight:asc', label: 'Weight (Low to High)' }
+]
+
+const loadProducts = () => {
+  fetchCatalogProducts({
+    name: searchQuery.value || undefined,
+    sort: selectedSort.value
+  })
+}
+
 onMounted(() => {
-  fetchCatalogProducts()
+  loadProducts()
+})
+
+// Reload when sort changes
+watch(selectedSort, () => {
+  loadProducts()
+})
+
+// Debounced search watcher
+let searchTimeout: any = null
+watch(searchQuery, () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    loadProducts()
+  }, 400)
 })
 
 // Interactive simulator card runs client-side and should always be present
@@ -45,7 +82,8 @@ const navigateToProduct = (item: any) => {
   if (item.isCustomRoute || item.id === 'custom') {
     navigateTo('/products/custom')
   } else {
-    navigateTo(`/products/${item.id}`)
+    // Navigate using slug if available, fallback to id
+    navigateTo(`/products/${item.slug || item.id}`)
   }
 }
 </script>
@@ -64,6 +102,35 @@ const navigateToProduct = (item: any) => {
         <p class="text-sm md:text-base text-gray-500 leading-relaxed">
           Select our pre-designed premium flower boards or jump directly into our interactive real-time simulator game to design your custom creation.
         </p>
+      </div>
+
+      <!-- Search and Sort Filters Section -->
+      <div class="mb-10 bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div class="relative w-full md:w-96">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input 
+            v-model="searchQuery" 
+            type="text" 
+            placeholder="Search flower boards..." 
+            class="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-11 pr-4 py-3 text-sm outline-none focus:bg-white focus:border-emerald-700 transition-all font-medium text-gray-800"
+          />
+        </div>
+
+        <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sort By</label>
+          <select 
+            v-model="selectedSort" 
+            class="bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-emerald-700 transition-all font-semibold text-gray-700 cursor-pointer"
+          >
+            <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+        </div>
       </div>
 
       <div v-if="isLoading" class="flex flex-col items-center justify-center min-h-[300px] space-y-4">

@@ -6,39 +6,40 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
 ## TODO
 
 - [ ] Public API
-  - [ ] Authentication
-    - [ ] Sign Up
-    - [ ] Verify Account
-    - [ ] Sign In
-  - [ ] Products
-    - [ ] Find Products
-    - [ ] Get Product Detail
+  - [X] Authentication
+    - [X] Sign Up
+    - [X] Verify Account
+    - [X] Sign In
+  - [X] Products
+    - [X] Find Products
+    - [X] Get Product Detail
   - [ ] Shops
     - [ ] Find Shops
     - [ ] Get Shop
     - [ ] Get Shop Addresses
     - [ ] Get Shop Couriers
     - [ ] Get Shop Products
-  - [ ] Locations
-    - [ ] List Provinces
-    - [ ] List Cities by Province
-    - [ ] List Districts by City
-    - [ ] List Villages by District
+  - [X] Locations
+    - [X] List Provinces
+    - [X] List Cities by Province
+    - [X] List Districts by City
+    - [X] List Villages by District
+
 - [ ] Authenticated Customer API
-  - [ ] Authentication
-    - [ ] Me
-    - [ ] Log Out
+  - [X] Authentication
+    - [X] Me
+    - [X] Log Out
   - [ ] Profile
     - [ ] Get Current User
-  - [ ] Addresses
-    - [ ] List My Addresses
-    - [ ] Save My Address
-    - [ ] Delete My Address
-  - [ ] Cart
-    - [ ] Get Cart
-    - [ ] Add Item
-    - [ ] Update Item
-    - [ ] Remove Item
+  - [X] Addresses
+    - [X] List My Addresses
+    - [X] Save My Address
+    - [X] Delete My Address
+  - [X] Cart
+    - [X] Get Cart
+    - [X] Add Item
+    - [X] Update Item
+    - [X] Remove Item
   - [ ] Checkout
     - [ ] Estimate Checkout
     - [ ] Calculate Checkout

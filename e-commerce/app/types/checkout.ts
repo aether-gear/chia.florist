@@ -39,12 +39,24 @@ export interface CheckoutShop {
   cost_couriers: CheckoutCourierOption[] | null
 }
 
+export interface PaymentMethod {
+  id: string
+  name: string
+  type: string
+  description: string
+  fee: number
+  subtotal: number
+  total: number
+}
+
 export interface CheckoutResponse {
   address: CheckoutAddress
   shops: CheckoutShop[]
   subtotal: number
   total_shipping: number
   total: number
+  payment_methods?: PaymentMethod[]
+  selected_payment_method?: PaymentMethod
 }
 
 export interface SelectedCourierInput {
@@ -63,5 +75,6 @@ export interface CheckoutShopInput {
 
 export interface CheckoutRequest {
   address_id?: string
+  payment_method_id?: string
   shops: CheckoutShopInput[]
 }
