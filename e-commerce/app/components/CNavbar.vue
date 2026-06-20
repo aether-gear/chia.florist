@@ -175,7 +175,7 @@ const closeSearch = () => {
                 <NuxtLink 
                   v-for="product in searchResults" 
                   :key="product.id"
-                  :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.id}`"
+                  :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.slug || product.id}`"
                   @click="closeSearch"
                   class="flex gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-all group cursor-pointer border border-transparent hover:border-gray-100"
                 >
