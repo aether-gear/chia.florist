@@ -341,9 +341,11 @@ func NewContainer(cfg Config,
 				addressRepo,
 				shopCourierRepo,
 				inventoryRepo,
+				paymentMethodRepo,
 				productRepo,
 				infra.ShippingCostProvider,
 				addressShopRepo,
+				shopRepo,
 			),
 
 		ListLocations: *locationUsecase.

@@ -4,7 +4,7 @@ CREATE TABLE payment_accounts (
     method_id UUID NOT NULL,
 
     account_name TEXT NOT NULL,
-    account_number TEXT NOT NULL,
+    account_number TEXT,
     phone_number TEXT,
     qr_string TEXT,
 

@@ -72,6 +72,23 @@ func (pM *PaymentMethod) Validate() error {
 	return nil
 }
 
+func (pM PaymentMethod) CalculateFee(amount int64) int64 {
+	switch pM.FeeType {
+	case FeeTypeFlat:
+		return pM.FeeFixed
+
+	case FeeTypePercentage:
+		return int64(float64(amount) * pM.FeePercentage / 100)
+
+	case FeeTypeMixed:
+		return pM.FeeFixed +
+			int64(float64(amount)*pM.FeePercentage/100)
+
+	default:
+		return 0
+	}
+}
+
 func (t PaymentMethodType) IsValid() bool {
 	switch t {
 	case TypeBankTransfer, TypeEWallet, TypeQRCode:
