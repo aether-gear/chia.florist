@@ -41,7 +41,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [ ] Remove Item
   - [ ] Checkout
     - [ ] Estimate Checkout
-    - [ ] Checkout
+    - [ ] Calculate Checkout
 
 # Public API
 
@@ -908,20 +908,19 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 ### Estimate Checkout
 
 - **Method**: `POST`
-- **Endpoint**: `/carts/checkout/calculate`
-- **Description**: Calculate shipping costs and order totals for a given set of items and shops without placing an order. A courier must be provided for each shop.
+- **Endpoint**: `/carts/checkout`
+- **Description**: Place an order for the selected items. Courier selection per shop is optional at this stage.
 - **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "address_id": "string (UUID, optional)",
     "shops": [
       {
         "shop_id": "string (UUID, required)",
         "items": [
           {
             "product_id": "string (UUID, required)",
-            "quantity":   1
+            "quantity":   80
           }
         ],
         "courier": {
@@ -935,53 +934,148 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 #### Important Notes
 
-> A `courier` object is **required** for every shop entry in this endpoint.
-> Use `GET /shops/{shopID}/couriers` to retrieve available courier codes for each shop.
+> The service will **use default address** of the user.
+> The service will use the **least** cost of payment method and courier option.
+> Only estimation grand total, use checkout calculate api to get real grand total
 
 #### Response `200 OK`
 
 ```json
 {
-  "address": {
-    "id":             "d4e5f6a7-b8c9-0123-defa-234567890123",
-    "recipient_name": "Jane Doe",
-    "phone":          "+6281234567890",
-    "full_address":   "Jl. Bunga Indah No. 10, Bekasi"
-  },
-  "shops": [
-    {
-      "shop_id":  "c3d4e5f6-a7b8-9012-cdef-123456789012",
-      "subtotal": 85000,
-      "total":    93000,
-      "selected_courier": {
-        "code":    "jne",
-        "service": "REG",
-        "fee":     8000
-      },
-      "items": [
+    "address": {
+        "id": "95120305-02ad-468e-9103-2bb113d41cd7",
+        "recipient_name": "My Belle Gweh",
+        "phone": "000",
+        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+    },
+    "shops": [
         {
-          "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
-          "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
-          "name":       "Anniversary",
-          "price":      85000,
-          "quantity":   1,
-          "subtotal":   85000
-        }
-      ],
-      "cost_couriers": [
+            "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+            "name": "Chia Medan Satria",
+            "slug": "chia-medan-satria",
+            "subtotal": 21600000,
+            "total": 21850000,
+            "items": [
+                {
+                    "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
+                    "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+                    "name": "Grand Opening",
+                    "price": 150000,
+                    "quantity": 144,
+                    "subtotal": 21600000
+                }
+            ],
+            "cost_couriers": [
+                {
+                    "code": "tiki",
+                    "name": "Citra Van Titipan Kilat (TIKI)",
+                    "service": "TRC",
+                    "etd": "5 day",
+                    "fee": 50000
+                },
+                {
+                    "code": "jne",
+                    "name": "Jalur Nugraha Ekakurir (JNE)",
+                    "service": "REG",
+                    "etd": "1 day",
+                    "fee": 150000
+                },
+                {
+                    "code": "lion",
+                    "name": "Lion Parcel",
+                    "service": "REGPACK",
+                    "etd": "1-2 day",
+                    "fee": 144450
+                },
+                {
+                    "code": "pos",
+                    "name": "POS Indonesia (POS)",
+                    "service": "PAKETPOS VALUABLE GOODS",
+                    "etd": "3 day",
+                    "fee": 247500
+                }
+            ]
+        },
         {
-          "code":    "jne",
-          "name":    "Jalur Nugraha Ekakurir",
-          "service": "REG",
-          "etd":     "2-3",
-          "fee":     8000
+            "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
+            "name": "Chia Cipinang",
+            "slug": "chia-cipinang",
+            "subtotal": 825000,
+            "total": 870000,
+            "items": [
+                {
+                    "product_id": "71be3ee1-17b4-4bb8-8f80-eae6ad93a844",
+                    "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
+                    "name": "Graduate",
+                    "price": 55000,
+                    "quantity": 15,
+                    "subtotal": 825000
+                }
+            ],
+            "cost_couriers": [
+                {
+                    "code": "tiki",
+                    "name": "Citra Van Titipan Kilat (TIKI)",
+                    "service": "TRC",
+                    "etd": "5 day",
+                    "fee": 50000
+                },
+                {
+                    "code": "jne",
+                    "name": "Jalur Nugraha Ekakurir (JNE)",
+                    "service": "REG",
+                    "etd": "1 day",
+                    "fee": 150000
+                },
+                {
+                    "code": "lion",
+                    "name": "Lion Parcel",
+                    "service": "REGPACK",
+                    "etd": "1-2 day",
+                    "fee": 144450
+                },
+                {
+                    "code": "pos",
+                    "name": "POS Indonesia (POS)",
+                    "service": "PAKETPOS VALUABLE GOODS",
+                    "etd": "3 day",
+                    "fee": 247500
+                }
+            ]
         }
-      ]
-    }
-  ],
-  "subtotal":       85000,
-  "total_shipping": 8000,
-  "total":          93000
+    ],
+    "subtotal": 22425000,
+    "total_shipping": 295000,
+    "total": 22720000,
+    "payment_methods": [
+        {
+            "id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
+            "name": "GoPay",
+            "type": "ewallet",
+            "description": "GoPay via Midtrans",
+            "fee": 0,
+            "subtotal": 22720000,
+            "total": 22720000
+        },
+        {
+            "id": "074b02e4-e047-4f60-bdb0-cfeb5481d002",
+            "name": "DANA",
+            "type": "ewallet",
+            "description": "DANA via Midtrans",
+            "fee": 0,
+            "subtotal": 22720000,
+            "total": 22720000
+        },
+        {
+            "id": "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
+            "name": "Mandiri",
+            "type": "bank_transfer",
+            "description": "Mandiri Bill Payment via Midtrans",
+            "fee": 0,
+            "subtotal": 22720000,
+            "total": 22720000
+        }
+    ]
 }
 ```
 
@@ -990,10 +1084,11 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | Field            | Type   | Description |
 |------------------|--------|-------------|
 | `address`        | object | Delivery address details. |
-| `shops`          | array  | Per-shop breakdown of items, couriers, and totals. |
+| `shops`          | array  | Per-shop breakdown of items, **list of couriers**, and totals. |
 | `subtotal`       | int64  | Sum of all item prices before shipping. |
 | `total_shipping` | int64  | Total shipping fee across all shops. |
-| `total`          | int64  | Grand total including shipping (only present when courier is selected). |
+| `payment_methods`| array  | Selection for method of payment. |
+| `total`          | int64  | Grand total but only estimation (use `/cart/checkout/calculate` for actual cost). |
 
 #### Error Responses
 
@@ -1001,17 +1096,19 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 |--------------------|-----------|
 | `400 Bad Request`  | Missing or invalid UUIDs, `quantity <= 0`, or courier missing for any shop. |
 | `401 Unauthorized` | Missing or invalid session. |
+| `409 Conflict`     | System conflict includes **empty user default address**, **insufficient stock** and **shop has not registered the courier**. |
 
-### Checkout
+### Calculate Checkout
 
 - **Method**: `POST`
-- **Endpoint**: `/carts/checkout`
-- **Description**: Place an order for the selected items. Courier selection per shop is optional at this stage.
+- **Endpoint**: `/carts/checkout/calculate`
+- **Description**: Calculate shipping costs and order totals for a given set of items and shops without placing an order. A courier must be provided for each shop.
 - **Authentication**: Customer
 - **Request Body**:
   ```json
   {
-    "address_id": "string (UUID, optional)",
+    "address_id": "string (UUID, required)",
+    "payment_method_id": "string (UUID, required)",
     "shops": [
       {
         "shop_id": "string (UUID, required)",
@@ -1032,12 +1129,89 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 #### Important Notes
 
-> Unlike Estimate Checkout, `courier` is **optional** per shop in this endpoint.
-> The response shape is identical to Estimate Checkout.
+> Unlike Estimate Checkout, `address_id`, `payment_method_id` and `courier` per shop are **required** in this endpoint.
 
 #### Response `200 OK`
 
-Same structure as the [Estimate Checkout response](#estimate-checkout).
+```json
+{
+    "address": {
+        "id": "cd0ce5ff-d5ed-4b1c-85a4-16fef4d19f01",
+        "recipient_name": "Dialyn UwU",
+        "phone": "000",
+        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+    },
+    "shops": [
+        {
+            "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+            "name": "Chia Medan Satria",
+            "slug": "chia-medan-satria",
+            "subtotal": 21600000,
+            "total": 41040000,
+            "selected_courier": {
+                "code": "tiki",
+                "service": "SDS",
+                "fee": 19440000
+            },
+            "items": [
+                {
+                    "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
+                    "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+                    "name": "Grand Opening",
+                    "price": 150000,
+                    "quantity": 144,
+                    "subtotal": 21600000
+                }
+            ]
+        },
+        {
+            "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
+            "name": "Chia Cipinang",
+            "slug": "chia-cipinang",
+            "subtotal": 825000,
+            "total": 960000,
+            "selected_courier": {
+                "code": "tiki",
+                "service": "REG",
+                "fee": 135000
+            },
+            "items": [
+                {
+                    "product_id": "71be3ee1-17b4-4bb8-8f80-eae6ad93a844",
+                    "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
+                    "name": "Graduate",
+                    "price": 55000,
+                    "quantity": 15,
+                    "subtotal": 825000
+                }
+            ]
+        }
+    ],
+    "subtotal": 22425000,
+    "total_shipping": 19575000,
+    "total": 42000000,
+    "selected_payment_method": {
+        "id": "0137d751-5188-447a-b630-1bf858f4f866",
+        "name": "QRIS",
+        "type": "qr_code",
+        "description": "QRIS payment via Midtrans",
+        "fee": 0,
+        "subtotal": 42000000,
+        "total": 42000000
+    }
+}
+```
+
+#### Checkout Response Fields
+
+| Field            | Type   | Description |
+|------------------|--------|-------------|
+| `address`        | object | Delivery address details. |
+| `shops`          | array  | Per-shop breakdown of items, **selected courier**, and totals. |
+| `subtotal`       | int64  | Sum of all item prices before shipping. |
+| `total_shipping` | int64  | Total shipping fee across all shops. |
+| `selected_payment_method`| object  | Selected method of payment. |
+| `total`          | int64  | Grand total including shipping and method of payment. |
 
 #### Error Responses
 
@@ -1045,3 +1219,4 @@ Same structure as the [Estimate Checkout response](#estimate-checkout).
 |--------------------|-----------|
 | `400 Bad Request`  | Missing or invalid UUIDs, or `quantity <= 0`. |
 | `401 Unauthorized` | Missing or invalid session. |
+| `409 Conflict`     | System conflict includes **empty user default address**, **insufficient stock** and **shop has not registered the courier**. |

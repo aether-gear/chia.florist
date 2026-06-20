@@ -27,6 +27,10 @@ Endpoints are organized by access level: **Public**, **Merchant Staff**, and **M
     - [ ] Find Merchants
   - [ ] Customer Management
     - [ ] Find Customers
+  - [ ] Payment
+    - [ ] List Payment Method
+    - [ ] List Payment Account
+    - [ ] Create Payment Account
 
 # Public API
 
@@ -659,3 +663,157 @@ These endpoints require a valid merchant session with the **merchant admin** rol
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the merchant admin role. |
 | `404 Not Found`    | No customers match the given filters. |
+
+## Payment Management
+
+### List Payment Method
+
+- **Method**: `GET`
+- **Endpoint**: `/payments/methods`
+- **Description**: Retrieve a list of payment methods.
+- **Authentication**: Merchant
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+    "methods": [
+        {
+            "id": "0137d751-5188-447a-b630-1bf858f4f866",
+            "name": "QRIS",
+            "type": "qr_code",
+            "is_active": true,
+            "description": "QRIS payment via Midtrans",
+            "fee_type": "",
+            "fee_fixed": 0,
+            "fee_percentage": 0
+        },
+        {
+            "id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
+            "name": "GoPay",
+            "type": "ewallet",
+            "is_active": true,
+            "description": "GoPay via Midtrans",
+            "fee_type": "",
+            "fee_fixed": 0,
+            "fee_percentage": 0
+        },
+        {
+            "id": "074b02e4-e047-4f60-bdb0-cfeb5481d002",
+            "name": "DANA",
+            "type": "ewallet",
+            "is_active": true,
+            "description": "DANA via Midtrans",
+            "fee_type": "",
+            "fee_fixed": 0,
+            "fee_percentage": 0
+        },
+        {
+            "id": "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
+            "name": "Mandiri",
+            "type": "bank_transfer",
+            "is_active": true,
+            "description": "Mandiri Bill Payment via Midtrans",
+            "fee_type": "",
+            "fee_fixed": 0,
+            "fee_percentage": 0
+        }
+    ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `id` is provided but is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the merchant admin role. |
+
+### List Payment Accounts
+
+- **Method**: `GET`
+- **Endpoint**: `/payments/accounts`
+- **Description**: Retrieve a list of payment accounts.
+- **Authentication**: Merchant Admin
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+    "accounts": [
+        {
+            "id": "5672b98b-3474-4bbe-94de-ccf784ae90dc",
+            "method_id": "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
+            "account_name": "Mandiri Reyhan",
+            "account_number": "1690002799366",
+            "phone_number": "0895326204046",
+            "qr_string": null
+        },
+        {
+            "id": "01198989-6b57-4005-b7e6-50e797ccca04",
+            "method_id": "074b02e4-e047-4f60-bdb0-cfeb5481d002",
+            "account_name": "Dana Ilham",
+            "account_number": null,
+            "phone_number": "081291302897",
+            "qr_string": null
+        },
+        {
+            "id": "d8242cd0-7e80-4bbb-95cd-7b0061230ed6",
+            "method_id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
+            "account_name": "GoPay Ilham",
+            "account_number": null,
+            "phone_number": "081291302897",
+            "qr_string": null
+        },
+        {
+            "id": "e16476f0-f7d1-4959-a3cc-07f95e2d6242",
+            "method_id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
+            "account_name": "GoPay Reyhan",
+            "account_number": null,
+            "phone_number": "0895326204046",
+            "qr_string": null
+        }
+    ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `id` is provided but is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the merchant admin role. |
+
+### Create Payment Account
+
+- **Method**: `POST`
+- **Endpoint**: `/payments/accounts`
+- **Description**: Create payment account per payment method.
+- **Authentication**: Customer
+
+- **Request Body**:
+  ```json
+  {
+    "method_id": "string (UUID, required)",
+    "account_number": "string (optional)",
+    "account_name": "string (required)",
+    "phone_number": "string (required)",
+    "is_active": "string (required)"
+  }
+  ```
+
+#### Important Notes
+
+> Account number is optional but required for creating account that based on `bank_transfer` payment method.
+
+#### Response `200 OK`
+
+```json
+{
+    "message": "payment account successfully created"
+}
+```
