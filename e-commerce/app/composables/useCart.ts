@@ -85,7 +85,7 @@ export const useCart = () => {
               id: item.product_id,
               name: item.name,
               price: price,
-              image: item.images?.thumbnail || '/images/birthday.jpeg',
+              image: item.images?.thumbnail || '',
               quantity: Number(item.quantity),
               shopId: item.shop_id,
               isCustom: false,

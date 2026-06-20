@@ -41,7 +41,7 @@ const buyNowItem = computed<CartItem | null>(() => {
     id: route.query.id as string,
     name: route.query.name as string,
     price: Number(route.query.price || 0),
-    image: (route.query.image as string) || '/images/birthday.jpeg',
+    image: (route.query.image as string) || '',
     quantity: Number(route.query.qty || 1),
     size: (route.query.size as string) || undefined,
     color: (route.query.color as string) || undefined,

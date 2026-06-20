@@ -178,10 +178,20 @@ useHead({
             </div>
 
             <div class="flex-1 flex gap-3 w-full">
-              <button @click="handleAddToCart" class="flex-1 border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 font-bold py-3 rounded-xl transition text-sm cursor-pointer">
+              <button 
+                :disabled="!product.available"
+                @click="product.available && handleAddToCart()" 
+                :class="[!product.available ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 bg-gray-50' : 'border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 cursor-pointer']"
+                class="flex-1 font-bold py-3 rounded-xl transition text-sm"
+              >
                 Add to Cart
               </button>
-              <button @click="handleBuyNow" class="flex-1 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 rounded-xl transition shadow-sm text-sm cursor-pointer">
+              <button 
+                :disabled="!product.available"
+                @click="product.available && handleBuyNow()" 
+                :class="[!product.available ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'bg-[#1b4332] hover:bg-[#143326] text-white cursor-pointer']"
+                class="flex-1 font-bold py-3 rounded-xl transition shadow-sm text-sm"
+              >
                 Buy Now
               </button>
             </div>
