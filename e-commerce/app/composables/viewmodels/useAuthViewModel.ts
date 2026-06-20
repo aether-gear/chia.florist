@@ -71,6 +71,9 @@ export const useAuthViewModel = () => {
     try {
       const response = await authService.signIn(credentials)
       if (response.message === 'login success') {
+        if (import.meta.client) {
+          localStorage.removeItem('chia-florist-cart-cache')
+        }
         // Fetch profile to populate global user state
         await fetchCurrentUser()
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
@@ -171,6 +174,7 @@ export const useAuthViewModel = () => {
           localStorage.removeItem('register_name')
           localStorage.removeItem('register_username')
           localStorage.removeItem('register_phone')
+          localStorage.removeItem('chia-florist-cart-cache')
         }
         challengeId.value = null
         registrationEmail.value = null
@@ -222,6 +226,7 @@ export const useAuthViewModel = () => {
         localStorage.removeItem('register_name')
         localStorage.removeItem('register_username')
         localStorage.removeItem('register_phone')
+        localStorage.removeItem('chia-florist-cart-cache')
       }
       isLoading.value = false
       navigateTo('/login')
