@@ -1,14 +1,14 @@
-import { Client } from 'pg'
-
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id
   const config = useRuntimeConfig()
-  const backendUrl = `${config.public.serviceCoreApiUrl}/products/${id}`
+  const backendBaseUrl = config.public.serviceCoreApiUrl || 'http://127.0.0.1:7129'
 
-  // 1. Fetch from Go backend
+  let slug = id || ''
+
+  // 2. Fetch full product details strictly from backend by slug
   let product: any = null
   try {
-    product = await $fetch(backendUrl)
+    product = await $fetch(`${backendBaseUrl}/products/${slug}`)
   } catch (err: any) {
     throw createError({
       statusCode: err.status || 500,
@@ -17,36 +17,20 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 2. Query database for shop_id
-  let shopId = '333f6432-a01c-412f-99f4-0f08ca0d8eb1' // Default fallback (Chia Cipinang)
-  const client = new Client({
-    user: 'postgres.mqolpawlannysqjokzoq',
-    host: 'aws-1-ap-northeast-2.pooler.supabase.com',
-    database: 'postgres',
-    password: 'Chia.Florist@21',
-    port: 6543,
-    ssl: { rejectUnauthorized: false }
-  })
-
+  // 3. Resolve shop_id using backend shops API based on availability
+  let shopId = '333f6432-a01c-412f-99f4-0f08ca0d8eb1' // Default fallback
   try {
-    await client.connect()
-    
-    // Support lookup by UUID or slug
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')
-    const queryStr = isUuid
-      ? 'SELECT shop_id FROM inventory WHERE product_id = $1 ORDER BY stock DESC LIMIT 1;'
-      : 'SELECT i.shop_id FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.slug = $1 ORDER BY i.stock DESC LIMIT 1;'
-
-    const res = await client.query(queryStr, [id])
-    if (res.rows.length > 0) {
-      shopId = res.rows[0].shop_id
+    const shopsRes: any = await $fetch(`${backendBaseUrl}/shops`)
+    if (shopsRes && Array.isArray(shopsRes.shops) && Array.isArray(product.availability) && product.availability.length > 0) {
+      const sortedAvail = [...product.availability].sort((a, b) => b.stock - a.stock)
+      const highestStockShopSlug = sortedAvail[0].name
+      const matchedShop = shopsRes.shops.find((s: any) => s.slug === highestStockShopSlug)
+      if (matchedShop) {
+        shopId = matchedShop.id
+      }
     }
-  } catch (dbErr) {
-    console.error('Failed to query inventory from DB:', dbErr)
-  } finally {
-    try {
-      await client.end()
-    } catch {}
+  } catch (shopErr) {
+    console.error('Failed to resolve shop ID dynamically from shops API:', shopErr)
   }
 
   return {
