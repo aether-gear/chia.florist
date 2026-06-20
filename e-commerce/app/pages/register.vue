@@ -76,7 +76,7 @@ const handleVerify = async () => {
   try {
     const success = await authVm.verifyOtp(parseInt(otpCode.value))
     if (success) {
-      navigateTo('/profile')
+      navigateTo('/')
     }
   } catch (err: any) {
     errorMessage.value = err.data?.message || 'Verification failed. Please try again.'

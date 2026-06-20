@@ -1,4 +1,6 @@
 // app/utils/bootstrap.ts
+import { triggerSessionExpired } from '~/composables/useSessionState'
+
 export const bootstrapConfig = {
   /**
    * On the client side, routes through Nuxt's server proxy (/api/core)
@@ -29,9 +31,16 @@ export const bootstrapConfig = {
     const cleanEndpoint = endpoint.replace(/^\//, '')
     const url = `${baseUrl}/${cleanEndpoint}`
     
-    return $fetch<T>(url, {
-      credentials: 'include',
-      ...options
-    })
+    try {
+      return await $fetch<T>(url, {
+        credentials: 'include',
+        ...options
+      })
+    } catch (err: any) {
+      if (import.meta.client && (err.status === 401 || err.status === 403)) {
+        triggerSessionExpired()
+      }
+      throw err
+    }
   }
 }
