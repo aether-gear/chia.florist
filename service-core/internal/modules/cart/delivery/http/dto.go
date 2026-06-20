@@ -135,5 +135,5 @@ type checkoutCalculateResponse struct {
 	Subtotal               int64                   `json:"subtotal"`
 	TotalShipping          int64                   `json:"total_shipping"`
 	TotalAll               *int64                  `json:"total"`
-	SelectedPaymentMethods paymentMethodResponse   `json:"selected_payment_methods"`
+	SelectedPaymentMethods paymentMethodResponse   `json:"selected_payment_method"`
 }
