@@ -31,7 +31,7 @@ export const cartService = {
   },
 
   async checkout(data: CheckoutRequest): Promise<CheckoutResponse> {
-    return bootstrapConfig.fetchApi<CheckoutResponse>('/carts/checkout/', {
+    return bootstrapConfig.fetchApi<CheckoutResponse>('/carts/checkout', {
       method: 'POST',
       body: data
     })
