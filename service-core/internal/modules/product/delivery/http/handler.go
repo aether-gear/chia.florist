@@ -171,6 +171,11 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 		})
 	}
 
+	var banner productImageResponse
+	if len(images) > 0 {
+		banner = images[0]
+	}
+
 	response := productDetailResponse{
 		productBaseResponse: productBaseResponse{
 			ID:     productDetail.Product.ID,
@@ -182,7 +187,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 				available > 0,
 			Price:      productDetail.Product.Price,
 			TotalStock: available,
-			Banner:     images[0],
+			Banner:     banner,
 		},
 		Description:  productDetail.Product.Description,
 		Weight:       productDetail.Product.Weight,
