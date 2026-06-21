@@ -1,0 +1,40 @@
+package domain
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type PaymentStatus string
+
+const (
+	PaymentStatusPending   PaymentStatus = "pending"
+	PaymentStatusPaid      PaymentStatus = "paid"
+	PaymentStatusFailed    PaymentStatus = "failed"
+	PaymentStatusExpired   PaymentStatus = "expired"
+	PaymentStatusCancelled PaymentStatus = "cancelled"
+	PaymentStatusRefunded  PaymentStatus = "refunded"
+)
+
+type Payment struct {
+	ID uuid.UUID
+
+	OrderID          uuid.UUID
+	MethodID         uuid.UUID
+	PaymentAccountID *uuid.UUID
+
+	Provider string
+
+	ProviderPaymentID *string
+	ProviderOrderID   *string
+
+	Amount int64
+
+	Status PaymentStatus
+
+	ExpiresAt *time.Time
+
+	CreatedAt time.Time
+	UpdatedAt *time.Time
+}
