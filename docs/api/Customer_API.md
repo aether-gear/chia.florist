@@ -1,4 +1,4 @@
-﻿# Customer API Documentation
+# Customer API Documentation
 
 This document covers the customer-facing APIs for the Chia Florist service.
 Endpoints are organized by access level: **Public** and **Authenticated Customer**.
@@ -43,6 +43,8 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
   - [ ] Checkout
     - [ ] Estimate Checkout
     - [ ] Calculate Checkout
+  - [ ] Orders
+    - [ ] Create Order
 
 # Public API
 
@@ -1221,3 +1223,86 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `400 Bad Request`  | Missing or invalid UUIDs, or `quantity <= 0`. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `409 Conflict`     | System conflict includes **empty user default address**, **insufficient stock** and **shop has not registered the courier**. |
+
+## Orders
+
+### Create Order
+
+- **Method**: `POST`
+- **Endpoint**: `/order`
+- **Description**: Place a new order and create the associated invoice, order items, invoice items, and payment details. It locks the inventory for the purchased products and returns the assigned payment account and instructions.
+- **Authentication**: Customer
+- **Request Body**:
+  ```json
+  {
+    "address_id": "string (UUID, required)",
+    "selected_payment": {
+      "id": "string (UUID, required)",
+      "is_manual": true
+    },
+    "shops": [
+      {
+        "shop_id": "string (UUID, required)",
+        "name": "string (required)",
+        "selected_courier": {
+          "code": "jne",
+          "service": "REG"
+        },
+        "items": [
+          {
+            "product_id": "string (UUID, required)",
+            "name": "string (required)",
+            "quantity": 1
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+#### Important Notes
+
+> Only manual payments are currently supported. If `is_manual` is set to `false`, the request will return a `403 Forbidden` response.
+>
+> `name` in `shops` refers to the shop's name, and `name` in `items` refers to the product's name.
+
+#### Response `200 OK`
+
+```json
+{
+  "order_id": "f1e2d3c4-b5a6-7890-fedc-ba0987654321",
+  "instruction": "# Payment Instructions\n\nPlease transfer **IDR 22,720,000** to the following account:\n- Bank: BCA\n- Account Name: Chia Florist\n- Account Number: 1234567890\n\nPlease complete the payment within 24 hours.",
+  "payment_account": {
+    "account_name": "Chia Florist",
+    "account_number": "1234567890"
+  }
+}
+```
+
+#### Response Fields
+
+| Field             | Type   | Description |
+|-------------------|--------|-------------|
+| `order_id`        | string | The unique ID of the created order. |
+| `instruction`     | string | Markdown-formatted payment instructions. |
+| `payment_account` | object | Details of the assigned payment account. |
+
+#### Payment Account Fields
+
+| Field            | Type   | Description |
+|------------------|--------|-------------|
+| `account_name`   | string | Name of the account holder. |
+| `account_number` | string | (Optional) Bank account number. |
+| `phone_number`   | string | (Optional) Phone number for e-wallet accounts. |
+| `qr_string`      | string | (Optional) Raw QR code string for QRIS payments. |
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Missing or invalid UUIDs, empty names, or `quantity <= 0`. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Requesting a non-manual payment method (gateway integration is not available yet). |
+| `404 Not Found`    | Payment method or address not found. |
+| `409 Conflict`     | System conflict including **no available payment account**, **insufficient stock**, or **courier/shipping issues**. |
+

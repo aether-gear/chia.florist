@@ -254,3 +254,42 @@ func (r *inventoryRepositoryImpl) Create(
 
 	return nil
 }
+
+func (r *inventoryRepositoryImpl) Reserve(
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+	shopID uuid.UUID,
+	qty int,
+) error {
+	// Atomically increment reserved_stock only when there is enough
+	// available stock (stock - reserved_stock >= qty)
+	//
+	// The UPDATE is its own implicit row-level lock, so no separate
+	// SELECT FOR UPDATE is required
+	query := `
+		UPDATE inventory
+		SET
+			reserved_stock = reserved_stock + $1,
+			updated_at     = NOW()
+		WHERE
+			product_id                    = $2
+			AND shop_id                   = $3
+			AND (stock - reserved_stock) >= $1
+	`
+
+	tag, err := exec.Exec(ctx, query,
+		qty,
+		productID,
+		shopID,
+	)
+	if err != nil {
+		return fmt.Errorf("reserve inventory failed: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return domain.ErrInsufficientStock
+	}
+
+	return nil
+}

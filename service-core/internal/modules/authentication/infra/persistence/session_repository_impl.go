@@ -137,7 +137,6 @@ func (r *sessionRepositoryImpl) Save(
 			ip_address = EXCLUDED.ip_address,
 			expires_at = EXCLUDED.expires_at,
 			revoked_at = EXCLUDED.revoked_at,
-			created_at = EXCLUDED.created_at,
 			last_activity_at = EXCLUDED.last_activity_at
 	`
 

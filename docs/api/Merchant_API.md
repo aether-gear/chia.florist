@@ -558,7 +558,7 @@ These endpoints require a valid merchant session with the **merchant admin** rol
 |----------|--------------------|-----------------------------|
 | `latest` | `sort=latest:desc` | Sort by creation date.      |
 | `name`   | `sort=name:asc`    | Sort by merchant name.      |
-| `modify` | `sort=modify:desc` | Sort by last modified date. |
+| `modified` | `sort=modified:desc` | Sort by last modified date. |
 
 > Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=name:asc,latest:desc`.
 
@@ -817,3 +817,89 @@ These endpoints require a valid merchant session with the **merchant admin** rol
     "message": "payment account successfully created"
 }
 ```
+
+## Order Management
+
+### Find Orders
+
+- **Method**: `GET`
+- **Endpoint**: `/orders`
+- **Description**: Retrieve a paginated list of registered customer accounts with optional filtering and sorting.
+- **Authentication**: Merchant Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `page` | `integer` | No | `1` | Page number for pagination. Must be `>= 1`. |
+| `limit` | `integer` | No | `10` | Number of items per page. Must be `>= 1`. |
+| `sort` | `string` | No | `latest:desc` | Sorting criteria. Format: `field:direction` (e.g. `latest:asc`, `total:desc`). Multiple sorts can be comma-separated. |
+| `id` | `string` | No | - | Filter by unique Order UUID. |
+| `number` | `string` | No | - | Filter/Search by order number (case-insensitive substring search). |
+| `user_id` | `string` | No | - | Filter by customer User UUID. |
+| `status` | `string` | No | - | Filter by order status (`pending`, `confirmed`, `processing`, `shipped`, `delivered`, `cancelled`). |
+
+#### Sort Fields
+
+| Field        | Example                | Description                    |
+|--------------|------------------------|--------------------------------|
+| `latest` / `date`     | `sort=latest:desc`     | Sort by account creation date. |
+| `number`       | `sort=number:asc`        | Sort by display number.          |
+| `total`   | `sort=total:asc`    | Sort by total paid.              |
+| `status`      | `sort=status:asc`       | Sort by status number.          |
+| `modified`     | `sort=modified:desc`     | Sort by last modified date.    |
+
+> Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=latest:asc,number:desc`.
+
+**Examples**:
+- `GET /orders?page=1&limit=20`
+- `GET /orders?number=011&sort=modified:desc`
+
+#### Response `200 OK`
+
+```json
+{
+  "orders": [
+    {
+      "id": "e4a31771-4638-4e89-a292-624e723927d1",
+      "number": "ORD-20260621-E4A317",
+      "user_id": "8ce91a56-deea-46ac-9330-de65d64daa32",
+      "address_id": "48956fd0-bcea-44a2-b598-af999d7abc7a",
+      "status": "pending",
+      "subtotal": 150000,
+      "shipping_fee": 15000,
+      "total": 165000,
+      "created_at": "2026-06-21T08:45:00Z",
+      "updated_at": null,
+      "items": [
+        {
+          "id": "2529f895-5b14-4aa1-a8a1-5bf890160441",
+          "product_id": "f55b14a1-a8a1-5bf8-9016-0441d2529f89",
+          "product_name": "Premium Red Roses Bouquet",
+          "quantity": 1,
+          "unit_price": 150000,
+          "subtotal": 150000,
+          "shop_id": "8c1e82f6-30a2-4cc6-be52-f05aa2d6e9ec",
+          "shop_name": "Jakarta Florist Central",
+          "courier_code": "jne",
+          "courier_service": "REG",
+          "shipping_fee": 15000
+        }
+      ]
+    }
+  ],
+  "page": 1,
+  "limit": 10,
+  "total": 1
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `id` is provided but is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the merchant admin role. |
+| `404 Not Found`    | No customers match the given filters. |

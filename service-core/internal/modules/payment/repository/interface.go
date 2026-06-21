@@ -9,6 +9,33 @@ import (
 	"github.com/google/uuid"
 )
 
+type PaymentRepository interface {
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.Payment, error)
+
+	GetByOrderID(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderID uuid.UUID,
+	) (*domain.Payment, error)
+
+	UpdateStatus(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		status domain.PaymentStatus,
+	) error
+
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		payment domain.Payment,
+	) error
+}
+
 type PaymentMethodRepository interface {
 	Save(
 		ctx context.Context,
@@ -47,17 +74,24 @@ type PaymentAccountRepository interface {
 		paymentID uuid.UUID,
 	) (*domain.PaymentAccount, error)
 
-	AcquireLeastLoaded(
+	// RetrieveLeastLoaded returns the active account with the
+	// lowest current load for the specified payment method
+	RetrieveLeastLoaded(
 		ctx context.Context,
 		exec transaction.Executor,
 		methodID uuid.UUID,
 	) (*domain.PaymentAccount, error)
 
+	// IncrementLoad increases the account's current load after
+	// it has been assigned to a payment
 	IncrementLoad(
 		ctx context.Context,
 		exec transaction.Executor,
 		accountID uuid.UUID,
 	) error
+
+	// DecrementLoad decreases the account's current load when
+	// the payment assignment is released or no longer active
 	DecrementLoad(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -73,4 +107,41 @@ type PaymentAccountRepository interface {
 		ctx context.Context,
 		exec transaction.Executor,
 	) ([]domain.PaymentAccount, error)
+}
+
+type PaymentEventRepository interface {
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.PaymentEvent, error)
+
+	ListByPaymentID(
+		ctx context.Context,
+		exec transaction.Executor,
+		paymentID uuid.UUID,
+	) ([]domain.PaymentEvent, error)
+
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		event domain.PaymentEvent,
+	) error
+}
+
+type PaymentInstructionRepository interface {
+	// Save persists the instruction record for a payment.
+	// Called once at order creation time.
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		instruction domain.PaymentInstruction,
+	) error
+
+	// GetByPaymentID retrieves the instruction for a given payment.
+	GetByPaymentID(
+		ctx context.Context,
+		exec transaction.Executor,
+		paymentID uuid.UUID,
+	) (*domain.PaymentInstruction, error)
 }

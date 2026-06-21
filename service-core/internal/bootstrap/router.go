@@ -18,6 +18,7 @@ import (
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
 	locationH "service-core/internal/modules/location/delivery/http"
 	merchantH "service-core/internal/modules/merchant/delivery/http"
+	orderH "service-core/internal/modules/order/delivery/http"
 	paymentH "service-core/internal/modules/payment/delivery/http"
 	productH "service-core/internal/modules/product/delivery/http"
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
@@ -182,6 +183,11 @@ func NewRouter(c *Container) *chi.Mux {
 		shipmentHandler = shipmentH.NewShipmentHandler(
 			&c.EstimateShippingOptions,
 		)
+
+		orderHandler = orderH.NewOrderHandler(
+			&c.FindOrders,
+			&c.CreateOrder,
+		)
 	)
 
 	r := chi.NewRouter()
@@ -294,13 +300,21 @@ func NewRouter(c *Container) *chi.Mux {
 			})
 
 			r.Route("/methods", func(r chi.Router) {
-				r.Get("/", chains.CoreAuth(paymentHandler.ListPaymentMethod))
+				r.Get("/", chains.MerchantOnly(paymentHandler.ListPaymentMethod))
 				r.Post("/", chains.MerchantAdminOnly(paymentHandler.CreatePaymentMethod))
 			})
 		})
 
 		r.Route("/shipping", func(r chi.Router) {
 			r.Post("/cost", chains.CoreAuth(shipmentHandler.EstimateShippingOptions))
+		})
+
+		r.Route("/order", func(r chi.Router) {
+			r.Post("/", chains.CustomerOnly(orderHandler.CreateOrder))
+		})
+
+		r.Route("/orders", func(r chi.Router) {
+			r.Get("/", chains.MerchantOnly(orderHandler.FindOrders))
 		})
 	})
 

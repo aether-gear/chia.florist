@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	database "service-core/internal/infra/db"
+	paymentgateway "service-core/internal/infra/payment-gateway"
+	midtransGateway "service-core/internal/infra/payment-gateway/midtrans"
 	storage "service-core/internal/infra/storage"
 	transaction "service-core/internal/shared/transaction"
 
@@ -21,6 +23,7 @@ type Dependency struct {
 	ShippingCostProvider shipmentRepo.ShippingCostProvider
 	TransactionProvider  transaction.Transactor
 	TransactionExecutor  transaction.Executor
+	PaymentGateway       paymentgateway.Provider
 }
 
 func NewDependency(cfg Config) (*Dependency, error) {
@@ -29,11 +32,21 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		return nil, err
 	}
 
-	storageProvider, err := supabaseStorage.NewSupabaseProvider(
-		cfg.Storage,
-		cfg.Supabase,
-		&http.Client{},
-	)
+	storageProvider, err :=
+		supabaseStorage.NewSupabaseProvider(
+			cfg.Storage,
+			cfg.Supabase,
+			&http.Client{},
+		)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	gateway, err :=
+		midtransGateway.NewMidtransProvider(
+			cfg.MidTrans,
+		)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -58,6 +71,7 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		),
 		TransactionProvider: database.NewPostgresTransactor(db.Pool),
 		TransactionExecutor: db.Pool,
+		PaymentGateway:      gateway,
 	}, nil
 }
 
