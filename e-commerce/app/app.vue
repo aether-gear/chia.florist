@@ -1,5 +1,9 @@
 <template>
-  <NuxtLayout>
-    <NuxtPage />
-  </NuxtLayout>
+  <div>
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+    <CSessionExpiredNotification />
+    <CAuthNotificationToast />
+  </div>
 </template>

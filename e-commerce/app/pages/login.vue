@@ -30,7 +30,7 @@ const handleLogin = async () => {
     })
     
     if (success) {
-      navigateTo('/profile')
+      navigateTo('/')
     }
   } catch (err: any) {
     // Handle 403 unverified case

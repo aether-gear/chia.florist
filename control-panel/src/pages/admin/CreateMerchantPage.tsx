@@ -36,7 +36,7 @@ export default function CreateMerchantPage() {
         method: 'POST',
         body: JSON.stringify(data),
       });
-      setSuccess(response.message || 'Merchant created successfully!');
+      setSuccess(response?.message || 'Merchant created successfully!');
       reset();
     } catch (err: any) {
       setError(err.message || 'Failed to create merchant');

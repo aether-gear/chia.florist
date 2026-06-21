@@ -6,6 +6,9 @@ import { useCart, type CartItem } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
 import { cartService } from '~/services/cartService'
 import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod } from '~/types/checkout'
+import type { UserAddress } from '~/types/address'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { triggerAuthAlert } from '~/composables/useSessionState'
 
 useHead({
   title: 'Secure Checkout - Chia Florist'
@@ -14,6 +17,7 @@ useHead({
 const route = useRoute()
 const { cart, cartSubtotal, cartSubtotalFormatted, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
+const authVm = useAuthViewModel()
 
 // State Management untuk Checkout & Shipping
 const checkoutData = ref<CheckoutResponse | null>(null)
@@ -26,6 +30,47 @@ const isProcessing = ref(false)
 // State Management untuk Payment Methods
 const paymentMethods = ref<PaymentMethod[]>([])
 const selectedPaymentMethodId = ref('')
+const isManualTransfer = ref(false)
+const openedCategories = ref<Record<string, boolean>>({})
+
+const FALLBACK_PAYMENT_METHODS = [
+  { id: '0137d751-5188-447a-b630-1bf858f4f866', name: 'QRIS', type: 'qr_code', description: 'QRIS payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '074b02e4-e047-4f60-bdb0-cfeb5481d002', name: 'DANA', type: 'ewallet', description: 'DANA via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '24ce2aac-bd73-4c29-9ab9-2f53282b2679', name: 'Mandiri', type: 'bank_transfer', description: 'Mandiri Bill Payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '5de3fdf1-7cf2-4354-bf31-a288a6706c41', name: 'GoPay', type: 'ewallet', description: 'GoPay via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '8ef6ab35-008d-42c4-a66b-7d0a81fdd727', name: 'ShopeePay', type: 'ewallet', description: 'ShopeePay via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: 'aa90abf7-dc0b-445a-aac1-dc34976708de', name: 'SeaBank', type: 'bank_transfer', description: 'SeaBank transfer via Midtrans', fee: 0, subtotal: 0, total: 0 }
+]
+
+const paymentMethodTypes = computed(() => {
+  const types = new Set<string>()
+  paymentMethods.value.forEach(method => {
+    types.add(method.type)
+  })
+  return Array.from(types)
+})
+
+const paymentMethodsGroupedByType = computed(() => {
+  const groups: Record<string, PaymentMethod[]> = {}
+  paymentMethods.value.forEach(method => {
+    if (!groups[method.type]) {
+      groups[method.type] = []
+    }
+    groups[method.type]!.push(method)
+  })
+  return groups
+})
+
+const formatPaymentType = (type: string) => {
+  if (type === 'ewallet') return 'E-Wallet'
+  if (type === 'bank_transfer') return 'Bank Transfer'
+  if (type === 'qr_code') return 'QR Code / QRIS'
+  return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
+const toggleCategory = (type: string) => {
+  openedCategories.value[type] = !openedCategories.value[type]
+}
 
 // Map untuk menyimpan opsi kurir per toko
 const courierOptionsMap = ref<Record<string, CheckoutCourierOption[]>>({})
@@ -41,7 +86,7 @@ const buyNowItem = computed<CartItem | null>(() => {
     id: route.query.id as string,
     name: route.query.name as string,
     price: Number(route.query.price || 0),
-    image: (route.query.image as string) || '/images/birthday.jpeg',
+    image: (route.query.image as string) || '',
     quantity: Number(route.query.qty || 1),
     size: (route.query.size as string) || undefined,
     color: (route.query.color as string) || undefined,
@@ -80,36 +125,70 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       subtotal: 0,
       total_shipping: 0,
       total: 0,
-      payment_methods: [
-        {
-          id: "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
-          name: "GoPay",
-          type: "ewallet",
-          description: "GoPay via Midtrans",
-          fee: 0,
-          subtotal: 0,
-          total: 0
-        },
-        {
-          id: "074b02e4-e047-4f60-bdb0-cfeb5481d002",
-          name: "DANA",
-          type: "ewallet",
-          description: "DANA via Midtrans",
-          fee: 0,
-          subtotal: 0,
-          total: 0
-        },
-        {
-          id: "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
-          name: "Mandiri",
-          type: "bank_transfer",
-          description: "Mandiri Bill Payment via Midtrans",
-          fee: 0,
-          subtotal: 0,
-          total: 0
-        }
-      ]
+      payment_methods: []
     }
+    
+    // Group ALL items by shopId
+    const shopsMap: Record<string, typeof checkoutItems.value> = {}
+    checkoutItems.value.forEach(item => {
+      const sId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      if (!shopsMap[sId]) {
+        shopsMap[sId] = []
+      }
+      shopsMap[sId].push(item)
+    })
+    
+    Object.keys(shopsMap).forEach(sId => {
+      const items = shopsMap[sId] || []
+      const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+      const mockOptions = [
+        { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 },
+        { code: 'tiki', name: 'TIKI', service: 'REG', etd: '2-4 Days', fee: 18000 },
+        { code: 'pos', name: 'POS', service: 'REG', etd: '3-5 Days', fee: 15000 }
+      ]
+      
+      if (!courierOptionsMap.value[sId]) {
+        courierOptionsMap.value[sId] = mockOptions
+      }
+      
+      const selected = selectedCouriers.value[sId] || { code: 'jne', service: 'REG' }
+      if (!selectedCouriers.value[sId]) {
+        selectedCouriers.value[sId] = selected
+      }
+      
+      const defaultOption = { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 }
+      const matchedOption = mockOptions.find(o => o.code === selected.code && o.service === selected.service) || mockOptions[0] || defaultOption
+      
+      const shopEntry = {
+        shop_id: sId,
+        subtotal: subtotal,
+        total: subtotal + matchedOption.fee,
+        selected_courier: {
+          code: matchedOption.code,
+          service: matchedOption.service,
+          fee: matchedOption.fee
+        },
+        items: items.map(item => ({
+          product_id: item.id,
+          shop_id: sId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: item.price * item.quantity,
+          size: item.size,
+          color: item.color
+        })),
+        cost_couriers: mockOptions
+      }
+      merged.shops.push(shopEntry)
+      merged.total_shipping += matchedOption.fee
+    })
+    
+    merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
+    merged.total_shipping = merged.shops.reduce((acc, s) => acc + (s.selected_courier ? s.selected_courier.fee : 0), 0)
+    merged.total = merged.subtotal + merged.total_shipping
+    
+    return merged
   } else {
     merged = JSON.parse(JSON.stringify(res))
   }
@@ -233,6 +312,13 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
 // Muat data checkout saat halaman dibuka
 onMounted(async () => {
+  await authVm.fetchCurrentUser()
+  if (!authVm.isAuthenticated.value) {
+    triggerAuthAlert('warning', 'Please sign in to proceed with checkout.')
+    navigateTo('/login')
+    return
+  }
+
   if (checkoutItems.value.length === 0) {
     navigateTo('/catalog')
     return
@@ -242,7 +328,18 @@ onMounted(async () => {
   try {
     await addressVm.fetchAddresses()
 
-    const defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+    let defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+    if (!defaultAddr && addressVm.addresses.value.length > 0) {
+      console.log('Self-healing on mount: Setting first address as default')
+      const firstAddr = addressVm.addresses.value[0]
+      if (firstAddr) {
+        const updated: UserAddress = { ...firstAddr, is_default: true }
+        await addressVm.saveAddress(updated)
+        await addressVm.fetchAddresses()
+        defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+      }
+    }
+
     if (defaultAddr) {
       selectedAddressId.value = defaultAddr.address_id || ''
     }
@@ -266,9 +363,17 @@ onMounted(async () => {
     }))
 
     let res: CheckoutResponse | null = null
-    if (shopsPayload.length > 0) {
+    if (defaultAddr && shopsPayload.length > 0) {
       const payload: any = { shops: shopsPayload }
-      res = await cartService.checkout(payload)
+      try {
+        res = await cartService.checkout(payload)
+      } catch (checkoutErr: any) {
+        if (checkoutErr.status === 409 || (checkoutErr.data?.message && checkoutErr.data.message.includes('address'))) {
+          console.warn('Backend returned address conflict on mount, using fallback client estimation:', checkoutErr)
+        } else {
+          throw checkoutErr
+        }
+      }
     }
 
     const mergedData = mergeCustomItems(res)
@@ -281,16 +386,26 @@ onMounted(async () => {
 
       if (mergedData.payment_methods && mergedData.payment_methods.length > 0) {
         paymentMethods.value = mergedData.payment_methods
-        selectedPaymentMethodId.value = mergedData.payment_methods[0].id
+      } else {
+        paymentMethods.value = JSON.parse(JSON.stringify(FALLBACK_PAYMENT_METHODS))
+      }
+
+      const firstMethod = paymentMethods.value[0]
+      if (firstMethod) {
+        selectedPaymentMethodId.value = firstMethod.id
+        paymentMethodTypes.value.forEach(type => {
+          openedCategories.value[type] = true
+        })
       }
 
       mergedData.shops.forEach(shop => {
         if (shop.cost_couriers) {
           courierOptionsMap.value[shop.shop_id] = shop.cost_couriers
-          if (!selectedCouriers.value[shop.shop_id] && shop.cost_couriers.length > 0) {
+          const firstOption = shop.cost_couriers[0]
+          if (!selectedCouriers.value[shop.shop_id] && firstOption) {
             selectedCouriers.value[shop.shop_id] = {
-              code: shop.cost_couriers[0].code,
-              service: shop.cost_couriers[0].service
+              code: firstOption.code,
+              service: firstOption.service
             }
           }
         }
@@ -335,9 +450,10 @@ const runCalculate = async () => {
 
         if (!courierPayload) {
           const options = courierOptionsMap.value[shop.shop_id]
-          if (options && options.length > 0) {
-            courierPayload = { code: options[0].code, service: options[0].service }
-            selectedCouriers.value[shop.shop_id] = { code: options[0].code, service: options[0].service }
+          const firstOption = options && options[0]
+          if (firstOption) {
+            courierPayload = { code: firstOption.code, service: firstOption.service }
+            selectedCouriers.value[shop.shop_id] = { code: firstOption.code, service: firstOption.service }
           } else {
             courierPayload = { code: 'jne', service: 'REG' }
             selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
@@ -394,8 +510,29 @@ const runCalculate = async () => {
         }
       })
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to calculate shipping:', err)
+    if (err.status === 409 || (err.data?.message && err.data.message.includes('default address'))) {
+      const addresses = addressVm.addresses.value
+      const defaultAddr = addresses.find(a => a.is_default)
+      if (!defaultAddr && addresses.length > 0) {
+        console.log('Self-healing in runCalculate: Setting default address and retrying calculation...')
+        try {
+          const firstAddr = addresses[0]
+          if (firstAddr) {
+            const updated: UserAddress = { ...firstAddr, is_default: true }
+            await addressVm.saveAddress(updated)
+            await addressVm.fetchAddresses()
+            setTimeout(() => {
+              runCalculate()
+            }, 100)
+            return
+          }
+        } catch (saveErr) {
+          console.error('Self-healing failed to save default address:', saveErr)
+        }
+      }
+    }
   } finally {
     isLoadingCalculate.value = false
   }
@@ -405,7 +542,8 @@ let addressTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan alamat untuk kalkulasi ulang ongkir
 watch(selectedAddressId, (newId, oldId) => {
-  if (newId && oldId && newId !== oldId) {
+  if (newId && newId !== oldId && !isLoadingCheckout.value) {
+    isLoadingCalculate.value = true
     if (addressTimeout) {
       clearTimeout(addressTimeout)
     }
@@ -419,7 +557,8 @@ let paymentMethodTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan metode pembayaran untuk kalkulasi ulang ongkir
 watch(selectedPaymentMethodId, (newId, oldId) => {
-  if (newId && oldId && newId !== oldId) {
+  if (newId && newId !== oldId && !isLoadingCheckout.value) {
+    isLoadingCalculate.value = true
     if (paymentMethodTimeout) {
       clearTimeout(paymentMethodTimeout)
     }
@@ -428,6 +567,7 @@ watch(selectedPaymentMethodId, (newId, oldId) => {
     }, 300)
   }
 })
+
 
 let courierTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -462,6 +602,7 @@ const handleCourierChange = (shopId: string, event: Event) => {
     const [code, service] = val.split('|')
     if (code && service) {
       selectedCouriers.value[shopId] = { code, service }
+      isLoadingCalculate.value = true
       if (courierTimeout) {
         clearTimeout(courierTimeout)
       }
@@ -485,8 +626,17 @@ const liveSubtotal = computed(() => {
 const liveShippingFee = computed(() => {
   return checkoutData.value ? checkoutData.value.total_shipping : 0
 })
+const livePaymentFee = computed(() => {
+  if (isManualTransfer.value) return 0
+  const activeMethod = paymentMethods.value.find(m => m.id === selectedPaymentMethodId.value)
+  return activeMethod ? activeMethod.fee : 0
+})
 const liveTotalPayment = computed(() => {
-  return checkoutData.value ? checkoutData.value.total : (cartSubtotal.value - discount.value)
+  if (!checkoutData.value) return cartSubtotal.value - discount.value
+  const sub = checkoutData.value.subtotal
+  const ship = checkoutData.value.total_shipping
+  const fee = livePaymentFee.value
+  return sub + ship + fee - discount.value
 })
 
 // Eksekusi checkout memindahkan state item keranjang ke invoice order profile
@@ -657,38 +807,96 @@ const handlePlaceOrder = async () => {
               </div>
             </div>
           </div>
-
-          <!-- 3. Payment Method -->
           <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
             <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">3. Payment Method</h3>
             
-            <div v-if="paymentMethods.length === 0" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4">
-              <p class="text-sm text-gray-500">No payment methods available.</p>
+            <!-- Manual Transfer Toggle Switch -->
+            <div 
+              class="flex items-center justify-between p-4 rounded-2xl border transition-all duration-300"
+              :class="[isManualTransfer ? 'border-[#1b4332] bg-emerald-50/10 shadow-sm font-semibold' : 'border-gray-100 bg-gray-50/30']"
+            >
+              <div class="flex items-center gap-3">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    v-model="isManualTransfer" 
+                    class="sr-only peer"
+                    :disabled="isLoadingCalculate || isLoadingCheckout"
+                  />
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1b4332]"></div>
+                </label>
+                <div class="flex flex-col">
+                  <span class="font-bold text-gray-900 text-xs">Manual Bank Transfer</span>
+                  <span class="text-[10px] text-gray-400 mt-0.5">Pay manually via direct bank transfer</span>
+                </div>
+              </div>
+              <div class="text-right text-xs">
+                <span class="text-emerald-700 font-bold">Free Fee</span>
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" v-else>
-              <label 
-                v-for="method in paymentMethods" 
-                :key="method.id"
-                :class="['border rounded-2xl p-4 flex items-start gap-4 cursor-pointer transition-all', selectedPaymentMethodId === method.id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300', (isLoadingCalculate || isLoadingCheckout) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '']"
-              >
-                <input 
-                  type="radio" 
-                  v-model="selectedPaymentMethodId" 
-                  :value="method.id" 
-                  :disabled="isLoadingCalculate || isLoadingCheckout"
-                  class="mt-1 accent-[#1b4332]" 
-                />
-                <div class="flex-1 text-xs">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="font-bold text-gray-900">{{ method.name }}</span>
-                    <span class="bg-emerald-100 text-emerald-800 font-bold text-[9px] px-2 py-0.2 rounded-full uppercase">{{ method.type.replace('_', ' ') }}</span>
+            <!-- Backend Payment Methods Selection (Always Visible) -->
+            <div class="space-y-4 border-t border-gray-100 pt-5 mt-5">
+              <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Select Payment Gateway Channel:</div>
+              <div v-if="paymentMethods.length === 0" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4">
+                <p class="text-sm text-gray-500">No payment methods available.</p>
+              </div>
+
+              <div v-else class="space-y-3">
+                <!-- Iterate over payment categories (types) -->
+                <div 
+                  v-for="type in paymentMethodTypes" 
+                  :key="type" 
+                  class="border border-gray-100 rounded-2xl overflow-hidden transition-all duration-300"
+                  :class="[openedCategories[type] ? 'border-[#1b4332] shadow-sm' : 'hover:border-gray-200']"
+                >
+                  <!-- Accordion Header -->
+                  <button
+                    type="button"
+                    @click="toggleCategory(type)"
+                    :disabled="isLoadingCalculate || isLoadingCheckout"
+                    class="w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-50/80 transition-all font-bold text-xs text-gray-700 text-left outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm" v-if="type === 'ewallet'">📱</span>
+                      <span class="text-sm" v-else-if="type === 'bank_transfer'">🏦</span>
+                      <span class="text-sm" v-else-if="type === 'qr_code'">🔍</span>
+                      <span class="text-sm" v-else>💳</span>
+                      <span>{{ formatPaymentType(type) }}</span>
+                    </div>
+                    <span class="text-xs transition-transform duration-300" :class="[openedCategories[type] ? 'rotate-180' : '']">
+                      ▼
+                    </span>
+                  </button>
+
+                  <!-- Accordion Content: Vertical Flat Radio List -->
+                  <div 
+                    v-show="openedCategories[type]" 
+                    class="p-4 bg-white border-t border-gray-50 flex flex-col space-y-2"
+                  >
+                    <label 
+                      v-for="method in paymentMethodsGroupedByType[type]" 
+                      :key="method.id"
+                      :class="['border rounded-xl p-3.5 flex items-center justify-between gap-3.5 cursor-pointer transition-all', selectedPaymentMethodId === method.id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300', (isLoadingCalculate || isLoadingCheckout) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '']"
+                    >
+                      <div class="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          v-model="selectedPaymentMethodId" 
+                          :value="method.id" 
+                          :disabled="isLoadingCalculate || isLoadingCheckout"
+                          class="accent-[#1b4332]" 
+                        />
+                        <span class="font-bold text-gray-900 text-xs">{{ method.name }}</span>
+                      </div>
+                      <div class="text-right text-xs">
+                        <span class="text-emerald-700 font-bold" v-if="method.fee > 0">Fee: {{ formatRupiah(method.fee) }}</span>
+                        <span class="text-emerald-700 font-bold text-[10px]" v-else>Free Fee</span>
+                      </div>
+                    </label>
                   </div>
-                  <p class="text-gray-500 leading-normal mb-1 font-semibold">{{ method.description }}</p>
-                  <p class="text-emerald-700 font-bold" v-if="method.fee > 0">Fee: {{ formatRupiah(method.fee) }}</p>
-                  <p class="text-emerald-700 font-bold text-[10px]" v-else>Free Transaction Fee</p>
                 </div>
-              </label>
+              </div>
             </div>
           </div>
         </div>
@@ -708,6 +916,13 @@ const handlePlaceOrder = async () => {
                 <span>Shipping Cost</span>
                 <span class="text-gray-900 font-bold">{{ formatRupiah(liveShippingFee) }}</span>
               </div>
+
+              <div class="flex justify-between items-center">
+                <span>Payment Fee</span>
+                <span class="text-gray-900 font-bold" :class="[isManualTransfer ? 'text-emerald-700 font-extrabold' : '']">
+                  {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
+                </span>
+              </div>
               
               <div class="flex justify-between items-center" v-if="discount > 0">
                 <span>Promo Discount</span>
@@ -724,7 +939,7 @@ const handlePlaceOrder = async () => {
 
             <button 
               @click="handlePlaceOrder"
-              :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || !selectedPaymentMethodId"
+              :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || (!isManualTransfer && !selectedPaymentMethodId)"
               class="w-full bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
             >
               <span v-if="isProcessing">Processing Order...</span>
