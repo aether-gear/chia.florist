@@ -13,11 +13,31 @@ type Config struct {
 	Postgres config.PostgresConfig
 	DB       config.DatabaseConfig
 	SMTP     config.SMTPConfig
+	MidTrans config.MidTransConfig
 }
 
 func LoadConfig() Config {
 	supabaseCfg := config.LoadSupabaseConfig()
 	postgresCfg := config.LoadPostgresConfig()
+
+	dbConf := config.LoadDBConfig(
+		supabaseCfg.Host,
+		supabaseCfg.Port,
+		supabaseCfg.User,
+		supabaseCfg.Password,
+		supabaseCfg.Name,
+		supabaseCfg.SSLMode,
+		&supabaseCfg.DSN,
+	)
+	// dbConf := config.LoadDBConfig(
+	// 	postgresCfg.Host,
+	// 	postgresCfg.Port,
+	// 	postgresCfg.User,
+	// 	postgresCfg.Password,
+	// 	postgresCfg.Name,
+	// 	postgresCfg.SSLMode,
+	// 	&postgresCfg.DSN,
+	// )
 
 	return Config{
 		App:      config.LoadAppConfig(),
@@ -26,24 +46,8 @@ func LoadConfig() Config {
 		Storage:  config.LoadStorageConfig(),
 		Supabase: supabaseCfg,
 		Postgres: postgresCfg,
-		DB: config.LoadDBConfig(
-			supabaseCfg.Host,
-			supabaseCfg.Port,
-			supabaseCfg.User,
-			supabaseCfg.Password,
-			supabaseCfg.Name,
-			supabaseCfg.SSLMode,
-			&supabaseCfg.DSN,
-		),
-		// DB: config.LoadDBConfig(
-		// 	postgresCfg.Host,
-		// 	postgresCfg.Port,
-		// 	postgresCfg.User,
-		// 	postgresCfg.Password,
-		// 	postgresCfg.Name,
-		// 	postgresCfg.SSLMode,
-		// 	&postgresCfg.DSN,
-		// ),
-		SMTP: config.LoadSMTPConfig(),
+		DB:       dbConf,
+		SMTP:     config.LoadSMTPConfig(),
+		MidTrans: config.LoadMidTransConfig(),
 	}
 }

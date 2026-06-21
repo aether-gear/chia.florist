@@ -11,6 +11,7 @@ require (
 
 require (
 	github.com/lib/pq v1.10.9 // indirect
+	github.com/midtrans/midtrans-go v1.3.8 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 )
 
