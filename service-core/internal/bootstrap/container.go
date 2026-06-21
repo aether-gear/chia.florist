@@ -17,6 +17,7 @@ import (
 	customerPersistence "service-core/internal/modules/customer/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
 	merchantPersistence "service-core/internal/modules/merchant/infra/persistence"
+	orderPersistence "service-core/internal/modules/order/infra/persistence"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
 	productPersistence "service-core/internal/modules/product/infra/persistence"
 	shopPersistence "service-core/internal/modules/shop/infra/persistence"
@@ -36,6 +37,7 @@ import (
 	inventoryUsecase "service-core/internal/modules/inventory/usecase"
 	locationUsecase "service-core/internal/modules/location/usecase"
 	merchantUsecase "service-core/internal/modules/merchant/usecase"
+	orderUsecase "service-core/internal/modules/order/usecase"
 	paymentUsecase "service-core/internal/modules/payment/usecase"
 	productUsecase "service-core/internal/modules/product/usecase"
 	shipmentUsecase "service-core/internal/modules/shipment/usecase"
@@ -104,6 +106,8 @@ type Container struct {
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
 
 	EstimateShippingOptions shipmentUsecase.EstimateShippingOptionsUsecase
+
+	CreateOrder orderUsecase.CreateOrderUsecase
 }
 
 func NewContainer(cfg Config,
@@ -113,26 +117,33 @@ func NewContainer(cfg Config,
 	)
 
 	var (
-		productRepo       = productPersistence.NewProductRepository()
-		productImageRepo  = productPersistence.NewProductImageRepository()
-		inventoryRepo     = inventoryPersistence.NewInventoryRepository()
-		accountRepo       = authenPersistence.NewAccountRepository()
-		challengeRepo     = authenPersistence.NewChallengeRepository()
-		sessionRepo       = authenPersistence.NewSessionRepositoryImpl()
-		refreshTokenRepo  = authenPersistence.NewRefreshTokenRepositoryImpl()
-		cartRepo          = cartPersistence.NewCartRepositoryImpl()
-		userRepo          = userPersistence.NewUserRepositoryImpl()
-		addressRepo       = addressPersistence.NewUserAddressRepositoryImpl()
-		addressShopRepo   = addressPersistence.NewShopAddressRepositoryImpl()
-		paymentAccRepo    = paymentPersistence.NewPaymentAccountRepository()
-		paymentMethodRepo = paymentPersistence.NewPaymentMethodRepository()
-		shopRepo          = shopPersistence.NewShopRepositoryImpl()
-		courierRepo       = courierPersistence.NewCourierRepositoryImpl()
-		shopCourierRepo   = courierPersistence.NewShopCourierRepositoryImpl()
-		merchantRepo      = merchantPersistence.NewMerchantRepositoryImpl()
-		customerRepo      = customerPersistence.NewCustomerRepositoryImpl()
-		membershipRepo    = authorPersistence.NewMerchantMembershipRepositoryImpl()
-		roleRepo          = authorPersistence.NewRoleRepositoryImpl()
+		productRepo            = productPersistence.NewProductRepository()
+		productImageRepo       = productPersistence.NewProductImageRepository()
+		inventoryRepo          = inventoryPersistence.NewInventoryRepository()
+		accountRepo            = authenPersistence.NewAccountRepository()
+		challengeRepo          = authenPersistence.NewChallengeRepository()
+		sessionRepo            = authenPersistence.NewSessionRepositoryImpl()
+		refreshTokenRepo       = authenPersistence.NewRefreshTokenRepositoryImpl()
+		cartRepo               = cartPersistence.NewCartRepositoryImpl()
+		userRepo               = userPersistence.NewUserRepositoryImpl()
+		addressRepo            = addressPersistence.NewUserAddressRepositoryImpl()
+		addressShopRepo        = addressPersistence.NewShopAddressRepositoryImpl()
+		paymentRepo            = paymentPersistence.NewPaymentRepositoryImpl()
+		paymentAccRepo         = paymentPersistence.NewPaymentAccountRepository()
+		paymentMethodRepo      = paymentPersistence.NewPaymentMethodRepository()
+		paymentEventRepo       = paymentPersistence.NewPaymentEventRepositoryImpl()
+		paymentInstructionRepo = paymentPersistence.NewPaymentInstructionRepositoryImpl()
+		shopRepo               = shopPersistence.NewShopRepositoryImpl()
+		courierRepo            = courierPersistence.NewCourierRepositoryImpl()
+		shopCourierRepo        = courierPersistence.NewShopCourierRepositoryImpl()
+		merchantRepo           = merchantPersistence.NewMerchantRepositoryImpl()
+		customerRepo           = customerPersistence.NewCustomerRepositoryImpl()
+		membershipRepo         = authorPersistence.NewMerchantMembershipRepositoryImpl()
+		roleRepo               = authorPersistence.NewRoleRepositoryImpl()
+		orderRepo              = orderPersistence.NewOrderRepositoryImpl()
+		orderItemRepo          = orderPersistence.NewOrderItemRepositoryImpl()
+		invoiceRepo            = orderPersistence.NewInvoiceRepositoryImpl()
+		invoiceItemRepo        = orderPersistence.NewInvoiceItemRepositoryImpl()
 	)
 
 	var (
@@ -472,6 +483,24 @@ func NewContainer(cfg Config,
 			NewEstimateShippingOptionsUsecase(
 				infra.ShippingCostProvider,
 				infra.TransactionExecutor,
+			),
+
+		CreateOrder: *orderUsecase.
+			NewCreateOrderUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
+				invoiceRepo,
+				invoiceItemRepo,
+				paymentRepo,
+				paymentMethodRepo,
+				paymentAccRepo,
+				paymentEventRepo,
+				paymentInstructionRepo,
+				inventoryRepo,
+				infra.PaymentGateway,
+				pricingService,
 			),
 	}
 }
