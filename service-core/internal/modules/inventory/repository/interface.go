@@ -60,4 +60,17 @@ type InventoryRepository interface {
 		exec transaction.Executor,
 		inventory *domain.Inventory,
 	) error
+
+	// Reserve increments reserved_stock for
+	// the given product and shop by qty
+	//
+	// Returns ErrInsufficientStock
+	// when available stock is too low
+	Reserve(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+		shopID uuid.UUID,
+		qty int,
+	) error
 }

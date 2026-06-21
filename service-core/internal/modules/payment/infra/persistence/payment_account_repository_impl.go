@@ -107,7 +107,7 @@ func (r *paymentAccountRepositoryImpl) GetByID(
 	return &acc, nil
 }
 
-func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(
+func (r *paymentAccountRepositoryImpl) RetrieveLeastLoaded(
 	ctx context.Context,
 	exec transaction.Executor,
 	methodID uuid.UUID,
@@ -155,27 +155,6 @@ func (r *paymentAccountRepositoryImpl) AcquireLeastLoaded(
 		return nil, fmt.Errorf("query payment account least loaded failed: %w", err)
 	}
 
-	updateQuery := `
-		UPDATE payment_accounts
-		SET current_load = current_load + 1,
-		    last_used_at = NOW(),
-		    updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
-		RETURNING current_load, last_used_at, updated_at
-	`
-
-	err = exec.QueryRow(ctx, updateQuery, acc.ID).Scan(
-		&acc.CurrentLoad,
-		&acc.LastUsedAt,
-		&acc.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("udpate payment account current load failed: %w", err)
-	}
-
 	return &acc, nil
 }
 
@@ -186,8 +165,9 @@ func (r *paymentAccountRepositoryImpl) IncrementLoad(
 ) error {
 	query := `
 		UPDATE payment_accounts
-		SET current_load = current_load + 1
-			last_used = NOW()
+		SET
+			current_load = current_load + 1,
+			last_used_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 

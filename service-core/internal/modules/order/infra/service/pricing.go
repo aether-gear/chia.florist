@@ -10,7 +10,6 @@ import (
 	addressRepo "service-core/internal/modules/address/repository"
 	cartDomain "service-core/internal/modules/cart/domain"
 	courierRepo "service-core/internal/modules/courier/repository"
-	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	orderRepo "service-core/internal/modules/order/repository"
 	paymentRepo "service-core/internal/modules/payment/repository"
@@ -183,7 +182,8 @@ func (s *pricingServiceImpl) Calculate(
 			}
 
 			if shopItem.Quantity > available {
-				return nil, apperrors.NewConflict(inventoryDomain.ErrInsufficientStock.Error())
+				productName := productMap[shopItem.ProductID].Name
+				return nil, apperrors.NewConflict(fmt.Sprintf("%s is out of stock", productName))
 			}
 
 			product, ok := productMap[shopItem.ProductID]
