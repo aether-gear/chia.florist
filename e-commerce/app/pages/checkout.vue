@@ -6,6 +6,7 @@ import { useCart, type CartItem } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
 import { cartService } from '~/services/cartService'
 import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod } from '~/types/checkout'
+import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { triggerAuthAlert } from '~/composables/useSessionState'
 
@@ -32,6 +33,15 @@ const selectedPaymentMethodId = ref('')
 const isManualTransfer = ref(false)
 const openedCategories = ref<Record<string, boolean>>({})
 
+const FALLBACK_PAYMENT_METHODS = [
+  { id: '0137d751-5188-447a-b630-1bf858f4f866', name: 'QRIS', type: 'qr_code', description: 'QRIS payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '074b02e4-e047-4f60-bdb0-cfeb5481d002', name: 'DANA', type: 'ewallet', description: 'DANA via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '24ce2aac-bd73-4c29-9ab9-2f53282b2679', name: 'Mandiri', type: 'bank_transfer', description: 'Mandiri Bill Payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '5de3fdf1-7cf2-4354-bf31-a288a6706c41', name: 'GoPay', type: 'ewallet', description: 'GoPay via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: '8ef6ab35-008d-42c4-a66b-7d0a81fdd727', name: 'ShopeePay', type: 'ewallet', description: 'ShopeePay via Midtrans', fee: 0, subtotal: 0, total: 0 },
+  { id: 'aa90abf7-dc0b-445a-aac1-dc34976708de', name: 'SeaBank', type: 'bank_transfer', description: 'SeaBank transfer via Midtrans', fee: 0, subtotal: 0, total: 0 }
+]
+
 const paymentMethodTypes = computed(() => {
   const types = new Set<string>()
   paymentMethods.value.forEach(method => {
@@ -46,7 +56,7 @@ const paymentMethodsGroupedByType = computed(() => {
     if (!groups[method.type]) {
       groups[method.type] = []
     }
-    groups[method.type].push(method)
+    groups[method.type]!.push(method)
   })
   return groups
 })
@@ -117,6 +127,68 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       total: 0,
       payment_methods: []
     }
+    
+    // Group ALL items by shopId
+    const shopsMap: Record<string, typeof checkoutItems.value> = {}
+    checkoutItems.value.forEach(item => {
+      const sId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      if (!shopsMap[sId]) {
+        shopsMap[sId] = []
+      }
+      shopsMap[sId].push(item)
+    })
+    
+    Object.keys(shopsMap).forEach(sId => {
+      const items = shopsMap[sId] || []
+      const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+      const mockOptions = [
+        { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 },
+        { code: 'tiki', name: 'TIKI', service: 'REG', etd: '2-4 Days', fee: 18000 },
+        { code: 'pos', name: 'POS', service: 'REG', etd: '3-5 Days', fee: 15000 }
+      ]
+      
+      if (!courierOptionsMap.value[sId]) {
+        courierOptionsMap.value[sId] = mockOptions
+      }
+      
+      const selected = selectedCouriers.value[sId] || { code: 'jne', service: 'REG' }
+      if (!selectedCouriers.value[sId]) {
+        selectedCouriers.value[sId] = selected
+      }
+      
+      const defaultOption = { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 }
+      const matchedOption = mockOptions.find(o => o.code === selected.code && o.service === selected.service) || mockOptions[0] || defaultOption
+      
+      const shopEntry = {
+        shop_id: sId,
+        subtotal: subtotal,
+        total: subtotal + matchedOption.fee,
+        selected_courier: {
+          code: matchedOption.code,
+          service: matchedOption.service,
+          fee: matchedOption.fee
+        },
+        items: items.map(item => ({
+          product_id: item.id,
+          shop_id: sId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: item.price * item.quantity,
+          size: item.size,
+          color: item.color
+        })),
+        cost_couriers: mockOptions
+      }
+      merged.shops.push(shopEntry)
+      merged.total_shipping += matchedOption.fee
+    })
+    
+    merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
+    merged.total_shipping = merged.shops.reduce((acc, s) => acc + (s.selected_courier ? s.selected_courier.fee : 0), 0)
+    merged.total = merged.subtotal + merged.total_shipping
+    
+    return merged
   } else {
     merged = JSON.parse(JSON.stringify(res))
   }
@@ -256,7 +328,18 @@ onMounted(async () => {
   try {
     await addressVm.fetchAddresses()
 
-    const defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+    let defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+    if (!defaultAddr && addressVm.addresses.value.length > 0) {
+      console.log('Self-healing on mount: Setting first address as default')
+      const firstAddr = addressVm.addresses.value[0]
+      if (firstAddr) {
+        const updated: UserAddress = { ...firstAddr, is_default: true }
+        await addressVm.saveAddress(updated)
+        await addressVm.fetchAddresses()
+        defaultAddr = addressVm.addresses.value.find(a => a.is_default)
+      }
+    }
+
     if (defaultAddr) {
       selectedAddressId.value = defaultAddr.address_id || ''
     }
@@ -280,9 +363,17 @@ onMounted(async () => {
     }))
 
     let res: CheckoutResponse | null = null
-    if (shopsPayload.length > 0) {
+    if (defaultAddr && shopsPayload.length > 0) {
       const payload: any = { shops: shopsPayload }
-      res = await cartService.checkout(payload)
+      try {
+        res = await cartService.checkout(payload)
+      } catch (checkoutErr: any) {
+        if (checkoutErr.status === 409 || (checkoutErr.data?.message && checkoutErr.data.message.includes('address'))) {
+          console.warn('Backend returned address conflict on mount, using fallback client estimation:', checkoutErr)
+        } else {
+          throw checkoutErr
+        }
+      }
     }
 
     const mergedData = mergeCustomItems(res)
@@ -295,7 +386,13 @@ onMounted(async () => {
 
       if (mergedData.payment_methods && mergedData.payment_methods.length > 0) {
         paymentMethods.value = mergedData.payment_methods
-        selectedPaymentMethodId.value = mergedData.payment_methods[0].id
+      } else {
+        paymentMethods.value = JSON.parse(JSON.stringify(FALLBACK_PAYMENT_METHODS))
+      }
+
+      const firstMethod = paymentMethods.value[0]
+      if (firstMethod) {
+        selectedPaymentMethodId.value = firstMethod.id
         paymentMethodTypes.value.forEach(type => {
           openedCategories.value[type] = true
         })
@@ -304,10 +401,11 @@ onMounted(async () => {
       mergedData.shops.forEach(shop => {
         if (shop.cost_couriers) {
           courierOptionsMap.value[shop.shop_id] = shop.cost_couriers
-          if (!selectedCouriers.value[shop.shop_id] && shop.cost_couriers.length > 0) {
+          const firstOption = shop.cost_couriers[0]
+          if (!selectedCouriers.value[shop.shop_id] && firstOption) {
             selectedCouriers.value[shop.shop_id] = {
-              code: shop.cost_couriers[0].code,
-              service: shop.cost_couriers[0].service
+              code: firstOption.code,
+              service: firstOption.service
             }
           }
         }
@@ -352,9 +450,10 @@ const runCalculate = async () => {
 
         if (!courierPayload) {
           const options = courierOptionsMap.value[shop.shop_id]
-          if (options && options.length > 0) {
-            courierPayload = { code: options[0].code, service: options[0].service }
-            selectedCouriers.value[shop.shop_id] = { code: options[0].code, service: options[0].service }
+          const firstOption = options && options[0]
+          if (firstOption) {
+            courierPayload = { code: firstOption.code, service: firstOption.service }
+            selectedCouriers.value[shop.shop_id] = { code: firstOption.code, service: firstOption.service }
           } else {
             courierPayload = { code: 'jne', service: 'REG' }
             selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
@@ -411,8 +510,29 @@ const runCalculate = async () => {
         }
       })
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to calculate shipping:', err)
+    if (err.status === 409 || (err.data?.message && err.data.message.includes('default address'))) {
+      const addresses = addressVm.addresses.value
+      const defaultAddr = addresses.find(a => a.is_default)
+      if (!defaultAddr && addresses.length > 0) {
+        console.log('Self-healing in runCalculate: Setting default address and retrying calculation...')
+        try {
+          const firstAddr = addresses[0]
+          if (firstAddr) {
+            const updated: UserAddress = { ...firstAddr, is_default: true }
+            await addressVm.saveAddress(updated)
+            await addressVm.fetchAddresses()
+            setTimeout(() => {
+              runCalculate()
+            }, 100)
+            return
+          }
+        } catch (saveErr) {
+          console.error('Self-healing failed to save default address:', saveErr)
+        }
+      }
+    }
   } finally {
     isLoadingCalculate.value = false
   }
@@ -422,7 +542,7 @@ let addressTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan alamat untuk kalkulasi ulang ongkir
 watch(selectedAddressId, (newId, oldId) => {
-  if (newId && oldId && newId !== oldId) {
+  if (newId && newId !== oldId && !isLoadingCheckout.value) {
     isLoadingCalculate.value = true
     if (addressTimeout) {
       clearTimeout(addressTimeout)
@@ -437,7 +557,7 @@ let paymentMethodTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan metode pembayaran untuk kalkulasi ulang ongkir
 watch(selectedPaymentMethodId, (newId, oldId) => {
-  if (newId && oldId && newId !== oldId) {
+  if (newId && newId !== oldId && !isLoadingCheckout.value) {
     isLoadingCalculate.value = true
     if (paymentMethodTimeout) {
       clearTimeout(paymentMethodTimeout)
