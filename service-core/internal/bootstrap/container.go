@@ -26,6 +26,7 @@ import (
 	authenRepo "service-core/internal/modules/authentication/repository"
 	authorSvc "service-core/internal/modules/authorization/infra/service"
 	authorRepo "service-core/internal/modules/authorization/repository"
+	orderSvc "service-core/internal/modules/order/infra/service"
 
 	addressUsecase "service-core/internal/modules/address/usecase"
 	authenUsecase "service-core/internal/modules/authentication/usecase"
@@ -168,6 +169,17 @@ func NewContainer(cfg Config,
 
 		imageTransformer     = imgSvc.NewImageTransformer()
 		imageVariantProvider = imgSvc.NewResolutionGenerator(imageTransformer)
+
+		pricingService = orderSvc.NewPricingService(
+			addressRepo,
+			shopCourierRepo,
+			inventoryRepo,
+			paymentMethodRepo,
+			productRepo,
+			infra.ShippingCostProvider,
+			addressShopRepo,
+			shopRepo,
+		)
 	)
 
 	return &Container{
@@ -338,14 +350,7 @@ func NewContainer(cfg Config,
 		Checkout: *cartUsecase.
 			NewCheckoutUsecase(
 				infra.TransactionExecutor,
-				addressRepo,
-				shopCourierRepo,
-				inventoryRepo,
-				paymentMethodRepo,
-				productRepo,
-				infra.ShippingCostProvider,
-				addressShopRepo,
-				shopRepo,
+				pricingService,
 			),
 
 		ListLocations: *locationUsecase.
