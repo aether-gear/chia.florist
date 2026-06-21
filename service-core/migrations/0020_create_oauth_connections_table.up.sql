@@ -15,7 +15,7 @@ CREATE TABLE oauth_connections (
 
     CONSTRAINT fk_user
         FOREIGN KEY(user_id)
-        REFERENCES oauth_connections(id)
+        REFERENCES users(id)
         ON DELETE CASCADE
 );
 
