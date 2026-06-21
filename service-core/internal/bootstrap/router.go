@@ -185,6 +185,7 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		orderHandler = orderH.NewOrderHandler(
+			&c.FindOrders,
 			&c.CreateOrder,
 		)
 	)
@@ -310,6 +311,10 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/order", func(r chi.Router) {
 			r.Post("/", chains.CustomerOnly(orderHandler.CreateOrder))
+		})
+
+		r.Route("/orders", func(r chi.Router) {
+			r.Get("/", chains.MerchantOnly(orderHandler.FindOrders))
 		})
 	})
 

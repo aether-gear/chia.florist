@@ -1,6 +1,8 @@
 package repository
 
 import (
+	query "service-core/internal/shared/query"
+
 	"github.com/google/uuid"
 )
 
@@ -83,3 +85,22 @@ type PricingResult struct {
 	PaymentMethods        []PaymentMethodPricingResult
 	SelectedPaymentMethod *PaymentMethodPricingResult
 }
+
+var (
+	OrderSortLatest query.SortKey = "latest"
+	OrderSortNumber query.SortKey = "number"
+	OrderSortTotal  query.SortKey = "total"
+	OrderSortStatus query.SortKey = "status"
+	OrderSortModify query.SortKey = "modify"
+)
+
+type FindOrderParams struct {
+	ID     *uuid.UUID
+	Number *string
+	UserID *uuid.UUID
+	Status *string
+
+	Pagination query.Pagination
+	Sorts      query.Sorts
+}
+

@@ -132,3 +132,69 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 
 	return nil
 }
+
+func (r *orderItemRepositoryImpl) ListByOrderIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	orderIDs []uuid.UUID,
+) ([]domain.OrderItem, error) {
+	if len(orderIDs) == 0 {
+		return []domain.OrderItem{}, nil
+	}
+
+	query := `
+		SELECT
+			id,
+			order_id,
+			shop_id,
+			shop_name,
+			product_id,
+			product_name,
+			quantity,
+			unit_price,
+			subtotal,
+			courier_code,
+			courier_service,
+			shipping_fee_total
+		FROM
+			order_items
+		WHERE
+			order_id = ANY($1::uuid[])
+	`
+
+	orderIDStrings := make([]string, len(orderIDs))
+	for i, id := range orderIDs {
+		orderIDStrings[i] = id.String()
+	}
+
+	rows, err := exec.Query(ctx, query, orderIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query order items by order ids failed: %w", err)
+	}
+	defer rows.Close()
+
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.OrderItem, error) {
+		var item domain.OrderItem
+		err := row.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ShopID,
+			&item.ShopName,
+			&item.ProductID,
+			&item.ProductName,
+			&item.Quantity,
+			&item.UnitPrice,
+			&item.Subtotal,
+			&item.CourierCode,
+			&item.CourierService,
+			&item.ShippingFee,
+		)
+		return item, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan order items failed: %w", err)
+	}
+
+	return items, nil
+}
+

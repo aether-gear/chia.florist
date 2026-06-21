@@ -108,6 +108,7 @@ type Container struct {
 	EstimateShippingOptions shipmentUsecase.EstimateShippingOptionsUsecase
 
 	CreateOrder orderUsecase.CreateOrderUsecase
+	FindOrders  orderUsecase.FindOrdersUsecase
 }
 
 func NewContainer(cfg Config,
@@ -501,6 +502,12 @@ func NewContainer(cfg Config,
 				inventoryRepo,
 				infra.PaymentGateway,
 				pricingService,
+			),
+		FindOrders: *orderUsecase.
+			NewFindOrdersUsecase(
+				infra.TransactionExecutor,
+				orderRepo,
+				orderItemRepo,
 			),
 	}
 }

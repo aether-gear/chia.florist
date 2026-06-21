@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -184,3 +186,170 @@ func (r *orderRepositoryImpl) Save(
 
 	return nil
 }
+
+func (r *orderRepositoryImpl) FindOrders(
+	ctx context.Context,
+	exec transaction.Executor,
+	params repository.FindOrderParams,
+) ([]domain.Order, int, error) {
+	baseQuery := `
+		FROM orders o
+	`
+
+	selectQuery := `
+		SELECT
+			o.id,
+			o.number,
+			o.user_id,
+			o.address_id,
+			o.status,
+			o.subtotal,
+			o.shipping_fee,
+			o.total,
+			o.created_at,
+			o.updated_at
+	`
+
+	whereClause := ""
+	var (
+		conditions []string
+		args       []any
+		argPos     = 1
+	)
+
+	if params.ID != nil {
+		conditions = append(conditions, fmt.Sprintf("o.id = $%d", argPos))
+		args = append(args, *params.ID)
+		argPos++
+	}
+
+	if params.Number != nil {
+		conditions = append(conditions, fmt.Sprintf("o.number ILIKE $%d", argPos))
+		args = append(args, "%"+*params.Number+"%")
+		argPos++
+	}
+
+	if params.UserID != nil {
+		conditions = append(conditions, fmt.Sprintf("o.user_id = $%d", argPos))
+		args = append(args, *params.UserID)
+		argPos++
+	}
+
+	if params.Status != nil {
+		conditions = append(conditions, fmt.Sprintf("o.status = $%d", argPos))
+		args = append(args, *params.Status)
+		argPos++
+	}
+
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Count matching orders
+	countQuery := `
+		SELECT COUNT(DISTINCT o.id)
+	` + baseQuery + whereClause
+
+	countArgs := append([]any{}, args...)
+	var total int
+	err := exec.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query count orders failed: %w", err)
+	}
+
+	// Build sorting expressions
+	var orderSortKeys = map[query.SortKey]string{
+		repository.OrderSortLatest: "o.created_at",
+		repository.OrderSortNumber: "o.number",
+		repository.OrderSortTotal:  "o.total",
+		repository.OrderSortStatus: "o.status",
+		repository.OrderSortModify: "o.updated_at",
+	}
+
+	var sortClauses []string
+	for _, sort := range params.Sorts {
+		colName, exists := orderSortKeys[sort.By]
+		if !exists {
+			continue
+		}
+
+		direction := "DESC"
+		if sort.Direction == query.SortAsc {
+			direction = "ASC"
+		}
+
+		sortClauses = append(
+			sortClauses,
+			fmt.Sprintf("%s %s", colName, direction),
+		)
+	}
+
+	orderBy := "ORDER BY o.created_at DESC"
+	if len(sortClauses) > 0 {
+		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
+	}
+
+	// Apply pagination
+	limitPos := argPos
+	offsetPos := argPos + 1
+
+	limit := params.Pagination.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	page := params.Pagination.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+	args = append(args, limit, offset)
+
+	// The execution
+	queryStr := selectQuery +
+		baseQuery +
+		whereClause +
+		" " +
+		orderBy +
+		fmt.Sprintf(
+			" LIMIT $%d OFFSET $%d",
+			limitPos,
+			offsetPos,
+		)
+
+	rows, err := exec.Query(ctx, queryStr, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query orders failed: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.Order
+	for rows.Next() {
+		var item domain.Order
+		err := rows.Scan(
+			&item.ID,
+			&item.Number,
+			&item.UserID,
+			&item.AddressID,
+			&item.Status,
+			&item.Subtotal,
+			&item.ShippingFee,
+			&item.Total,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("mapping order model to domain failed: %w", err)
+		}
+
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate orders failed: %w", err)
+	}
+
+	return results, total, nil
+}
+

@@ -42,6 +42,12 @@ type OrderRepository interface {
 		exec transaction.Executor,
 		order domain.Order,
 	) error
+
+	FindOrders(
+		ctx context.Context,
+		exec transaction.Executor,
+		params FindOrderParams,
+	) ([]domain.Order, int, error)
 }
 
 type OrderItemRepository interface {
@@ -49,6 +55,12 @@ type OrderItemRepository interface {
 		ctx context.Context,
 		exec transaction.Executor,
 		orderID uuid.UUID,
+	) ([]domain.OrderItem, error)
+
+	ListByOrderIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderIDs []uuid.UUID,
 	) ([]domain.OrderItem, error)
 
 	SaveBulk(

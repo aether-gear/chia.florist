@@ -6,21 +6,130 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	authenDomain "service-core/internal/modules/authentication/domain"
+	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/order/usecase"
 
 	"github.com/google/uuid"
 )
 
 type orderHandler struct {
+	findOrders  *usecase.FindOrdersUsecase
 	createOrder *usecase.CreateOrderUsecase
 }
 
 func NewOrderHandler(
+	findOrders *usecase.FindOrdersUsecase,
 	createOrder *usecase.CreateOrderUsecase,
 ) *orderHandler {
 	return &orderHandler{
+		findOrders:  findOrders,
 		createOrder: createOrder,
 	}
+}
+
+func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	if actor.Type != authenDomain.AccountTypeMerchant {
+		return apperrors.NewForbidden("forbidden: merchant account required")
+	}
+
+	page := apphttp.QueryIntDefault(r, "page", 1)
+	if page <= 0 {
+		page = 1
+	}
+	limit := apphttp.QueryIntDefault(r, "limit", 10)
+	if limit <= 0 {
+		limit = 10
+	}
+
+	sort := apphttp.Query(r, "sort")
+	idStr := apphttp.Query(r, "id")
+	number := apphttp.Query(r, "number")
+	userIDStr := apphttp.Query(r, "user_id")
+	status := apphttp.Query(r, "status")
+
+	input := usecase.FindOrdersInput{
+		Page:  page,
+		Limit: limit,
+		Sort:  sort,
+	}
+
+	if idStr != "" {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid order id")
+		}
+		input.ID = &id
+	}
+
+	if number != "" {
+		input.Number = &number
+	}
+
+	if userIDStr != "" {
+		userID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid user id")
+		}
+		input.UserID = &userID
+	}
+
+	if status != "" {
+		input.Status = &status
+	}
+
+	orders, total, err := h.findOrders.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	results := make([]orderResponse, len(orders))
+	for i, o := range orders {
+		items := make([]orderItemResponse, len(o.Items))
+		for j, item := range o.Items {
+			items[j] = orderItemResponse{
+				ID:               item.ID.String(),
+				ProductID:        item.ProductID.String(),
+				ProductName:      item.ProductName,
+				Quantity:         item.Quantity,
+				UnitPrice:        item.UnitPrice,
+				Subtotal:         item.Subtotal,
+				ShopID:           item.ShopID.String(),
+				ShopName:         item.ShopName,
+				CourierCode:      item.CourierCode,
+				CourierService:   item.CourierService,
+				ShippingFeeTotal: item.ShippingFee,
+			}
+		}
+
+		results[i] = orderResponse{
+			ID:          o.Order.ID.String(),
+			Number:      o.Order.Number,
+			UserID:      o.Order.UserID.String(),
+			AddressID:   o.Order.AddressID.String(),
+			Status:      string(o.Order.Status),
+			Subtotal:    o.Order.Subtotal,
+			ShippingFee: o.Order.ShippingFee,
+			Total:       o.Order.Total,
+			CreatedAt:   o.Order.CreatedAt,
+			UpdatedAt:   o.Order.UpdatedAt,
+			Items:       items,
+		}
+	}
+
+	response := map[string]any{
+		"orders": results,
+		"page":   page,
+		"limit":  limit,
+		"total":  total,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }
 
 func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error {
