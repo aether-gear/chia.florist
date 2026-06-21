@@ -44,7 +44,7 @@ func (u *FindMerchantsUsecase) Execute(
 	var merchantSortKeys = map[string]query.SortKey{
 		"latest": repository.MerchantSortLatest,
 		"name":   repository.MerchantSortName,
-		"modify": repository.MerchantSortModify,
+		"modified": repository.MerchantSortModify,
 	}
 
 	var sorts query.Sorts

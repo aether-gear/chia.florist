@@ -9,7 +9,7 @@ import (
 var (
 	MerchantSortLatest query.SortKey = "latest"
 	MerchantSortName   query.SortKey = "name"
-	MerchantSortModify query.SortKey = "modify"
+	MerchantSortModify query.SortKey = "modified"
 )
 
 type FindMerchantParams struct {
