@@ -62,8 +62,7 @@ func (r *refreshTokenRepositoryImpl) Save(
 			session_id = EXCLUDED.session_id,
 			token_hash = EXCLUDED.token_hash,
 			expires_at = EXCLUDED.expires_at,
-			revoked_at = EXCLUDED.revoked_at,
-			created_at = EXCLUDED.created_at
+			revoked_at = EXCLUDED.revoked_at
 	`
 
 	_, err := exec.Exec(ctx, query,

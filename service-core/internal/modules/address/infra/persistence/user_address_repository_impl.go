@@ -274,7 +274,6 @@ func (r *userAddressRepositoryImpl) Save(
 			village = EXCLUDED.village,
 			full_address = EXCLUDED.full_address,
 			postal_code = EXCLUDED.postal_code,
-			created_at = EXCLUDED.created_at,
 			updated_at = EXCLUDED.updated_at
 	`
 
