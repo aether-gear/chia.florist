@@ -5,6 +5,8 @@ import { useRoute } from 'vue-router'
 import { useCart, type CartItem } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
 import { cartService } from '~/services/cartService'
+import { orderService } from '~/services/orderService'
+import { bootstrapConfig } from '~/utils/bootstrap'
 import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod } from '~/types/checkout'
 import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
@@ -15,7 +17,7 @@ useHead({
 })
 
 const route = useRoute()
-const { cart, cartSubtotal, cartSubtotalFormatted, checkoutToOrder, formatRupiah } = useCart()
+const { cart, orders, loadCart, flushCart, cartSubtotal, cartSubtotalFormatted, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
 const authVm = useAuthViewModel()
 
@@ -32,6 +34,23 @@ const paymentMethods = ref<PaymentMethod[]>([])
 const selectedPaymentMethodId = ref('')
 const isManualTransfer = ref(false)
 const openedCategories = ref<Record<string, boolean>>({})
+
+// Dynamic shop mapping and payment state
+const shopsMap = ref<Record<string, string>>({})
+const paymentInfoState = useState<any>('last-payment-info', () => null)
+
+const fetchShops = async () => {
+  try {
+    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string }[] }>('/shops')
+    if (res && res.shops) {
+      res.shops.forEach(s => {
+        shopsMap.value[s.id] = s.name
+      })
+    }
+  } catch (err) {
+    console.error('Failed to fetch shops:', err)
+  }
+}
 
 const FALLBACK_PAYMENT_METHODS = [
   { id: '0137d751-5188-447a-b630-1bf858f4f866', name: 'QRIS', type: 'qr_code', description: 'QRIS payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
@@ -161,6 +180,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       
       const shopEntry = {
         shop_id: sId,
+        name: shopsMap.value[sId] || 'Chia Florist',
         subtotal: subtotal,
         total: subtotal + matchedOption.fee,
         selected_courier: {
@@ -195,6 +215,9 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
   // 1. Gabungkan atribut lokal (size, color, price) untuk produk reguler
   merged.shops.forEach(shop => {
+    if (!shop.name) {
+      shop.name = shopsMap.value[shop.shop_id] || 'Chia Florist'
+    }
     shop.items.forEach(item => {
       const localItem = checkoutItems.value.find(i => i.id === item.product_id)
       if (localItem) {
@@ -279,6 +302,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       
       shopEntry = {
         shop_id: sId,
+        name: shopsMap.value[sId] || 'Chia Florist',
         subtotal: subtotal,
         total: subtotal + matchedOption.fee,
         selected_courier: {
@@ -313,6 +337,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 // Muat data checkout saat halaman dibuka
 onMounted(async () => {
   await authVm.fetchCurrentUser()
+  await fetchShops()
   if (!authVm.isAuthenticated.value) {
     triggerAuthAlert('warning', 'Please sign in to proceed with checkout.')
     navigateTo('/login')
@@ -645,18 +670,92 @@ const handlePlaceOrder = async () => {
     alert('Please select a shipping address before completing your order.')
     return
   }
+  if (!selectedPaymentMethodId.value) {
+    alert('Please select a payment method before completing your order.')
+    return
+  }
 
   isProcessing.value = true
 
   try {
-    // Selesaikan pemesanan dan sinkronkan keranjang backend
-    await checkoutToOrder(liveTotalPayment.value, checkoutItems.value)
+    if (!checkoutData.value || !checkoutData.value.shops) {
+      throw new Error('Checkout details are not fully loaded.')
+    }
+
+    const shopsPayload = checkoutData.value.shops.map(shop => {
+      const shopName = shop.name || shopsMap.value[shop.shop_id] || 'Chia Florist'
+      const courier = selectedCouriers.value[shop.shop_id]
+      if (!courier) {
+        throw new Error(`Please select a courier for the shop: ${shopName}`)
+      }
+      return {
+        shop_id: shop.shop_id,
+        name: shopName,
+        selected_courier: {
+          code: courier.code,
+          service: courier.service
+        },
+        items: shop.items.map(item => ({
+          product_id: item.product_id,
+          name: item.name,
+          quantity: item.quantity
+        }))
+      }
+    })
+
+    const payload = {
+      address_id: selectedAddressId.value,
+      selected_payment: {
+        id: selectedPaymentMethodId.value,
+        is_manual: true
+      },
+      shops: shopsPayload
+    }
+
+    const result = await orderService.createOrder(payload)
     
+    const paymentInfo = {
+      orderId: result.order_id,
+      instruction: result.instruction,
+      paymentAccount: result.payment_account,
+      total: liveTotalPayment.value
+    }
+    paymentInfoState.value = paymentInfo
+    if (import.meta.client) {
+      sessionStorage.setItem('chia-last-payment-info', JSON.stringify(paymentInfo))
+    }
+
+    const orderItems = [...checkoutItems.value]
+    const newOrder = {
+      orderId: result.order_id,
+      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+      items: orderItems,
+      total: liveTotalPayment.value,
+      status: 'pembayaran' as const
+    }
+    orders.value.push(newOrder)
+
+    if (authVm.isAuthenticated.value) {
+      for (const item of orderItems) {
+        if (import.meta.client) {
+          localStorage.removeItem(`cart_attr_${item.id}`)
+        }
+      }
+      await loadCart(true)
+    } else {
+      for (const item of orderItems) {
+        if (import.meta.client) {
+          localStorage.removeItem(`cart_attr_${item.id}`)
+        }
+      }
+      cart.value = []
+    }
+
     alert('Order placed successfully! Redirecting to secure payment page...')
-    navigateTo('/profile')
-  } catch (err) {
+    navigateTo('/payment')
+  } catch (err: any) {
     console.error('Checkout processing error:', err)
-    alert('Failed to process checkout. Please try again.')
+    alert(err.data?.message || err.message || 'Failed to process checkout. Please try again.')
   } finally {
     isProcessing.value = false
   }
