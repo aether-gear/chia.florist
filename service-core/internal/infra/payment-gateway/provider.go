@@ -7,6 +7,13 @@ import (
 	"github.com/google/uuid"
 )
 
+type ChargeItem struct {
+	ID       string
+	Name     string
+	Quantity int
+	Price    int64
+}
+
 type ChargeRequest struct {
 	// PaymentID is the internal Payment UUID
 	// — used as the idempotency key external
@@ -46,6 +53,10 @@ type ChargeRequest struct {
 	// When zero the gateway will apply
 	// its own default
 	ExpiresAt time.Time
+
+	// Items lists the individual products, shipping fees, or
+	// adjustments that comprise the total transaction amount.
+	Items []ChargeItem
 }
 
 // PaymentInstruction is a single actionable

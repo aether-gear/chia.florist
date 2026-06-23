@@ -130,18 +130,15 @@ type PaymentEventRepository interface {
 }
 
 type PaymentInstructionRepository interface {
-	// Save persists the instruction record for a payment.
-	// Called once at order creation time.
+	GetByPaymentMethodID(
+		ctx context.Context,
+		exec transaction.Executor,
+		methodID uuid.UUID,
+	) (*domain.PaymentInstruction, error)
+
 	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		instruction domain.PaymentInstruction,
 	) error
-
-	// GetByPaymentID retrieves the instruction for a given payment.
-	GetByPaymentID(
-		ctx context.Context,
-		exec transaction.Executor,
-		paymentID uuid.UUID,
-	) (*domain.PaymentInstruction, error)
 }

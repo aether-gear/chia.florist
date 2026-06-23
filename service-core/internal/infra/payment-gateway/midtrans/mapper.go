@@ -1,6 +1,9 @@
 package midtrans
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // MapPaymentType converts an internal payment method name
 // into the Midtrans Core API payment_type string required
@@ -10,16 +13,16 @@ import "fmt"
 // by this provider, so the caller can reject the request early
 // rather than sending an invalid charge to the gateway.
 func MapPaymentType(methodName string) (string, error) {
+	methodName = strings.ToLower(methodName)
+
 	switch methodName {
-	case "QRIS":
+	case "qris":
 		return "qris", nil
-	case "GoPay":
+	case "gopay":
 		return "gopay", nil
-	case "DANA":
-		return "dana", nil
-	case "ShopeePay":
+	case "shopeepay":
 		return "shopeepay", nil
-	case "Mandiri":
+	case "mandiri":
 		return "echannel", nil
 	default:
 		return "", fmt.Errorf("midtrans: unsupported payment method %q", methodName)
