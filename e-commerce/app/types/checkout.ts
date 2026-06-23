@@ -32,6 +32,7 @@ export interface CheckoutItem {
 
 export interface CheckoutShop {
   shop_id: string
+  name?: string
   subtotal: number
   total: number
   selected_courier: SelectedCourier | null
