@@ -9,6 +9,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
+	cartRepo "service-core/internal/modules/cart/repository"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
@@ -33,6 +34,7 @@ type CreateOrderUsecase struct {
 	paymentEventRepo       paymentRepo.PaymentEventRepository
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository
 	inventoryRepo          inventoryRepo.InventoryRepository
+	cartRepo               cartRepo.CartRepository
 	paymentGateway         paymentgateway.Provider
 	pricingService         repository.PricingService
 }
@@ -50,6 +52,7 @@ func NewCreateOrderUsecase(
 	paymentEventRepo paymentRepo.PaymentEventRepository,
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
+	cartRepo cartRepo.CartRepository,
 	paymentGateway paymentgateway.Provider,
 	pricingService repository.PricingService,
 ) *CreateOrderUsecase {
@@ -66,6 +69,7 @@ func NewCreateOrderUsecase(
 		paymentEventRepo:       paymentEventRepo,
 		paymentInstructionRepo: paymentInstructionRepo,
 		inventoryRepo:          inventoryRepo,
+		cartRepo:               cartRepo,
 		paymentGateway:         paymentGateway,
 		pricingService:         pricingService,
 	}
@@ -367,6 +371,20 @@ func (u *CreateOrderUsecase) Execute(
 				}
 			}
 
+			cart, err := u.cartRepo.GetWithItemsByUserID(ctx, exec, input.UserID)
+			if err != nil {
+				return fmt.Errorf("failed to load cart with items: %w", err)
+			}
+			if cart != nil {
+				for _, item := range orderItems {
+					cart.RemoveItem(item.ProductID, item.ShopID)
+				}
+
+				if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
+					return fmt.Errorf("failed to update cart: %w", err)
+				}
+			}
+
 			ins, err :=
 				u.paymentInstructionRepo.GetByPaymentID(
 					ctx,
@@ -524,6 +542,26 @@ func (u *CreateOrderUsecase) executeGatewayPayment(
 						"failed to reserve inventory for product %s: %w",
 						item.ProductID, err,
 					)
+				}
+			}
+
+			cart, err :=
+				u.cartRepo.GetWithItemsByUserID(
+					ctx,
+					exec,
+					input.UserID,
+				)
+			if err != nil {
+				return fmt.Errorf("failed to load cart with items: %w", err)
+			}
+
+			if cart != nil {
+				for _, item := range orderItems {
+					cart.RemoveItem(item.ProductID, item.ShopID)
+				}
+
+				if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
+					return fmt.Errorf("failed to update cart: %w", err)
 				}
 			}
 
