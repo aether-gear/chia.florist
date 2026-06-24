@@ -4,6 +4,7 @@ import LoginPage from '../pages/auth/LoginPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import SecurityPage from '../pages/security/SecurityPage';
 import PlaceholderPage from '../pages/PlaceholderPage';
+import OrdersPage from '../pages/orders/OrdersPage';
 import MerchantProfileSettings from '../pages/merchant-profile/MerchantProfileSettings';
 import CreateMerchantPage from '../pages/admin/CreateMerchantPage';
 import AddMerchantAccountPage from '../pages/admin/AddMerchantAccountPage';
@@ -30,7 +31,7 @@ export default function AppRoutes() {
             <Route path="/shop" element={<ShopManagementPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/create" element={<CreateProductPage />} />
-            <Route path="/orders" element={<PlaceholderPage title="Orders" />} />
+            <Route path="/orders" element={<OrdersPage />} />
             <Route path="/transactions" element={<PlaceholderPage title="Transactions" />} />
             <Route path="/shipments" element={<PlaceholderPage title="Shipments" />} />
             <Route path="/merchant/settings" element={<MerchantProfileSettings />} />
