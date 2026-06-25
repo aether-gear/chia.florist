@@ -13,21 +13,14 @@ import (
 	"github.com/midtrans/midtrans-go/coreapi"
 )
 
-// MidtransProvider implements paymentgateway.Provider
-// using the Midtrans Core API
-//
-// It supports bank-transfer (VA), QRIS and e-wallet charges
-type MidtransProvider struct {
+type midtransSDKProvider struct {
 	cfg    config.MidTransConfig
 	client coreapi.Client
 }
 
-// NewMidtransProvider constructs a ready-to-use MidtransProvider
-//
-// It validates that a ServerKey is present before returning
-func NewMidtransProvider(
+func NewMidtransSDKProvider(
 	cfg config.MidTransConfig,
-) (*MidtransProvider, error) {
+) (*midtransSDKProvider, error) {
 	if strings.TrimSpace(cfg.ServerKey) == "" {
 		return nil, fmt.Errorf("midtrans: server key is required")
 	}
@@ -40,16 +33,13 @@ func NewMidtransProvider(
 	c := coreapi.Client{}
 	c.New(cfg.ServerKey, env)
 
-	return &MidtransProvider{
+	return &midtransSDKProvider{
 		cfg:    cfg,
 		client: c,
 	}, nil
 }
 
-// Charge creates a new Midtrans Core API transaction
-// and returns the payment instructions the customer
-// must follow to complete the payment
-func (p *MidtransProvider) Charge(
+func (p *midtransSDKProvider) Charge(
 	ctx context.Context,
 	req paymentgateway.ChargeRequest,
 ) (*paymentgateway.ChargeResponse, error) {
@@ -60,23 +50,19 @@ func (p *MidtransProvider) Charge(
 
 	resp, midErr := p.client.ChargeTransaction(chargeReq)
 	if midErr != nil {
-		return nil, fmt.Errorf("midtrans: charge transaction: %s (status %d)", midErr.Message, midErr.StatusCode)
+		return nil, fmt.Errorf("midtrans: charge transaction: %s (status %d)",
+			midErr.Message, midErr.StatusCode)
 	}
 
-	return p.mapChargeResponse(resp)
+	result, err := p.mapChargeResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
-// ParseNotification validates and normalises an inbound
-// Midtrans notification webhook payload into a
-// provider-agnostic NotificationResult.
-//
-// The payload is the raw JSON body decoded into a map
-// (order_id, transaction_id, transaction_status,
-// gross_amount, fraud_status, …)
-//
-// Re-query the gateway to verify authenticity
-// before trusting the values (prevents spoofing)
-func (p *MidtransProvider) ParseNotification(
+func (p *midtransSDKProvider) ParseNotification(
 	_ context.Context,
 	payload paymentgateway.NotificationPayload,
 ) (*paymentgateway.NotificationResult, error) {
@@ -85,7 +71,8 @@ func (p *MidtransProvider) ParseNotification(
 		return nil, fmt.Errorf("midtrans: parse notification: missing order_id in payload")
 	}
 
-	result, midErr := p.client.CheckTransaction(orderID)
+	result, midErr :=
+		p.client.CheckTransaction(orderID)
 	if midErr != nil {
 		return nil, fmt.Errorf("midtrans: check transaction %q: %s (status %d)",
 			orderID, midErr.Message, midErr.StatusCode)
@@ -109,11 +96,12 @@ func (p *MidtransProvider) ParseNotification(
 // CancelTransaction requests Midtrans
 // to cancel a pending / authorised transaction
 // identified by its gateway-side order ID
-func (p *MidtransProvider) CancelTransaction(
+func (p *midtransSDKProvider) CancelTransaction(
 	_ context.Context,
 	gatewayOrderID string,
 ) error {
-	_, midErr := p.client.CancelTransaction(gatewayOrderID)
+	_, midErr :=
+		p.client.CancelTransaction(gatewayOrderID)
 	if midErr != nil {
 		return fmt.Errorf("midtrans: cancel transaction %q: %s (status %d)",
 			gatewayOrderID, midErr.Message, midErr.StatusCode)
@@ -121,13 +109,14 @@ func (p *MidtransProvider) CancelTransaction(
 	return nil
 }
 
-// buildChargeRequest converts our generic ChargeRequest into a Midtrans
-// coreapi.ChargeReq. Add more payment-type branches here as needed
-func (p *MidtransProvider) buildChargeRequest(
+// buildChargeRequest converts the app
+// eneric ChargeRequest into a Midtrans
+// coreapi.ChargeReq.
+func (p *midtransSDKProvider) buildChargeRequest(
 	req paymentgateway.ChargeRequest,
 ) (*coreapi.ChargeReq, error) {
 	txDetails := midtranssdk.TransactionDetails{
-		OrderID:  req.PaymentID.String(), // payment UUID as the idempotency key
+		OrderID:  req.PaymentID.String(),
 		GrossAmt: req.Amount,
 	}
 
@@ -140,7 +129,6 @@ func (p *MidtransProvider) buildChargeRequest(
 		},
 	}
 
-	// Attach expiry when explicitly set.
 	if !req.ExpiresAt.IsZero() {
 		dur := time.Until(req.ExpiresAt)
 		if dur > 0 {
@@ -158,8 +146,8 @@ func (p *MidtransProvider) buildChargeRequest(
 	paymentType := strings.ToLower(req.PaymentType)
 
 	switch paymentType {
-	case "bank_transfer":
-		bankCode := strings.ToUpper(req.BankCode)
+	case "mandiri":
+		bankCode := "Mandiri"
 		chargeReq.PaymentType = coreapi.PaymentTypeBankTransfer
 		chargeReq.BankTransfer = &coreapi.BankTransferDetails{
 			Bank: midtranssdk.Bank(bankCode),
@@ -189,7 +177,7 @@ func (p *MidtransProvider) buildChargeRequest(
 
 // mapChargeResponse converts a Midtrans coreapi.ChargeResponse into our
 // provider-agnostic ChargeResponse
-func (p *MidtransProvider) mapChargeResponse(
+func (p *midtransSDKProvider) mapChargeResponse(
 	resp *coreapi.ChargeResponse,
 ) (*paymentgateway.ChargeResponse, error) {
 	grossAmount, err := parseAmount(resp.GrossAmount)
@@ -223,7 +211,7 @@ func (p *MidtransProvider) mapChargeResponse(
 }
 
 // extractInstructions pulls VA numbers, QR strings,
-// or deep-link actions from the raw Midtrans response
+// or deep-link actions from the raw Midtrans SDK response
 // and normalises them into PaymentInstruction slices
 func extractInstructions(resp *coreapi.ChargeResponse) []paymentgateway.PaymentInstruction {
 	var instructions []paymentgateway.PaymentInstruction
@@ -256,48 +244,4 @@ func extractInstructions(resp *coreapi.ChargeResponse) []paymentgateway.PaymentI
 	}
 
 	return instructions
-}
-
-// mapNotificationStatus converts Midtrans transaction_status + fraud_status
-// into our normalised NotificationStatus.
-func mapNotificationStatus(txStatus, fraudStatus string) paymentgateway.NotificationStatus {
-	switch txStatus {
-	case "capture":
-		if fraudStatus == "challenge" {
-			return paymentgateway.NotificationStatusChallenge
-		}
-		return paymentgateway.NotificationStatusSettlement
-	case "settlement":
-		return paymentgateway.NotificationStatusSettlement
-	case "pending":
-		return paymentgateway.NotificationStatusPending
-	case "deny":
-		return paymentgateway.NotificationStatusDeny
-	case "expire":
-		return paymentgateway.NotificationStatusExpire
-	case "cancel":
-		return paymentgateway.NotificationStatusCancel
-	case "refund", "partial_refund":
-		return paymentgateway.NotificationStatusRefund
-	default:
-		return paymentgateway.NotificationStatus(txStatus)
-	}
-}
-
-// parseAmount converts the Midtrans gross_amount string (e.g. "150000.00")
-// into an int64 representing the amount in the smallest unit.
-func parseAmount(raw string) (int64, error) {
-	if raw == "" {
-		return 0, nil
-	}
-	// Strip decimal part if present (IDR has no sub-unit).
-	if idx := strings.Index(raw, "."); idx != -1 {
-		raw = raw[:idx]
-	}
-	var amount int64
-	_, err := fmt.Sscanf(raw, "%d", &amount)
-	if err != nil {
-		return 0, fmt.Errorf("parse %q as int64: %w", raw, err)
-	}
-	return amount, nil
 }

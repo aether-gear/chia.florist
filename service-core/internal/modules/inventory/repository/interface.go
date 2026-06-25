@@ -73,4 +73,24 @@ type InventoryRepository interface {
 		shopID uuid.UUID,
 		qty int,
 	) error
+
+	// Release decrements reserved_stock for
+	// the given product and shop by qty
+	Release(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+		shopID uuid.UUID,
+		qty int,
+	) error
+
+	// Commit decrements both stock and reserved_stock for
+	// the given product and shop by qty
+	Commit(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+		shopID uuid.UUID,
+		qty int,
+	) error
 }

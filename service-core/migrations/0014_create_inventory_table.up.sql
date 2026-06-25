@@ -1,5 +1,5 @@
 CREATE TABLE inventory (
-    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     product_id UUID NOT NULL,
     shop_id UUID NOT NULL,

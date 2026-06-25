@@ -164,6 +164,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.ListPaymentAccount,
 			&c.CreatePaymentMethod,
 			&c.ListPaymentMethod,
+			&c.ProcessPaymentWebhook,
+			&c.ProcessManualPayment,
 		)
 
 		shopHandler = shopH.NewShopHandler(
@@ -293,7 +295,13 @@ func NewRouter(c *Container) *chi.Mux {
 			})
 		})
 
+		r.Route("/midtrans", func(r chi.Router) {
+			r.Post("/webhook", chains.Core(paymentHandler.HandleMidtransWebhook))
+		})
+
 		r.Route("/payments", func(r chi.Router) {
+			r.Post("/{id}/action", chains.MerchantOnly(paymentHandler.ProcessManualPayment))
+
 			r.Route("/accounts", func(r chi.Router) {
 				r.Get("/", chains.MerchantOnly(paymentHandler.ListPaymentAccount))
 				r.Post("/", chains.MerchantAdminOnly(paymentHandler.CreatePaymentAccount))

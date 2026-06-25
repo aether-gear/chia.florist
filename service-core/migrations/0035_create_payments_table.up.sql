@@ -13,7 +13,7 @@ CREATE TABLE payments (
 
     order_id UUID NOT NULL,
     method_id UUID NOT NULL,
-    payment_account_id UUID NOT NULL,
+    payment_account_id UUID,
 
     provider TEXT NOT NULL,
 
