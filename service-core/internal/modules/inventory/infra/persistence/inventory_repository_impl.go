@@ -293,3 +293,73 @@ func (r *inventoryRepositoryImpl) Reserve(
 
 	return nil
 }
+
+func (r *inventoryRepositoryImpl) Release(
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+	shopID uuid.UUID,
+	qty int,
+) error {
+	query := `
+		UPDATE inventory
+		SET
+			reserved_stock = reserved_stock - $1,
+			updated_at     = NOW()
+		WHERE
+			product_id       = $2
+			AND shop_id      = $3
+			AND reserved_stock >= $1
+	`
+
+	tag, err := exec.Exec(ctx, query,
+		qty,
+		productID,
+		shopID,
+	)
+	if err != nil {
+		return fmt.Errorf("release inventory failed: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return domain.ErrInsufficientReserved
+	}
+
+	return nil
+}
+
+func (r *inventoryRepositoryImpl) Commit(
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+	shopID uuid.UUID,
+	qty int,
+) error {
+	query := `
+		UPDATE inventory
+		SET
+			stock          = stock - $1,
+			reserved_stock = reserved_stock - $1,
+			updated_at     = NOW()
+		WHERE
+			product_id       = $2
+			AND shop_id      = $3
+			AND stock       >= $1
+			AND reserved_stock >= $1
+	`
+
+	tag, err := exec.Exec(ctx, query,
+		qty,
+		productID,
+		shopID,
+	)
+	if err != nil {
+		return fmt.Errorf("commit inventory failed: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return domain.ErrInsufficientReserved
+	}
+
+	return nil
+}

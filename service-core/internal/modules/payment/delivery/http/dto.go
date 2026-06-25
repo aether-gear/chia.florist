@@ -42,3 +42,7 @@ type paymentAccountResponse struct {
 	PhoneNumber   string    `json:"phone_number"`
 	QRString      *string   `json:"qr_string"`
 }
+
+type manualPaymentActionRequest struct {
+	Action string `json:"action"`
+}

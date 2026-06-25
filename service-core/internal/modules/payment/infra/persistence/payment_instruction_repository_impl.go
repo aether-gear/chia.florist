@@ -19,6 +19,39 @@ func NewPaymentInstructionRepositoryImpl() repository.PaymentInstructionReposito
 	return &paymentInstructionRepositoryImpl{}
 }
 
+func (r *paymentInstructionRepositoryImpl) GetByPaymentMethodID(
+	ctx context.Context,
+	exec transaction.Executor,
+	methodID uuid.UUID,
+) (*domain.PaymentInstruction, error) {
+	query := `
+		SELECT
+			id,
+			payment_method_id,
+			content,
+			created_at
+		FROM payment_instructions
+		WHERE payment_method_id = $1
+		LIMIT 1
+	`
+
+	var inst domain.PaymentInstruction
+	err := exec.QueryRow(ctx, query, methodID).Scan(
+		&inst.ID,
+		&inst.PaymentID,
+		&inst.Content,
+		&inst.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query payment instruction by payment_method_id failed: %w", err)
+	}
+
+	return &inst, nil
+}
+
 func (r *paymentInstructionRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
@@ -44,37 +77,4 @@ func (r *paymentInstructionRepositoryImpl) Save(
 	}
 
 	return nil
-}
-
-func (r *paymentInstructionRepositoryImpl) GetByPaymentID(
-	ctx context.Context,
-	exec transaction.Executor,
-	paymentID uuid.UUID,
-) (*domain.PaymentInstruction, error) {
-	query := `
-		SELECT
-			id,
-			payment_method_id,
-			content,
-			created_at
-		FROM payment_instructions
-		WHERE payment_method_id = $1
-		LIMIT 1
-	`
-
-	var inst domain.PaymentInstruction
-	err := exec.QueryRow(ctx, query, paymentID).Scan(
-		&inst.ID,
-		&inst.PaymentID,
-		&inst.Content,
-		&inst.CreatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("query payment instruction by payment_method_id failed: %w", err)
-	}
-
-	return &inst, nil
 }

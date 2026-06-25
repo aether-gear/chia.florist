@@ -32,8 +32,8 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		return nil, err
 	}
 
-	storageProvider, err :=
-		supabaseStorage.NewSupabaseProvider(
+	storageProvider, err := supabaseStorage.
+		NewSupabaseProvider(
 			cfg.Storage,
 			cfg.Supabase,
 			&http.Client{},
@@ -43,8 +43,8 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		return nil, err
 	}
 
-	gateway, err :=
-		midtransGateway.NewMidtransProvider(
+	gateway, err := midtransGateway.
+		NewMidtransAPIProvider(
 			cfg.MidTrans,
 		)
 	if err != nil {

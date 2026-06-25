@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -8,14 +9,17 @@ import (
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/payment/usecase"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type PaymentHandler struct {
-	createPaymentAccount *usecase.CreatePaymentAccountUsecase
-	listPaymentAccount   *usecase.ListPaymentAccountUsecase
-	createPaymentMethod  *usecase.CreatePaymentMethodUsecase
-	listPaymentMethod    *usecase.ListPaymentMethodUsecase
+	createPaymentAccount  *usecase.CreatePaymentAccountUsecase
+	listPaymentAccount    *usecase.ListPaymentAccountUsecase
+	createPaymentMethod   *usecase.CreatePaymentMethodUsecase
+	listPaymentMethod     *usecase.ListPaymentMethodUsecase
+	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase
+	processManualPayment  *usecase.ProcessManualPaymentUsecase
 }
 
 func NewPaymentHandler(
@@ -23,12 +27,16 @@ func NewPaymentHandler(
 	listPaymentAccount *usecase.ListPaymentAccountUsecase,
 	createPaymentMethod *usecase.CreatePaymentMethodUsecase,
 	listPaymentMethod *usecase.ListPaymentMethodUsecase,
+	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase,
+	processManualPayment *usecase.ProcessManualPaymentUsecase,
 ) *PaymentHandler {
 	return &PaymentHandler{
-		createPaymentAccount: createPaymentAccount,
-		listPaymentAccount:   listPaymentAccount,
-		createPaymentMethod:  createPaymentMethod,
-		listPaymentMethod:    listPaymentMethod,
+		createPaymentAccount:  createPaymentAccount,
+		listPaymentAccount:    listPaymentAccount,
+		createPaymentMethod:   createPaymentMethod,
+		listPaymentMethod:     listPaymentMethod,
+		processPaymentWebhook: processPaymentWebhook,
+		processManualPayment:  processManualPayment,
 	}
 }
 
@@ -194,6 +202,59 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 
 	response := map[string]interface{}{
 		"methods": paymentMthds,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *PaymentHandler) HandleMidtransWebhook(w http.ResponseWriter, r *http.Request) error {
+	var payload map[string]any
+	if err := apphttp.DecodeJSON(r, &payload); err != nil {
+		return apperrors.NewBadRequest("invalid payload")
+	}
+
+	input := usecase.ProcessPaymentWebhookInput{
+		Payload: payload,
+	}
+
+	if err := h.processPaymentWebhook.
+		Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "webhook processed successfully",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *PaymentHandler) ProcessManualPayment(w http.ResponseWriter, r *http.Request) error {
+	idStr := chi.URLParam(r, "id")
+	paymentID, err := uuid.Parse(idStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid payment ID")
+	}
+
+	var req manualPaymentActionRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+
+	input := usecase.ProcessManualPaymentInput{
+		PaymentID: paymentID,
+		Action:    req.Action,
+	}
+
+	if err := h.processManualPayment.
+		Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": fmt.Sprintf("manual payment successfully updated with action: %s", req.Action),
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
