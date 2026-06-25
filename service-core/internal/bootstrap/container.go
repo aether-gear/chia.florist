@@ -190,7 +190,7 @@ func NewContainer(cfg Config,
 			inventoryRepo,
 			paymentMethodRepo,
 			productRepo,
-			infra.ShippingCostProvider,
+			infra.ShippingProvider,
 			addressShopRepo,
 			shopRepo,
 		)

@@ -10,22 +10,16 @@ import (
 	"service-core/internal/infra/shipping/rajaongkir"
 	storage "service-core/internal/infra/storage"
 	supabaseStorage "service-core/internal/infra/storage/supabase"
-	lService "service-core/internal/modules/location/infra/service"
-	locationRepo "service-core/internal/modules/location/repository"
-	sCostService "service-core/internal/modules/shipment/infra/service"
-	shipmentRepo "service-core/internal/modules/shipment/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type Dependency struct {
-	DB                   *database.Connection
-	StorageProvider      storage.Provider
-	LocationProvider     locationRepo.LocationRepository
-	ShippingCostProvider shipmentRepo.ShippingCostProvider
-	TransactionProvider  transaction.Transactor
-	TransactionExecutor  transaction.Executor
-	PaymentGateway       paymentgateway.Provider
-	ShippingProvider     shipping.Provider
+	DB                  *database.Connection
+	StorageProvider     storage.Provider
+	TransactionProvider transaction.Transactor
+	TransactionExecutor transaction.Executor
+	PaymentGateway      paymentgateway.Provider
+	ShippingProvider    shipping.Provider
 }
 
 func NewDependency(cfg Config) (*Dependency, error) {
@@ -58,22 +52,8 @@ func NewDependency(cfg Config) (*Dependency, error) {
 	}
 
 	return &Dependency{
-		DB:              db,
-		StorageProvider: storageProvider,
-		LocationProvider: lService.NewRajaOngkirLocation(
-			cfg.Shipping.DestinationKey,
-			cfg.Shipping.DestinationURL,
-			&http.Client{
-				Timeout: cfg.Shipping.Timeout,
-			},
-		),
-		ShippingCostProvider: sCostService.NewRajaOngkirCostEstimation(
-			cfg.Shipping.CalculateKEY,
-			cfg.Shipping.CalculateURL,
-			&http.Client{
-				Timeout: cfg.Shipping.Timeout,
-			},
-		),
+		DB:                  db,
+		StorageProvider:     storageProvider,
 		TransactionProvider: database.NewPostgresTransactor(db.Pool),
 		TransactionExecutor: db.Pool,
 		PaymentGateway:      gateway,

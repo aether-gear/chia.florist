@@ -27,19 +27,6 @@ type ShipmentRepository interface {
 	) error
 }
 
-type TrackingRepository interface {
-	AddTracking(
-		ctx context.Context,
-		exec transaction.Executor,
-		tracking domain.ShipmentEvent,
-	) error
-	GetTrackingByShipmentID(
-		ctx context.Context,
-		exec transaction.Executor,
-		shipmentID uuid.UUID,
-	) ([]domain.ShipmentEvent, error)
-}
-
 type ShipmentMethodRepository interface {
 	ListActive(
 		ctx context.Context,
@@ -50,20 +37,4 @@ type ShipmentMethodRepository interface {
 		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.ShipmentOption, error)
-}
-
-type ShippingCostProvider interface {
-	CalculateCost(
-		ctx context.Context,
-		exec transaction.Executor,
-		input CalculateCostInput,
-	) ([]CostOption, error)
-}
-
-type ShipmentTracker interface {
-	Track(
-		ctx context.Context,
-		exec transaction.Executor,
-		trackingNumber string,
-	) ([]domain.ShipmentEvent, error)
 }
