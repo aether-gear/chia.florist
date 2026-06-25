@@ -27,7 +27,7 @@ type ShipmentRepository interface {
 	) error
 }
 
-type ShipmentEventRepository interface {
+type TrackingRepository interface {
 	AddTracking(
 		ctx context.Context,
 		exec transaction.Executor,

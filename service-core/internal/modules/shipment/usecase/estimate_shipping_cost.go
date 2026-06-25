@@ -6,23 +6,23 @@ import (
 	"strings"
 
 	apperrors "service-core/internal/common/errors"
+	shipping "service-core/internal/infra/shipping"
 	"service-core/internal/modules/shipment/domain"
-	"service-core/internal/modules/shipment/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type EstimateShippingOptionsUsecase struct {
-	shippingCostProvider repository.ShippingCostProvider
-	executor             transaction.Executor
+	shipping shipping.Provider
+	executor transaction.Executor
 }
 
 func NewEstimateShippingOptionsUsecase(
-	shippingCostProvider repository.ShippingCostProvider,
+	shipping shipping.Provider,
 	executor transaction.Executor,
 ) *EstimateShippingOptionsUsecase {
 	return &EstimateShippingOptionsUsecase{
-		shippingCostProvider: shippingCostProvider,
-		executor:             executor,
+		shipping: shipping,
+		executor: executor,
 	}
 }
 
@@ -37,7 +37,7 @@ type EstimateShippingOptionsInput struct {
 func (u *EstimateShippingOptionsUsecase) Execute(
 	ctx context.Context,
 	input EstimateShippingOptionsInput,
-) ([]repository.CostOption, error) {
+) ([]shipping.RateOption, error) {
 	if input.Origin == input.Destination {
 		return nil, apperrors.NewInvalidInput(domain.ErrInvalidRoute.Error())
 	}
@@ -66,7 +66,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 		return nil, apperrors.NewInvalidInput(domain.ErrInvalidWeight.Error())
 	}
 
-	query := repository.CalculateCostInput{
+	query := shipping.CalculateRatesInput{
 		OriginID:      input.Origin,
 		DestinationID: input.Destination,
 		Weight:        input.Weight,
@@ -74,7 +74,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 		PriceFilter:   input.PriceFilter,
 	}
 
-	costOptions, err := u.shippingCostProvider.CalculateCost(ctx, u.executor, query)
+	costOptions, err := u.shipping.CalculateRates(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate shipping cost: %w", err)
 	}
