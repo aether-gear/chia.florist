@@ -97,10 +97,10 @@ type Container struct {
 	GetShopCouriers  shopUsecase.GetShopCouriersUsecase
 	GetShopProducts  shopUsecase.GetShopProductsUsecase
 
-	CreatePaymentAccount paymentUsecase.CreatePaymentAccountUsecase
-	ListPaymentAccount   paymentUsecase.ListPaymentAccountUsecase
-	CreatePaymentMethod  paymentUsecase.CreatePaymentMethodUsecase
-	ListPaymentMethod    paymentUsecase.ListPaymentMethodUsecase
+	CreatePaymentAccount  paymentUsecase.CreatePaymentAccountUsecase
+	ListPaymentAccount    paymentUsecase.ListPaymentAccountUsecase
+	CreatePaymentMethod   paymentUsecase.CreatePaymentMethodUsecase
+	ListPaymentMethod     paymentUsecase.ListPaymentMethodUsecase
 	ProcessPaymentWebhook paymentUsecase.ProcessPaymentWebhookUsecase
 	ProcessManualPayment  paymentUsecase.ProcessManualPaymentUsecase
 
@@ -190,7 +190,7 @@ func NewContainer(cfg Config,
 			inventoryRepo,
 			paymentMethodRepo,
 			productRepo,
-			infra.ShippingCostProvider,
+			infra.ShippingProvider,
 			addressShopRepo,
 			shopRepo,
 		)
@@ -369,7 +369,7 @@ func NewContainer(cfg Config,
 
 		ListLocations: *locationUsecase.
 			NewListLocationUsecase(
-				infra.LocationProvider,
+				infra.ShippingProvider,
 				infra.TransactionExecutor,
 			),
 
@@ -507,7 +507,7 @@ func NewContainer(cfg Config,
 
 		EstimateShippingOptions: *shipmentUsecase.
 			NewEstimateShippingOptionsUsecase(
-				infra.ShippingCostProvider,
+				infra.ShippingProvider,
 				infra.TransactionExecutor,
 			),
 

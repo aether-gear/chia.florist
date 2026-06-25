@@ -5,15 +5,16 @@ import (
 )
 
 type Config struct {
-	App      config.AppConfig
-	Shipping config.ShippingConfig
-	JWT      config.JWTConfig
-	Storage  config.StorageConfig
-	Supabase config.SupabaseConfig
-	Postgres config.PostgresConfig
-	DB       config.DatabaseConfig
-	SMTP     config.SMTPConfig
-	MidTrans config.MidTransConfig
+	App        config.AppConfig
+	Shipping   config.ShippingConfig
+	JWT        config.JWTConfig
+	Storage    config.StorageConfig
+	Supabase   config.SupabaseConfig
+	Postgres   config.PostgresConfig
+	DB         config.DatabaseConfig
+	SMTP       config.SMTPConfig
+	MidTrans   config.MidTransConfig
+	RajaOngkir config.RajaOngkirConfig
 }
 
 func LoadConfig() Config {
@@ -40,14 +41,15 @@ func LoadConfig() Config {
 	// )
 
 	return Config{
-		App:      config.LoadAppConfig(),
-		Shipping: config.LoadShippingConfig(),
-		JWT:      config.LoadJWTConfig(),
-		Storage:  config.LoadStorageConfig(),
-		Supabase: supabaseCfg,
-		Postgres: postgresCfg,
-		DB:       dbConf,
-		SMTP:     config.LoadSMTPConfig(),
-		MidTrans: config.LoadMidTransConfig(),
+		App:        config.LoadAppConfig(),
+		Shipping:   config.LoadShippingConfig(),
+		JWT:        config.LoadJWTConfig(),
+		Storage:    config.LoadStorageConfig(),
+		Supabase:   supabaseCfg,
+		Postgres:   postgresCfg,
+		DB:         dbConf,
+		SMTP:       config.LoadSMTPConfig(),
+		MidTrans:   config.LoadMidTransConfig(),
+		RajaOngkir: config.LoadRajaOngkirConfig(),
 	}
 }

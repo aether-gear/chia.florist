@@ -4,28 +4,28 @@ import (
 	"context"
 	"fmt"
 
+	shipping "service-core/internal/infra/shipping"
 	"service-core/internal/modules/location/domain"
-	"service-core/internal/modules/location/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type ListLocationUsecase struct {
-	locationRepo repository.LocationRepository
-	executor     transaction.Executor
+	shipping shipping.Provider
+	executor transaction.Executor
 }
 
 func NewListLocationUsecase(
-	locationRepo repository.LocationRepository,
+	shipping shipping.Provider,
 	executor transaction.Executor,
 ) *ListLocationUsecase {
 	return &ListLocationUsecase{
-		locationRepo: locationRepo,
-		executor:     executor,
+		shipping: shipping,
+		executor: executor,
 	}
 }
 
 func (u *ListLocationUsecase) Province(ctx context.Context) ([]domain.Province, error) {
-	res, err := u.locationRepo.ListProvinces(ctx, u.executor)
+	res, err := u.shipping.ListProvinces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load provinces: %w", err)
 	}
@@ -34,7 +34,7 @@ func (u *ListLocationUsecase) Province(ctx context.Context) ([]domain.Province, 
 }
 
 func (u *ListLocationUsecase) City(ctx context.Context, provinceID string) ([]domain.City, error) {
-	res, err := u.locationRepo.ListCitiesByProvince(ctx, u.executor, provinceID)
+	res, err := u.shipping.ListCities(ctx, provinceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cities: %w", err)
 	}
@@ -43,7 +43,7 @@ func (u *ListLocationUsecase) City(ctx context.Context, provinceID string) ([]do
 }
 
 func (u *ListLocationUsecase) District(ctx context.Context, cityID string) ([]domain.District, error) {
-	res, err := u.locationRepo.ListDistrictsByCity(ctx, u.executor, cityID)
+	res, err := u.shipping.ListDistricts(ctx, cityID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load districts: %w", err)
 	}
@@ -52,7 +52,7 @@ func (u *ListLocationUsecase) District(ctx context.Context, cityID string) ([]do
 }
 
 func (u *ListLocationUsecase) Village(ctx context.Context, districtID string) ([]domain.Village, error) {
-	res, err := u.locationRepo.ListVillagesByDistrict(ctx, u.executor, districtID)
+	res, err := u.shipping.ListVillages(ctx, districtID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load villages: %w", err)
 	}
