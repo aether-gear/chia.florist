@@ -29,13 +29,9 @@ func NewMidtransAPIProvider(
 		return nil, fmt.Errorf("midtrans: server key is required")
 	}
 
-	baseURL := "https://api.sandbox.midtrans.com"
-	if cfg.IsProduction {
-		baseURL = "https://api.midtrans.com"
-	}
-
 	// Allow an explicit URL override
 	// (useful for tests / local proxies).
+	var baseURL string
 	if strings.TrimSpace(cfg.URL) != "" {
 		cleanedURL := strings.TrimRight(cfg.URL, "/")
 		cleanedURL = strings.TrimSuffix(cleanedURL, "/v2/charge")

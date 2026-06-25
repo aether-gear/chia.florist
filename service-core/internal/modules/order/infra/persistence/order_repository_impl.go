@@ -28,15 +28,15 @@ func (r *orderRepositoryImpl) GetByID(
 ) (*domain.Order, error) {
 	query := `
 		SELECT
-			id
-			number
-			user_id
-			address_id
-			status
-			subtotal
-			shipping_fee
-			total
-			created_at
+			id,
+			number,
+			user_id,
+			address_id,
+			status,
+			subtotal,
+			shipping_fee,
+			total,
+			created_at,
 			updated_at
 		FROM
 			orders
@@ -75,15 +75,15 @@ func (r *orderRepositoryImpl) GetByNumber(
 ) (*domain.Order, error) {
 	query := `
 		SELECT
-			id
-			number
-			user_id
-			address_id
-			status
-			subtotal
-			shipping_fee
-			total
-			created_at
+			id,
+			number,
+			user_id,
+			address_id,
+			status,
+			subtotal,
+			shipping_fee,
+			total,
+			created_at,
 			updated_at
 		FROM
 			orders

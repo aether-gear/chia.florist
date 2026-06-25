@@ -17,6 +17,13 @@ const (
 	PaymentStatusRefunded  PaymentStatus = "refunded"
 )
 
+type PaymentProvider string
+
+const (
+	PaymentProviderManual  PaymentProvider = "manual"
+	PaymentProviderGateway PaymentProvider = "gateway"
+)
+
 type Payment struct {
 	ID uuid.UUID
 
