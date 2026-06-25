@@ -13,8 +13,7 @@ import CreateProductPage from '../pages/products/CreateProductPage';
 import MerchantsListPage from '../pages/admin/MerchantsListPage';
 import CustomersListPage from '../pages/admin/CustomersListPage';
 import ShopManagementPage from '../pages/shop/ShopManagementPage';
-import PaymentMethodsPage from '../pages/admin/payments/PaymentMethodsPage';
-import PaymentAccountsPage from '../pages/admin/payments/PaymentAccountsPage';
+import PaymentSettingsPage from '../pages/admin/payments/PaymentSettingsPage';
 import CreatePaymentAccountPage from '../pages/admin/payments/CreatePaymentAccountPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -39,8 +38,7 @@ export default function AppRoutes() {
             {/* Admin Routes */}
             <Route path="/admin/merchants" element={<MerchantsListPage />} />
             <Route path="/admin/customers" element={<CustomersListPage />} />
-            <Route path="/admin/payments/methods" element={<PaymentMethodsPage />} />
-            <Route path="/admin/payments/accounts" element={<PaymentAccountsPage />} />
+            <Route path="/admin/payments" element={<PaymentSettingsPage />} />
             <Route path="/admin/payments/accounts/create" element={<CreatePaymentAccountPage />} />
             <Route path="/admin/merchants/create" element={<CreateMerchantPage />} />
             <Route path="/admin/merchants/accounts/add" element={<AddMerchantAccountPage />} />
