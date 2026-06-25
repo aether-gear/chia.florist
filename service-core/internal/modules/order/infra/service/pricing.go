@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	apperrors "service-core/internal/common/errors"
+	shipping "service-core/internal/infra/shipping"
 	addressDomain "service-core/internal/modules/address/domain"
 	addressRepo "service-core/internal/modules/address/repository"
 	cartDomain "service-core/internal/modules/cart/domain"
@@ -15,7 +16,6 @@ import (
 	paymentRepo "service-core/internal/modules/payment/repository"
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
-	shipmentRepo "service-core/internal/modules/shipment/repository"
 	shopDomain "service-core/internal/modules/shop/domain"
 	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -29,7 +29,7 @@ type pricingServiceImpl struct {
 	inventoryRepo     inventoryRepo.InventoryRepository
 	paymentMethodRepo paymentRepo.PaymentMethodRepository
 	productRepo       productRepo.ProductRepository
-	shipmentRepo      shipmentRepo.ShippingCostProvider
+	shipping          shipping.Provider
 	shopAddressRepo   addressRepo.ShopAddressRepository
 	shopRepo          shopRepo.ShopRepository
 }
@@ -40,7 +40,7 @@ func NewPricingService(
 	inventoryRepo inventoryRepo.InventoryRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
 	productRepo productRepo.ProductRepository,
-	shipmentRepo shipmentRepo.ShippingCostProvider,
+	shipping shipping.Provider,
 	shopAddressRepo addressRepo.ShopAddressRepository,
 	shopRepo shopRepo.ShopRepository,
 ) orderRepo.PricingService {
@@ -50,7 +50,7 @@ func NewPricingService(
 		inventoryRepo:     inventoryRepo,
 		paymentMethodRepo: paymentMethodRepo,
 		productRepo:       productRepo,
-		shipmentRepo:      shipmentRepo,
+		shipping:          shipping,
 		shopAddressRepo:   shopAddressRepo,
 		shopRepo:          shopRepo,
 	}
@@ -240,10 +240,9 @@ func (s *pricingServiceImpl) Calculate(
 			return nil, fmt.Errorf("invalid origin district id: %w", err)
 		}
 
-		costOptions, err := s.shipmentRepo.CalculateCost(
+		costOptions, err := s.shipping.CalculateRates(
 			ctx,
-			exec,
-			shipmentRepo.CalculateCostInput{
+			shipping.CalculateRatesInput{
 				OriginID:      originDistrictID,
 				DestinationID: destDistrictID,
 				Weight:        shopItemsWeight,

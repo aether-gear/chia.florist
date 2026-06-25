@@ -4,36 +4,60 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
 
-// Pages visible to all logged-in merchants
-const merchantNavigation = [
-  { name: 'Dashboard',        href: '/',                       icon: LayoutDashboard },
-  { name: 'Security',         href: '/security',               icon: ShieldAlert },
-  { name: 'Shop',             href: '/shop',                   icon: ShoppingBag },
-  { name: 'Products',         href: '/products',               icon: Package },
-  { name: 'Orders',           href: '/orders',                 icon: FileText },
-  { name: 'Transactions',     href: '/transactions',           icon: Activity },
-  { name: 'Profile Settings', href: '/merchant/settings',      icon: Settings },
-  { name: 'Payment Methods',  href: '/admin/payments/methods', icon: CreditCard },
-  { name: 'Payment Accounts', href: '/admin/payments/accounts',icon: Wallet },
+type NavigationItem = {
+  name: string;
+  href: string;
+  icon: any;
+  adminOnly?: boolean;
+};
+
+type NavigationGroup = {
+  title: string | null;
+  items: NavigationItem[];
+};
+
+const navigationGroups: NavigationGroup[] = [
+  {
+    title: null,
+    items: [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    ]
+  },
+  {
+    title: 'OPERATIONS',
+    items: [
+      { name: 'Orders', href: '/orders', icon: FileText },
+      { name: 'Products', href: '/products', icon: Package },
+      { name: 'Shop', href: '/shop', icon: ShoppingBag },
+      { name: 'Transactions', href: '/transactions', icon: Activity },
+      { name: 'Shipments', href: '/shipments', icon: Truck, adminOnly: true },
+    ]
+  },
+  {
+    title: 'ADMIN',
+    items: [
+      { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: true },
+      { name: 'Merchants', href: '/admin/merchants', icon: Store, adminOnly: true },
+      { name: 'Security', href: '/security', icon: ShieldAlert },
+    ]
+  },
+  {
+    title: 'SETTINGS',
+    items: [
+      { name: 'Payment Settings', href: '/admin/payments', icon: Wallet },
+      { name: 'Profile', href: '/merchant/settings', icon: Settings },
+    ]
+  }
 ];
 
-// Pages visible ONLY to admin account
-const adminNavigation = [
-  { name: 'Shipments',        href: '/shipments',                   icon: Truck },
-  { name: 'Merchants List',   href: '/admin/merchants',             icon: Store },
-  { name: 'Customers List',   href: '/admin/customers',             icon: Users },
-  { name: 'Create Merchant',  href: '/admin/merchants/create',      icon: Store },
-  { name: 'Add Account',      href: '/admin/merchants/accounts/add',icon: UserPlus },
-];
-
-const allNavigation = [...merchantNavigation, ...adminNavigation];
+const allNavigation = navigationGroups.flatMap(g => g.items);
 
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: authData, isAdmin } = useAuthMeViewModel();
 
-  const visibleNavigation = isAdmin ? allNavigation : merchantNavigation;
+  const visibleNavigation = allNavigation.filter(n => isAdmin || !n.adminOnly);
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -69,58 +93,44 @@ export default function DashboardLayout() {
 
       <div className="flex-1 overflow-y-auto py-2">
         <nav className="space-y-1 px-3">
-          {/* Merchant nav section */}
-          {merchantNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
+          {navigationGroups.map((group, idx) => {
+            const visibleItems = group.items.filter(item => isAdmin || !item.adminOnly);
+            if (visibleItems.length === 0) return null;
+
             return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
-                  isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <item.icon
-                  className={`flex-shrink-0 -ml-1 mr-3 h-5 w-5 ${
-                    isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span className="truncate">{item.name}</span>
-              </Link>
+              <div key={group.title || `group-${idx}`} className="mb-6">
+                {group.title && (
+                  <div className="px-3 pt-4 pb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      {group.title}
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {visibleItems.map((item) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <item.icon
+                          className={`flex-shrink-0 -ml-1 mr-3 h-5 w-5 ${
+                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
-
-          {/* Admin-only nav section */}
-          {isAdmin && (
-            <>
-              <div className="px-3 pt-4 pb-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Admin Only
-                </p>
-              </div>
-              {adminNavigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
-                      isActive ? 'bg-amber-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <item.icon
-                      className={`flex-shrink-0 -ml-1 mr-3 h-5 w-5 ${
-                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">{item.name}</span>
-                  </Link>
-                );
-              })}
-            </>
-          )}
         </nav>
       </div>
       <div className="p-4 border-t border-slate-800">

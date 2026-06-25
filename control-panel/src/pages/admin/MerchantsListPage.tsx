@@ -1,5 +1,7 @@
 import { Store, Search, Loader2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
+import { Link } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -39,6 +41,13 @@ export default function MerchantsListPage() {
             <p className="text-muted-foreground">
               Manage merchants registered on the platform
             </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button asChild>
+              <Link to="/admin/merchants/create">
+                <Store className="mr-2 h-4 w-4" /> Create Merchant
+              </Link>
+            </Button>
           </div>
         </div>
 
