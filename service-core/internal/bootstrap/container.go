@@ -78,8 +78,9 @@ type Container struct {
 
 	ListLocations locationUsecase.ListLocationUsecase
 
-	GetUser           userUsecase.GetUserUsecase
-	GetCurrentProfile userUsecase.GetCurrentProfileUsecase
+	GetUser              userUsecase.GetUserUsecase
+	GetCurrentProfile   userUsecase.GetCurrentProfileUsecase
+	UpdateCurrentProfile userUsecase.UpdateCurrentProfileUsecase
 
 	FindCustomers customerUsecase.FindCustomersUsecase
 
@@ -388,6 +389,14 @@ func NewContainer(cfg Config,
 			customerRepo,
 			staffRepo,
 			sessionRepo,
+		),
+		UpdateCurrentProfile: *userUsecase.NewUpdateCurrentProfileUsecase(
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			accountRepo,
+			customerRepo,
+			staffRepo,
+			userRepo,
 		),
 
 		FindCustomers: *customerUsecase.

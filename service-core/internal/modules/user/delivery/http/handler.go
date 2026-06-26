@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -10,17 +11,20 @@ import (
 )
 
 type UserHandler struct {
-	getUser    *usecase.GetUserUsecase
-	getProfile *usecase.GetCurrentProfileUsecase
+	getUser       *usecase.GetUserUsecase
+	getProfile    *usecase.GetCurrentProfileUsecase
+	updateProfile *usecase.UpdateCurrentProfileUsecase
 }
 
 func NewUserHandler(
 	getUser *usecase.GetUserUsecase,
 	getProfile *usecase.GetCurrentProfileUsecase,
+	updateProfile *usecase.UpdateCurrentProfileUsecase,
 ) *UserHandler {
 	return &UserHandler{
-		getUser:    getUser,
-		getProfile: getProfile,
+		getUser:       getUser,
+		getProfile:    getProfile,
+		updateProfile: updateProfile,
 	}
 }
 
@@ -102,7 +106,7 @@ func (h *UserHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) 
 	if result.Customer != nil {
 		response = map[string]profileResponse{
 			"profile": {
-				CustomerID:  result.Customer.ID,
+				CustomerID:  &result.Customer.ID,
 				UserID:      result.Customer.UserID,
 				Name:        result.Customer.Name,
 				Username:    result.Customer.Username,
@@ -118,7 +122,7 @@ func (h *UserHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) 
 	if result.Staff != nil {
 		response = map[string]profileResponse{
 			"profile": {
-				StaffID:     result.Staff.ID,
+				StaffID:     &result.Staff.ID,
 				UserID:      result.Staff.UserID,
 				Name:        result.Staff.Name,
 				Username:    result.Staff.Username,
@@ -127,6 +131,69 @@ func (h *UserHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) 
 				LastLoginAt: result.Staff.LastLoginAt,
 				CreatedAt:   result.Staff.CreatedAt,
 				UpdatedAt:   result.Staff.UpdatedAt,
+			},
+		}
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *UserHandler) UpdateCurrentProfile(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	var req updateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	result, err := h.updateProfile.Execute(
+		r.Context(),
+		*authCtx,
+		usecase.UpdateProfileInput{
+			Name:      req.Name,
+			Phone:     req.Phone,
+			AvatarURL: req.AvatarURL,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result == nil {
+		return nil
+	}
+
+	var response map[string]profileResponse
+	if result.Customer != nil {
+		response = map[string]profileResponse{
+			"profile": {
+				CustomerID: &result.Customer.ID,
+				UserID:     result.Customer.UserID,
+				Name:       result.Customer.Name,
+				Username:   result.Customer.Username,
+				Phone:      result.Customer.Phone,
+				AvatarURL:  result.Customer.AvatarURL,
+				CreatedAt:  result.Customer.CreatedAt,
+				UpdatedAt:  result.Customer.UpdatedAt,
+			},
+		}
+	}
+
+	if result.Staff != nil {
+		response = map[string]profileResponse{
+			"profile": {
+				StaffID:   &result.Staff.ID,
+				UserID:    result.Staff.UserID,
+				Name:      result.Staff.Name,
+				Username:  result.Staff.Username,
+				Phone:     result.Staff.Phone,
+				AvatarURL: result.Staff.AvatarURL,
+				CreatedAt: result.Staff.CreatedAt,
+				UpdatedAt: result.Staff.UpdatedAt,
 			},
 		}
 	}

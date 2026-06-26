@@ -150,6 +150,7 @@ func NewRouter(c *Container) *chi.Mux {
 		userHandler = userH.NewUserHandler(
 			&c.GetUser,
 			&c.GetCurrentProfile,
+			&c.UpdateCurrentProfile,
 		)
 
 		addressHandler = addressH.NewAddressHandler(
@@ -231,6 +232,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/profile", func(r chi.Router) {
 			r.Get("/", chains.CoreAuth(userHandler.GetCurrentProfile))
+			r.Put("/", chains.CoreAuth(userHandler.UpdateCurrentProfile))
 		})
 
 		r.Route("/carts", func(r chi.Router) {

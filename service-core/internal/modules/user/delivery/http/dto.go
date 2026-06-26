@@ -16,8 +16,8 @@ type userResponse struct {
 }
 
 type profileResponse struct {
-	CustomerID  uuid.UUID  `json:"customer_id,omitempty"`
-	StaffID     uuid.UUID  `json:"staff_id,omitempty"`
+	CustomerID  *uuid.UUID `json:"customer_id,omitempty"`
+	StaffID     *uuid.UUID `json:"staff_id,omitempty"`
 	UserID      uuid.UUID  `json:"user_id"`
 	Name        string     `json:"Name"`
 	Username    string     `json:"Username"`
@@ -26,4 +26,10 @@ type profileResponse struct {
 	LastLoginAt *time.Time `json:"LastLoginAt"`
 	CreatedAt   time.Time  `json:"CreatedAt"`
 	UpdatedAt   *time.Time `json:"UpdatedAt"`
+}
+
+type updateProfileRequest struct {
+	Name      *string `json:"name"`
+	Phone     *string `json:"phone"`
+	AvatarURL *string `json:"avatar_url"`
 }

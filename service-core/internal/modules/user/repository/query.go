@@ -26,3 +26,11 @@ type CreateUserProps struct {
 	AvatarURL *string
 	CreatedAt time.Time
 }
+
+type SaveProfileProps struct {
+	UserID    uuid.UUID
+	Name      *string
+	Phone     *string
+	AvatarURL *string
+	UpdatedAt time.Time
+}

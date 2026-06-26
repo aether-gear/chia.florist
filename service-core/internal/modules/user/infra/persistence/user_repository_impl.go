@@ -141,3 +141,32 @@ func (r *userRepositoryImpl) CreateUser(
 
 	return nil
 }
+
+func (r *userRepositoryImpl) SaveProfile(
+	ctx context.Context,
+	exec transaction.Executor,
+	props repository.SaveProfileProps,
+) error {
+	query := `
+		UPDATE users
+		SET
+			name       = COALESCE($2, name),
+			phone      = COALESCE($3, phone),
+			avatar_url = COALESCE($4, avatar_url),
+			updated_at = $5
+		WHERE id = $1;
+	`
+
+	_, err := exec.Exec(ctx, query,
+		props.UserID,
+		props.Name,
+		props.Phone,
+		props.AvatarURL,
+		props.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save user profile failed: %w", err)
+	}
+
+	return nil
+}
