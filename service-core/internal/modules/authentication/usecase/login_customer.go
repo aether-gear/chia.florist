@@ -8,6 +8,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	customerRepo "service-core/internal/modules/customer/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ type LoginCustomerUsecase struct {
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	customerRepo     customerRepo.CustomerRepository
 }
 
 func NewLoginCustomerUsecase(
@@ -33,6 +35,7 @@ func NewLoginCustomerUsecase(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	customerRepo customerRepo.CustomerRepository,
 ) *LoginCustomerUsecase {
 	return &LoginCustomerUsecase{
 		executor:         executor,
@@ -43,6 +46,7 @@ func NewLoginCustomerUsecase(
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
+		customerRepo:     customerRepo,
 	}
 }
 
@@ -88,12 +92,23 @@ func (u *LoginCustomerUsecase) Execute(
 		CreatedAt: now,
 	}
 
+	// Fetch the customer entity to embed CustomerID in the token
+	var customerID *uuid.UUID
+	cust, err := u.customerRepo.GetByUserID(ctx, u.executor, existing.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve customer: %w", err)
+	}
+	if cust != nil {
+		customerID = &cust.ID
+	}
+
 	accessTkn, err := u.tokenSvc.
 		Generate(repository.GenerateTokenParams{
-			UserID:    existing.UserID,
-			SessionID: session.ID,
-			Type:      domain.TokenTypeAccess,
-			Duration:  30 * time.Minute,
+			UserID:     existing.UserID,
+			SessionID:  session.ID,
+			CustomerID: customerID,
+			Type:       domain.TokenTypeAccess,
+			Duration:   30 * time.Minute,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
@@ -101,10 +116,11 @@ func (u *LoginCustomerUsecase) Execute(
 
 	refreshTkn, err := u.tokenSvc.
 		Generate(repository.GenerateTokenParams{
-			UserID:    existing.UserID,
-			SessionID: session.ID,
-			Type:      domain.TokenTypeRefresh,
-			Duration:  7 * 24 * time.Hour,
+			UserID:     existing.UserID,
+			SessionID:  session.ID,
+			CustomerID: customerID,
+			Type:       domain.TokenTypeRefresh,
+			Duration:   7 * 24 * time.Hour,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)

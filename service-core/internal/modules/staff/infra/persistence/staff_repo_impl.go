@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,9 @@ import (
 	"service-core/internal/modules/staff/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type staffRepositoryImpl struct{}
@@ -42,28 +46,109 @@ func (r *staffRepositoryImpl) Create(
 	return nil
 }
 
+func (r *staffRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Staff, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM staff
+		WHERE id = $1
+		LIMIT 1
+	`
+
+	var m domain.Staff
+	err := exec.QueryRow(ctx, query, id).Scan(
+		&m.ID,
+		&m.UserID,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+		&m.DeletedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query staff by id failed: %w", err)
+	}
+	return &m, nil
+}
+
+func (r *staffRepositoryImpl) GetProfileByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*domain.StaffProfile, error) {
+	query := `
+		SELECT
+			s.id,
+			s.user_id,
+			u.name,
+			u.username,
+			u.phone,
+			u.avatar_url,
+			s.created_at,
+			s.updated_at
+		FROM staff s
+		INNER JOIN users u
+			ON u.id = s.user_id
+		WHERE s.user_id = $1
+	`
+
+	var profile domain.StaffProfile
+	err := exec.QueryRow(ctx, query, userID).Scan(
+		&profile.ID,
+		&profile.UserID,
+		&profile.Name,
+		&profile.Username,
+		&profile.Phone,
+		&profile.AvatarURL,
+		&profile.CreatedAt,
+		&profile.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFoundStaff
+		}
+
+		return nil, fmt.Errorf("get staff profile by user id failed: %w", err)
+	}
+
+	return &profile, nil
+}
+
 func (r *staffRepositoryImpl) FindStaff(
 	ctx context.Context,
 	exec transaction.Executor,
 	params repository.FindStaffParams,
-) ([]domain.Staff, int, error) {
+) ([]domain.StaffProfile, int, error) {
 	baseQuery := `
 		FROM staff m
+		INNER JOIN users u ON u.id = m.user_id
 	`
 
 	selectQuery := `
 		SELECT
 			m.id,
 			m.user_id,
+			u.name,
+			u.username,
+			u.phone,
+			u.avatar_url,
 			m.created_at,
-			m.updated_at,
-			m.deleted_at
+			m.updated_at
 	`
 
 	// Build filters
 	// Apply search criteria and soft-delete constraints
 	whereClause := ""
-	notDeletedCondition := "m.deleted_at IS NULL"
+	notDeletedCondition := "m.deleted_at IS NULL AND u.deleted_at IS NULL"
 
 	var (
 		conditions []string
@@ -78,12 +163,6 @@ func (r *staffRepositoryImpl) FindStaff(
 		args = append(args, *params.ID)
 		argPos++
 	}
-
-	// if params.Name != nil {
-	// 	conditions = append(conditions, fmt.Sprintf("m.name ILIKE $%d", argPos))
-	// 	args = append(args, "%"+*params.Name+"%")
-	// 	argPos++
-	// }
 
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
@@ -110,7 +189,6 @@ func (r *staffRepositoryImpl) FindStaff(
 	var staffSortKeys = map[query.SortKey]string{
 		repository.StaffSortLatest: "m.created_at",
 		repository.StaffSortModify: "m.updated_at",
-		// repository.StaffSortName:   "m.name",
 	}
 
 	var sortClauses []string
@@ -164,15 +242,18 @@ func (r *staffRepositoryImpl) FindStaff(
 	}
 	defer rows.Close()
 
-	var results []domain.Staff
+	var results []domain.StaffProfile
 	for rows.Next() {
-		var m domain.Staff
+		var m domain.StaffProfile
 		err := rows.Scan(
 			&m.ID,
 			&m.UserID,
+			&m.Name,
+			&m.Username,
+			&m.Phone,
+			&m.AvatarURL,
 			&m.CreatedAt,
 			&m.UpdatedAt,
-			&m.DeletedAt,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("mapping staff model to domain failed: %w", err)

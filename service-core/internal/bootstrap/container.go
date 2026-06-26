@@ -78,7 +78,8 @@ type Container struct {
 
 	ListLocations locationUsecase.ListLocationUsecase
 
-	GetUser userUsecase.GetUserUsecase
+	GetUser           userUsecase.GetUserUsecase
+	GetCurrentProfile userUsecase.GetCurrentProfileUsecase
 
 	FindCustomers customerUsecase.FindCustomersUsecase
 
@@ -263,6 +264,7 @@ func NewContainer(cfg Config,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
+				customerRepo,
 			),
 		LoginStaff: *authenUsecase.
 			NewLoginStaffUsecase(
@@ -306,6 +308,7 @@ func NewContainer(cfg Config,
 				accountRepo,
 				pwHasher,
 				userRepo,
+				customerRepo,
 				challengeRepo,
 				otpGen,
 				mailSender,
@@ -318,6 +321,8 @@ func NewContainer(cfg Config,
 				pwHasher,
 				tokenHasher,
 				userRepo,
+				customerRepo,
+				membershipRepo,
 				challengeRepo,
 				tokenSvc,
 				sessionRepo,
@@ -377,6 +382,13 @@ func NewContainer(cfg Config,
 				userRepo,
 				infra.TransactionExecutor,
 			),
+		GetCurrentProfile: *userUsecase.NewGetCurrentProfileUsecase(
+			infra.TransactionExecutor,
+			accountRepo,
+			customerRepo,
+			staffRepo,
+			sessionRepo,
+		),
 
 		FindCustomers: *customerUsecase.
 			NewFindCustomersUsecase(

@@ -10,6 +10,9 @@ import (
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
+	customerRepo "service-core/internal/modules/customer/repository"
+	authorzDomain "service-core/internal/modules/authorization/domain"
+	authorzRepo "service-core/internal/modules/authorization/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -22,6 +25,8 @@ type VerifyAccountUsecase struct {
 	pwHasher         repository.PasswordHasher
 	tokenHasher      repository.TokenHasher
 	userRepo         userRepo.UserRepository
+	customerRepo     customerRepo.CustomerRepository
+	membershipRepo   authorzRepo.StaffMembershipRepository
 	challengeRepo    repository.VerificationChallengeRepository
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
@@ -35,6 +40,8 @@ func NewVerifyAccountUsecase(
 	pwHasher repository.PasswordHasher,
 	tokenHasher repository.TokenHasher,
 	userRepo userRepo.UserRepository,
+	customerRepo customerRepo.CustomerRepository,
+	membershipRepo authorzRepo.StaffMembershipRepository,
 	challengeRepo repository.VerificationChallengeRepository,
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
@@ -47,6 +54,8 @@ func NewVerifyAccountUsecase(
 		pwHasher:         pwHasher,
 		tokenHasher:      tokenHasher,
 		userRepo:         userRepo,
+		customerRepo:     customerRepo,
+		membershipRepo:   membershipRepo,
 		challengeRepo:    challengeRepo,
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
@@ -118,13 +127,59 @@ func (u *VerifyAccountUsecase) Execute(
 	challenge.VerifiedAt = &now
 	challenge.ConsumedAt = &now
 
+	var (
+		staffID    *uuid.UUID
+		customerID *uuid.UUID
+		roleCodes  []authorzDomain.RoleCode
+	)
+
+	account, err := u.accountRepo.GetByUserID(ctx, u.executor, *challenge.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account: %w", err)
+	}
+	if account != nil {
+		if account.Type == domain.AccountTypeCustomer {
+			cust, err := u.customerRepo.GetByUserID(ctx, u.executor, account.UserID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get customer profile: %w", err)
+			}
+			if cust != nil {
+				customerID = &cust.ID
+			}
+		} else if account.Type == domain.AccountTypeStaff {
+			memberStaff, err := u.membershipRepo.GetByAccountID(ctx, u.executor, account.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get staff membership: %w", err)
+			}
+			if memberStaff != nil {
+				staffID = &memberStaff.StaffID
+				roles, err := u.membershipRepo.ListRolesByAccountIDAndStaffID(
+					ctx,
+					u.executor,
+					account.ID,
+					memberStaff.StaffID,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to list staff roles: %w", err)
+				}
+				roleCodes = make([]authorzDomain.RoleCode, len(roles))
+				for i, r := range roles {
+					roleCodes[i] = r.Code
+				}
+			}
+		}
+	}
+
 	sessionID := uuid.New()
 	accessTkn, err := u.tokenSvc.
 		Generate(repository.GenerateTokenParams{
-			UserID:    *challenge.UserID,
-			SessionID: sessionID,
-			Type:      domain.TokenTypeAccess,
-			Duration:  30 * time.Minute,
+			UserID:     *challenge.UserID,
+			SessionID:  sessionID,
+			StaffID:    staffID,
+			CustomerID: customerID,
+			Roles:      roleCodes,
+			Type:       domain.TokenTypeAccess,
+			Duration:   30 * time.Minute,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
@@ -132,10 +187,13 @@ func (u *VerifyAccountUsecase) Execute(
 
 	refreshTkn, err := u.tokenSvc.
 		Generate(repository.GenerateTokenParams{
-			UserID:    *challenge.UserID,
-			SessionID: sessionID,
-			Type:      domain.TokenTypeRefresh,
-			Duration:  7 * 24 * time.Hour,
+			UserID:     *challenge.UserID,
+			SessionID:  sessionID,
+			StaffID:    staffID,
+			CustomerID: customerID,
+			Roles:      roleCodes,
+			Type:       domain.TokenTypeRefresh,
+			Duration:   7 * 24 * time.Hour,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)

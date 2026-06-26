@@ -23,5 +23,6 @@ type CreateUserProps struct {
 	Name      string
 	Username  string
 	Phone     *string
+	AvatarURL *string
 	CreatedAt time.Time
 }

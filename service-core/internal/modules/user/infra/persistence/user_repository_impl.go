@@ -30,6 +30,7 @@ func (r *userRepositoryImpl) GetByID(
 			u.name,
 			u.username,
 			u.phone,
+			u.avatar_url,
 			u.created_at,
 			u.updated_at,
 			u.deleted_at,
@@ -47,6 +48,7 @@ func (r *userRepositoryImpl) GetByID(
 		&m.Name,
 		&m.Username,
 		&m.Phone,
+		&m.AvatarURL,
 		&m.CreatedAt,
 		&m.UpdatedAt,
 		&m.DeletedAt,
@@ -74,6 +76,7 @@ func (r *userRepositoryImpl) GetByUsername(
 			u.name,
 			u.username,
 			u.phone,
+			u.avatar_url,
 			u.created_at,
 			u.updated_at,
 			u.deleted_at,
@@ -90,6 +93,7 @@ func (r *userRepositoryImpl) GetByUsername(
 		&m.Name,
 		&m.Username,
 		&m.Phone,
+		&m.AvatarURL,
 		&m.CreatedAt,
 		&m.UpdatedAt,
 		&m.DeletedAt,
@@ -117,9 +121,10 @@ func (r *userRepositoryImpl) CreateUser(
 			name,
 			username,
 			phone,
+			avatar_url,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -127,6 +132,7 @@ func (r *userRepositoryImpl) CreateUser(
 		props.Name,
 		props.Username,
 		props.Phone,
+		props.AvatarURL,
 		props.CreatedAt,
 	)
 	if err != nil {

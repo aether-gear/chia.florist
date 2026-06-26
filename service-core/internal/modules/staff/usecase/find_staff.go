@@ -40,7 +40,7 @@ type FindStaffInput struct {
 func (u *FindStaffUsecase) Execute(
 	ctx context.Context,
 	input FindStaffInput,
-) ([]domain.Staff, int, error) {
+) ([]domain.StaffProfile, int, error) {
 	var staffSortKeys = map[string]query.SortKey{
 		"latest":   repository.StaffSortLatest,
 		"modified": repository.StaffSortModify,

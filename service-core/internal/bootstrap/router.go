@@ -149,6 +149,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		userHandler = userH.NewUserHandler(
 			&c.GetUser,
+			&c.GetCurrentProfile,
 		)
 
 		addressHandler = addressH.NewAddressHandler(
@@ -217,13 +218,19 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/staff", func(r chi.Router) {
 			r.Get("/", chains.StaffAdminOnly(staffHandler.FindStaff))
 			r.Post("/", chains.StaffAdminOnly(staffHandler.CreateStaff))
-			r.Route("/{staffID}/accounts", func(r chi.Router) {
-				r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+			r.Route("/{staffID}", func(r chi.Router) {
+				r.Route("/accounts", func(r chi.Router) {
+					r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+				})
 			})
 		})
 
 		r.Route("/customers", func(r chi.Router) {
 			r.Get("/", chains.StaffAdminOnly(customerHandler.FindCustomers))
+		})
+
+		r.Route("/profile", func(r chi.Router) {
+			r.Get("/", chains.CoreAuth(userHandler.GetCurrentProfile))
 		})
 
 		r.Route("/carts", func(r chi.Router) {

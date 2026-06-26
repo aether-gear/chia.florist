@@ -12,13 +12,9 @@ import (
 // This type exists to support customer-specific queries and use cases while
 // allowing customer behavior and attributes to evolve independently in the future.
 type Customer struct {
-	ID       uuid.UUID
-	Name     string
-	Username string
-	Phone    *string
-
-	CreatedAt   time.Time
-	UpdatedAt   *time.Time
-	DeletedAt   *time.Time
-	LastLoginAt *time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt *time.Time
+	DeletedAt *time.Time
 }

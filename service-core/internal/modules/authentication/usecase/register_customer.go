@@ -9,6 +9,8 @@ import (
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	userRepo "service-core/internal/modules/user/repository"
+	customerDomain "service-core/internal/modules/customer/domain"
+	customerRepo "service-core/internal/modules/customer/repository"
 	mailer "service-core/internal/shared/mailer"
 	otp "service-core/internal/shared/otp"
 	transaction "service-core/internal/shared/transaction"
@@ -22,6 +24,7 @@ type RegisterCustomerUsecase struct {
 	accountRepo   repository.AccountRepository
 	hasher        domain.PasswordHasher
 	userRepo      userRepo.UserRepository
+	customerRepo  customerRepo.CustomerRepository
 	challengeRepo repository.VerificationChallengeRepository
 	otpGen        otp.Generator
 	mailer        mailer.Sender
@@ -33,6 +36,7 @@ func NewRegisterCustomerUsecase(
 	accountRepo repository.AccountRepository,
 	hasher domain.PasswordHasher,
 	userRepo userRepo.UserRepository,
+	customerRepo customerRepo.CustomerRepository,
 	challengeRepo repository.VerificationChallengeRepository,
 	otpGen otp.Generator,
 	mailer mailer.Sender,
@@ -43,6 +47,7 @@ func NewRegisterCustomerUsecase(
 		accountRepo:   accountRepo,
 		hasher:        hasher,
 		userRepo:      userRepo,
+		customerRepo:  customerRepo,
 		challengeRepo: challengeRepo,
 		otpGen:        otpGen,
 		mailer:        mailer,
@@ -123,11 +128,22 @@ func (u *RegisterCustomerUsecase) Execute(
 		CreatedAt:    now,
 	}
 
+	cust := customerDomain.Customer{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		CreatedAt: now,
+	}
+
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
 			if err := u.userRepo.
 				CreateUser(ctx, exec, user); err != nil {
+				return fmt.Errorf("failed to register: %w", err)
+			}
+
+			if err := u.customerRepo.
+				Create(ctx, exec, cust); err != nil {
 				return fmt.Errorf("failed to register: %w", err)
 			}
 

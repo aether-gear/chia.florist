@@ -136,6 +136,7 @@ func (aM *jwtAuthenticator) authenticate(
 		TokenType:       claims.Type,
 		IsAuthenticated: true,
 		StaffID:         claims.StaffID,
+		CustomerID:      claims.CustomerID,
 		Roles:           claims.Roles,
 	}, nil
 }

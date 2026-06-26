@@ -107,7 +107,6 @@ func (h *staffHandler) FindStaff(w http.ResponseWriter, r *http.Request) error {
 		limit = 10
 	}
 
-	name := apphttp.Query(r, "name")
 	idStr := apphttp.Query(r, "id")
 	sort := apphttp.Query(r, "sort")
 
@@ -115,9 +114,6 @@ func (h *staffHandler) FindStaff(w http.ResponseWriter, r *http.Request) error {
 		Page:  page,
 		Limit: limit,
 		Sort:  sort,
-	}
-	if name != "" {
-		input.Name = &name
 	}
 	if idStr != "" {
 		id, err := uuid.Parse(idStr)
@@ -136,6 +132,11 @@ func (h *staffHandler) FindStaff(w http.ResponseWriter, r *http.Request) error {
 	for _, m := range staff {
 		results = append(results, staffResponse{
 			ID:        m.ID,
+			UserID:    m.UserID,
+			Name:      m.Name,
+			Username:  m.Username,
+			Phone:     m.Phone,
+			AvatarURL: m.AvatarURL,
 			CreatedAt: m.CreatedAt,
 		})
 	}

@@ -2,13 +2,18 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/customer/domain"
 	"service-core/internal/modules/customer/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type customerRepositoryImpl struct{}
@@ -17,32 +22,170 @@ func NewCustomerRepositoryImpl() repository.CustomerRepository {
 	return &customerRepositoryImpl{}
 }
 
+func (r *customerRepositoryImpl) Create(
+	ctx context.Context,
+	exec transaction.Executor,
+	customer domain.Customer,
+) error {
+	query := `
+		INSERT INTO customers (
+			id,
+			user_id,
+			created_at
+		) VALUES ($1, $2, $3)
+	`
+
+	_, err := exec.Exec(ctx, query,
+		customer.ID,
+		customer.UserID,
+		customer.CreatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("insert customer failed: %w", err)
+	}
+	return nil
+}
+
+func (r *customerRepositoryImpl) GetByID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) (*domain.Customer, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM customers
+		WHERE id = $1
+		LIMIT 1
+	`
+
+	var m domain.Customer
+	err := exec.QueryRow(ctx, query, id).Scan(
+		&m.ID,
+		&m.UserID,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+		&m.DeletedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query customer by id failed: %w", err)
+	}
+	return &m, nil
+}
+
+func (r *customerRepositoryImpl) GetByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*domain.Customer, error) {
+	query := `
+		SELECT
+			id,
+			user_id,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM customers
+		WHERE user_id = $1
+		LIMIT 1
+	`
+
+	var m domain.Customer
+	err := exec.QueryRow(ctx, query, userID).Scan(
+		&m.ID,
+		&m.UserID,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+		&m.DeletedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query customer by user_id failed: %w", err)
+	}
+	return &m, nil
+}
+
+func (r *customerRepositoryImpl) GetProfileByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) (*domain.CustomerProfile, error) {
+	query := `
+		SELECT
+			c.id,
+			c.user_id,
+			u.name,
+			u.username,
+			u.phone,
+			u.avatar_url,
+			c.created_at,
+			c.updated_at
+		FROM customers c
+		INNER JOIN users u
+			ON u.id = c.user_id
+		WHERE c.user_id = $1
+	`
+
+	var profile domain.CustomerProfile
+	err := exec.QueryRow(ctx, query, userID).Scan(
+		&profile.ID,
+		&profile.UserID,
+		&profile.Name,
+		&profile.Username,
+		&profile.Phone,
+		&profile.AvatarURL,
+		&profile.CreatedAt,
+		&profile.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("customer not found")
+		}
+
+		return nil, fmt.Errorf("get staff profile by user id failed: %w", err)
+	}
+
+	return &profile, nil
+}
+
 func (r *customerRepositoryImpl) FindCustomers(
 	ctx context.Context,
 	exec transaction.Executor,
 	params repository.FindCustomerParams,
-) ([]domain.Customer, int, error) {
+) ([]domain.CustomerProfile, int, error) {
 	baseQuery := `
-		FROM users u
+		FROM customers m
+		INNER JOIN users u ON u.id = m.user_id
 		LEFT JOIN accounts a ON a.user_id = u.id
 	`
 
 	selectQuery := `
 		SELECT 
-			u.id, 
+			m.id, 
+			m.user_id,
 			u.name, 
 			u.username, 
 			u.phone,
-			u.created_at, 
-			u.updated_at, 
-			u.deleted_at,
+			u.avatar_url,
+			m.created_at, 
+			m.updated_at, 
 			a.last_login_at
 	`
 
 	// Build filters
 	// Apply search criteria and soft-delete constraints
 	whereClause := ""
-	notDeletedCondition := "u.deleted_at IS NULL"
+	notDeletedCondition := "m.deleted_at IS NULL AND u.deleted_at IS NULL"
 	onlyCustomerCondition := "a.type = 'customer'"
 
 	var (
@@ -57,7 +200,7 @@ func (r *customerRepositoryImpl) FindCustomers(
 	)
 
 	if params.ID != nil {
-		conditions = append(conditions, fmt.Sprintf("u.id = $%d", argPos))
+		conditions = append(conditions, fmt.Sprintf("m.id = $%d", argPos))
 		args = append(args, *params.ID)
 		argPos++
 	}
@@ -103,11 +246,11 @@ func (r *customerRepositoryImpl) FindCustomers(
 	// Build sorting expressions
 	// Convert requested sort keys into SQL ORDER BY clauses
 	var userSortKeys = map[query.SortKey]string{
-		repository.CustomerSortLatest:    "u.created_at",
+		repository.CustomerSortLatest:    "m.created_at",
 		repository.CustomerSortName:      "u.name",
 		repository.CustomerSortUsername:  "u.username",
 		repository.CustomerSortPhone:     "u.phone",
-		repository.CustomerSortModify:    "u.updated_at",
+		repository.CustomerSortModify:    "m.updated_at",
 		repository.CustomerSortLastLogin: "a.last_login_at",
 	}
 
@@ -129,7 +272,7 @@ func (r *customerRepositoryImpl) FindCustomers(
 		)
 	}
 
-	orderBy := "ORDER BY u.created_at DESC"
+	orderBy := "ORDER BY m.created_at DESC"
 	if len(sortClauses) > 0 {
 		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
 	}
@@ -162,17 +305,18 @@ func (r *customerRepositoryImpl) FindCustomers(
 	}
 	defer rows.Close()
 
-	var results []domain.Customer
+	var results []domain.CustomerProfile
 	for rows.Next() {
-		var m domain.Customer
+		var m domain.CustomerProfile
 		err := rows.Scan(
 			&m.ID,
+			&m.UserID,
 			&m.Name,
 			&m.Username,
 			&m.Phone,
+			&m.AvatarURL,
 			&m.CreatedAt,
 			&m.UpdatedAt,
-			&m.DeletedAt,
 			&m.LastLoginAt,
 		)
 		if err != nil {

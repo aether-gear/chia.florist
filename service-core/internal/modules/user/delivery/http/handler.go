@@ -10,14 +10,17 @@ import (
 )
 
 type UserHandler struct {
-	getUser *usecase.GetUserUsecase
+	getUser    *usecase.GetUserUsecase
+	getProfile *usecase.GetCurrentProfileUsecase
 }
 
 func NewUserHandler(
 	getUser *usecase.GetUserUsecase,
+	getProfile *usecase.GetCurrentProfileUsecase,
 ) *UserHandler {
 	return &UserHandler{
-		getUser: getUser,
+		getUser:    getUser,
+		getProfile: getProfile,
 	}
 }
 
@@ -40,6 +43,7 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) error 
 		Name:        result.Name,
 		Username:    result.Username,
 		Phone:       result.Phone,
+		AvatarURL:   result.AvatarURL,
 		LastLoginAt: result.LastLoginAt,
 	}
 
@@ -67,8 +71,64 @@ func (h *UserHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) err
 			Name:        result.Name,
 			Username:    result.Username,
 			Phone:       result.Phone,
+			AvatarURL:   result.AvatarURL,
 			LastLoginAt: result.LastLoginAt,
 		},
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *UserHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authendomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	result, err := h.getProfile.Execute(
+		r.Context(),
+		*authCtx,
+	)
+	if err != nil {
+		return err
+	}
+
+	if result == nil {
+		return nil
+	}
+
+	var response map[string]profileResponse
+	if result.Customer != nil {
+		response = map[string]profileResponse{
+			"profile": {
+				CustomerID:  result.Customer.ID,
+				UserID:      result.Customer.UserID,
+				Name:        result.Customer.Name,
+				Username:    result.Customer.Username,
+				Phone:       result.Customer.Phone,
+				AvatarURL:   result.Customer.AvatarURL,
+				LastLoginAt: result.Customer.LastLoginAt,
+				CreatedAt:   result.Customer.CreatedAt,
+				UpdatedAt:   result.Customer.UpdatedAt,
+			},
+		}
+	}
+
+	if result.Staff != nil {
+		response = map[string]profileResponse{
+			"profile": {
+				StaffID:     result.Staff.ID,
+				UserID:      result.Staff.UserID,
+				Name:        result.Staff.Name,
+				Username:    result.Staff.Username,
+				Phone:       result.Staff.Phone,
+				AvatarURL:   result.Staff.AvatarURL,
+				LastLoginAt: result.Staff.LastLoginAt,
+				CreatedAt:   result.Staff.CreatedAt,
+				UpdatedAt:   result.Staff.UpdatedAt,
+			},
+		}
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
