@@ -3,20 +3,20 @@ package repository
 import (
 	"context"
 
-	"service-core/internal/modules/merchant/domain"
+	"service-core/internal/modules/staff/domain"
 	transaction "service-core/internal/shared/transaction"
 )
 
-type MerchantRepository interface {
+type StaffRepository interface {
 	Create(
 		ctx context.Context,
 		exec transaction.Executor,
-		merchant domain.Merchant,
+		staff domain.Staff,
 	) error
 
-	FindMerchants(
+	FindStaff(
 		ctx context.Context,
 		exec transaction.Executor,
-		params FindMerchantParams,
-	) ([]domain.Merchant, int, error)
+		params FindStaffParams,
+	) ([]domain.Staff, int, error)
 }

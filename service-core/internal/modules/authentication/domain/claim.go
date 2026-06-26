@@ -24,9 +24,9 @@ const (
 // Instead, it should be translated into an AuthContext after the token
 // has been successfully validated.
 type TokenClaims struct {
-	UserID     uuid.UUID
-	SessionID  uuid.UUID
-	MerchantID *uuid.UUID
+	UserID    uuid.UUID
+	SessionID uuid.UUID
+	StaffID   *uuid.UUID
 
 	Type TokenType
 

@@ -20,7 +20,7 @@ type ChargeRequest struct {
 	// order-reference sent to the gateway
 	PaymentID uuid.UUID
 
-	// OrderID is the merchant's order reference
+	// OrderID is the staff's order reference
 	// exposed to the gateway
 	OrderID uuid.UUID
 

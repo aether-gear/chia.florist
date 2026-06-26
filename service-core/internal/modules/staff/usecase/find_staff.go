@@ -6,30 +6,30 @@ import (
 	"strings"
 
 	apperrors "service-core/internal/common/errors"
-	"service-core/internal/modules/merchant/domain"
-	"service-core/internal/modules/merchant/repository"
+	"service-core/internal/modules/staff/domain"
+	"service-core/internal/modules/staff/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
-type FindMerchantsUsecase struct {
-	executor     transaction.Executor
-	merchantRepo repository.MerchantRepository
+type FindStaffUsecase struct {
+	executor  transaction.Executor
+	staffRepo repository.StaffRepository
 }
 
-func NewFindMerchantsUsecase(
+func NewFindStaffUsecase(
 	executor transaction.Executor,
-	merchantRepo repository.MerchantRepository,
-) *FindMerchantsUsecase {
-	return &FindMerchantsUsecase{
-		executor:     executor,
-		merchantRepo: merchantRepo,
+	staffRepo repository.StaffRepository,
+) *FindStaffUsecase {
+	return &FindStaffUsecase{
+		executor:  executor,
+		staffRepo: staffRepo,
 	}
 }
 
-type FindMerchantsInput struct {
+type FindStaffInput struct {
 	Page  int
 	Limit int
 	ID    *uuid.UUID
@@ -37,14 +37,14 @@ type FindMerchantsInput struct {
 	Sort  string
 }
 
-func (u *FindMerchantsUsecase) Execute(
+func (u *FindStaffUsecase) Execute(
 	ctx context.Context,
-	input FindMerchantsInput,
-) ([]domain.Merchant, int, error) {
-	var merchantSortKeys = map[string]query.SortKey{
-		"latest": repository.MerchantSortLatest,
-		"name":   repository.MerchantSortName,
-		"modified": repository.MerchantSortModify,
+	input FindStaffInput,
+) ([]domain.Staff, int, error) {
+	var staffSortKeys = map[string]query.SortKey{
+		"latest":   repository.StaffSortLatest,
+		"modified": repository.StaffSortModify,
+		// "name":     repository.StaffSortName,
 	}
 
 	var sorts query.Sorts
@@ -67,7 +67,7 @@ func (u *FindMerchantsUsecase) Execute(
 				}
 			}
 
-			sortKey, exists := merchantSortKeys[key]
+			sortKey, exists := staffSortKeys[key]
 			if exists {
 				sorts = append(sorts, query.Sort{
 					By:        sortKey,
@@ -80,15 +80,14 @@ func (u *FindMerchantsUsecase) Execute(
 	if len(sorts) == 0 {
 		sorts = query.Sorts{
 			{
-				By:        repository.MerchantSortLatest,
+				By:        repository.StaffSortLatest,
 				Direction: query.SortDesc,
 			},
 		}
 	}
 
-	params := repository.FindMerchantParams{
-		ID:   input.ID,
-		Name: input.Name,
+	params := repository.FindStaffParams{
+		ID: input.ID,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,
@@ -96,13 +95,13 @@ func (u *FindMerchantsUsecase) Execute(
 		Sorts: sorts,
 	}
 
-	merchants, total, err := u.merchantRepo.FindMerchants(ctx, u.executor, params)
+	staff, total, err := u.staffRepo.FindStaff(ctx, u.executor, params)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to load merchants: %w", err)
+		return nil, 0, fmt.Errorf("failed to load staff: %w", err)
 	}
-	if len(merchants) == 0 {
-		return nil, 0, apperrors.NewNotFound("merchants not available at the moment")
+	if len(staff) == 0 {
+		return nil, 0, apperrors.NewNotFound("staff not available at the moment")
 	}
 
-	return merchants, total, nil
+	return staff, total, nil
 }

@@ -33,8 +33,8 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	if actor.Type != authenDomain.AccountTypeMerchant {
-		return apperrors.NewForbidden("forbidden: merchant account required")
+	if actor.Type != authenDomain.AccountTypeStaff {
+		return apperrors.NewForbidden("forbidden: staff account required")
 	}
 
 	page := apphttp.QueryIntDefault(r, "page", 1)

@@ -8,7 +8,6 @@ import (
 	authenRepo "service-core/internal/modules/authentication/repository"
 	"service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/authorization/repository"
-	merchantRepo "service-core/internal/modules/merchant/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -16,18 +15,15 @@ import (
 
 type ActorService struct {
 	accountRepo    authenRepo.AccountRepository
-	merchantRepo   merchantRepo.MerchantRepository
-	membershipRepo repository.MerchantMembershipRepository
+	membershipRepo repository.StaffMembershipRepository
 }
 
 func NewActorService(
 	accountRepo authenRepo.AccountRepository,
-	merchantRepo merchantRepo.MerchantRepository,
-	membershipRepo repository.MerchantMembershipRepository,
+	membershipRepo repository.StaffMembershipRepository,
 ) repository.ActorService {
 	return &ActorService{
 		accountRepo:    accountRepo,
-		merchantRepo:   merchantRepo,
 		membershipRepo: membershipRepo,
 	}
 }
@@ -36,12 +32,10 @@ func (s *ActorService) Load(
 	ctx context.Context,
 	exec transaction.Executor,
 	userID uuid.UUID,
-	merchantID *uuid.UUID,
+	staffID *uuid.UUID,
 ) (*domain.Actor, error) {
 	account, err := s.accountRepo.
-		GetByUserID(ctx, exec,
-			userID,
-		)
+		GetByUserID(ctx, exec, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -51,14 +45,16 @@ func (s *ActorService) Load(
 		Type:      account.Type,
 	}
 
-	if actor.Type == authenDomain.AccountTypeMerchant {
+	if actor.Type == authenDomain.AccountTypeStaff {
 		roles, err := s.membershipRepo.
-			ListRolesByAccountIDAndMerchantID(ctx, exec,
+			ListRolesByAccountIDAndStaffID(
+				ctx,
+				exec,
 				account.ID,
-				*merchantID,
+				*staffID,
 			)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve merchant roles: %w", err)
+			return nil, fmt.Errorf("failed to retrieve staff roles: %w", err)
 		}
 
 		actor.Roles = roles

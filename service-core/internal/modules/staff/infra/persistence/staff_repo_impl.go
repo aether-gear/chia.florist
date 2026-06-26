@@ -5,65 +5,56 @@ import (
 	"fmt"
 	"strings"
 
-	"service-core/internal/modules/merchant/domain"
-	"service-core/internal/modules/merchant/repository"
+	"service-core/internal/modules/staff/domain"
+	"service-core/internal/modules/staff/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 )
 
-type merchantRepositoryImpl struct{}
+type staffRepositoryImpl struct{}
 
-func NewMerchantRepositoryImpl() repository.MerchantRepository {
-	return &merchantRepositoryImpl{}
+func NewStaffRepositoryImpl() repository.StaffRepository {
+	return &staffRepositoryImpl{}
 }
 
-func (r *merchantRepositoryImpl) Create(
+func (r *staffRepositoryImpl) Create(
 	ctx context.Context,
 	exec transaction.Executor,
-	merchant domain.Merchant,
+	staff domain.Staff,
 ) error {
 	query := `
-		INSERT INTO merchants (
+		INSERT INTO staff (
 			id,
-			name,
-			description,
-			logo_url,
-			banner_url,
+			user_id,
 			created_at
-		) VALUES ($1,$2,$3,$4,$5,$6)
+		) VALUES ($1,$2,$3)
 	`
 
 	_, err := exec.Exec(ctx, query,
-		merchant.ID,
-		merchant.Name,
-		merchant.Description,
-		merchant.LogoUrl,
-		merchant.BannerUrl,
-		merchant.CreatedAt,
+		staff.ID,
+		staff.UserID,
+		staff.CreatedAt,
 	)
 
 	if err != nil {
-		return fmt.Errorf("insert merchant failed: %w", err)
+		return fmt.Errorf("insert staff failed: %w", err)
 	}
 	return nil
 }
 
-func (r *merchantRepositoryImpl) FindMerchants(
+func (r *staffRepositoryImpl) FindStaff(
 	ctx context.Context,
 	exec transaction.Executor,
-	params repository.FindMerchantParams,
-) ([]domain.Merchant, int, error) {
+	params repository.FindStaffParams,
+) ([]domain.Staff, int, error) {
 	baseQuery := `
-		FROM merchants m
+		FROM staff m
 	`
 
 	selectQuery := `
 		SELECT
 			m.id,
-			m.name,
-			m.description,
-			m.logo_url,
-			m.banner_url,
+			m.user_id,
 			m.created_at,
 			m.updated_at,
 			m.deleted_at
@@ -88,11 +79,11 @@ func (r *merchantRepositoryImpl) FindMerchants(
 		argPos++
 	}
 
-	if params.Name != nil {
-		conditions = append(conditions, fmt.Sprintf("m.name ILIKE $%d", argPos))
-		args = append(args, "%"+*params.Name+"%")
-		argPos++
-	}
+	// if params.Name != nil {
+	// 	conditions = append(conditions, fmt.Sprintf("m.name ILIKE $%d", argPos))
+	// 	args = append(args, "%"+*params.Name+"%")
+	// 	argPos++
+	// }
 
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
@@ -111,20 +102,20 @@ func (r *merchantRepositoryImpl) FindMerchants(
 		QueryRow(ctx, countQuery, countArgs...).
 		Scan(&total)
 	if err != nil {
-		return nil, 0, fmt.Errorf("query count merchants failed: %w", err)
+		return nil, 0, fmt.Errorf("query count staff failed: %w", err)
 	}
 
 	// Build sorting expressions
 	// Convert requested sort keys into SQL ORDER BY clauses
-	var merchantSortKeys = map[query.SortKey]string{
-		repository.MerchantSortLatest: "m.created_at",
-		repository.MerchantSortName:   "m.name",
-		repository.MerchantSortModify: "m.updated_at",
+	var staffSortKeys = map[query.SortKey]string{
+		repository.StaffSortLatest: "m.created_at",
+		repository.StaffSortModify: "m.updated_at",
+		// repository.StaffSortName:   "m.name",
 	}
 
 	var sortClauses []string
 	for _, sort := range params.Sorts {
-		colName, exists := merchantSortKeys[sort.By]
+		colName, exists := staffSortKeys[sort.By]
 		if !exists {
 			continue
 		}
@@ -169,31 +160,28 @@ func (r *merchantRepositoryImpl) FindMerchants(
 
 	rows, err := exec.Query(ctx, queryStr, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("query list merchants failed: %w", err)
+		return nil, 0, fmt.Errorf("query list staff failed: %w", err)
 	}
 	defer rows.Close()
 
-	var results []domain.Merchant
+	var results []domain.Staff
 	for rows.Next() {
-		var m domain.Merchant
+		var m domain.Staff
 		err := rows.Scan(
 			&m.ID,
-			&m.Name,
-			&m.Description,
-			&m.LogoUrl,
-			&m.BannerUrl,
+			&m.UserID,
 			&m.CreatedAt,
 			&m.UpdatedAt,
 			&m.DeletedAt,
 		)
 		if err != nil {
-			return nil, 0, fmt.Errorf("mapping merchant model to domain failed: %w", err)
+			return nil, 0, fmt.Errorf("mapping staff model to domain failed: %w", err)
 		}
 		results = append(results, m)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterate merchants failed: %w", err)
+		return nil, 0, fmt.Errorf("iterate staff failed: %w", err)
 	}
 
 	return results, total, nil

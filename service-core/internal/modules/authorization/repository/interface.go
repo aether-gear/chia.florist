@@ -10,31 +10,31 @@ import (
 	"github.com/google/uuid"
 )
 
-type MerchantMembershipRepository interface {
+type StaffMembershipRepository interface {
 	GetByAccountID(
 		ctx context.Context,
 		exec transaction.Executor,
 		accountID uuid.UUID,
-	) (*domain.MerchantMembership, error)
+	) (*domain.StaffMembership, error)
 
-	GetByAccountIDAndMerchantID(
+	GetByAccountIDAndStaffID(
 		ctx context.Context,
 		exec transaction.Executor,
 		accountID uuid.UUID,
-		merchantID uuid.UUID,
-	) (*domain.MerchantMembership, error)
+		staffID uuid.UUID,
+	) (*domain.StaffMembership, error)
 
-	ListRolesByAccountIDAndMerchantID(
+	ListRolesByAccountIDAndStaffID(
 		ctx context.Context,
 		exec transaction.Executor,
 		accountID uuid.UUID,
-		merchantID uuid.UUID,
+		staffID uuid.UUID,
 	) ([]domain.Role, error)
 
 	Save(
 		ctx context.Context,
 		exec transaction.Executor,
-		membership domain.MerchantMembership,
+		membership domain.StaffMembership,
 	) error
 }
 
@@ -51,7 +51,7 @@ type ActorService interface {
 		ctx context.Context,
 		exec transaction.Executor,
 		userID uuid.UUID,
-		merchantID *uuid.UUID,
+		staffID *uuid.UUID,
 	) (*domain.Actor, error)
 }
 
@@ -63,7 +63,7 @@ type Authorizer interface {
 	RequireAccountType(
 		allowedTypes ...authendomain.AccountType,
 	) appmiddleware.Middleware
-	RequireMerchantRole(
+	RequireStaffRole(
 		allowedRoles ...domain.RoleCode,
 	) appmiddleware.Middleware
 }

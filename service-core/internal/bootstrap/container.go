@@ -16,11 +16,11 @@ import (
 	courierPersistence "service-core/internal/modules/courier/infra/persistence"
 	customerPersistence "service-core/internal/modules/customer/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
-	merchantPersistence "service-core/internal/modules/merchant/infra/persistence"
 	orderPersistence "service-core/internal/modules/order/infra/persistence"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
 	productPersistence "service-core/internal/modules/product/infra/persistence"
 	shopPersistence "service-core/internal/modules/shop/infra/persistence"
+	staffPersistence "service-core/internal/modules/staff/infra/persistence"
 	userPersistence "service-core/internal/modules/user/infra/persistence"
 
 	authenSvc "service-core/internal/modules/authentication/infra/service"
@@ -36,12 +36,12 @@ import (
 	customerUsecase "service-core/internal/modules/customer/usecase"
 	inventoryUsecase "service-core/internal/modules/inventory/usecase"
 	locationUsecase "service-core/internal/modules/location/usecase"
-	merchantUsecase "service-core/internal/modules/merchant/usecase"
 	orderUsecase "service-core/internal/modules/order/usecase"
 	paymentUsecase "service-core/internal/modules/payment/usecase"
 	productUsecase "service-core/internal/modules/product/usecase"
 	shipmentUsecase "service-core/internal/modules/shipment/usecase"
 	shopUsecase "service-core/internal/modules/shop/usecase"
+	staffUsecase "service-core/internal/modules/staff/usecase"
 	userUsecase "service-core/internal/modules/user/usecase"
 )
 
@@ -60,15 +60,15 @@ type Container struct {
 
 	Me               authenUsecase.MeUsecase
 	LoginCustomer    authenUsecase.LoginCustomerUsecase
-	LoginMerchant    authenUsecase.LoginMerchantUsecase
+	LoginStaff       authenUsecase.LoginStaffUsecase
 	RegisterCustomer authenUsecase.RegisterCustomerUsecase
 	VerifyAccount    authenUsecase.VerifyAccountUsecase
 	GetAccount       authenUsecase.GetAccountUsecase
 	Logout           authenUsecase.LogoutUsecase
 
-	FindMerchants      merchantUsecase.FindMerchantsUsecase
-	CreateMerchant     merchantUsecase.CreateMerchantUsecase
-	AddMerchantAccount merchantUsecase.AddMerchantAccountUsecase
+	FindStaff       staffUsecase.FindStaffUsecase
+	CreateStaff     staffUsecase.CreateStaffUsecase
+	AddStaffAccount staffUsecase.AddStaffAccountUsecase
 
 	GetCart    cartUsecase.GetCartUsecase
 	AddItem    cartUsecase.AddItemUsecase
@@ -139,9 +139,9 @@ func NewContainer(cfg Config,
 		shopRepo               = shopPersistence.NewShopRepositoryImpl()
 		courierRepo            = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo        = courierPersistence.NewShopCourierRepositoryImpl()
-		merchantRepo           = merchantPersistence.NewMerchantRepositoryImpl()
+		staffRepo              = staffPersistence.NewStaffRepositoryImpl()
 		customerRepo           = customerPersistence.NewCustomerRepositoryImpl()
-		membershipRepo         = authorPersistence.NewMerchantMembershipRepositoryImpl()
+		membershipRepo         = authorPersistence.NewStaffMembershipRepositoryImpl()
 		roleRepo               = authorPersistence.NewRoleRepositoryImpl()
 		orderRepo              = orderPersistence.NewOrderRepositoryImpl()
 		orderItemRepo          = orderPersistence.NewOrderItemRepositoryImpl()
@@ -160,7 +160,6 @@ func NewContainer(cfg Config,
 
 		actorSvc = authorSvc.NewActorService(
 			accountRepo,
-			merchantRepo,
 			membershipRepo,
 		)
 		authorMdwr = authorSvc.NewAuthorizer(
@@ -265,8 +264,8 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				refreshTokenRepo,
 			),
-		LoginMerchant: *authenUsecase.
-			NewLoginMerchantUsecase(
+		LoginStaff: *authenUsecase.
+			NewLoginStaffUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				accountRepo,
@@ -275,22 +274,22 @@ func NewContainer(cfg Config,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
-				merchantRepo,
+				staffRepo,
 				membershipRepo,
 			),
 
-		FindMerchants: *merchantUsecase.
-			NewFindMerchantsUsecase(
+		FindStaff: *staffUsecase.
+			NewFindStaffUsecase(
 				infra.TransactionExecutor,
-				merchantRepo,
+				staffRepo,
 			),
-		CreateMerchant: *merchantUsecase.
-			NewCreateMerchantUsecase(
-				merchantRepo,
+		CreateStaff: *staffUsecase.
+			NewCreateStaffUsecase(
+				staffRepo,
 				infra.TransactionExecutor,
 			),
-		AddMerchantAccount: *merchantUsecase.
-			NewAddMerchantAccountUsecase(
+		AddStaffAccount: *staffUsecase.
+			NewAddStaffAccountUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				accountRepo,

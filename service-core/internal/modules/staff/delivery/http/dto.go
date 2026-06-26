@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type addMerchantAccountRequest struct {
+type addStaffAccountRequest struct {
 	Email    string  `json:"email"`
 	Name     string  `json:"name"`
 	Username string  `json:"username"`
@@ -14,18 +14,18 @@ type addMerchantAccountRequest struct {
 	Phone    *string `json:"phone"`
 }
 
-type createMerchantRequest struct {
+type createStaffRequest struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	LogoUrl     *string `json:"logo_url"`
 	BannerUrl   *string `json:"banner_url"`
 }
 
-type merchantResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description"`
-	LogoUrl     *string    `json:"logo_url"`
-	BannerUrl   *string    `json:"banner_url"`
-	CreatedAt   time.Time  `json:"created_at"`
+type staffResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	LogoUrl     *string   `json:"logo_url"`
+	BannerUrl   *string   `json:"banner_url"`
+	CreatedAt   time.Time `json:"created_at"`
 }

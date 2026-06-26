@@ -23,11 +23,11 @@ func NewJWTService(secret string) repository.TokenService {
 }
 
 type jwtClaims struct {
-	UserID     string `json:"user_id"`
-	SessionID  string `json:"session_id"`
-	Type       string `json:"type"`
-	MerchantID string `json:"merchant_id,omitempty"`
-	Role       string `json:"roles,omitempty"` // comma-separated
+	UserID    string `json:"user_id"`
+	SessionID string `json:"session_id"`
+	Type      string `json:"type"`
+	StaffID   string `json:"staff_id,omitempty"`
+	Role      string `json:"roles,omitempty"` // comma-separated
 
 	jwt.RegisteredClaims
 }
@@ -36,9 +36,9 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 	now := time.Now()
 	exp := now.Add(params.Duration)
 
-	merchantIDStr := ""
-	if params.MerchantID != nil {
-		merchantIDStr = params.MerchantID.String()
+	staffIDStr := ""
+	if params.StaffID != nil {
+		staffIDStr = params.StaffID.String()
 	}
 
 	roles := make([]string, len(params.Roles))
@@ -48,11 +48,11 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 	rolesStr := strings.Join(roles, ",")
 
 	claims := jwtClaims{
-		UserID:     params.UserID.String(),
-		SessionID:  params.SessionID.String(),
-		Type:       string(params.Type),
-		MerchantID: merchantIDStr,
-		Role:       rolesStr,
+		UserID:    params.UserID.String(),
+		SessionID: params.SessionID.String(),
+		Type:      string(params.Type),
+		StaffID:   staffIDStr,
+		Role:      rolesStr,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(exp),
@@ -120,12 +120,12 @@ func (j *JWTService) Validate(tokenStr string) (*domain.TokenClaims, error) {
 		ExpiresAt: claims.ExpiresAt.Time,
 	}
 
-	if claims.MerchantID != "" {
-		mid, err := uuid.Parse(claims.MerchantID)
+	if claims.StaffID != "" {
+		mid, err := uuid.Parse(claims.StaffID)
 		if err != nil {
-			return nil, fmt.Errorf("invalid merchant_id claim: %w", err)
+			return nil, fmt.Errorf("invalid staff_id claim: %w", err)
 		}
-		tknClaim.MerchantID = &mid
+		tknClaim.StaffID = &mid
 	}
 	if claims.Role != "" {
 		tknClaim.Roles = strings.Split(claims.Role, ",")

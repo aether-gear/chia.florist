@@ -19,11 +19,11 @@ func NewRoleRepositoryImpl() repository.RoleRepository {
 	return &roleRepositoryImpl{}
 }
 
-func (r *roleRepositoryImpl) GetRolesByAccountAndMerchant(
+func (r *roleRepositoryImpl) GetRolesByAccountAndStaff(
 	ctx context.Context,
 	exec transaction.Executor,
 	accountID uuid.UUID,
-	merchantID uuid.UUID,
+	staffID uuid.UUID,
 ) ([]domain.Role, error) {
 	query := `
 		SELECT
@@ -31,18 +31,18 @@ func (r *roleRepositoryImpl) GetRolesByAccountAndMerchant(
 			ro.code,
 			ro.name
 		FROM
-			merchant_memberships mm
-		JOIN roles ro ON ro.id = mm.role_id
+			staff_memberships sm
+		JOIN roles ro ON ro.id = sm.role_id
 		WHERE
-			mm.account_id = $1 AND mm.merchant_id = $2
+			sm.account_id = $1 AND sm.staff_id = $2
 	`
 
 	rows, err := exec.Query(ctx, query,
 		accountID,
-		merchantID,
+		staffID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("query roles by merchant membership failed: %w", err)
+		return nil, fmt.Errorf("query roles by membership failed: %w", err)
 	}
 	defer rows.Close()
 

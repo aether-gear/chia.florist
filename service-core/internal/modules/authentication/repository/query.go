@@ -13,7 +13,7 @@ type GenerateTokenParams struct {
 	UserID    uuid.UUID
 	SessionID uuid.UUID
 
-	MerchantID *uuid.UUID
+	StaffID *uuid.UUID
 
 	Type     domain.TokenType
 	Duration time.Duration

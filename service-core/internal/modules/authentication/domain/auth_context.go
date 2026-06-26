@@ -24,7 +24,7 @@ type AuthContext struct {
 	UserID    uuid.UUID
 	SessionID uuid.UUID
 
-	MerchantID *uuid.UUID
+	StaffID *uuid.UUID
 
 	TokenType TokenType
 
