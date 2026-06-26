@@ -148,17 +148,17 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     }
     
     // Group ALL items by shopId
-    const shopsMap: Record<string, typeof checkoutItems.value> = {}
+    const itemsByShop: Record<string, typeof checkoutItems.value> = {}
     checkoutItems.value.forEach(item => {
       const sId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
-      if (!shopsMap[sId]) {
-        shopsMap[sId] = []
+      if (!itemsByShop[sId]) {
+        itemsByShop[sId] = []
       }
-      shopsMap[sId].push(item)
+      itemsByShop[sId].push(item)
     })
     
-    Object.keys(shopsMap).forEach(sId => {
-      const items = shopsMap[sId] || []
+    Object.keys(itemsByShop).forEach(sId => {
+      const items = itemsByShop[sId] || []
       const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
       const mockOptions = [
         { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 },
@@ -731,7 +731,7 @@ const handlePlaceOrder = async () => {
       date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
       items: orderItems,
       total: liveTotalPayment.value,
-      status: 'pembayaran' as const
+      status: 'pending' as const
     }
     orders.value.push(newOrder)
 

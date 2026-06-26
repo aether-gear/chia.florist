@@ -1,6 +1,7 @@
 // app/composables/viewmodels/useAuthViewModel.ts
 import { ref, computed } from 'vue'
 import { authService } from '~/services/authService'
+import { supabaseService } from '~/services/supabaseService'
 import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest } from '~/types/auth'
 import { triggerAuthAlert } from '~/composables/useSessionState'
 
@@ -28,17 +29,51 @@ export const useAuthViewModel = () => {
         const isLoggedIn = useCookie('is_logged_in')
         
         isLoggedIn.value = 'true'
+
+        let profileDetails: any = null
+        try {
+          const profileRes = await authService.getCurrentUser(cookieHeader)
+          if (profileRes && profileRes.me) {
+            profileDetails = profileRes.me
+          }
+        } catch (profileErr) {
+          console.warn('Failed to fetch profile details from Golang backend:', profileErr)
+        }
         
-        if (!userProfile.value) {
+        let avatarUrlVal: string | null = null
+        if (import.meta.client) {
+          try {
+            const urls = await supabaseService.getAvatarUrls(profileDetails?.id || response.account_id)
+            if (urls) {
+              avatarUrlVal = urls.signedUrl || urls.publicUrl
+            }
+          } catch (avatarErr) {
+            console.warn('Failed to load user avatar from Supabase:', avatarErr)
+          }
+        }
+
+        if (profileDetails) {
+          userProfile.value = {
+            id: profileDetails.id,
+            name: profileDetails.name || 'Customer',
+            username: profileDetails.username || 'customer',
+            email: profileDetails.email || userProfile.value?.email || '',
+            phone: profileDetails.phone || '',
+            last_login_at: profileDetails.last_login_at || new Date().toISOString(),
+            avatarUrl: avatarUrlVal
+          }
+        } else if (!userProfile.value) {
           userProfile.value = {
             id: response.account_id,
             name: 'Customer',
             username: 'customer',
             phone: '',
-            last_login_at: new Date().toISOString()
+            last_login_at: new Date().toISOString(),
+            avatarUrl: avatarUrlVal
           }
         } else {
           userProfile.value.id = response.account_id
+          userProfile.value.avatarUrl = avatarUrlVal
         }
         
         currentUser.value = userProfile.value as UserMe
@@ -48,6 +83,9 @@ export const useAuthViewModel = () => {
         const isLoggedIn = useCookie('is_logged_in')
         userProfile.value = null
         isLoggedIn.value = null
+        if (response && response.message) {
+          error.value = response.message
+        }
       }
     } catch (err: any) {
       currentUser.value = null
@@ -55,6 +93,7 @@ export const useAuthViewModel = () => {
       const isLoggedIn = useCookie('is_logged_in')
       userProfile.value = null
       isLoggedIn.value = null
+      error.value = err.data?.message || err.message || 'Failed to fetch user state'
       console.warn('Failed to fetch user state:', err)
     } finally {
       isLoading.value = false
@@ -77,9 +116,17 @@ export const useAuthViewModel = () => {
         }
         // Fetch profile to populate global user state
         await fetchCurrentUser()
+        
+        if (!isAuthenticated.value) {
+          clearLocalSession()
+          const errMsg = error.value || 'Access forbidden: Insufficient account permissions.'
+          error.value = errMsg
+          throw new Error(errMsg)
+        }
+
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
         userProfile.value = {
-          id: 'temp-id',
+          id: currentUser.value?.id || 'temp-id',
           name: credentials.email.split('@')[0],
           username: credentials.email.split('@')[0],
           email: credentials.email,
@@ -96,7 +143,7 @@ export const useAuthViewModel = () => {
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || 'Login failed. Please check your credentials.'
+      error.value = err.data?.message || err.message || 'Login failed. Please check your credentials.'
       currentUser.value = null
       throw err
     } finally {
@@ -180,9 +227,20 @@ export const useAuthViewModel = () => {
         }
         challengeId.value = null
         registrationEmail.value = null
+
+        // Fetch profile to verify session permissions
+        await fetchCurrentUser()
+
+        if (!isAuthenticated.value) {
+          clearLocalSession()
+          const errMsg = error.value || 'Access forbidden: Insufficient account permissions.'
+          error.value = errMsg
+          throw new Error(errMsg)
+        }
+
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
         userProfile.value = {
-          id: 'temp-id',
+          id: currentUser.value?.id || 'temp-id',
           name,
           username,
           email,
@@ -197,7 +255,7 @@ export const useAuthViewModel = () => {
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || 'OTP Verification failed. Please check the code.'
+      error.value = err.data?.message || err.message || 'OTP Verification failed. Please check the code.'
       throw err
     } finally {
       isLoading.value = false

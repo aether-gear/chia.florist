@@ -20,7 +20,16 @@ export interface Order {
   date: string
   items: CartItem[]
   total: number
-  status: 'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulasan'
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'finished' | 'cancelled' | 'pembayaran' | 'pengemasan' | 'pengiriman' | 'ulasan'
+  shipping?: {
+    courier: string
+    service: string
+    trackingNumber: string
+    recipientName: string
+    phone: string
+    address: string
+    cost: number
+  }
 }
 
 interface PendingEntry {
@@ -36,7 +45,190 @@ let loadCartPromise: Promise<void> | null = null
 
 export const useCart = () => {
   const cart = useState<CartItem[]>('chia-florist-cart', () => [])
-  const orders = useState<Order[]>('chia-florist-orders', () => [])
+  const orders = useState<Order[]>('chia-florist-orders', () => [
+    {
+      orderId: 'CHIA-982145',
+      date: '26 Jun 2026',
+      items: [
+        {
+          id: 'prod-001',
+          name: 'Papan Bunga Congratulation Grand Opening Premium',
+          price: 850000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: '2.0m x 1.5m',
+          color: '#1b4332'
+        }
+      ],
+      total: 850000,
+      status: 'pending',
+      shipping: {
+        courier: 'JNE Express',
+        service: 'REG',
+        trackingNumber: 'AWB-8839214751',
+        recipientName: 'Jane Doe',
+        phone: '081234567890',
+        address: 'Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan, 12110',
+        cost: 20000
+      }
+    },
+    {
+      orderId: 'CHIA-881234',
+      date: '25 Jun 2026',
+      items: [
+        {
+          id: 'prod-002',
+          name: 'Standing Flower Congratulation Special',
+          price: 1200000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: '1.8m',
+          color: '#c1121f'
+        }
+      ],
+      total: 1200000,
+      status: 'confirmed',
+      shipping: {
+        courier: 'J&T Express',
+        service: 'EZ',
+        trackingNumber: 'JT-9948214002',
+        recipientName: 'John Smith',
+        phone: '081987654321',
+        address: 'Sudirman Central Business District (SCBD), Tower B Lt. 12, Jakarta Selatan, 12190',
+        cost: 15000
+      }
+    },
+    {
+      orderId: 'CHIA-775621',
+      date: '25 Jun 2026',
+      items: [
+        {
+          id: 'prod-003',
+          name: 'Hand Bouquet Rose & Lily Sweet Pink',
+          price: 550000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: 'Standard',
+          color: '#ffb3c1'
+        }
+      ],
+      total: 550000,
+      status: 'processing',
+      shipping: {
+        courier: 'SiCepat',
+        service: 'REG',
+        trackingNumber: 'SI-7738291044',
+        recipientName: 'Alice Johnson',
+        phone: '087711223344',
+        address: 'Kuningan Place, Block C-3, Jakarta Selatan, 12950',
+        cost: 18000
+      }
+    },
+    {
+      orderId: 'CHIA-664321',
+      date: '24 Jun 2026',
+      items: [
+        {
+          id: 'prod-004',
+          name: 'Papan Bunga Pernikahan Elegant Double Board',
+          price: 950000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: '2.5m x 1.5m',
+          color: '#1b4332'
+        }
+      ],
+      total: 950000,
+      status: 'shipped',
+      shipping: {
+        courier: 'JNE Express',
+        service: 'YES',
+        trackingNumber: 'AWB-8839214755',
+        recipientName: 'Michael Brown',
+        phone: '081299887766',
+        address: 'Jl. Kemang Raya No. 10, Kemang, Jakarta Selatan, 12730',
+        cost: 30000
+      }
+    },
+    {
+      orderId: 'CHIA-553199',
+      date: '24 Jun 2026',
+      items: [
+        {
+          id: 'prod-005',
+          name: 'Papan Bunga Wisuda Congratulations Modern',
+          price: 650000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: '1.8m',
+          color: '#0077b6'
+        }
+      ],
+      total: 650000,
+      status: 'delivered',
+      shipping: {
+        courier: 'Grab Express',
+        service: 'Instant',
+        trackingNumber: 'GRAB-229981442',
+        recipientName: 'David Lee',
+        phone: '081344556677',
+        address: 'Apartemen Sudirman Hill, Unit 15-A, Jakarta Pusat, 10210',
+        cost: 25000
+      }
+    },
+    {
+      orderId: 'CHIA-442188',
+      date: '20 Jun 2026',
+      items: [
+        {
+          id: 'prod-001',
+          name: 'Papan Bunga Congratulation Grand Opening Premium',
+          price: 850000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: '2.0m x 1.5m',
+          color: '#1b4332'
+        }
+      ],
+      total: 850000,
+      status: 'finished',
+      shipping: {
+        courier: 'JNE Express',
+        service: 'REG',
+        trackingNumber: 'AWB-8839214760',
+        recipientName: 'Sarah Connor',
+        phone: '085522334455',
+        address: 'Menteng Residence, Block D No. 5, Jakarta Pusat, 10310',
+        cost: 20000
+      }
+    },
+    {
+      orderId: 'CHIA-331077',
+      date: '18 Jun 2026',
+      items: [
+        {
+          id: 'prod-002',
+          name: 'Standing Flower Congratulation Special',
+          price: 1200000,
+          image: '/images/custom-preview.png',
+          quantity: 1,
+          size: '1.8m',
+          color: '#c1121f'
+        }
+      ],
+      total: 1200000,
+      status: 'cancelled',
+      shipping: {
+        courier: 'JNE Express',
+        service: 'REG',
+        trackingNumber: 'AWB-8839214770',
+        recipientName: 'Sarah Connor',
+        phone: '085522334455',
+        address: 'Menteng Residence, Block D No. 5, Jakarta Pusat, 10310',
+        cost: 20000
+      }
+    }
+  ])
   const isLoggedIn = useCookie('is_logged_in')
 
   const loadCart = (force = false): Promise<void> => {
@@ -290,10 +482,19 @@ export const useCart = () => {
 
     const newOrder: Order = {
       orderId: 'CHIA-' + Date.now().toString().slice(-6),
-      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+      date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
       items: orderItems,
       total: totalAmount,
-      status: 'pembayaran'
+      status: 'pending',
+      shipping: {
+        courier: 'JNE Express',
+        service: 'REG',
+        trackingNumber: 'AWB-' + Math.floor(1000000000 + Math.random() * 9000000000),
+        recipientName: 'Jane Doe',
+        phone: '081234567890',
+        address: 'Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan, 12110',
+        cost: 20000
+      }
     }
 
     orders.value.push(newOrder)

@@ -42,6 +42,7 @@ export interface UserMe {
   email?: string
   phone: string
   last_login_at: string | null
+  avatarUrl?: string | null
 }
 
 export interface GetCurrentUserResponse {
