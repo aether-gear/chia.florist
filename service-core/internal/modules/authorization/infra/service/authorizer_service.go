@@ -48,7 +48,7 @@ func (s *authorizer) RequireAccountType(
 	}
 }
 
-func (s *authorizer) RequireMerchantRole(
+func (s *authorizer) RequireStaffRole(
 	allowedRoles ...domain.RoleCode,
 ) appmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
@@ -58,8 +58,8 @@ func (s *authorizer) RequireMerchantRole(
 				return apperrors.NewUnauthorized("authentication required")
 			}
 
-			if actor.Type != authendomain.AccountTypeMerchant {
-				return apperrors.NewForbidden(domain.ErrMerchantRequired.Error())
+			if actor.Type != authendomain.AccountTypeStaff {
+				return apperrors.NewForbidden(domain.ErrStaffRequired.Error())
 			}
 
 			allowed := false
@@ -99,7 +99,7 @@ func (s *authorizer) LoadActor(
 					r.Context(),
 					exec,
 					authCtx.UserID,
-					authCtx.MerchantID,
+					authCtx.StaffID,
 				)
 			if err != nil {
 				return err

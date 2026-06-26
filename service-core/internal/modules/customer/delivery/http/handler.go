@@ -55,32 +55,35 @@ func (h *CustomerHandler) FindCustomers(w http.ResponseWriter, r *http.Request) 
 	if idStr != "" {
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			return apperrors.NewBadRequest("invalid user id")
+			return apperrors.NewBadRequest("invalid customer id")
 		}
 		input.ID = &id
 	}
 
-	users, total, err := h.findCustomers.Execute(r.Context(), input)
+	customers, total, err := h.findCustomers.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
 
-	results := make([]customerResponse, 0, len(users))
-	for _, u := range users {
+	results := make([]customerResponse, 0, len(customers))
+	for _, c := range customers {
 		results = append(results, customerResponse{
-			ID:          u.ID,
-			Name:        u.Name,
-			Username:    u.Username,
-			Phone:       u.Phone,
-			LastLoginAt: u.LastLoginAt,
+			ID:          c.ID,
+			UserID:      c.UserID,
+			Name:        c.Name,
+			Username:    c.Username,
+			Phone:       c.Phone,
+			AvatarURL:   c.AvatarURL,
+			LastLoginAt: c.LastLoginAt,
+			CreatedAt:   c.CreatedAt,
 		})
 	}
 
 	response := map[string]interface{}{
-		"users": results,
-		"page":  page,
-		"limit": limit,
-		"total": total,
+		"customers": results,
+		"page":      page,
+		"limit":     limit,
+		"total":     total,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

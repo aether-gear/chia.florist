@@ -6,18 +6,18 @@ import (
 	"github.com/google/uuid"
 )
 
-// MerchantMembership represents the assignment of an account to a
-// merchant under a specific role.
+// StaffMembership represents the assignment of an account to a
+// staff under a specific role.
 //
 // A membership establishes the relationship between an account and a
-// merchant and serves as the source of role-based access control within
-// a merchant workspace.
-type MerchantMembership struct {
+// staff and serves as the source of role-based access control within
+// a staff workspace.
+type StaffMembership struct {
 	ID uuid.UUID
 
-	MerchantID uuid.UUID
-	AccountID  uuid.UUID
-	RoleID     uuid.UUID
+	StaffID   uuid.UUID
+	AccountID uuid.UUID
+	RoleID    uuid.UUID
 
 	CreatedBy uuid.UUID
 

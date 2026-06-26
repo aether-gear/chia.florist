@@ -10,13 +10,13 @@ import (
 	"service-core/internal/modules/authentication/repository"
 	authorzDomain "service-core/internal/modules/authorization/domain"
 	authorRepo "service-core/internal/modules/authorization/repository"
-	merchantRepo "service-core/internal/modules/merchant/repository"
+	staffRepo "service-core/internal/modules/staff/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
-type LoginMerchantUsecase struct {
+type LoginStaffUsecase struct {
 	executor         transaction.Executor
 	transactor       transaction.Transactor
 	accountRepo      repository.AccountRepository
@@ -25,11 +25,11 @@ type LoginMerchantUsecase struct {
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
-	merchantRepo     merchantRepo.MerchantRepository
-	membershipRepo   authorRepo.MerchantMembershipRepository
+	staffRepo        staffRepo.StaffRepository
+	membershipRepo   authorRepo.StaffMembershipRepository
 }
 
-func NewLoginMerchantUsecase(
+func NewLoginStaffUsecase(
 	executor transaction.Executor,
 	transactor transaction.Transactor,
 	accountRepo repository.AccountRepository,
@@ -38,10 +38,10 @@ func NewLoginMerchantUsecase(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
-	merchantRepo merchantRepo.MerchantRepository,
-	membershipRepo authorRepo.MerchantMembershipRepository,
-) *LoginMerchantUsecase {
-	return &LoginMerchantUsecase{
+	staffRepo staffRepo.StaffRepository,
+	membershipRepo authorRepo.StaffMembershipRepository,
+) *LoginStaffUsecase {
+	return &LoginStaffUsecase{
 		executor:         executor,
 		transactor:       transactor,
 		accountRepo:      accountRepo,
@@ -50,21 +50,21 @@ func NewLoginMerchantUsecase(
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
-		merchantRepo:     merchantRepo,
+		staffRepo:        staffRepo,
 		membershipRepo:   membershipRepo,
 	}
 }
 
-type LoginMerchantParams struct {
+type LoginStaffParams struct {
 	UserAgent *string
 	IPAddress *string
 	Email     string
 	Password  string
 }
 
-func (u *LoginMerchantUsecase) Execute(
+func (u *LoginStaffUsecase) Execute(
 	ctx context.Context,
-	input LoginMerchantParams,
+	input LoginStaffParams,
 ) (*LoginEmailResult, error) {
 	existing, err := u.accountRepo.
 		GetByEmail(ctx, u.executor, input.Email)
@@ -76,7 +76,7 @@ func (u *LoginMerchantUsecase) Execute(
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
-	if existing.Type != domain.AccountTypeMerchant {
+	if existing.Type != domain.AccountTypeStaff {
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 	if existing.Status != domain.AccountActive {
@@ -87,21 +87,21 @@ func (u *LoginMerchantUsecase) Execute(
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
-	memberMerchant, err := u.membershipRepo.
+	memberStaff, err := u.membershipRepo.
 		GetByAccountID(ctx, u.executor, existing.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve membership: %w", err)
 	}
-	if memberMerchant == nil {
+	if memberStaff == nil {
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	roles, err := u.membershipRepo.
-		ListRolesByAccountIDAndMerchantID(
+		ListRolesByAccountIDAndStaffID(
 			ctx,
 			u.executor,
 			existing.ID,
-			memberMerchant.MerchantID,
+			memberStaff.StaffID,
 		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve roles: %w", err)
@@ -127,12 +127,12 @@ func (u *LoginMerchantUsecase) Execute(
 
 	accessTkn, err := u.tokenSvc.
 		Generate(repository.GenerateTokenParams{
-			UserID:     existing.UserID,
-			SessionID:  session.ID,
-			MerchantID: &memberMerchant.MerchantID,
-			Roles:      roleCodes,
-			Type:       domain.TokenTypeAccess,
-			Duration:   30 * time.Minute,
+			UserID:    existing.UserID,
+			SessionID: session.ID,
+			StaffID:   &memberStaff.StaffID,
+			Roles:     roleCodes,
+			Type:      domain.TokenTypeAccess,
+			Duration:  30 * time.Minute,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
@@ -140,12 +140,12 @@ func (u *LoginMerchantUsecase) Execute(
 
 	refreshTkn, err := u.tokenSvc.
 		Generate(repository.GenerateTokenParams{
-			UserID:     existing.UserID,
-			SessionID:  session.ID,
-			MerchantID: &memberMerchant.ID,
-			Roles:      roleCodes,
-			Type:       domain.TokenTypeRefresh,
-			Duration:   7 * 24 * time.Hour,
+			UserID:    existing.UserID,
+			SessionID: session.ID,
+			StaffID:   &memberStaff.ID,
+			Roles:     roleCodes,
+			Type:      domain.TokenTypeRefresh,
+			Duration:  7 * 24 * time.Hour,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)

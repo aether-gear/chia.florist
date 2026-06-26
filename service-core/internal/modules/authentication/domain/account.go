@@ -22,7 +22,7 @@ const (
 
 const (
 	AccountTypeCustomer AccountType = "customer"
-	AccountTypeMerchant AccountType = "merchant"
+	AccountTypeStaff    AccountType = "staff"
 )
 
 var (

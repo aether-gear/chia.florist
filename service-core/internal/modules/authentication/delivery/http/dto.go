@@ -50,7 +50,7 @@ type meResponse struct {
 	AccountType     string    `json:"account_type"`
 	IsAuthenticated bool      `json:"is_authenticated"`
 
-	MerchantID  *uuid.UUID           `json:"merchant_id,omitempty"`
+	StaffID     *uuid.UUID           `json:"staff_id,omitempty"`
 	Roles       []roleResponse       `json:"roles,omitempty"`
 	Permissions []permissionResponse `json:"permissions,omitempty"`
 }

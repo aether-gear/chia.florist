@@ -10,15 +10,15 @@ import (
 )
 
 type GenerateTokenParams struct {
-	UserID    uuid.UUID
-	SessionID uuid.UUID
+	UserID     uuid.UUID
+	SessionID  uuid.UUID
+	StaffID    *uuid.UUID
+	CustomerID *uuid.UUID
+	Roles      []authorzDomain.RoleCode
 
-	MerchantID *uuid.UUID
+	Type domain.TokenType
 
-	Type     domain.TokenType
 	Duration time.Duration
-
-	Roles []authorzDomain.RoleCode
 }
 
 type GeneratedToken struct {

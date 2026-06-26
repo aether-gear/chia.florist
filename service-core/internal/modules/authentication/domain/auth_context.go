@@ -21,10 +21,11 @@ var requestAuthContextKey authContextKey
 // after a token has been validated and should be passed into business
 // workflows instead of token-specific structures.
 type AuthContext struct {
-	UserID    uuid.UUID
-	SessionID uuid.UUID
+	UserID     uuid.UUID
+	SessionID  uuid.UUID
 
-	MerchantID *uuid.UUID
+	StaffID    *uuid.UUID
+	CustomerID *uuid.UUID
 
 	TokenType TokenType
 

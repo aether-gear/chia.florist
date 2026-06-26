@@ -68,7 +68,7 @@ type chargeAPIResponse struct {
 	StatusMessage     string `json:"status_message"`
 	TransactionID     string `json:"transaction_id"`
 	OrderID           string `json:"order_id"`
-	MerchantID        string `json:"merchant_id"`
+	StaffID           string `json:"staff_id"`
 	GrossAmount       string `json:"gross_amount"`
 	PaymentType       string `json:"payment_type"`
 	TransactionTime   string `json:"transaction_time"`

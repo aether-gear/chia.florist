@@ -13,36 +13,36 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type merchantMembershipRepositoryImpl struct{}
+type staffMembershipRepositoryImpl struct{}
 
-func NewMerchantMembershipRepositoryImpl() repository.MerchantMembershipRepository {
-	return &merchantMembershipRepositoryImpl{}
+func NewStaffMembershipRepositoryImpl() repository.StaffMembershipRepository {
+	return &staffMembershipRepositoryImpl{}
 }
 
-func (r *merchantMembershipRepositoryImpl) GetByAccountID(
+func (r *staffMembershipRepositoryImpl) GetByAccountID(
 	ctx context.Context,
 	exec transaction.Executor,
 	accountID uuid.UUID,
-) (*domain.MerchantMembership, error) {
+) (*domain.StaffMembership, error) {
 	query := `
 		SELECT
 			id,
-			merchant_id,
+			staff_id,
 			account_id,
 			role_id,
 			created_by,
 			created_at
 		FROM
-			merchant_memberships
+			staff_memberships
 		WHERE
 			account_id = $1
 		LIMIT 1
 	`
 
-	var m domain.MerchantMembership
+	var m domain.StaffMembership
 	err := exec.QueryRow(ctx, query, accountID).Scan(
 		&m.ID,
-		&m.MerchantID,
+		&m.StaffID,
 		&m.AccountID,
 		&m.RoleID,
 		&m.CreatedBy,
@@ -52,13 +52,13 @@ func (r *merchantMembershipRepositoryImpl) GetByAccountID(
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query merchant membership failed: %w", err)
+		return nil, fmt.Errorf("query staff membership failed: %w", err)
 	}
 
 	return &m, nil
 }
 
-func (r *merchantMembershipRepositoryImpl) GetRolesByAccountID(
+func (r *staffMembershipRepositoryImpl) GetRolesByAccountID(
 	ctx context.Context,
 	exec transaction.Executor,
 	accountID uuid.UUID,
@@ -69,17 +69,17 @@ func (r *merchantMembershipRepositoryImpl) GetRolesByAccountID(
 			ro.code,
 			ro.name
 		FROM
-			merchant_memberships mm
-		JOIN roles ro ON ro.id = mm.role_id
+			staff_memberships sm
+		JOIN roles ro ON ro.id = sm.role_id
 		WHERE
-			mm.account_id = $1
+			sm.account_id = $1
 	`
 
 	rows, err := exec.Query(ctx, query,
 		accountID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("query roles by merchant membership failed: %w", err)
+		return nil, fmt.Errorf("query roles by staff membership failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -99,31 +99,31 @@ func (r *merchantMembershipRepositoryImpl) GetRolesByAccountID(
 	return roles, nil
 }
 
-func (r *merchantMembershipRepositoryImpl) GetByAccountIDAndMerchantID(
+func (r *staffMembershipRepositoryImpl) GetByAccountIDAndStaffID(
 	ctx context.Context,
 	exec transaction.Executor,
 	accountID uuid.UUID,
-	merchantID uuid.UUID,
-) (*domain.MerchantMembership, error) {
+	staffID uuid.UUID,
+) (*domain.StaffMembership, error) {
 	query := `
 		SELECT
 			id,
-			merchant_id,
+			staff_id,
 			account_id,
 			role_id,
 			created_by,
 			created_at
 		FROM
-			merchant_memberships
+			staff_memberships
 		WHERE
-			account_id = $1 AND merchant_id = $2
+			account_id = $1 AND staff_id = $2
 		LIMIT 1
 	`
 
-	var m domain.MerchantMembership
-	err := exec.QueryRow(ctx, query, accountID, merchantID).Scan(
+	var m domain.StaffMembership
+	err := exec.QueryRow(ctx, query, accountID, staffID).Scan(
 		&m.ID,
-		&m.MerchantID,
+		&m.StaffID,
 		&m.AccountID,
 		&m.RoleID,
 		&m.CreatedBy,
@@ -133,17 +133,17 @@ func (r *merchantMembershipRepositoryImpl) GetByAccountIDAndMerchantID(
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query merchant membership failed: %w", err)
+		return nil, fmt.Errorf("query staff membership failed: %w", err)
 	}
 
 	return &m, nil
 }
 
-func (r *merchantMembershipRepositoryImpl) ListRolesByAccountIDAndMerchantID(
+func (r *staffMembershipRepositoryImpl) ListRolesByAccountIDAndStaffID(
 	ctx context.Context,
 	exec transaction.Executor,
 	accountID uuid.UUID,
-	merchantID uuid.UUID,
+	staffID uuid.UUID,
 ) ([]domain.Role, error) {
 	query := `
 		SELECT
@@ -151,18 +151,18 @@ func (r *merchantMembershipRepositoryImpl) ListRolesByAccountIDAndMerchantID(
 			ro.code,
 			ro.name
 		FROM
-			merchant_memberships mm
-		JOIN roles ro ON ro.id = mm.role_id
+			staff_memberships sm
+		JOIN roles ro ON ro.id = sm.role_id
 		WHERE
-			mm.account_id = $1 AND mm.merchant_id = $2
+			sm.account_id = $1 AND sm.staff_id = $2
 	`
 
 	rows, err := exec.Query(ctx, query,
 		accountID,
-		merchantID,
+		staffID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("query roles by merchant membership failed: %w", err)
+		return nil, fmt.Errorf("query roles by staff membership failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -182,15 +182,15 @@ func (r *merchantMembershipRepositoryImpl) ListRolesByAccountIDAndMerchantID(
 	return roles, nil
 }
 
-func (r *merchantMembershipRepositoryImpl) Save(
+func (r *staffMembershipRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
-	m domain.MerchantMembership,
+	m domain.StaffMembership,
 ) error {
 	query := `
-		INSERT INTO merchant_memberships (
+		INSERT INTO staff_memberships (
 			id,
-			merchant_id,
+			staff_id,
 			account_id,
 			role_id,
 			created_by,
@@ -201,14 +201,14 @@ func (r *merchantMembershipRepositoryImpl) Save(
 
 	_, err := exec.Exec(ctx, query,
 		m.ID,
-		m.MerchantID,
+		m.StaffID,
 		m.AccountID,
 		m.RoleID,
 		m.CreatedBy,
 		m.CreatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert merchant membership failed: %w", err)
+		return fmt.Errorf("insert staff membership failed: %w", err)
 	}
 
 	return nil

@@ -42,7 +42,7 @@ type FindCustomersInput struct {
 func (u *FindCustomersUsecase) Execute(
 	ctx context.Context,
 	input FindCustomersInput,
-) ([]domain.Customer, int, error) {
+) ([]domain.CustomerProfile, int, error) {
 	var userSortKeys = map[string]query.SortKey{
 		"latest":     repository.CustomerSortLatest,
 		"name":       repository.CustomerSortName,
