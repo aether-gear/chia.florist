@@ -30,7 +30,7 @@ func (r *orderRepositoryImpl) GetByID(
 		SELECT
 			id,
 			number,
-			user_id,
+			customer_id,
 			address_id,
 			status,
 			subtotal,
@@ -49,7 +49,7 @@ func (r *orderRepositoryImpl) GetByID(
 	err := exec.QueryRow(ctx, query, id).Scan(
 		&order.ID,
 		&order.Number,
-		&order.UserID,
+		&order.CustomerID,
 		&order.AddressID,
 		&order.Status,
 		&order.Subtotal,
@@ -77,7 +77,7 @@ func (r *orderRepositoryImpl) GetByNumber(
 		SELECT
 			id,
 			number,
-			user_id,
+			customer_id,
 			address_id,
 			status,
 			subtotal,
@@ -96,7 +96,7 @@ func (r *orderRepositoryImpl) GetByNumber(
 	err := exec.QueryRow(ctx, query, number).Scan(
 		&order.ID,
 		&order.Number,
-		&order.UserID,
+		&order.CustomerID,
 		&order.AddressID,
 		&order.Status,
 		&order.Subtotal,
@@ -149,7 +149,7 @@ func (r *orderRepositoryImpl) Save(
 		INSERT INTO orders (
 			id,
 			number,
-			user_id,
+			customer_id,
 			address_id,
 			status,
 			subtotal,
@@ -161,7 +161,7 @@ func (r *orderRepositoryImpl) Save(
 		ON CONFLICT (id)
 		DO UPDATE SET
 			number = EXCLUDED.number,
-			user_id = EXCLUDED.user_id,
+			customer_id = EXCLUDED.customer_id,
 			address_id = EXCLUDED.address_id,
 			status = EXCLUDED.status,
 			subtotal = EXCLUDED.subtotal,
@@ -172,7 +172,7 @@ func (r *orderRepositoryImpl) Save(
 	_, err := exec.Exec(ctx, query,
 		order.ID,
 		order.Number,
-		order.UserID,
+		order.CustomerID,
 		order.AddressID,
 		order.Status,
 		order.Subtotal,
@@ -200,7 +200,7 @@ func (r *orderRepositoryImpl) FindOrders(
 		SELECT
 			o.id,
 			o.number,
-			o.user_id,
+			o.customer_id,
 			o.address_id,
 			o.status,
 			o.subtotal,
@@ -229,9 +229,9 @@ func (r *orderRepositoryImpl) FindOrders(
 		argPos++
 	}
 
-	if params.UserID != nil {
-		conditions = append(conditions, fmt.Sprintf("o.user_id = $%d", argPos))
-		args = append(args, *params.UserID)
+	if params.CustomerID != nil {
+		conditions = append(conditions, fmt.Sprintf("o.customer_id = $%d", argPos))
+		args = append(args, *params.CustomerID)
 		argPos++
 	}
 
@@ -330,7 +330,7 @@ func (r *orderRepositoryImpl) FindOrders(
 		err := rows.Scan(
 			&item.ID,
 			&item.Number,
-			&item.UserID,
+			&item.CustomerID,
 			&item.AddressID,
 			&item.Status,
 			&item.Subtotal,
@@ -352,4 +352,3 @@ func (r *orderRepositoryImpl) FindOrders(
 
 	return results, total, nil
 }
-

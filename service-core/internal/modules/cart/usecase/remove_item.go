@@ -31,7 +31,7 @@ func NewRemoveItemUsecase(
 }
 
 type RemoveItemInput struct {
-	UserID, ProductID, ShopID uuid.UUID
+	CustomerID, ProductID, ShopID uuid.UUID
 }
 
 func (u *RemoveItemUsecase) Execute(
@@ -43,7 +43,7 @@ func (u *RemoveItemUsecase) Execute(
 	}
 
 	cart, err := u.cartRepo.
-		GetWithItemsByUserID(ctx, u.executor, input.UserID)
+		GetWithItemsByCustomerID(ctx, u.executor, input.CustomerID)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}

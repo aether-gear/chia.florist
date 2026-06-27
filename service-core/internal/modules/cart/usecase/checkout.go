@@ -115,7 +115,7 @@ func (u *CheckoutUsecase) Execute(
 	input CheckoutInput,
 ) (*CheckoutResult, error) {
 	pricingInput := orderRepo.PricingInput{
-		UserID:          authCtx.UserID,
+		CustomerID:      *authCtx.CustomerID,
 		AddressID:       input.AddressID,
 		PaymentMethodID: input.PaymentMethodID,
 		Shops: make(

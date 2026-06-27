@@ -9,7 +9,7 @@ import (
 type Cart struct {
 	ID uuid.UUID
 
-	UserID uuid.UUID
+	CustomerID uuid.UUID
 
 	Items []CartItem
 

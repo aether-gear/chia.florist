@@ -13,21 +13,21 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type userAddressRepositoryImpl struct{}
+type customerAddressRepositoryImpl struct{}
 
-func NewUserAddressRepositoryImpl() repository.UserAddressRepository {
-	return &userAddressRepositoryImpl{}
+func NewCustomerAddressRepositoryImpl() repository.CustomerAddressRepository {
+	return &customerAddressRepositoryImpl{}
 }
 
-func (r *userAddressRepositoryImpl) GetByID(
+func (r *customerAddressRepositoryImpl) GetByID(
 	ctx context.Context,
 	exec transaction.Executor,
 	addressID uuid.UUID,
-) (*domain.Address, error) {
+) (*domain.CustomerAddress, error) {
 	query := `
 		SELECT
 			id,
-			user_id,
+			customer_id,
 			recipient_name,
 			phone,
 			province,
@@ -39,14 +39,14 @@ func (r *userAddressRepositoryImpl) GetByID(
 			is_default,
 			created_at,
 			updated_at
-		FROM user_addresses
+		FROM customer_addresses
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	var add domain.Address
+	var add domain.CustomerAddress
 	err := exec.QueryRow(ctx, query, addressID).Scan(
 		&add.ID,
-		&add.UserID,
+		&add.CustomerID,
 		&add.ReceiverName,
 		&add.Phone,
 		&add.Detail.ProvinceID,
@@ -69,15 +69,15 @@ func (r *userAddressRepositoryImpl) GetByID(
 	return &add, nil
 }
 
-func (r *userAddressRepositoryImpl) GetDefaultByUserID(
+func (r *customerAddressRepositoryImpl) GetDefaultByCustomerID(
 	ctx context.Context,
 	exec transaction.Executor,
-	userID uuid.UUID,
-) (*domain.Address, error) {
+	customerID uuid.UUID,
+) (*domain.CustomerAddress, error) {
 	query := `
 		SELECT
 			id,
-			user_id,
+			customer_id,
 			recipient_name,
 			phone,
 			province,
@@ -90,18 +90,18 @@ func (r *userAddressRepositoryImpl) GetDefaultByUserID(
 			created_at,
 			updated_at
 		FROM
-			user_addresses
+			customer_addresses
 		WHERE
-			user_id = $1
+			customer_id = $1
 			AND is_default = true
 			AND deleted_at IS NULL
 		LIMIT 1
 	`
 
-	var add domain.Address
-	err := exec.QueryRow(ctx, query, userID).Scan(
+	var add domain.CustomerAddress
+	err := exec.QueryRow(ctx, query, customerID).Scan(
 		&add.ID,
-		&add.UserID,
+		&add.CustomerID,
 		&add.ReceiverName,
 		&add.Phone,
 		&add.Detail.ProvinceID,
@@ -118,21 +118,21 @@ func (r *userAddressRepositoryImpl) GetDefaultByUserID(
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query get default address by user id failed: %w", err)
+		return nil, fmt.Errorf("query get default address by customer id failed: %w", err)
 	}
 
 	return &add, nil
 }
 
-func (r *userAddressRepositoryImpl) ListByUserID(
+func (r *customerAddressRepositoryImpl) ListByCustomerID(
 	ctx context.Context,
 	exec transaction.Executor,
-	userID uuid.UUID,
-) ([]domain.Address, error) {
+	customerID uuid.UUID,
+) ([]domain.CustomerAddress, error) {
 	query := `
 		SELECT
 			id,
-			user_id,
+			customer_id,
 			recipient_name,
 			phone,
 			province,
@@ -145,23 +145,23 @@ func (r *userAddressRepositoryImpl) ListByUserID(
 			created_at,
 			updated_at,
 			deleted_at
-		FROM user_addresses
-		WHERE user_id = $1 AND deleted_at IS NULL
+		FROM customer_addresses
+		WHERE customer_id = $1 AND deleted_at IS NULL
 	`
 
-	rows, err := exec.Query(ctx, query, userID)
+	rows, err := exec.Query(ctx, query, customerID)
 	if err != nil {
-		return nil, fmt.Errorf("query user_addresses by user id failed: %w", err)
+		return nil, fmt.Errorf("query customer_addresses by customer id failed: %w", err)
 	}
 	defer rows.Close()
 
-	var addresses []domain.Address
+	var addresses []domain.CustomerAddress
 	for rows.Next() {
-		var a domain.Address
+		var a domain.CustomerAddress
 
 		err := rows.Scan(
 			&a.ID,
-			&a.UserID,
+			&a.CustomerID,
 			&a.ReceiverName,
 			&a.Phone,
 			&a.Detail.ProvinceID,
@@ -189,22 +189,22 @@ func (r *userAddressRepositoryImpl) ListByUserID(
 	return addresses, nil
 }
 
-func (r *userAddressRepositoryImpl) CountByUserID(
+func (r *customerAddressRepositoryImpl) CountByCustomerID(
 	ctx context.Context,
 	exec transaction.Executor,
-	userID uuid.UUID,
+	customerID uuid.UUID,
 ) (*int, error) {
 	query := `
 		SELECT COUNT(*)
 		FROM
-			user_addresses
+			customer_addresses
 		WHERE
-			user_id = $1
+			customer_id = $1
 			AND deleted_at IS NULL
 	`
 
 	var count int
-	err := exec.QueryRow(ctx, query, userID).Scan(&count)
+	err := exec.QueryRow(ctx, query, customerID).Scan(&count)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -215,24 +215,24 @@ func (r *userAddressRepositoryImpl) CountByUserID(
 	return &count, nil
 }
 
-func (r *userAddressRepositoryImpl) UnsetDefaultByUserID(
+func (r *customerAddressRepositoryImpl) UnsetDefaultByCustomerID(
 	ctx context.Context,
 	exec transaction.Executor,
-	userID uuid.UUID,
+	customerID uuid.UUID,
 ) error {
 	query := `
 		UPDATE
-			user_addresses
+			customer_addresses
 		SET
 			is_default = false,
 			updated_at = NOW()
 		WHERE
-			user_id = $1
+			customer_id = $1
 			AND is_default = true
 			AND deleted_at IS NULL
 	`
 
-	_, err := exec.Exec(ctx, query, userID)
+	_, err := exec.Exec(ctx, query, customerID)
 	if err != nil {
 		return fmt.Errorf("query unset default address failed: %w", err)
 	}
@@ -240,15 +240,15 @@ func (r *userAddressRepositoryImpl) UnsetDefaultByUserID(
 	return nil
 }
 
-func (r *userAddressRepositoryImpl) Save(
+func (r *customerAddressRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
-	address domain.Address,
+	address domain.CustomerAddress,
 ) error {
 	query := `
-		INSERT INTO user_addresses (
+		INSERT INTO customer_addresses (
 			id,
-			user_id,
+			customer_id,
 			recipient_name,
 			phone,
 			is_default,
@@ -279,7 +279,7 @@ func (r *userAddressRepositoryImpl) Save(
 
 	_, err := exec.Exec(ctx, query,
 		address.ID,
-		address.UserID,
+		address.CustomerID,
 		address.ReceiverName,
 		address.Phone,
 		address.IsDefault,
@@ -299,14 +299,14 @@ func (r *userAddressRepositoryImpl) Save(
 	return nil
 }
 
-func (r *userAddressRepositoryImpl) Delete(
+func (r *customerAddressRepositoryImpl) Delete(
 	ctx context.Context,
 	exec transaction.Executor,
 	addressID uuid.UUID,
 ) error {
 	query := `
 		UPDATE
-			user_addresses
+			customer_addresses
 		SET
 			is_default = false,
 			deleted_at = now()

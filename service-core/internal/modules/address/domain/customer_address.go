@@ -6,10 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type Address struct {
+type CustomerAddress struct {
 	ID uuid.UUID
 
-	UserID uuid.UUID
+	CustomerID uuid.UUID
 
 	ReceiverName string
 	Phone        *string

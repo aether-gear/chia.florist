@@ -19,7 +19,7 @@ type PricingShopInput struct {
 }
 
 type PricingInput struct {
-	UserID          uuid.UUID
+	CustomerID      uuid.UUID
 	AddressID       *uuid.UUID
 	PaymentMethodID *uuid.UUID
 	Shops           []PricingShopInput
@@ -95,12 +95,11 @@ var (
 )
 
 type FindOrderParams struct {
-	ID     *uuid.UUID
-	Number *string
-	UserID *uuid.UUID
-	Status *string
+	ID         *uuid.UUID
+	Number     *string
+	CustomerID *uuid.UUID
+	Status     *string
 
 	Pagination query.Pagination
 	Sorts      query.Sorts
 }
-

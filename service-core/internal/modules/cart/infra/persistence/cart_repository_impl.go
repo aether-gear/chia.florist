@@ -20,15 +20,15 @@ func NewCartRepositoryImpl() repository.CartRepository {
 	return &cartRepositoryImpl{}
 }
 
-func (r *cartRepositoryImpl) GetWithItemsByUserID(
+func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 	ctx context.Context,
 	exec transaction.Executor,
-	userID uuid.UUID,
+	customerID uuid.UUID,
 ) (*domain.Cart, error) {
 	query := `
 		SELECT 
 			c.id,
-			c.user_id,
+			c.customer_id,
 			c.created_at,
 			c.updated_at,
 			ci.id,
@@ -39,16 +39,16 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(
 		LEFT JOIN cart_items ci 
 			ON ci.cart_id = c.id 
 			AND ci.deleted_at IS NULL
-		WHERE c.user_id = $1
+		WHERE c.customer_id = $1
 		ORDER BY ci.created_at
 	`
 
-	rows, err := exec.Query(ctx, query, userID)
+	rows, err := exec.Query(ctx, query, customerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query cart with items by user id failed: %w", err)
+		return nil, fmt.Errorf("query cart with items by customer id failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -57,7 +57,7 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(
 	for rows.Next() {
 		var (
 			cID       uuid.UUID
-			uID       uuid.UUID
+			custID    uuid.UUID
 			createdAt time.Time
 			updatedAt *time.Time
 			itemID    *uuid.UUID
@@ -68,7 +68,7 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(
 
 		err := rows.Scan(
 			&cID,
-			&uID,
+			&custID,
 			&createdAt,
 			&updatedAt,
 			&itemID,
@@ -82,11 +82,11 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(
 
 		if cart == nil {
 			cart = &domain.Cart{
-				ID:        cID,
-				UserID:    uID,
-				CreatedAt: createdAt,
-				UpdatedAt: updatedAt,
-				Items:     []domain.CartItem{},
+				ID:         cID,
+				CustomerID: custID,
+				CreatedAt:  createdAt,
+				UpdatedAt:  updatedAt,
+				Items:      []domain.CartItem{},
 			}
 		}
 
@@ -110,19 +110,19 @@ func (r *cartRepositoryImpl) GetWithItemsByUserID(
 func (r *cartRepositoryImpl) NewCart(
 	ctx context.Context,
 	exec transaction.Executor,
-	userID uuid.UUID,
+	customerID uuid.UUID,
 ) (*domain.Cart, error) {
 	query := `
-		INSERT INTO carts (user_id)
+		INSERT INTO carts (customer_id)
 		VALUES ($1)
-		RETURNING id, user_id, created_at, updated_at
+		RETURNING id, customer_id, created_at, updated_at
 	`
 
 	var cart domain.Cart
 
-	err := exec.QueryRow(ctx, query, userID).Scan(
+	err := exec.QueryRow(ctx, query, customerID).Scan(
 		&cart.ID,
-		&cart.UserID,
+		&cart.CustomerID,
 		&cart.CreatedAt,
 		&cart.UpdatedAt,
 	)

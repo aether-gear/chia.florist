@@ -23,8 +23,8 @@ type Order struct {
 	ID     uuid.UUID
 	Number string
 
-	UserID    uuid.UUID
-	AddressID uuid.UUID
+	CustomerID uuid.UUID
+	AddressID  uuid.UUID
 
 	Status OrderStatus
 
