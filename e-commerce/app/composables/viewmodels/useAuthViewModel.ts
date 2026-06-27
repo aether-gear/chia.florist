@@ -187,7 +187,7 @@ export const useAuthViewModel = () => {
   /**
    * Verify account with OTP code.
    */
-  const verifyOtp = async (otpCode: number) => {
+  const verifyOtp = async (otpCode: string) => {
     isLoading.value = true
     error.value = null
     
