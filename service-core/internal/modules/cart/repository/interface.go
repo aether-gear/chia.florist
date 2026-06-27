@@ -10,16 +10,16 @@ import (
 )
 
 type CartRepository interface {
-	GetWithItemsByUserID(
+	GetWithItemsByCustomerID(
 		ctx context.Context,
 		exec transaction.Executor,
-		userID uuid.UUID,
+		customerID uuid.UUID,
 	) (*domain.Cart, error)
 
 	NewCart(
 		ctx context.Context,
 		exec transaction.Executor,
-		userID uuid.UUID,
+		customerID uuid.UUID,
 	) (*domain.Cart, error)
 
 	Save(

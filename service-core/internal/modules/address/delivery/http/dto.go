@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type saveUserAddressRequest struct {
+type saveCustomerAddressRequest struct {
 	AddressID    *string `json:"address_id"`
 	ReceiverName string  `json:"receiver_name"`
 	Phone        *string `json:"phone"`
@@ -31,9 +31,9 @@ type createShopAddressRequest struct {
 	PostalCode  string  `json:"postal_code"`
 }
 
-type userAddressResponse struct {
+type customerAddressResponse struct {
 	AddressID    uuid.UUID  `json:"address_id"`
-	UserID       uuid.UUID  `json:"user_id"`
+	CustomerID   uuid.UUID  `json:"customer_id"`
 	ReceiverName string     `json:"receiver_name"`
 	Phone        *string    `json:"phone,omitempty"`
 	IsDefault    bool       `json:"is_default"`

@@ -24,7 +24,7 @@ import (
 )
 
 type pricingServiceImpl struct {
-	addressRepo       addressRepo.UserAddressRepository
+	addressRepo       addressRepo.CustomerAddressRepository
 	courierShopRepo   courierRepo.ShopCourierRepository
 	inventoryRepo     inventoryRepo.InventoryRepository
 	paymentMethodRepo paymentRepo.PaymentMethodRepository
@@ -35,7 +35,7 @@ type pricingServiceImpl struct {
 }
 
 func NewPricingService(
-	addressRepo addressRepo.UserAddressRepository,
+	addressRepo addressRepo.CustomerAddressRepository,
 	courierShopRepo courierRepo.ShopCourierRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
@@ -65,7 +65,7 @@ func (s *pricingServiceImpl) Calculate(
 ) (*orderRepo.PricingResult, error) {
 	// Checkout shipping destination defaults to the user's
 	// primary address unless a specific address is requested
-	var destAddress *addressDomain.Address
+	var destAddress *addressDomain.CustomerAddress
 	if input.AddressID != nil {
 		addr, err := s.addressRepo.
 			GetByID(ctx, exec, *input.AddressID)
@@ -80,7 +80,7 @@ func (s *pricingServiceImpl) Calculate(
 		destAddress = addr
 	} else {
 		addr, err := s.addressRepo.
-			GetDefaultByUserID(ctx, exec, input.UserID)
+			GetDefaultByCustomerID(ctx, exec, input.CustomerID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve default destination address: %w", err)
 		}

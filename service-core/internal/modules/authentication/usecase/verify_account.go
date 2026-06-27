@@ -3,16 +3,15 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
-	userRepo "service-core/internal/modules/user/repository"
-	customerRepo "service-core/internal/modules/customer/repository"
 	authorzDomain "service-core/internal/modules/authorization/domain"
 	authorzRepo "service-core/internal/modules/authorization/repository"
+	customerRepo "service-core/internal/modules/customer/repository"
+	userRepo "service-core/internal/modules/user/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -67,7 +66,7 @@ type VerifyAccountParams struct {
 	UserAgent   *string
 	IPAddress   *string
 	ChallengeID uuid.UUID
-	OTP         int
+	OTP         string
 }
 
 type VerifyAccountResult struct {
@@ -105,7 +104,7 @@ func (u *VerifyAccountUsecase) Execute(
 	if err := u.pwHasher.
 		Compare(
 			challenge.CodeHash,
-			strconv.Itoa(input.OTP),
+			input.OTP,
 		); err != nil {
 		challenge.AttemptCount++
 
@@ -133,32 +132,37 @@ func (u *VerifyAccountUsecase) Execute(
 		roleCodes  []authorzDomain.RoleCode
 	)
 
-	account, err := u.accountRepo.GetByUserID(ctx, u.executor, *challenge.UserID)
+	account, err := u.accountRepo.
+		GetByUserID(ctx, u.executor, *challenge.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 	if account != nil {
-		if account.Type == domain.AccountTypeCustomer {
-			cust, err := u.customerRepo.GetByUserID(ctx, u.executor, account.UserID)
+		switch account.Type {
+		case domain.AccountTypeCustomer:
+			cust, err := u.customerRepo.
+				GetByUserID(ctx, u.executor, account.UserID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get customer profile: %w", err)
 			}
 			if cust != nil {
 				customerID = &cust.ID
 			}
-		} else if account.Type == domain.AccountTypeStaff {
-			memberStaff, err := u.membershipRepo.GetByAccountID(ctx, u.executor, account.ID)
+		case domain.AccountTypeStaff:
+			memberStaff, err := u.membershipRepo.
+				GetByAccountID(ctx, u.executor, account.ID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get staff membership: %w", err)
 			}
 			if memberStaff != nil {
 				staffID = &memberStaff.StaffID
-				roles, err := u.membershipRepo.ListRolesByAccountIDAndStaffID(
-					ctx,
-					u.executor,
-					account.ID,
-					memberStaff.StaffID,
-				)
+				roles, err := u.membershipRepo.
+					ListRolesByAccountIDAndStaffID(
+						ctx,
+						u.executor,
+						account.ID,
+						memberStaff.StaffID,
+					)
 				if err != nil {
 					return nil, fmt.Errorf("failed to list staff roles: %w", err)
 				}

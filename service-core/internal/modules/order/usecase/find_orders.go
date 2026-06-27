@@ -32,13 +32,13 @@ func NewFindOrdersUsecase(
 }
 
 type FindOrdersInput struct {
-	Page   int
-	Limit  int
-	ID     *uuid.UUID
-	Number *string
-	UserID *uuid.UUID
-	Status *string
-	Sort   string
+	Page       int
+	Limit      int
+	ID         *uuid.UUID
+	Number     *string
+	CustomerID *uuid.UUID
+	Status     *string
+	Sort       string
 }
 
 type OrderSearchResult struct {
@@ -99,10 +99,10 @@ func (u *FindOrdersUsecase) Execute(
 	}
 
 	params := repository.FindOrderParams{
-		ID:     input.ID,
-		Number: input.Number,
-		UserID: input.UserID,
-		Status: input.Status,
+		ID:         input.ID,
+		Number:     input.Number,
+		CustomerID: input.CustomerID,
+		Status:     input.Status,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,

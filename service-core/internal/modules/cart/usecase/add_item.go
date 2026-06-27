@@ -39,8 +39,8 @@ func NewAddItemUsecase(
 }
 
 type AddItemInput struct {
-	UserID, ProductID, ShopID uuid.UUID
-	Quantity                  int
+	CustomerID, ProductID, ShopID uuid.UUID
+	Quantity                      int
 }
 
 func (u *AddItemUsecase) Execute(
@@ -79,17 +79,17 @@ func (u *AddItemUsecase) Execute(
 	}
 
 	cart, err := u.cartRepo.
-		GetWithItemsByUserID(
+		GetWithItemsByCustomerID(
 			ctx,
 			u.executor,
-			input.UserID,
+			input.CustomerID,
 		)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
 		cart, err = u.cartRepo.
-			NewCart(ctx, u.executor, input.UserID)
+			NewCart(ctx, u.executor, input.CustomerID)
 		if err != nil {
 			return fmt.Errorf("failed to create cart: %w", err)
 		}

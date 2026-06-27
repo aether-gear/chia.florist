@@ -84,9 +84,9 @@ type Container struct {
 
 	FindCustomers customerUsecase.FindCustomersUsecase
 
-	ListUserAddresses addressUsecase.ListUserAddressUsecase
-	CreateUserAddress addressUsecase.SaveUserAddressUsecase
-	DeleteUserAddress addressUsecase.DeleteUserAddressUsecase
+	ListUserAddresses addressUsecase.ListCustomerAddressesUsecase
+	CreateUserAddress addressUsecase.SaveCustomerAddressUsecase
+	DeleteUserAddress addressUsecase.DeleteCustomerAddressUsecase
 
 	ListShopAddresses addressUsecase.ListShopAddressesUsecase
 	SaveShopAddress   addressUsecase.CreateShopAddressUsecase
@@ -131,7 +131,7 @@ func NewContainer(cfg Config,
 		refreshTokenRepo       = authenPersistence.NewRefreshTokenRepositoryImpl()
 		cartRepo               = cartPersistence.NewCartRepositoryImpl()
 		userRepo               = userPersistence.NewUserRepositoryImpl()
-		addressRepo            = addressPersistence.NewUserAddressRepositoryImpl()
+		addressRepo            = addressPersistence.NewCustomerAddressRepositoryImpl()
 		addressShopRepo        = addressPersistence.NewShopAddressRepositoryImpl()
 		paymentRepo            = paymentPersistence.NewPaymentRepositoryImpl()
 		paymentAccRepo         = paymentPersistence.NewPaymentAccountRepository()
@@ -406,18 +406,18 @@ func NewContainer(cfg Config,
 			),
 
 		ListUserAddresses: *addressUsecase.
-			NewListUserAddressUsecase(
+			NewListCustomerAddressesUsecase(
 				addressRepo,
 				infra.TransactionExecutor,
 			),
 		CreateUserAddress: *addressUsecase.
-			NewSaveUserAddressUsecase(
+			NewSaveCustomerAddressUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				addressRepo,
 			),
 		DeleteUserAddress: *addressUsecase.
-			NewDeleteUserAddressUsecase(
+			NewDeleteCustomerAddressUsecase(
 				infra.TransactionExecutor,
 				addressRepo,
 			),

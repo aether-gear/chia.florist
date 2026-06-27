@@ -62,15 +62,15 @@ type GetCartResult struct {
 
 func (u *GetCartUsecase) Execute(
 	ctx context.Context,
-	userID uuid.UUID,
+	customerID uuid.UUID,
 ) (*GetCartResult, error) {
-	cart, err := u.cartRepo.GetWithItemsByUserID(ctx, u.executor, userID)
+	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor, customerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve cart: %w", err)
 	}
 
 	if cart == nil {
-		cart, err = u.cartRepo.NewCart(ctx, u.executor, userID)
+		cart, err = u.cartRepo.NewCart(ctx, u.executor, customerID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create cart: %w", err)
 		}

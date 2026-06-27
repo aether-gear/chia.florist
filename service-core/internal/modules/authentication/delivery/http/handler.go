@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
@@ -203,7 +202,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return apperrors.NewBadRequest("invalid challenge id")
 	}
-	if len(strconv.Itoa(req.OTP)) != 6 {
+	if len(req.OTP) != 6 {
 		return apperrors.NewBadRequest("invalid otp")
 	}
 

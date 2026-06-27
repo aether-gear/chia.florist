@@ -9,41 +9,41 @@ import (
 	"github.com/google/uuid"
 )
 
-type UserAddressRepository interface {
+type CustomerAddressRepository interface {
 	GetByID(
 		ctx context.Context,
 		exec transaction.Executor,
 		addressID uuid.UUID,
-	) (*domain.Address, error)
+	) (*domain.CustomerAddress, error)
 
-	GetDefaultByUserID(
+	GetDefaultByCustomerID(
 		ctx context.Context,
 		exec transaction.Executor,
-		userID uuid.UUID,
-	) (*domain.Address, error)
+		customerID uuid.UUID,
+	) (*domain.CustomerAddress, error)
 
-	ListByUserID(
+	ListByCustomerID(
 		ctx context.Context,
 		exec transaction.Executor,
-		userID uuid.UUID,
-	) ([]domain.Address, error)
+		customerID uuid.UUID,
+	) ([]domain.CustomerAddress, error)
 
-	CountByUserID(
+	CountByCustomerID(
 		ctx context.Context,
 		exec transaction.Executor,
-		userID uuid.UUID,
+		customerID uuid.UUID,
 	) (*int, error)
 
-	UnsetDefaultByUserID(
+	UnsetDefaultByCustomerID(
 		ctx context.Context,
 		exec transaction.Executor,
-		userID uuid.UUID,
+		customerID uuid.UUID,
 	) error
 
 	Save(
 		ctx context.Context,
 		exec transaction.Executor,
-		address domain.Address,
+		address domain.CustomerAddress,
 	) error
 
 	Delete(

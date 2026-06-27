@@ -6,7 +6,7 @@ CREATE TYPE payment_status
         'expired',
         'cancelled',
         'refunded'
-    )
+    );
 
 CREATE TABLE payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

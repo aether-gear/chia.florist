@@ -49,7 +49,7 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 	sort := apphttp.Query(r, "sort")
 	idStr := apphttp.Query(r, "id")
 	number := apphttp.Query(r, "number")
-	userIDStr := apphttp.Query(r, "user_id")
+	customerIDStr := apphttp.Query(r, "customer_id")
 	status := apphttp.Query(r, "status")
 
 	input := usecase.FindOrdersInput{
@@ -70,19 +70,20 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 		input.Number = &number
 	}
 
-	if userIDStr != "" {
-		userID, err := uuid.Parse(userIDStr)
+	if customerIDStr != "" {
+		customerID, err := uuid.Parse(customerIDStr)
 		if err != nil {
-			return apperrors.NewBadRequest("invalid user id")
+			return apperrors.NewBadRequest("invalid customer id")
 		}
-		input.UserID = &userID
+		input.CustomerID = &customerID
 	}
 
 	if status != "" {
 		input.Status = &status
 	}
 
-	orders, total, err := h.findOrders.Execute(r.Context(), input)
+	orders, total, err := h.findOrders.
+		Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 		results[i] = orderResponse{
 			ID:          o.Order.ID.String(),
 			Number:      o.Order.Number,
-			UserID:      o.Order.UserID.String(),
+			CustomerID:  o.Order.CustomerID.String(),
 			AddressID:   o.Order.AddressID.String(),
 			Status:      string(o.Order.Status),
 			Subtotal:    o.Order.Subtotal,
@@ -137,8 +138,12 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 	if !ok || !authCtx.IsAuthenticated {
 		return apperrors.NewUnauthorized("authentication required")
 	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
 
 	userID := authCtx.UserID
+	customerID := *authCtx.CustomerID
 
 	var req createOrderRequest
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
@@ -210,6 +215,7 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 
 	input := usecase.CreateOrderInput{
 		UserID:          userID,
+		CustomerID:      customerID,
 		AddressID:       parsedAddressID,
 		PaymentMethodID: parsedPaymentMethodID,
 		IsManual:        req.SelectedPayment.IsManual,

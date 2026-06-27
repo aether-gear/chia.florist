@@ -16,7 +16,7 @@ type verifyAccountRequest struct {
 	UserAgent   *string `json:"user_agent"`
 	IPAddress   *string `json:"ip_address"`
 	ChallengeID string  `json:"challenge_id"`
-	OTP         int     `json:"otp"`
+	OTP         string  `json:"otp"`
 }
 
 type signInEmailRequest struct {

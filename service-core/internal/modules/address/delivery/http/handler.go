@@ -13,26 +13,26 @@ import (
 )
 
 type AddressHandler struct {
-	listUserAddresses *usecase.ListUserAddressUsecase
-	saveUserAddress   *usecase.SaveUserAddressUsecase
-	deleteUserAddress *usecase.DeleteUserAddressUsecase
-	listShopAddresses *usecase.ListShopAddressesUsecase
-	createShopAddress *usecase.CreateShopAddressUsecase
+	listCustomerAddresses *usecase.ListCustomerAddressesUsecase
+	saveCustomerAddress   *usecase.SaveCustomerAddressUsecase
+	deleteCustomerAddress *usecase.DeleteCustomerAddressUsecase
+	listShopAddresses     *usecase.ListShopAddressesUsecase
+	createShopAddress     *usecase.CreateShopAddressUsecase
 }
 
 func NewAddressHandler(
-	listUserAddresses *usecase.ListUserAddressUsecase,
-	saveUserAddress *usecase.SaveUserAddressUsecase,
-	deleteUserAddress *usecase.DeleteUserAddressUsecase,
+	listCustomerAddresses *usecase.ListCustomerAddressesUsecase,
+	saveCustomerAddress *usecase.SaveCustomerAddressUsecase,
+	deleteCustomerAddress *usecase.DeleteCustomerAddressUsecase,
 	listShopAddresses *usecase.ListShopAddressesUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
-		listUserAddresses: listUserAddresses,
-		saveUserAddress:   saveUserAddress,
-		deleteUserAddress: deleteUserAddress,
-		listShopAddresses: listShopAddresses,
-		createShopAddress: createShopAddress,
+		listCustomerAddresses: listCustomerAddresses,
+		saveCustomerAddress:   saveCustomerAddress,
+		deleteCustomerAddress: deleteCustomerAddress,
+		listShopAddresses:     listShopAddresses,
+		createShopAddress:     createShopAddress,
 	}
 }
 
@@ -41,17 +41,20 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 	if !ok || !authCtx.IsAuthenticated {
 		return apperrors.NewUnauthorized("authentication required")
 	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
 
-	addresses, err := h.listUserAddresses.ListByUserID(r.Context(), authCtx.UserID)
+	addresses, err := h.listCustomerAddresses.ListByCustomerID(r.Context(), *authCtx.CustomerID)
 	if err != nil {
 		return err
 	}
 
-	result := make([]userAddressResponse, 0, len(addresses))
+	result := make([]customerAddressResponse, 0, len(addresses))
 	for _, r := range addresses {
-		address := userAddressResponse{
+		address := customerAddressResponse{
 			AddressID:    r.ID,
-			UserID:       r.UserID,
+			CustomerID:   r.CustomerID,
 			ReceiverName: r.ReceiverName,
 			Phone:        r.Phone,
 			IsDefault:    r.IsDefault,
@@ -68,7 +71,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 		result = append(result, address)
 	}
 
-	response := map[string][]userAddressResponse{
+	response := map[string][]customerAddressResponse{
 		"addresses": result,
 	}
 
@@ -77,7 +80,7 @@ func (h *AddressHandler) ListUserAddresses(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AddressHandler) SaveUserAddress(w http.ResponseWriter, r *http.Request) error {
-	var req saveUserAddressRequest
+	var req saveCustomerAddressRequest
 
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
@@ -106,6 +109,9 @@ func (h *AddressHandler) SaveUserAddress(w http.ResponseWriter, r *http.Request)
 	if !ok || !authCtx.IsAuthenticated {
 		return apperrors.NewUnauthorized("authentication required")
 	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
 
 	var addressID *uuid.UUID
 	if req.AddressID != nil {
@@ -126,9 +132,9 @@ func (h *AddressHandler) SaveUserAddress(w http.ResponseWriter, r *http.Request)
 		parsedIsDefault = parsed
 	}
 
-	input := usecase.SaveUserAddressInput{
+	input := usecase.SaveCustomerAddressInput{
 		ID:           addressID,
-		UserID:       authCtx.UserID,
+		CustomerID:   *authCtx.CustomerID,
 		ReceiverName: req.ReceiverName,
 		Phone:        req.Phone,
 		IsDefault:    &parsedIsDefault,
@@ -140,7 +146,7 @@ func (h *AddressHandler) SaveUserAddress(w http.ResponseWriter, r *http.Request)
 		PostalCode:   req.PostalCode,
 	}
 
-	err := h.saveUserAddress.Execute(r.Context(), input)
+	err := h.saveCustomerAddress.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -158,13 +164,16 @@ func (h *AddressHandler) DeleteUserAddress(w http.ResponseWriter, r *http.Reques
 	if !ok || !authCtx.IsAuthenticated {
 		return apperrors.NewUnauthorized("authentication required")
 	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
 
 	addressID, err := apphttp.ParamUUID(r, "addressID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid address id")
 	}
 
-	err = h.deleteUserAddress.Execute(r.Context(), addressID)
+	err = h.deleteCustomerAddress.Execute(r.Context(), addressID)
 	if err != nil {
 		return err
 	}

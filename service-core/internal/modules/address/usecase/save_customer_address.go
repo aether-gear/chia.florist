@@ -13,28 +13,27 @@ import (
 	"github.com/google/uuid"
 )
 
-type SaveUserAddressUsecase struct {
-	executor        transaction.Executor
-	transactor      transaction.Transactor
-	userAddressRepo repository.UserAddressRepository
+type SaveCustomerAddressUsecase struct {
+	executor            transaction.Executor
+	transactor          transaction.Transactor
+	customerAddressRepo repository.CustomerAddressRepository
 }
 
-func NewSaveUserAddressUsecase(
+func NewSaveCustomerAddressUsecase(
 	executor transaction.Executor,
 	transactor transaction.Transactor,
-	userAddressRepo repository.UserAddressRepository,
-
-) *SaveUserAddressUsecase {
-	return &SaveUserAddressUsecase{
-		executor:        executor,
-		transactor:      transactor,
-		userAddressRepo: userAddressRepo,
+	customerAddressRepo repository.CustomerAddressRepository,
+) *SaveCustomerAddressUsecase {
+	return &SaveCustomerAddressUsecase{
+		executor:            executor,
+		transactor:          transactor,
+		customerAddressRepo: customerAddressRepo,
 	}
 }
 
-type SaveUserAddressInput struct {
+type SaveCustomerAddressInput struct {
 	ID           *uuid.UUID
-	UserID       uuid.UUID
+	CustomerID   uuid.UUID
 	ReceiverName string
 	Phone        *string
 	IsDefault    *bool
@@ -46,9 +45,9 @@ type SaveUserAddressInput struct {
 	PostalCode   string
 }
 
-func (u *SaveUserAddressUsecase) Execute(
+func (u *SaveCustomerAddressUsecase) Execute(
 	ctx context.Context,
-	input SaveUserAddressInput,
+	input SaveCustomerAddressInput,
 ) error {
 	var addressID uuid.UUID
 
@@ -58,8 +57,8 @@ func (u *SaveUserAddressUsecase) Execute(
 	if isCreate {
 		addressID = uuid.New()
 
-		count, err := u.userAddressRepo.
-			CountByUserID(ctx, u.executor, input.UserID)
+		count, err := u.customerAddressRepo.
+			CountByCustomerID(ctx, u.executor, input.CustomerID)
 		if err != nil {
 			return fmt.Errorf("failed to count addresses: %w", err)
 		}
@@ -77,9 +76,9 @@ func (u *SaveUserAddressUsecase) Execute(
 		addressID = *input.ID
 	}
 
-	address := domain.Address{
+	address := domain.CustomerAddress{
 		ID:           addressID,
-		UserID:       input.UserID,
+		CustomerID:   input.CustomerID,
 		ReceiverName: input.ReceiverName,
 		Phone:        input.Phone,
 		IsDefault:    isDefault,
@@ -98,17 +97,17 @@ func (u *SaveUserAddressUsecase) Execute(
 		ctx,
 		func(exec transaction.Executor) error {
 			if isDefault {
-				if err := u.userAddressRepo.
-					UnsetDefaultByUserID(
+				if err := u.customerAddressRepo.
+					UnsetDefaultByCustomerID(
 						ctx,
 						exec,
-						input.UserID,
+						input.CustomerID,
 					); err != nil {
 					return fmt.Errorf("failed to unset default address: %w", err)
 				}
 			}
 
-			if err := u.userAddressRepo.
+			if err := u.customerAddressRepo.
 				Save(
 					ctx,
 					exec,

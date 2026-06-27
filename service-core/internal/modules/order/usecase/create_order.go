@@ -103,6 +103,7 @@ type OrderShopInput struct {
 
 type CreateOrderInput struct {
 	UserID          uuid.UUID
+	CustomerID      uuid.UUID
 	AddressID       uuid.UUID
 	PaymentMethodID uuid.UUID
 	IsManual        bool
@@ -146,7 +147,7 @@ func (u *CreateOrderUsecase) Execute(
 	// Build a pricing request from the checkout input so all
 	// product, shipping, and payment costs can be calculated
 	pricingInput := repository.PricingInput{
-		UserID:          input.UserID,
+		CustomerID:      input.CustomerID,
 		AddressID:       &input.AddressID,
 		PaymentMethodID: &input.PaymentMethodID,
 		Shops: make(
@@ -194,7 +195,7 @@ func (u *CreateOrderUsecase) Execute(
 	order := domain.Order{
 		ID:          uuid.New(),
 		Number:      domain.NewOrderNumber(),
-		UserID:      input.UserID,
+		CustomerID:  input.CustomerID,
 		AddressID:   input.AddressID,
 		Status:      domain.OrderStatusPending,
 		Subtotal:    pricingResult.Subtotal,
@@ -436,7 +437,7 @@ func (u *CreateOrderUsecase) Execute(
 			}
 
 			cart, err := u.cartRepo.
-				GetWithItemsByUserID(ctx, exec, input.UserID)
+				GetWithItemsByCustomerID(ctx, exec, input.CustomerID)
 			if err != nil {
 				return fmt.Errorf("failed to load cart with items: %w", err)
 			}

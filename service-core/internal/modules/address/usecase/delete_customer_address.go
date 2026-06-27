@@ -12,26 +12,26 @@ import (
 	"github.com/google/uuid"
 )
 
-type DeleteUserAddressUsecase struct {
-	executor        transaction.Executor
-	userAddressRepo repository.UserAddressRepository
+type DeleteCustomerAddressUsecase struct {
+	executor            transaction.Executor
+	customerAddressRepo repository.CustomerAddressRepository
 }
 
-func NewDeleteUserAddressUsecase(
+func NewDeleteCustomerAddressUsecase(
 	executor transaction.Executor,
-	userAddressRepo repository.UserAddressRepository,
-) *DeleteUserAddressUsecase {
-	return &DeleteUserAddressUsecase{
-		executor:        executor,
-		userAddressRepo: userAddressRepo,
+	customerAddressRepo repository.CustomerAddressRepository,
+) *DeleteCustomerAddressUsecase {
+	return &DeleteCustomerAddressUsecase{
+		executor:            executor,
+		customerAddressRepo: customerAddressRepo,
 	}
 }
 
-func (u *DeleteUserAddressUsecase) Execute(
+func (u *DeleteCustomerAddressUsecase) Execute(
 	ctx context.Context,
 	addressID uuid.UUID,
 ) error {
-	address, err := u.userAddressRepo.
+	address, err := u.customerAddressRepo.
 		GetByID(ctx, u.executor, addressID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve address: %w", err)
@@ -44,7 +44,7 @@ func (u *DeleteUserAddressUsecase) Execute(
 		return apperrors.NewConflict(domain.ErrCannotDeleteDefaultAddress.Error())
 	}
 
-	if err := u.userAddressRepo.
+	if err := u.customerAddressRepo.
 		Delete(ctx, u.executor, addressID); err != nil {
 		return fmt.Errorf("failed to delete address: %w", err)
 	}

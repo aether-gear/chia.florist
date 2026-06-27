@@ -45,23 +45,23 @@ type createOrderResponse struct {
 }
 
 type orderItemResponse struct {
-	ID               string `json:"id"`
-	ProductID        string `json:"product_id"`
-	ProductName      string `json:"product_name"`
-	Quantity         int    `json:"quantity"`
-	UnitPrice        int64  `json:"unit_price"`
-	Subtotal         int64  `json:"subtotal"`
-	ShopID           string `json:"shop_id"`
-	ShopName         string `json:"shop_name"`
+	ID               string  `json:"id"`
+	ProductID        string  `json:"product_id"`
+	ProductName      string  `json:"product_name"`
+	Quantity         int     `json:"quantity"`
+	UnitPrice        int64   `json:"unit_price"`
+	Subtotal         int64   `json:"subtotal"`
+	ShopID           string  `json:"shop_id"`
+	ShopName         string  `json:"shop_name"`
 	CourierCode      *string `json:"courier_code,omitempty"`
 	CourierService   *string `json:"courier_service,omitempty"`
-	ShippingFeeTotal int64  `json:"shipping_fee"`
+	ShippingFeeTotal int64   `json:"shipping_fee"`
 }
 
 type orderResponse struct {
 	ID          string              `json:"id"`
 	Number      string              `json:"number"`
-	UserID      string              `json:"user_id"`
+	CustomerID  string              `json:"customer_id"`
 	AddressID   string              `json:"address_id"`
 	Status      string              `json:"status"`
 	Subtotal    int64               `json:"subtotal"`
@@ -71,4 +71,3 @@ type orderResponse struct {
 	UpdatedAt   *time.Time          `json:"updated_at,omitempty"`
 	Items       []orderItemResponse `json:"items"`
 }
-
