@@ -12,7 +12,7 @@ CREATE TYPE shipment_status_enum AS ENUM (
 CREATE TABLE shipments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    transaction_id UUID NOT NULL UNIQUE,
+    order_id UUID NOT NULL UNIQUE,
 
     status shipment_status_enum NOT NULL DEFAULT 'pending',
 
@@ -28,8 +28,8 @@ CREATE TABLE shipments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
 
-    CONSTRAINT fk_transaction
-        FOREIGN KEY(transaction_id)
-        REFERENCES transactions(id)
+    CONSTRAINT fk_order
+        FOREIGN KEY(order_id)
+        REFERENCES orders(id)
         ON DELETE CASCADE
 );

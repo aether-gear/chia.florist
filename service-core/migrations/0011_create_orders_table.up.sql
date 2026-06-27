@@ -12,7 +12,7 @@ CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     number VARCHAR(50) UNIQUE NOT NULL,
 
-    user_id UUID NOT NULL,
+    customer_id UUID NOT NULL,
     address_id UUID NOT NULL,
 
     status order_status NOT NULL,
@@ -24,13 +24,13 @@ CREATE TABLE orders (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
 
-    CONSTRAINT fk_orders_user_id
-        FOREIGN KEY (user_id)
-        REFERENCES users(id),
+    CONSTRAINT fk_orders_customer_id
+        FOREIGN KEY (customer_id)
+        REFERENCES customers(id),
 
     CONSTRAINT fk_orders_address_id
         FOREIGN KEY (address_id)
-        REFERENCES user_addresses(id),
+        REFERENCES customer_addresses(id),
 
     CONSTRAINT orders_subtotal_check
         CHECK (subtotal >= 0),

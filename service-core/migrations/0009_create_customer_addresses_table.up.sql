@@ -1,7 +1,7 @@
-CREATE TABLE user_addresses (
+CREATE TABLE customer_addresses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    user_id UUID NOT NULL,
+    customer_id UUID NOT NULL,
 
     recipient_name TEXT NOT NULL,
     phone TEXT NOT NULL,
@@ -19,12 +19,12 @@ CREATE TABLE user_addresses (
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT fk_user
-        FOREIGN KEY(user_id)
-        REFERENCES users(id)
+    CONSTRAINT fk_customer
+        FOREIGN KEY(customer_id)
+        REFERENCES customers(id)
         ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX uq_idx_one_default_address_per_user
-ON user_addresses(user_id)
+CREATE UNIQUE INDEX uq_idx_one_default_address_per_customer
+ON customer_addresses(customer_id)
 WHERE is_default = true;
