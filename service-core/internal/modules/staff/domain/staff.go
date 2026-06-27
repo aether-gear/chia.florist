@@ -6,15 +6,9 @@ import (
 	"github.com/google/uuid"
 )
 
-type Merchant struct {
-	ID        uuid.UUID
-	AccountID uuid.UUID
-
-	Name        string
-	Description *string
-
-	LogoUrl   *string
-	BannerUrl *string
+type Staff struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
@@ -26,7 +20,7 @@ type Merchant struct {
 // id
 // account_id
 
-// merchant_type
+// staff_type
 // (name: personal/business)
 
 // display_name

@@ -27,4 +27,10 @@ type UserRepository interface {
 		exec transaction.Executor,
 		props CreateUserProps,
 	) error
+
+	SaveProfile(
+		ctx context.Context,
+		exec transaction.Executor,
+		props SaveProfileProps,
+	) error
 }

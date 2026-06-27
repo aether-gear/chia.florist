@@ -5,20 +5,20 @@ import "github.com/google/uuid"
 type RoleCode string
 
 const (
-	// RoleMerchantAdmin grants full access to merchant resources and
-	// administrative operations within a merchant workspace.
-	RoleMerchantAdmin RoleCode = "merchant_admin"
+	// RoleStaffAdmin grants full access to staff resources and
+	// administrative operations within a staff workspace.
+	RoleStaffAdmin RoleCode = "admin"
 
-	// RoleMerchantStaff grants operational access to merchant resources
+	// RoleStaff grants operational access to staff resources
 	// with permissions restricted by business policy.
-	RoleMerchantStaff RoleCode = "merchant_staff"
+	RoleStaff RoleCode = "staff"
 )
 
 // Role defines a collection of permissions that can be assigned to an
-// account through a merchant membership.
+// account through a staff membership.
 //
 // Roles provide a reusable mechanism for grouping permissions and
-// implementing role-based access control (RBAC) within a merchant
+// implementing role-based access control (RBAC) within a staff
 // workspace.
 type Role struct {
 	ID uuid.UUID

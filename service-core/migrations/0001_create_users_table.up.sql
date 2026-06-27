@@ -7,6 +7,8 @@ CREATE TABLE users (
     username TEXT NOT NULL UNIQUE,
     phone TEXT,
 
+    avatar_url TEXT,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ

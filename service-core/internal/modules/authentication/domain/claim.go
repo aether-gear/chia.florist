@@ -26,7 +26,8 @@ const (
 type TokenClaims struct {
 	UserID     uuid.UUID
 	SessionID  uuid.UUID
-	MerchantID *uuid.UUID
+	StaffID    *uuid.UUID
+	CustomerID *uuid.UUID
 
 	Type TokenType
 

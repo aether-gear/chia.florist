@@ -30,6 +30,7 @@ func (r *userRepositoryImpl) GetByID(
 			u.name,
 			u.username,
 			u.phone,
+			u.avatar_url,
 			u.created_at,
 			u.updated_at,
 			u.deleted_at,
@@ -47,6 +48,7 @@ func (r *userRepositoryImpl) GetByID(
 		&m.Name,
 		&m.Username,
 		&m.Phone,
+		&m.AvatarURL,
 		&m.CreatedAt,
 		&m.UpdatedAt,
 		&m.DeletedAt,
@@ -74,6 +76,7 @@ func (r *userRepositoryImpl) GetByUsername(
 			u.name,
 			u.username,
 			u.phone,
+			u.avatar_url,
 			u.created_at,
 			u.updated_at,
 			u.deleted_at,
@@ -90,6 +93,7 @@ func (r *userRepositoryImpl) GetByUsername(
 		&m.Name,
 		&m.Username,
 		&m.Phone,
+		&m.AvatarURL,
 		&m.CreatedAt,
 		&m.UpdatedAt,
 		&m.DeletedAt,
@@ -117,9 +121,10 @@ func (r *userRepositoryImpl) CreateUser(
 			name,
 			username,
 			phone,
+			avatar_url,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -127,10 +132,40 @@ func (r *userRepositoryImpl) CreateUser(
 		props.Name,
 		props.Username,
 		props.Phone,
+		props.AvatarURL,
 		props.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert user failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *userRepositoryImpl) SaveProfile(
+	ctx context.Context,
+	exec transaction.Executor,
+	props repository.SaveProfileProps,
+) error {
+	query := `
+		UPDATE users
+		SET
+			name       = COALESCE($2, name),
+			phone      = COALESCE($3, phone),
+			avatar_url = COALESCE($4, avatar_url),
+			updated_at = $5
+		WHERE id = $1;
+	`
+
+	_, err := exec.Exec(ctx, query,
+		props.UserID,
+		props.Name,
+		props.Phone,
+		props.AvatarURL,
+		props.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save user profile failed: %w", err)
 	}
 
 	return nil

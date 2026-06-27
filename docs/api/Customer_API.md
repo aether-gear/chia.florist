@@ -31,6 +31,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [X] Log Out
   - [ ] Profile
     - [ ] Get Current User
+    - [ ] Update User
   - [X] Addresses
     - [X] List My Addresses
     - [X] Save My Address
@@ -642,7 +643,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 ### Get Current User
 
 - **Method**: `GET`
-- **Endpoint**: `/users/me`
+- **Endpoint**: `/profile`
 - **Description**: Retrieve the profile of the currently authenticated customer.
 - **Authentication**: Customer
 - **Request Body**: None
@@ -651,12 +652,56 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 ```json
 {
-  "me": {
-    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "Jane Doe",
-    "username": "janedoe",
-    "phone": "+6281234567890",
-    "last_login_at": "2026-06-17T10:00:00Z"
+  "profile": {
+    "customer_id": "d0118ea9-ab28-4338-89dd-3d3ca5f89880",
+    "user_id": "56d88b08-ad99-4c91-9571-15b5bae95591",
+    "Name": "Astra Yao",
+    "Username": "friedriceuwu",
+    "Phone": "021",
+    "AvatarURL": "https://pbs.twimg.com/profile_images/1868113521902489600/SeenT54s_400x400.png",
+    "LastLoginAt": null,
+    "CreatedAt": "2026-06-26T19:47:28.045173Z",
+    "UpdatedAt": null
+  }
+}
+```
+
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | User profile not found.     |
+
+### Update Current User
+
+- **Method**: `PUT`
+- **Endpoint**: `/profile`
+- **Description**: Update the profile of the currently authenticated customer.
+- **Authentication**: Customer
+- **Request Body**: None
+  ```json
+  {
+    "name": "string - optional",
+    "phone": "string - optional",
+    "avatar_url": "string - optional"
+  }
+  ```
+
+#### Response `200 OK`
+
+```json
+{
+  "profile": {
+    "customer_id": "d0118ea9-ab28-4338-89dd-3d3ca5f89880",
+    "user_id": "56d88b08-ad99-4c91-9571-15b5bae95591",
+    "Name": "Astra Yao",
+    "Username": "friedriceuwu",
+    "Phone": "021",
+    "AvatarURL": "https://pbs.twimg.com/profile_images/1868113521902489600/SeenT54s_400x400.png",
+    "LastLoginAt": null,
+    "CreatedAt": "2026-06-26T19:47:28.045173Z",
+    "UpdatedAt": null
   }
 }
 ```

@@ -3,40 +3,34 @@ package repository
 import (
 	"context"
 
-	"service-core/internal/modules/customer/domain"
+	"service-core/internal/modules/staff/domain"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
-type CustomerRepository interface {
+type StaffRepository interface {
 	Create(
 		ctx context.Context,
 		exec transaction.Executor,
-		customer domain.Customer,
+		staff domain.Staff,
 	) error
 
 	GetByID(
 		ctx context.Context,
 		exec transaction.Executor,
 		id uuid.UUID,
-	) (*domain.Customer, error)
-
-	GetByUserID(
-		ctx context.Context,
-		exec transaction.Executor,
-		userID uuid.UUID,
-	) (*domain.Customer, error)
+	) (*domain.Staff, error)
 
 	GetProfileByUserID(
 		ctx context.Context,
 		exec transaction.Executor,
 		userID uuid.UUID,
-	) (*domain.CustomerProfile, error)
+	) (*domain.StaffProfile, error)
 
-	FindCustomers(
+	FindStaff(
 		ctx context.Context,
 		exec transaction.Executor,
-		params FindCustomerParams,
-	) ([]domain.CustomerProfile, int, error)
+		params FindStaffParams,
+	) ([]domain.StaffProfile, int, error)
 }

@@ -2,7 +2,7 @@ CREATE TYPE account_status
     AS ENUM ('pending', 'active', 'suspended', 'locked');
 
 CREATE TYPE account_type
-    AS ENUM ('customer', 'merchant');
+    AS ENUM ('customer', 'staff');
 
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

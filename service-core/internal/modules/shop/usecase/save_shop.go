@@ -46,7 +46,7 @@ func (u *SaveShopUsecase) Execute(
 ) error {
 	canSetActive := false
 	for _, actorRole := range actor.Roles {
-		if actorRole.Code == authorDomain.RoleMerchantAdmin {
+		if actorRole.Code == authorDomain.RoleStaffAdmin {
 			canSetActive = true
 			break
 		}

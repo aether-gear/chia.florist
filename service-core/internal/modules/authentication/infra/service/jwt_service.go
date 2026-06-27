@@ -26,7 +26,8 @@ type jwtClaims struct {
 	UserID     string `json:"user_id"`
 	SessionID  string `json:"session_id"`
 	Type       string `json:"type"`
-	MerchantID string `json:"merchant_id,omitempty"`
+	StaffID    string `json:"staff_id,omitempty"`
+	CustomerID string `json:"customer_id,omitempty"`
 	Role       string `json:"roles,omitempty"` // comma-separated
 
 	jwt.RegisteredClaims
@@ -36,9 +37,14 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 	now := time.Now()
 	exp := now.Add(params.Duration)
 
-	merchantIDStr := ""
-	if params.MerchantID != nil {
-		merchantIDStr = params.MerchantID.String()
+	staffIDStr := ""
+	if params.StaffID != nil {
+		staffIDStr = params.StaffID.String()
+	}
+
+	customerIDStr := ""
+	if params.CustomerID != nil {
+		customerIDStr = params.CustomerID.String()
 	}
 
 	roles := make([]string, len(params.Roles))
@@ -51,7 +57,8 @@ func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository
 		UserID:     params.UserID.String(),
 		SessionID:  params.SessionID.String(),
 		Type:       string(params.Type),
-		MerchantID: merchantIDStr,
+		StaffID:    staffIDStr,
+		CustomerID: customerIDStr,
 		Role:       rolesStr,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -120,12 +127,19 @@ func (j *JWTService) Validate(tokenStr string) (*domain.TokenClaims, error) {
 		ExpiresAt: claims.ExpiresAt.Time,
 	}
 
-	if claims.MerchantID != "" {
-		mid, err := uuid.Parse(claims.MerchantID)
+	if claims.StaffID != "" {
+		mid, err := uuid.Parse(claims.StaffID)
 		if err != nil {
-			return nil, fmt.Errorf("invalid merchant_id claim: %w", err)
+			return nil, fmt.Errorf("invalid staff_id claim: %w", err)
 		}
-		tknClaim.MerchantID = &mid
+		tknClaim.StaffID = &mid
+	}
+	if claims.CustomerID != "" {
+		cid, err := uuid.Parse(claims.CustomerID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid customer_id claim: %w", err)
+		}
+		tknClaim.CustomerID = &cid
 	}
 	if claims.Role != "" {
 		tknClaim.Roles = strings.Split(claims.Role, ",")

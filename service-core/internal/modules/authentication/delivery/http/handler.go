@@ -17,7 +17,7 @@ type authHandler struct {
 	me               *usecase.MeUsecase
 	logout           *usecase.LogoutUsecase
 	loginCustomer    *usecase.LoginCustomerUsecase
-	loginMerchant    *usecase.LoginMerchantUsecase
+	loginStaff       *usecase.LoginStaffUsecase
 	registerCustomer *usecase.RegisterCustomerUsecase
 	verifyAccount    *usecase.VerifyAccountUsecase
 	getAccount       *usecase.GetAccountUsecase
@@ -27,7 +27,7 @@ func NewAuthHandler(
 	me *usecase.MeUsecase,
 	logout *usecase.LogoutUsecase,
 	loginCustomer *usecase.LoginCustomerUsecase,
-	loginMerchant *usecase.LoginMerchantUsecase,
+	loginStaff *usecase.LoginStaffUsecase,
 	registerCustomer *usecase.RegisterCustomerUsecase,
 	verifyAccount *usecase.VerifyAccountUsecase,
 	getAccount *usecase.GetAccountUsecase,
@@ -36,7 +36,7 @@ func NewAuthHandler(
 		me:               me,
 		logout:           logout,
 		loginCustomer:    loginCustomer,
-		loginMerchant:    loginMerchant,
+		loginStaff:       loginStaff,
 		registerCustomer: registerCustomer,
 		verifyAccount:    verifyAccount,
 		getAccount:       getAccount,
@@ -97,7 +97,7 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 		AccountID:       me.Account.ID,
 		AccountType:     string(me.Account.Type),
 		IsAuthenticated: true,
-		MerchantID:      me.Actor.MerchantID,
+		StaffID:         me.Actor.StaffID,
 		Roles:           roles,
 		Permissions:     permissions,
 	}
@@ -237,7 +237,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (h *authHandler) SignInMerchantEmail(w http.ResponseWriter, r *http.Request) error {
+func (h *authHandler) SignInStaffEmail(w http.ResponseWriter, r *http.Request) error {
 	var req signInEmailRequest
 
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
@@ -251,20 +251,20 @@ func (h *authHandler) SignInMerchantEmail(w http.ResponseWriter, r *http.Request
 		return apperrors.NewBadRequest("invalid password")
 	}
 
-	input := usecase.LoginMerchantParams{
+	input := usecase.LoginStaffParams{
 		UserAgent: req.UserAgent,
 		IPAddress: req.IPAddress,
 		Email:     req.Email,
 		Password:  req.Password,
 	}
 
-	tokens, err := h.loginMerchant.Execute(r.Context(), input)
+	tokens, err := h.loginStaff.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     appcookie.AccessTokenMerchantCookieName,
+		Name:     appcookie.AccessTokenStaffCookieName,
 		Value:    tokens.AccessToken.Token,
 		Path:     "/",
 		HttpOnly: true,

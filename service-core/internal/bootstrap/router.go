@@ -17,12 +17,12 @@ import (
 	customerH "service-core/internal/modules/customer/delivery/http"
 	inventoryH "service-core/internal/modules/inventory/delivery/http"
 	locationH "service-core/internal/modules/location/delivery/http"
-	merchantH "service-core/internal/modules/merchant/delivery/http"
 	orderH "service-core/internal/modules/order/delivery/http"
 	paymentH "service-core/internal/modules/payment/delivery/http"
 	productH "service-core/internal/modules/product/delivery/http"
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
 	shopH "service-core/internal/modules/shop/delivery/http"
+	staffH "service-core/internal/modules/staff/delivery/http"
 	userH "service-core/internal/modules/user/delivery/http"
 
 	"github.com/go-chi/chi/v5"
@@ -31,11 +31,11 @@ import (
 // RouteChains encapsulates all pre-built middleware chains for
 // different routing policies.
 type RouteChains struct {
-	Core              func(apphttp.AppHandler) http.HandlerFunc
-	CoreAuth          func(apphttp.AppHandler) http.HandlerFunc
-	MerchantOnly      func(apphttp.AppHandler) http.HandlerFunc
-	MerchantAdminOnly func(apphttp.AppHandler) http.HandlerFunc
-	CustomerOnly      func(apphttp.AppHandler) http.HandlerFunc
+	Core           func(apphttp.AppHandler) http.HandlerFunc
+	CoreAuth       func(apphttp.AppHandler) http.HandlerFunc
+	StaffOnly      func(apphttp.AppHandler) http.HandlerFunc
+	StaffAdminOnly func(apphttp.AppHandler) http.HandlerFunc
+	CustomerOnly   func(apphttp.AppHandler) http.HandlerFunc
 }
 
 // NewRouteChains builds and returns the route chains using
@@ -64,30 +64,30 @@ func NewRouteChains(c *Container) *RouteChains {
 			c.Authenticator.RequireAnyAuth(
 				c.DBExecutor,
 				appcookie.AccessTokenCookieName,
-				appcookie.AccessTokenMerchantCookieName,
+				appcookie.AccessTokenStaffCookieName,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(
-				authendomain.AccountTypeMerchant,
+				authendomain.AccountTypeStaff,
 				authendomain.AccountTypeCustomer,
 			),
 		),
-		MerchantOnly: buildChain(
+		StaffOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenMerchantCookieName,
+				appcookie.AccessTokenStaffCookieName,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
-			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
 		),
-		MerchantAdminOnly: buildChain(
+		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenMerchantCookieName,
+				appcookie.AccessTokenStaffCookieName,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
-			c.Authorizer.RequireAccountType(authendomain.AccountTypeMerchant),
-			c.Authorizer.RequireMerchantRole(authorzDomain.RoleMerchantAdmin),
+			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
+			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaffAdmin),
 		),
 		CustomerOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -119,16 +119,16 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.Me,
 			&c.Logout,
 			&c.LoginCustomer,
-			&c.LoginMerchant,
+			&c.LoginStaff,
 			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
 		)
 
-		merchantHandler = merchantH.NewMerchantHandler(
-			&c.AddMerchantAccount,
-			&c.CreateMerchant,
-			&c.FindMerchants,
+		staffHandler = staffH.NewStaffHandler(
+			&c.AddStaffAccount,
+			&c.CreateStaff,
+			&c.FindStaff,
 		)
 
 		customerHandler = customerH.NewCustomerHandler(
@@ -149,6 +149,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 		userHandler = userH.NewUserHandler(
 			&c.GetUser,
+			&c.GetCurrentProfile,
+			&c.UpdateCurrentProfile,
 		)
 
 		addressHandler = addressH.NewAddressHandler(
@@ -197,33 +199,40 @@ func NewRouter(c *Container) *chi.Mux {
 	r.Route("/", func(r chi.Router) {
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
-			r.Post("/", chains.MerchantOnly(productHandler.CreateProduct))
+			r.Post("/", chains.StaffOnly(productHandler.CreateProduct))
 
 			r.Route("/{slug}", func(r chi.Router) {
 				r.Get("/", chains.Core(productHandler.GetProduct))
-				r.Post("/images", chains.MerchantOnly(productHandler.AddProductImages))
+				r.Post("/images", chains.StaffOnly(productHandler.AddProductImages))
 			})
 		})
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/signin", chains.Core(authHandler.SignInEmail))
-			r.Post("/merchant/signin", chains.Core(authHandler.SignInMerchantEmail))
+			r.Post("/staff/signin", chains.Core(authHandler.SignInStaffEmail))
 			r.Post("/signup", chains.Core(authHandler.SignUpAccount))
 			r.Post("/verify", chains.Core(authHandler.VerifyAccount))
 			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
 			r.Get("/me", chains.CoreAuth(authHandler.Me))
 		})
 
-		r.Route("/merchants", func(r chi.Router) {
-			r.Get("/", chains.MerchantAdminOnly(merchantHandler.FindMerchants))
-			r.Post("/", chains.MerchantAdminOnly(merchantHandler.CreateMerchant))
-			r.Route("/{merchantID}/accounts", func(r chi.Router) {
-				r.Post("/", chains.MerchantAdminOnly(merchantHandler.AddMerchantAccount))
+		r.Route("/staff", func(r chi.Router) {
+			r.Get("/", chains.StaffAdminOnly(staffHandler.FindStaff))
+			r.Post("/", chains.StaffAdminOnly(staffHandler.CreateStaff))
+			r.Route("/{staffID}", func(r chi.Router) {
+				r.Route("/accounts", func(r chi.Router) {
+					r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+				})
 			})
 		})
 
 		r.Route("/customers", func(r chi.Router) {
-			r.Get("/", chains.MerchantAdminOnly(customerHandler.FindCustomers))
+			r.Get("/", chains.StaffAdminOnly(customerHandler.FindCustomers))
+		})
+
+		r.Route("/profile", func(r chi.Router) {
+			r.Get("/", chains.CoreAuth(userHandler.GetCurrentProfile))
+			r.Put("/", chains.CoreAuth(userHandler.UpdateCurrentProfile))
 		})
 
 		r.Route("/carts", func(r chi.Router) {
@@ -257,7 +266,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/users", func(r chi.Router) {
-			r.Get("/{id}", chains.MerchantAdminOnly(userHandler.GetUserByID))
+			r.Get("/{id}", chains.StaffAdminOnly(userHandler.GetUserByID))
 		})
 
 		r.Route("/users/me", func(r chi.Router) {
@@ -272,25 +281,25 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/shops", func(r chi.Router) {
 			r.Get("/", chains.Core(shopHandler.FindShops))
-			r.Post("/", chains.MerchantOnly(shopHandler.SaveShop))
+			r.Post("/", chains.StaffOnly(shopHandler.SaveShop))
 
 			r.Route("/{shopID}", func(r chi.Router) {
 				r.Get("/", chains.Core(shopHandler.GetShopByID))
 
 				r.Route("/addresses", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopAddresses))
-					r.Post("/", chains.MerchantOnly(addressHandler.CreateShopAddress))
+					r.Post("/", chains.StaffOnly(addressHandler.CreateShopAddress))
 				})
 
 				r.Route("/couriers", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopCouriers))
-					r.Post("/", chains.MerchantOnly(courierHandler.ConfigureCourierShop))
+					r.Post("/", chains.StaffOnly(courierHandler.ConfigureCourierShop))
 				})
 
 				r.Route("/products", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopProducts))
 					r.Post("/{productID}/inventories",
-						chains.MerchantOnly(inventoryHandler.AddInventory))
+						chains.StaffOnly(inventoryHandler.AddInventory))
 				})
 			})
 		})
@@ -300,16 +309,16 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/payments", func(r chi.Router) {
-			r.Post("/{id}/action", chains.MerchantOnly(paymentHandler.ProcessManualPayment))
+			r.Post("/{id}/action", chains.StaffOnly(paymentHandler.ProcessManualPayment))
 
 			r.Route("/accounts", func(r chi.Router) {
-				r.Get("/", chains.MerchantOnly(paymentHandler.ListPaymentAccount))
-				r.Post("/", chains.MerchantAdminOnly(paymentHandler.CreatePaymentAccount))
+				r.Get("/", chains.StaffOnly(paymentHandler.ListPaymentAccount))
+				r.Post("/", chains.StaffAdminOnly(paymentHandler.CreatePaymentAccount))
 			})
 
 			r.Route("/methods", func(r chi.Router) {
-				r.Get("/", chains.MerchantOnly(paymentHandler.ListPaymentMethod))
-				r.Post("/", chains.MerchantAdminOnly(paymentHandler.CreatePaymentMethod))
+				r.Get("/", chains.StaffOnly(paymentHandler.ListPaymentMethod))
+				r.Post("/", chains.StaffAdminOnly(paymentHandler.CreatePaymentMethod))
 			})
 		})
 
@@ -322,7 +331,7 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/orders", func(r chi.Router) {
-			r.Get("/", chains.MerchantOnly(orderHandler.FindOrders))
+			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 		})
 	})
 

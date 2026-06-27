@@ -3,9 +3,8 @@ package domain
 import "errors"
 
 var (
-	ErrMerchantRequired    = errors.New("merchant required")
+	ErrStaffRequired       = errors.New("staff required")
 	ErrCustomerRequired    = errors.New("customer required")
 	ErrInsufficientRole    = errors.New("insufficient role")
-	ErrMemberAlreadyExists = errors.New("member already exists in this merchant")
+	ErrMemberAlreadyExists = errors.New("member already exists in this staff")
 )
-

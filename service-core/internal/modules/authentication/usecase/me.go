@@ -59,7 +59,7 @@ func (u *MeUsecase) Execute(
 		ctx,
 		u.exec,
 		authCtx.UserID,
-		authCtx.MerchantID,
+		authCtx.StaffID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve actor: %w", err)

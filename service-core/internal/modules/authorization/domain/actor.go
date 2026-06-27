@@ -10,7 +10,7 @@ import (
 // application.
 //
 // An Actor is derived from an authenticated account and contains the
-// roles and permissions granted to that account within a merchant scope.
+// roles and permissions granted to that account within a staff scope.
 // It is primarily used by authorization and access control workflows to
 // determine what actions an authenticated account is allowed to perform.
 //
@@ -21,7 +21,7 @@ type Actor struct {
 
 	Type domain.AccountType
 
-	MerchantID *uuid.UUID
+	StaffID *uuid.UUID
 
 	Roles       []Role
 	Permissions []Permission

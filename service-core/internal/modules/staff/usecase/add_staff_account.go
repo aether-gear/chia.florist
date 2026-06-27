@@ -16,26 +16,26 @@ import (
 	"github.com/google/uuid"
 )
 
-type AddMerchantAccountUsecase struct {
+type AddStaffAccountUsecase struct {
 	executor       transaction.Executor
 	transactor     transaction.Transactor
 	accountRepo    authenRepo.AccountRepository
 	pwHasher       authenRepo.PasswordHasher
 	userRepo       userRepo.UserRepository
-	membershipRepo authzRepo.MerchantMembershipRepository
+	membershipRepo authzRepo.StaffMembershipRepository
 	roleRepo       authzRepo.RoleRepository
 }
 
-func NewAddMerchantAccountUsecase(
+func NewAddStaffAccountUsecase(
 	executor transaction.Executor,
 	transactor transaction.Transactor,
 	accountRepo authenRepo.AccountRepository,
 	pwHasher authenRepo.PasswordHasher,
 	userRepo userRepo.UserRepository,
-	membershipRepo authzRepo.MerchantMembershipRepository,
+	membershipRepo authzRepo.StaffMembershipRepository,
 	roleRepo authzRepo.RoleRepository,
-) *AddMerchantAccountUsecase {
-	return &AddMerchantAccountUsecase{
+) *AddStaffAccountUsecase {
+	return &AddStaffAccountUsecase{
 		executor:       executor,
 		transactor:     transactor,
 		accountRepo:    accountRepo,
@@ -46,31 +46,31 @@ func NewAddMerchantAccountUsecase(
 	}
 }
 
-type AddMerchantAccountParams struct {
-	ActorAccountID  uuid.UUID
-	ActorMerchantID uuid.UUID
-	MerchantID      uuid.UUID
-	Email           string
-	Name            string
-	Username        string
-	Password        string
-	Phone           *string
+type AddStaffAccountParams struct {
+	ActorAccountID uuid.UUID
+	ActorStaffID   uuid.UUID
+	StaffID        uuid.UUID
+	Email          string
+	Name           string
+	Username       string
+	Password       string
+	Phone          *string
 }
 
-type AddMerchantAccountResult struct {
+type AddStaffAccountResult struct {
 	AccountID uuid.UUID
 }
 
-func (u *AddMerchantAccountUsecase) Execute(
+func (u *AddStaffAccountUsecase) Execute(
 	ctx context.Context,
-	input AddMerchantAccountParams,
+	input AddStaffAccountParams,
 ) error {
 	actorMembership, err := u.membershipRepo.
-		GetByAccountIDAndMerchantID(
+		GetByAccountIDAndStaffID(
 			ctx,
 			u.executor,
 			input.ActorAccountID,
-			input.ActorMerchantID,
+			input.ActorStaffID,
 		)
 	if err != nil {
 		return fmt.Errorf("failed to verify actor membership: %w", err)
@@ -80,11 +80,11 @@ func (u *AddMerchantAccountUsecase) Execute(
 	}
 
 	actorRoles, err := u.membershipRepo.
-		ListRolesByAccountIDAndMerchantID(
+		ListRolesByAccountIDAndStaffID(
 			ctx,
 			u.executor,
 			input.ActorAccountID,
-			input.ActorMerchantID,
+			input.ActorStaffID,
 		)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve actor roles: %w", err)
@@ -92,7 +92,7 @@ func (u *AddMerchantAccountUsecase) Execute(
 
 	found := false
 	for _, role := range actorRoles {
-		if role.Code == authzDomain.RoleMerchantAdmin {
+		if role.Code == authzDomain.RoleStaffAdmin {
 			found = true
 			break
 		}
@@ -111,12 +111,12 @@ func (u *AddMerchantAccountUsecase) Execute(
 	}
 
 	staffRole, err := u.roleRepo.
-		GetByCode(ctx, u.executor, authzDomain.RoleMerchantStaff)
+		GetByCode(ctx, u.executor, authzDomain.RoleStaff)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve staff role: %w", err)
 	}
 	if staffRole == nil {
-		return fmt.Errorf("merchant_staff role not found in database")
+		return fmt.Errorf("staff role not found in database")
 	}
 
 	now := time.Now()
@@ -142,17 +142,17 @@ func (u *AddMerchantAccountUsecase) Execute(
 		Email:     input.Email,
 		Password:  hash,
 		Status:    authenDomain.AccountActive,
-		Type:      authenDomain.AccountTypeMerchant,
+		Type:      authenDomain.AccountTypeStaff,
 		CreatedAt: now,
 	}
 
-	newMembership := authzDomain.MerchantMembership{
-		ID:         uuid.New(),
-		MerchantID: input.MerchantID,
-		AccountID:  newAccountID,
-		RoleID:     staffRole.ID,
-		CreatedBy:  input.ActorAccountID,
-		CreatedAt:  now,
+	newMembership := authzDomain.StaffMembership{
+		ID:        uuid.New(),
+		StaffID:   input.StaffID,
+		AccountID: newAccountID,
+		RoleID:    staffRole.ID,
+		CreatedBy: input.ActorAccountID,
+		CreatedAt: now,
 	}
 
 	err = u.transactor.WithinTransaction(
