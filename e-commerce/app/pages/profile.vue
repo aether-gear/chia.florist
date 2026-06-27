@@ -425,23 +425,7 @@ const triggerAlert = (message: string) => {
                   </div>
                 </div>
 
-                <!-- Supabase Storage Info / Links (For Testing) -->
-                <div v-if="avatarUrl" class="bg-gray-50 border border-gray-100 rounded-2xl p-4 mt-2 space-y-2 text-xs">
-                  <div class="flex items-center gap-2">
-                    <span class="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">Supabase Connected</span>
-                    <span class="text-[10px] text-gray-400">Bucket: <code class="font-mono">private-assets</code></span>
-                  </div>
-                  <div class="space-y-1 mt-1 font-semibold text-gray-600">
-                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-1">
-                      <span>Public Storage URL:</span>
-                      <a :href="publicAvatarUrl!" target="_blank" class="text-[#1b4332] hover:underline font-mono text-[10px] break-all select-all">{{ publicAvatarUrl }}</a>
-                    </div>
-                    <div v-if="signedAvatarUrl" class="flex flex-col sm:flex-row sm:items-start justify-between gap-1 border-t border-gray-100 pt-1.5">
-                      <span>Signed Access URL:</span>
-                      <a :href="signedAvatarUrl!" target="_blank" class="text-[#1b4332] hover:underline font-mono text-[10px] break-all select-all">{{ signedAvatarUrl }}</a>
-                    </div>
-                  </div>
-                </div>
+
                 
                 <!-- Upload Error -->
                 <div v-if="uploadError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
