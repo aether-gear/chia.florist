@@ -358,17 +358,13 @@ export const useCart = () => {
 
     if (isLoggedIn.value === 'true') {
       try {
-        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+        const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
         
-        // FIX SUCCESS: Gunakan type-casting 'as any' saat melempar payload ke addItem 
-        // agar tidak memicu error structural contract pada model parameter backend kalian
         await cartService.addItem({ 
           product_id: item.id, 
           shop_id: shopId, 
-          quantity: qty,
-          size: item.size || '1.8m',
-          color: item.color || '#1b4332'
-        } as any)
+          quantity: qty
+        })
         
         await loadCart(true)
       } catch (err) {
@@ -395,7 +391,7 @@ export const useCart = () => {
 
     if (isLoggedIn.value === 'true') {
       try {
-        const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+        const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
         await cartService.removeItem(shopId, id)
         await loadCart(true)
       } catch (err) {
@@ -421,7 +417,7 @@ export const useCart = () => {
     if (item.isCustom) return
 
     if (isLoggedIn.value === 'true') {
-      const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
 
       if (pendingUpdates[id]?.timeoutId) {
         clearTimeout(pendingUpdates[id].timeoutId!)
@@ -464,7 +460,7 @@ export const useCart = () => {
         }
         if (!item.isCustom) {
           try {
-            const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+            const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
             await cartService.removeItem(shopId, item.id)
           } catch (err) {
             console.error(`Failed to remove item ${item.id} from backend cart on checkout:`, err)

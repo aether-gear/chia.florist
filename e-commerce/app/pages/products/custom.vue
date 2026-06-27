@@ -116,7 +116,7 @@ const handleCustomAddToCart = () => {
     image: '/images/custom-preview.png', // Fallback gambar preview simulator
     size: selection.value.size.label,
     color: selection.value.theme.color,
-    shopId: '333f6432-a01c-412f-99f4-0f08ca0d8eb1', // Pass default shop ID for custom products
+    shopId: '99ef0062-1040-4574-a4be-0123abce5670', // Pass default shop ID for custom products
     isCustom: true
   }, 1)
 
