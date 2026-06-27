@@ -111,15 +111,15 @@ onUnmounted(() => {
             to="/catalog" 
             class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 px-8 rounded-xl transition shadow-md text-sm text-center"
           >
-            Order Now
+            View Products
           </NuxtLink>
 
-          <NuxtLink 
+          <!-- <NuxtLink 
             to="/catalog" 
             class="border-2 border-white hover:bg-white/10 text-white font-bold py-3 px-8 rounded-xl transition text-sm text-center flex items-center justify-center gap-2"
           >
             <span>View Products</span>
-          </NuxtLink>
+          </NuxtLink> -->
         </div>
       </div>
 
@@ -276,10 +276,10 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <section class="max-w-7xl mx-auto px-8 py-20">
+    <!-- <section class="max-w-7xl mx-auto px-8 py-20">
       <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">Our Gallery View</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Main Large Gallery Item -->
+
         <div class="h-[600px] rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
           <img 
             v-if="getProductImageBySlug('graduate')" 
@@ -295,9 +295,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 2x2 Grid of Smaller Items -->
         <div class="md:col-span-2 grid grid-cols-2 grid-rows-2 gap-6 h-[600px]">
-          <!-- Wedding -->
           <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
             <img 
               v-if="getProductImageBySlug('wedding')" 
@@ -313,7 +311,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Birthday -->
           <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
             <img 
               v-if="getProductImageBySlug('birthday')" 
@@ -329,7 +326,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Anniversary -->
           <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
             <img 
               v-if="getProductImageBySlug('anniversary')" 
@@ -345,7 +341,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Condolences -->
           <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
             <img 
               v-if="getProductImageBySlug('condolences')" 
@@ -362,7 +357,7 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-    </section>
+    </section> -->
 
     <section class="max-w-7xl mx-auto px-8 py-20">
       <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">What Do They Say About Us</h2>

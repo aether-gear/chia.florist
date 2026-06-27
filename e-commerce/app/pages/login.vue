@@ -52,19 +52,14 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-8 py-20 mt-10 min-h-[80vh] flex items-center">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center w-full">
-      
-      <!-- Left image section -->
-      <div class="hidden md:block h-[600px]">
-        <img 
-          src="/images/florist.jpg"
-          alt="Plants Decor" 
-          class="w-full h-full object-cover rounded-xl shadow-sm"
-        />
-      </div>
-
-      <!-- Right auth panels container -->
+  <div class="
+    max-w-7xl mx-auto px-8 py-20 mt-10 min-h-[80vh] flex flex-col items-center
+    gap-10
+  ">
+    <div class="">
+      <img src="/images/logo.png" class="h-20 mx-auto mb-4" alt="Chia Florist Logo" />
+    </div>
+    
       <div class="max-w-md w-full mx-auto relative py-4">
         
         <!-- Error Alerts -->
@@ -78,7 +73,7 @@ const handleLogin = async () => {
 
         <div class="space-y-8">
           <div>
-            <h1 class="text-4xl font-medium tracking-tight mb-2">Welcome to Chia Florist</h1>
+            <h1 class="text-4xl font-medium tracking-tight mb-2">Sign in</h1>
             <p class="text-gray-600">Enter your details below</p>
           </div>
 
@@ -133,7 +128,6 @@ const handleLogin = async () => {
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 

@@ -15,7 +15,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      serviceCoreApiUrl: process.env.SERVICE_CORE_API_URL || 'http://127.0.0.1:7129'
+      serviceCoreApiUrl: process.env.SERVICE_CORE_API_URL || 'http://127.0.0.1:7129',
+      supabaseUrl: process.env.SUPABASE_URL || '',
+      supabaseKey: process.env.SUPABASE_KEY || ''
     }
   },
 
