@@ -5,37 +5,37 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
 
 ## TODO
 
-- [ ] Public API
-  - [ ] Products
-    - [ ] Find Products
-    - [ ] Get Product Detail
-  - [ ] Shops
-    - [ ] Get Shop Addresses
-    - [ ] Get Shop Couriers
-    - [ ] Get Shop Products
-- [ ] Staff API
-  - [ ] Authentication
-    - [ ] Staff Sign In
-    - [ ] Me
-    - [ ] Log Out
-  - [ ] Shops
-    - [ ] Save Shop
-  - [ ] Inventory
-    - [ ] Add Inventory
-  - [ ] Profile
-    - [ ] Get Current User
-    - [ ] Update User
-- [ ] Staff Admin API
-  - [ ] Staff Management
-    - [ ] Create Staff
-    - [ ] Add Staff Account
-    - [ ] Find Staff
-  - [ ] Customer Management
-    - [ ] Find Customers
-  - [ ] Payment
-    - [ ] List Payment Method
-    - [ ] List Payment Account
-    - [ ] Create Payment Account
+- [x] Public API
+  - [x] Products
+    - [x] Find Products
+    - [x] Get Product Detail
+  - [x] Shops
+    - [x] Get Shop Addresses
+    - [x] Get Shop Couriers
+    - [x] Get Shop Products
+- [x] Staff API
+  - [x] Authentication
+    - [x] Staff Sign In
+    - [x] Me
+    - [x] Log Out
+  - [x] Shops
+    - [x] Save Shop
+  - [x] Inventory
+    - [x] Add Inventory
+  - [x] Profile
+    - [x] Get Current User
+    - [x] Update User
+- [x] Staff Admin API
+  - [x] Staff Management
+    - [x] Create Staff
+    - [x] Add Staff Account
+    - [x] Find Staff
+  - [x] Customer Management
+    - [x] Find Customers
+  - [x] Payment
+    - [x] List Payment Method
+    - [x] List Payment Account
+    - [x] Create Payment Account
 
 # Public API
 
@@ -75,6 +75,7 @@ No authentication is required for these endpoints.
 | `stock`    | `sort=stock:desc`    | Sort by available stock quantity. |
 
 **Examples**:
+
 - `GET /products?page=1&limit=10`
 - `GET /products?name=coffee`
 - `GET /products?sort=price:asc`
@@ -189,6 +190,7 @@ No authentication is required for these endpoints.
 | `modified` | `sort=modified:desc` | Sort by last modified date.       |
 
 **Examples**:
+
 - `GET /shops?page=1&limit=10`
 - `GET /shops?name=coffee`
 - `GET /shops?sort=date:asc`
@@ -371,6 +373,7 @@ Authentication is handled via a session cookie set at sign-in.
 - **Description**: Authenticate a staff account using email and password. Sets a session cookie on success.
 - **Authentication**: None (public endpoint)
 - **Request Body**:
+
   ```json
   {
     "email":      "string (required)",
@@ -384,6 +387,7 @@ Authentication is handled via a session cookie set at sign-in.
 
 - **Set-Cookie**: `hotpot=<value>`
 - **Body**:
+
   ```json
   { "message": "login success" }
   ```
@@ -435,6 +439,7 @@ Authentication is handled via a session cookie set at sign-in.
 - **Description**: Create a new shop or update an existing shop owned by the authenticated staff. Omit `id` to create; supply `id` to update.
 - **Authentication**: Staff (any role)
 - **Request Body**:
+
   ```json
   {
     "id":          "string (UUID, optional — omit to create, supply to update)",
@@ -475,6 +480,7 @@ Authentication is handled via a session cookie set at sign-in.
 - **Description**: Create a new inventory for an existing shop or existing product.
 - **Authentication**: Staff (any role)
 - **Request Body**:
+
   ```json
   {
       "product_id": "string - uuid (required)",
@@ -541,6 +547,7 @@ Authentication is handled via a session cookie set at sign-in.
 - **Description**: Update the profile of the currently authenticated staff.
 - **Authentication**: Staff (any role)
 - **Request Body**: None
+
   ```json
   {
     "name": "string - optional",
@@ -587,6 +594,7 @@ These endpoints require a valid staff session with the **staff admin** role.
 - **Description**: Create a new staff entity. The authenticated account is automatically associated as the staff owner.
 - **Authentication**: Staff Admin
 - **Request Body**:
+
   ```json
   {
     "name":        "string (required)",
@@ -617,6 +625,7 @@ These endpoints require a valid staff session with the **staff admin** role.
 - **Description**: Register and assign a new account to a staff. The actor must be an admin of the target staff.
 - **Authentication**: Staff Admin
 - **Request Body**:
+
   ```json
   {
     "email":    "string (required)",
@@ -676,6 +685,7 @@ These endpoints require a valid staff session with the **staff admin** role.
 > Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=name:asc,latest:desc`.
 
 **Examples**:
+
 - `GET /staff?page=1&limit=10`
 - `GET /staff?name=chia`
 - `GET /staff?sort=name:asc`
@@ -745,6 +755,7 @@ These endpoints require a valid staff session with the **staff admin** role.
 > Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=name:asc,last_login:desc`.
 
 **Examples**:
+
 - `GET /customers?page=1&limit=20`
 - `GET /customers?name=jane`
 - `GET /customers?email=jane@example.com&sort=last_login:desc`
@@ -909,6 +920,7 @@ These endpoints require a valid staff session with the **staff admin** role.
 - **Authentication**: Customer
 
 - **Request Body**:
+
   ```json
   {
     "method_id": "string (UUID, required)",
@@ -966,6 +978,7 @@ These endpoints require a valid staff session with the **staff admin** role.
 > Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=latest:asc,number:desc`.
 
 **Examples**:
+
 - `GET /orders?page=1&limit=20`
 - `GET /orders?number=011&sort=modified:desc`
 

@@ -39,7 +39,7 @@ type paymentAccountResponse struct {
 	MethodID      uuid.UUID `json:"method_id"`
 	AccountName   string    `json:"account_name"`
 	AccountNumber *string   `json:"account_number"`
-	PhoneNumber   string    `json:"phone_number"`
+	PhoneNumber   *string   `json:"phone_number"`
 	QRString      *string   `json:"qr_string"`
 }
 

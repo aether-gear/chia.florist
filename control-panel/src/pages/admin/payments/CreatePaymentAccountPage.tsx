@@ -48,7 +48,7 @@ export default function CreatePaymentAccountPage() {
     setIsSubmitting(false);
     
     if (success) {
-      navigate('/admin/payments/accounts');
+      navigate('/admin/payments');
     }
   };
 

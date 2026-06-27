@@ -7,7 +7,7 @@ type RoleCode string
 const (
 	// RoleStaffAdmin grants full access to staff resources and
 	// administrative operations within a staff workspace.
-	RoleStaffAdmin RoleCode = "admin"
+	RoleStaffAdmin RoleCode = "staff_admin"
 
 	// RoleStaff grants operational access to staff resources
 	// with permissions restricted by business policy.

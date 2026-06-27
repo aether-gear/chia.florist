@@ -89,11 +89,32 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 }
 
 func (h *staffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) error {
+	var req createStaffRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+
+	if req.Name == "" {
+		return apperrors.NewBadRequest("name is required")
+	}
+
+	input := usecase.CreateStaffInput{
+		Name:        req.Name,
+		Description: req.Description,
+		LogoUrl:     req.LogoUrl,
+		BannerUrl:   req.BannerUrl,
+	}
+
+	err := h.createStaff.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
 	response := map[string]string{
 		"message": "staff successfully created",
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, response)
+	apphttp.WriteJSON(w, http.StatusCreated, response)
 	return nil
 }
 

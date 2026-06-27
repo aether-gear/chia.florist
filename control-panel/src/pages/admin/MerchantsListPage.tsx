@@ -77,13 +77,14 @@ export default function MerchantsListPage() {
                     <TableHead className="w-[80px]">Logo</TableHead>
                     <TableHead>Merchant Name</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Registered On</TableHead>
+                    <TableHead>Registered On</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data?.merchants.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
+                      <TableCell colSpan={5} className="h-24 text-center">
                         No merchants found.
                       </TableCell>
                     </TableRow>
@@ -114,12 +115,19 @@ export default function MerchantsListPage() {
                         <TableCell className="max-w-xs truncate">
                           {merchant.description || '-'}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell>
                           {new Date(merchant.created_at).toLocaleDateString('en-GB', {
                             day: 'numeric',
                             month: 'short',
                             year: 'numeric'
                           })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" asChild>
+                            <Link to={`/admin/merchants/${merchant.id}/accounts/add`}>
+                              Add Account
+                            </Link>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))

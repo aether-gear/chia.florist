@@ -57,7 +57,7 @@ export default function CustomersListPage() {
           <CardHeader>
             <CardTitle>All Customers</CardTitle>
             <CardDescription>
-              Showing {data?.users.length || 0} of {data?.total || 0} customers.
+              Showing {data?.customers.length || 0} of {data?.total || 0} customers.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -71,7 +71,7 @@ export default function CustomersListPage() {
                 />
               </div>
             </div>
-
+ 
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -82,14 +82,14 @@ export default function CustomersListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.users.length === 0 ? (
+                  {data?.customers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={3} className="h-24 text-center">
                         No customers found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data?.users.map((customer) => (
+                    data?.customers.map((customer) => (
                       <TableRow key={customer.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-3">

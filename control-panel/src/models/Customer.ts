@@ -10,5 +10,5 @@ export interface CustomersResponse {
   page: number;
   limit: number;
   total: number;
-  users: Customer[];
+  customers: Customer[];
 }

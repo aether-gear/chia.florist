@@ -27,7 +27,7 @@ import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
 
 export default function ShopManagementPage() {
-  const { addresses, couriers, products, loading, error, createAddress } = useShopViewModel();
+  const { shopId, shopInfo, addresses, couriers, products, loading, error, createAddress, saveShop, refresh } = useShopViewModel();
   
   // Sheet control
   const [isOpen, setIsOpen] = useState(false);
@@ -38,6 +38,33 @@ export default function ShopManagementPage() {
   const [fullAddress, setFullAddress] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [isActive, setIsActive] = useState(false);
+  
+  // Shop Info Form states
+  const [shopName, setShopName] = useState('');
+  const [shopDesc, setShopDesc] = useState('');
+  const [shopIsActive, setShopIsActive] = useState(false);
+  const [isSavingShop, setIsSavingShop] = useState(false);
+
+  // Sync shop info to form
+  useEffect(() => {
+    if (shopInfo) {
+      setShopName(shopInfo.name || '');
+      setShopDesc(shopInfo.description || '');
+      setShopIsActive(shopInfo.is_active || false);
+    }
+  }, [shopInfo]);
+
+  const handleSaveShop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingShop(true);
+    await saveShop({
+      name: shopName,
+      description: shopDesc,
+      is_active: shopIsActive ? "true" : "false"
+    });
+    setIsSavingShop(false);
+  };
+
   
   // Location dropdown states
   const [provinces, setProvinces] = useState<any[]>([]);
@@ -52,6 +79,54 @@ export default function ShopManagementPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Add Inventory Sheet states
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [productsList, setProductsList] = useState<any[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [inventoryStock, setInventoryStock] = useState('');
+  const [isInventorySubmitting, setIsInventorySubmitting] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+
+  // Load all products when Add Inventory Sheet is open
+  useEffect(() => {
+    if (isInventoryOpen) {
+      const loadProducts = async () => {
+        try {
+          const res = await fetchApi('/products?page=1&limit=100');
+          setProductsList(res.products || []);
+        } catch (err: any) {
+          console.error('Failed to load products', err);
+        }
+      };
+      loadProducts();
+    }
+  }, [isInventoryOpen]);
+
+  const handleInventorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const activeShopId = shopId || "c3d4e5f6-a7b8-9012-cdef-123456789012";
+    if (!activeShopId || !selectedProductId || !inventoryStock) return;
+
+    setIsInventorySubmitting(true);
+    setInventoryError(null);
+
+    try {
+      await fetchApi(`/shops/${activeShopId}/products/${selectedProductId}/inventories`, {
+        method: 'POST',
+        body: JSON.stringify({ stock: Number(inventoryStock) }),
+      });
+      setIsInventoryOpen(false);
+      setSelectedProductId('');
+      setInventoryStock('');
+      refresh();
+    } catch (err: any) {
+      setInventoryError(err.message || 'Failed to add inventory');
+    } finally {
+      setIsInventorySubmitting(false);
+    }
+  };
+
 
   // Load provinces on Sheet open
   useEffect(() => {
@@ -204,13 +279,50 @@ export default function ShopManagementPage() {
               <CardHeader>
                 <CardTitle>General Information</CardTitle>
                 <CardDescription>
-                  Basic details about your shop. This links back to your Merchant Profile Settings.
+                  Basic details and configuration for your shop.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  For general settings like Shop Name, Description, Logo, and Operational Hours, please go to the <strong>Profile Settings</strong> menu.
-                </p>
+                <form onSubmit={handleSaveShop} className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label htmlFor="shopName">Shop Name</Label>
+                    <Input
+                      id="shopName"
+                      value={shopName}
+                      onChange={(e) => setShopName(e.target.value)}
+                      required
+                      placeholder="e.g. Chia Branch 1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="shopDesc">Description</Label>
+                    <textarea
+                      id="shopDesc"
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      value={shopDesc}
+                      onChange={(e) => setShopDesc(e.target.value)}
+                      placeholder="Brief description of the shop..."
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input
+                      id="shopIsActive"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      checked={shopIsActive}
+                      onChange={(e) => setShopIsActive(e.target.checked)}
+                    />
+                    <Label htmlFor="shopIsActive" className="text-sm font-medium leading-none cursor-pointer">
+                      Shop is Active
+                    </Label>
+                  </div>
+                  <div className="pt-4">
+                    <Button type="submit" disabled={isSavingShop}>
+                      {isSavingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Save Shop Settings
+                    </Button>
+                  </div>
+                </form>
               </CardContent>
             </Card>
           </TabsContent>
@@ -472,9 +584,71 @@ export default function ShopManagementPage() {
                     Products associated with this specific shop location and their stock levels.
                   </CardDescription>
                 </div>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" /> Add Inventory
-                </Button>
+                
+                <Sheet open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
+                  <SheetTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" /> Add Inventory
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="sm:max-w-md overflow-y-auto">
+                    <SheetHeader className="mb-4">
+                      <SheetTitle>Add Inventory</SheetTitle>
+                      <SheetDescription>
+                        Assign stock for a product at this shop location.
+                      </SheetDescription>
+                    </SheetHeader>
+
+                    {inventoryError && (
+                      <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100 mb-4">
+                        {inventoryError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleInventorySubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="productSelect">Select Product</Label>
+                        <select
+                          id="productSelect"
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                          value={selectedProductId}
+                          onChange={(e) => setSelectedProductId(e.target.value)}
+                          required
+                        >
+                          <option value="">Select Product</option>
+                          {productsList.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.sku})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="inventoryStockInput">Initial Stock</Label>
+                        <Input
+                          id="inventoryStockInput"
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 50"
+                          value={inventoryStock}
+                          onChange={(e) => setInventoryStock(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="pt-4 flex justify-end gap-2">
+                        <SheetClose asChild>
+                          <Button type="button" variant="outline">Cancel</Button>
+                        </SheetClose>
+                        <Button type="submit" disabled={isInventorySubmitting}>
+                          {isInventorySubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Add Stock
+                        </Button>
+                      </div>
+                    </form>
+                  </SheetContent>
+                </Sheet>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">

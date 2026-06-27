@@ -289,7 +289,9 @@ func NewContainer(cfg Config,
 		CreateStaff: *staffUsecase.
 			NewCreateStaffUsecase(
 				staffRepo,
+				userRepo,
 				infra.TransactionExecutor,
+				infra.TransactionProvider,
 			),
 		AddStaffAccount: *staffUsecase.
 			NewAddStaffAccountUsecase(

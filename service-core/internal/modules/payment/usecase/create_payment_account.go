@@ -53,12 +53,17 @@ func (u *CreatePaymentAccountUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrPaymentMethodNotFound.Error())
 	}
 
+	var phonePtr *string
+	if input.PhoneNumber != "" {
+		phonePtr = &input.PhoneNumber
+	}
+
 	paymentAccount := domain.PaymentAccount{
 		ID:            uuid.New(),
 		MethodID:      method.ID,
 		AccountName:   input.AccountName,
 		AccountNumber: input.AccountNumber,
-		PhoneNumber:   input.PhoneNumber,
+		PhoneNumber:   phonePtr,
 		QRString:      input.QRString,
 		IsActive:      input.IsActive,
 		CurrentLoad:   0,

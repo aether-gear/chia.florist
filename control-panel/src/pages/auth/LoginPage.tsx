@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await fetchApi('/auth/merchant/signin', {
+      await fetchApi('/auth/staff/signin', {
         method: 'POST',
         body: JSON.stringify({
           email,

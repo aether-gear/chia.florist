@@ -113,7 +113,7 @@ type CreateOrderInput struct {
 type PaymentAccountResult struct {
 	AccountName   string
 	AccountNumber *string
-	PhoneNumber   string
+	PhoneNumber   *string
 	QRString      *string
 }
 
@@ -486,8 +486,8 @@ func (u *CreateOrderUsecase) Execute(
 			if paymentAccount != nil {
 				if paymentAccount.AccountNumber != nil {
 					vaNumber = *paymentAccount.AccountNumber
-				} else if paymentAccount.PhoneNumber != "" {
-					vaNumber = paymentAccount.PhoneNumber
+				} else if paymentAccount.PhoneNumber != nil && *paymentAccount.PhoneNumber != "" {
+					vaNumber = *paymentAccount.PhoneNumber
 				} else if paymentAccount.QRString != nil {
 					vaNumber = *paymentAccount.QRString
 				}
