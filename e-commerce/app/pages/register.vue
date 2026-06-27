@@ -74,7 +74,7 @@ const handleVerify = async () => {
   errorMessage.value = ''
 
   try {
-    const success = await authVm.verifyOtp(parseInt(otpCode.value))
+    const success = await authVm.verifyOtp(otpCode.value)
     if (success) {
       navigateTo('/')
     }

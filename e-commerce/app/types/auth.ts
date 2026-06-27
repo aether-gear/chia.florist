@@ -17,7 +17,7 @@ export interface VerifyRequest {
   user_agent?: string
   ip_address?: string
   challenge_id: string
-  otp: number
+  otp: string
 }
 
 export interface VerifyResponse {
