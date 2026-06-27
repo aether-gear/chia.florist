@@ -193,3 +193,68 @@ func (r *paymentRepositoryImpl) scanPayment(
 
 	return &payment, nil
 }
+
+func (r *paymentRepositoryImpl) ListByOrderIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	orderIDs []uuid.UUID,
+) ([]domain.Payment, error) {
+	if len(orderIDs) == 0 {
+		return []domain.Payment{}, nil
+	}
+
+	query := `
+		SELECT DISTINCT ON (order_id)
+			id,
+			order_id,
+			method_id,
+			payment_account_id,
+			provider,
+			provider_payment_id,
+			provider_order_id,
+			amount,
+			status,
+			expires_at,
+			created_at,
+			updated_at
+		FROM payments
+		WHERE order_id = ANY($1::uuid[])
+		ORDER BY order_id, created_at DESC
+	`
+
+	orderIDStrings := make([]string, len(orderIDs))
+	for i, id := range orderIDs {
+		orderIDStrings[i] = id.String()
+	}
+
+	rows, err := exec.Query(ctx, query, orderIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query payments by order ids failed: %w", err)
+	}
+	defer rows.Close()
+
+	payments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Payment, error) {
+		var p domain.Payment
+		err := row.Scan(
+			&p.ID,
+			&p.OrderID,
+			&p.MethodID,
+			&p.PaymentAccountID,
+			&p.Provider,
+			&p.ProviderPaymentID,
+			&p.ProviderOrderID,
+			&p.Amount,
+			&p.Status,
+			&p.ExpiresAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		)
+		return p, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan payments failed: %w", err)
+	}
+
+	return payments, nil
+}
+

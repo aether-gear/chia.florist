@@ -1,4 +1,4 @@
-package usecase
+﻿package usecase
 
 import (
 	"context"
@@ -7,6 +7,10 @@ import (
 
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
+	paymentDomain "service-core/internal/modules/payment/domain"
+	paymentRepo "service-core/internal/modules/payment/repository"
+	shipmentDomain "service-core/internal/modules/shipment/domain"
+	shipmentRepo "service-core/internal/modules/shipment/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
@@ -17,17 +21,23 @@ type FindOrdersUsecase struct {
 	executor      transaction.Executor
 	orderRepo     repository.OrderRepository
 	orderItemRepo repository.OrderItemRepository
+	paymentRepo   paymentRepo.PaymentRepository
+	shipmentRepo  shipmentRepo.ShipmentRepository
 }
 
 func NewFindOrdersUsecase(
 	executor transaction.Executor,
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
+	paymentRepo paymentRepo.PaymentRepository,
+	shipmentRepo shipmentRepo.ShipmentRepository,
 ) *FindOrdersUsecase {
 	return &FindOrdersUsecase{
 		executor:      executor,
 		orderRepo:     orderRepo,
 		orderItemRepo: orderItemRepo,
+		paymentRepo:   paymentRepo,
+		shipmentRepo:  shipmentRepo,
 	}
 }
 
@@ -42,8 +52,10 @@ type FindOrdersInput struct {
 }
 
 type OrderSearchResult struct {
-	Order domain.Order
-	Items []domain.OrderItem
+	Order    domain.Order
+	Items    []domain.OrderItem
+	Payment  *paymentDomain.Payment
+	Shipment *shipmentDomain.Shipment
 }
 
 func (u *FindOrdersUsecase) Execute(
@@ -129,9 +141,31 @@ func (u *FindOrdersUsecase) Execute(
 		return nil, 0, fmt.Errorf("failed to list order items: %w", err)
 	}
 
+	payments, err := u.paymentRepo.ListByOrderIDs(ctx, u.executor, orderIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list payments: %w", err)
+	}
+
+	shipments, err := u.shipmentRepo.ListByOrderIDs(ctx, u.executor, orderIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list shipments: %w", err)
+	}
+
 	itemsMap := make(map[uuid.UUID][]domain.OrderItem)
 	for _, item := range orderItems {
 		itemsMap[item.OrderID] = append(itemsMap[item.OrderID], item)
+	}
+
+	paymentsMap := make(map[uuid.UUID]*paymentDomain.Payment)
+	for i := range payments {
+		p := payments[i]
+		paymentsMap[p.OrderID] = &p
+	}
+
+	shipmentsMap := make(map[uuid.UUID]*shipmentDomain.Shipment)
+	for i := range shipments {
+		s := shipments[i]
+		shipmentsMap[s.OrderID] = &s
 	}
 
 	results := make([]OrderSearchResult, len(orders))
@@ -141,8 +175,10 @@ func (u *FindOrdersUsecase) Execute(
 			items = []domain.OrderItem{}
 		}
 		results[i] = OrderSearchResult{
-			Order: o,
-			Items: items,
+			Order:    o,
+			Items:    items,
+			Payment:  paymentsMap[o.ID],
+			Shipment: shipmentsMap[o.ID],
 		}
 	}
 
