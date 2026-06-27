@@ -129,8 +129,9 @@ const closeSearch = () => {
             class="flex items-center gap-2 py-1 px-2.5 hover:bg-gray-50 rounded-full transition-all duration-300 group"
             title="Profile Settings"
           >
-            <div class="relative w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#1b4332] group-hover:bg-[#1b4332] group-hover:text-white transition-all duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="relative w-8 h-8 rounded-full overflow-hidden bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#1b4332] group-hover:bg-[#1b4332] group-hover:text-white transition-all duration-300">
+              <img v-if="authVm.currentUser.value?.avatarUrl" :src="authVm.currentUser.value.avatarUrl" class="w-full h-full object-cover" />
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               <!-- Green online dot overlay -->

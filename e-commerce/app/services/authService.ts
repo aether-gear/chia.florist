@@ -6,7 +6,9 @@ import type {
   SignInRequest, 
   SignInResponse, 
   GetCurrentUserResponse,
-  GetMeResponse
+  GetMeResponse,
+  GetProfileResponse,
+  UpdateProfileRequest
 } from '~/types/auth'
 import { bootstrapConfig } from '~/utils/bootstrap'
 
@@ -72,6 +74,33 @@ export const authService = {
     return bootstrapConfig.fetchApi<GetCurrentUserResponse>('/users/me/', {
       method: 'GET',
       headers
+    })
+  },
+  /**
+   * Retrieve profile of the currently authenticated customer.
+   */
+  async getProfile(cookieHeader?: string): Promise<GetProfileResponse> {
+    const headers: Record<string, string> = {}
+    if (cookieHeader) {
+      headers['cookie'] = cookieHeader
+    }
+    return bootstrapConfig.fetchApi<GetProfileResponse>('/profile', {
+      method: 'GET',
+      headers
+    })
+  },
+  /**
+   * Update profile of the currently authenticated customer.
+   */
+  async updateProfile(data: UpdateProfileRequest, cookieHeader?: string): Promise<GetProfileResponse> {
+    const headers: Record<string, string> = {}
+    if (cookieHeader) {
+      headers['cookie'] = cookieHeader
+    }
+    return bootstrapConfig.fetchApi<GetProfileResponse>('/profile', {
+      method: 'PUT',
+      headers,
+      body: data
     })
   }
 }
