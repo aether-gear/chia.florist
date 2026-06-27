@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Package, Search, Plus, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
+import { Label } from '../../components/ui/label';
 import {
   Table,
   TableBody,
@@ -11,12 +13,68 @@ import {
   TableRow,
 } from '../../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from '../../components/ui/sheet';
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
 import { useNavigate } from 'react-router-dom';
+import { fetchApi } from '../../lib/api';
 
 export default function ProductsPage() {
-  const { data, loading, error } = useProductsViewModel();
+  const { data, loading, error, refresh } = useProductsViewModel();
   const navigate = useNavigate();
+
+  // Sheet form states
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [isAddInventoryOpen, setIsAddInventoryOpen] = useState(false);
+  const [shops, setShops] = useState<any[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState('');
+  const [stock, setStock] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Load shops on Sheet open
+  useEffect(() => {
+    if (isAddInventoryOpen) {
+      const loadShops = async () => {
+        try {
+          const res = await fetchApi('/shops');
+          setShops(res.shops || []);
+        } catch (err: any) {
+          console.error('Failed to load shops', err);
+        }
+      };
+      loadShops();
+    }
+  }, [isAddInventoryOpen]);
+
+  const handleAddInventory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProduct || !selectedShopId || !stock) return;
+
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      await fetchApi(`/shops/${selectedShopId}/products/${selectedProduct.id}/inventories`, {
+        method: 'POST',
+        body: JSON.stringify({ stock: Number(stock) }),
+      });
+      setIsAddInventoryOpen(false);
+      setSelectedShopId('');
+      setStock('');
+      refresh();
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to add inventory');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -80,12 +138,13 @@ export default function ProductsPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="w-[150px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!data?.products || data.products.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center">
+                      <TableCell colSpan={7} className="h-24 text-center">
                         No products found.
                       </TableCell>
                     </TableRow>
@@ -139,6 +198,18 @@ export default function ProductsPage() {
                             {product.stock}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setIsAddInventoryOpen(true);
+                            }}
+                          >
+                            <Plus className="mr-1 h-3.5 w-3.5" /> Add Inventory
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -148,6 +219,70 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Inventory Sheet */}
+      <Sheet open={isAddInventoryOpen} onOpenChange={setIsAddInventoryOpen}>
+        <SheetContent className="sm:max-w-md overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Add Inventory</SheetTitle>
+            <SheetDescription>
+              Assign new inventory stock to a shop location for <strong>{selectedProduct?.name}</strong>.
+            </SheetDescription>
+          </SheetHeader>
+
+          {formError && (
+            <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100 mb-4">
+              {formError}
+            </div>
+          )}
+
+          <form onSubmit={handleAddInventory} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="shop">Select Shop</Label>
+              <select
+                id="shop"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={selectedShopId}
+                onChange={(e) => setSelectedShopId(e.target.value)}
+                required
+              >
+                <option value="">Select Shop Branch</option>
+                {shops.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="stock">Initial Stock</Label>
+              <Input
+                id="stock"
+                type="number"
+                min="0"
+                placeholder="e.g. 50"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="pt-4 flex justify-end gap-2">
+              <SheetClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </SheetClose>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Stock
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
+

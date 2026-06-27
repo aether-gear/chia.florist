@@ -1,89 +1,53 @@
-# WAF-Golang Project Context
-*This document provides a comprehensive overview of the "WAF Sentinel" project for AI assistants lacking direct directory access.*
+# Project Context: Chia Florist Control Panel & WAF
+This document provides the current context, architecture, and recent updates for the Chia Florist control-panel workspace. AI agents should use this document to understand the project structure and ongoing tasks before generating code or modifying files.
 
-## 1. Project Overview
-The "WAF Sentinel" is a custom, high-performance Web Application Firewall (WAF) and real-time visualization dashboard designed for a small-to-medium e-commerce platform (like a flower shop). It acts as an active defense shield that intercepts inbound HTTP traffic, detects malicious signatures, blocks threats, and visualizes the attack data.
+## 📌 Project Overview
+The control-panel is a hybrid workspace encompassing the frontend dashboard for Chia Florist and a newly integrated, custom-built Web Application Firewall (WAF) written in Golang.
 
-## 2. Tech Stack Overview
-### Backend (The WAF Middleware & API)
-- **Language**: Go (Golang 1.20+)
-- **Server/Router**: Native `net/http` ServeMux.
-- **Persistence Layer**: JSON files (No external database like PostgreSQL/GORM).
-- **Core Security Engine**: Go's native standard Regular Expression (`regexp`) engine.
-- **Concurrency**: Goroutines and `sync.RWMutex` for lock-safe memory operations on high-throughput traffic logs.
-- **External APIs**: Integrated with VirusTotal (Reputation Scanning) and GeoIP APIs.
+Core Objectives:
+- Maintain a fast, modern frontend using Vite, TypeScript, and Tailwind CSS.
+- Secure the application using a robust Golang-based WAF.
+- Continuously test and monitor firewall rules against spam and simulated attacks.
 
-### Frontend (The Security Dashboard)
-- **Framework**: Next.js (React) using the App Router (`app/` directory).
-- **Styling**: Tailwind CSS + Shadcn/UI components (Dark Mode premium aesthetic).
-- **Data Visualization**: 
-  - `Recharts` for SIEM-style traffic analysis and zero-filled time-series bucket charts (up to 500 bucket performance limits).
-  - `Leaflet.js` (via react-leaflet) for dynamic geospatial threat mapping.
+## 🚀 Recent Updates & Migrations
+- **Golang WAF Migration:** The WAF system has been successfully migrated to Golang (see `WAF_MIGRATION_REPORT.md` and `CHANGELOG_WAF_GOLANG.md` for historical context). The compiled executable is `main.exe`.
+- **WAF Configuration Files:** The firewall is now fully driven by JSON configurations:
+  - `waf-rules.json`: Defines the active security rules.
+  - `waf-filters.json`: Defines specific filter parameters.
+  - `waf-blocked.json`: Records IP/entities currently blocked.
+  - `waf-logs.json`: General WAF activity logging.
+- **Attack Simulation Tooling:** Added Node.js/CommonJS scripts (`simulate_attacks.js`, `simulate_spam.js`, and their `.cjs` variants) to rigorously test the WAF rules in development.
 
-## 3. Directory Structure
-```text
-D:\Antigravity-Workspace\web-dummy\WAF-Golang\
-│
-├── main.go                 # Core Go Backend (WAF Middleware, APIs, Log Management)
-├── waf-logs.json           # Stores historical traffic logs
-├── waf-rules.json          # Stores regex-based WAF signatures
-├── waf-blocked.json        # Stores Banned, Whitelisted, and Ignored IP configurations
-├── simulate_attacks.js     # Node.js script to simulate botnets/traffic
-├── CHANGELOG_WAF_GOLANG.md # Detailed technical history of the codebase
-│
-└── ui/                     # Next.js Frontend Dashboard
-    ├── package.json
-    ├── app/
-    │   ├── layout.tsx      # Global layout (forced "dark" class)
-    │   ├── page.tsx        # Main Dashboard UI (Charts, Map, Log Table, API calls)
-    │   └── config/
-    │       └── page.tsx    # Configuration UI (Rule management, IP Blacklisting)
-    └── components/
-        ├── TrafficChart.tsx # Recharts implementation (Zero-filling, responsive intervals)
-        ├── AttackMap.tsx    # Leaflet implementation (Threat geographic plotting)
-        └── ui/              # Shadcn/UI primitive components
-```
+## 📂 Workspace Structure
+The workspace contains both Go and Node.js ecosystems:
 
-## 4. Core Mechanics & Architecture
+**Frontend (UI & Tooling)**
+- `src/` & `public/`: Contains the frontend source code and static assets.
+- `vite.config.ts`, `tsconfig.*.json`: Build and TypeScript configurations.
+- `tailwind.config.js`, `postcss.config.js`: Styling engine configurations.
+- `components.json`: Likely used for a UI library (e.g., shadcn/ui).
+- `package.json` & `package-lock.json`: Node dependencies.
 
-### A. Traffic Interception (WAF Logic)
-Located in `WAFMiddleware(next http.Handler)` in `main.go`.
-1. Extracts Client IP (handling IPv4 and IPv6 proxy formats safely).
-2. Checks memory cache for Whitelist/Blacklist.
-3. If not whitelisted, the HTTP request URL and Query are matched against expressions loaded from `waf-rules.json`.
-4. If a match is found (e.g., SQL Injection), the WAF returns `403 Forbidden` and logs the attack.
-5. If clean, the request is passed through the middleware.
+**Backend (Golang WAF)**
+- `main.go`: The main entry point for the Golang backend/WAF.
+- `go.mod`: Go module dependencies.
+- `main.exe`: The compiled WAF binary.
 
-### B. Persistent State Management
-Data relies on high-speed JSON read/writes controlled by Mutex locks to prevent race conditions:
-- `waf-rules.json`: Dynamic rules array.
-- `waf-logs.json`: Append-only array of traffic events.
-- `waf-blocked.json`: Three lists -> `blocked_ips`, `whitelisted_ips`, `ignored_ips` (Muted IPs).
+**Documentation & AI Context**
+- `Task-md/`: Folder containing task breakdowns and specific AI instructions.
+- `PROJECT_CONTEXT_FOR_AI.md`: This file (or similar) to guide AI agents.
+- `notefromme.txt`: Personal notes or immediate directives for the AI.
 
-### C. The Dashboard (Frontend App)
-The `ui/app/page.tsx` serves as the primary hub:
-- **State Initialization**: Contains an `isReady` synchronization guard to prevent browser `localStorage` race conditions regarding user-preferred chart intervals (e.g., "1h", "24h").
-- **Real-Time Polling**: Fetches `/api/stats` continuously at adjustable intervals (1s, 2s, 5s).
-- **Smart Filtering**: Extracts unique IPs from incoming logs and dynamically proxies VirusTotal and GeoIP checks.
+## 📋 Current TODOs & Focus Areas
+- [x] Migrate WAF to Golang.
+- [x] Set up JSON-based rule engine (waf-rules.json).
+- [x] Create attack simulation scripts.
+- [ ] Review and analyze recent waf-logs.json for false positives.
+- [ ] Optimize main.go for better request throughput.
+- [ ] Connect the frontend dashboard to the WAF configuration files (allow editing waf-rules.json via UI).
 
-## 5. Backend REST API Endpoints (`main.go`)
-- `GET /` : Vulnerable target application endpoint (Simulating a Flower Shop).
-- `GET /api/stats` : Returns total requests and the full array of WAF logs.
-- `GET /api/rules` : Fetches the current WAF RegEx ruleset.
-- `POST /api/rules` : Adds a new security rule to the configuration.
-- `GET /api/ip` : Returns the combined status of all managed IPs (Banned, Whitelisted, Ignored).
-- `POST /api/ip` : Action handler receiving `{ "ip": "...", "action": "ban|whitelist|ignore" }`.
-- `GET /api/analyze/{ip}` : Backend Proxy handling VirusTotal requests to hide API keys from the client.
-- `GET /api/geo/{ip}` : Backend Proxy handling GeoIP resolution.
-
-## 6. How to Run Locally
-The project requires running two persistent terminals:
-1. **Backend**: `cd WAF-Golang` -> `go run main.go` (Runs on `localhost:8080`)
-2. **Frontend**: `cd WAF-Golang/ui` -> `npm run dev` (Runs on `localhost:3000`)
-
-## 7. Known Nuances / Constraints
-- **Performance Cap**: Recharts module has an adaptive bucket limit (~500 buckets) to prevent browser crashing when viewing large 30-day time ranges.
-- **Frontend Race Conditions**: The `page.tsx` heavily relies on caching API responses in `useRef` (e.g., `geoCache`) to avoid exhausting rate limits on free Geo/VirusTotal APIs.
-- **API Keys**: Keys are stored/injected via the Backend Proxy (`main.go`) to prevent leakage in the frontend source.
-
-*This concludes the context setup for external AI processing.*
+## 🛠️ Directives for AI Agents
+When interacting with this workspace:
+- **Language & Tech Stack:** Write frontend code in TypeScript/React (Vite) and backend WAF code in Golang.
+- **Testing WAF:** If modifying `main.go` or WAF rules, always suggest running `node simulate_attacks.js` to verify the changes do not break existing protections.
+- **Log Modification:** Do not manually alter `waf-logs.json` or `waf-blocked.json` via scripts unless explicitly instructed to build a flush/clean mechanism.

@@ -41,7 +41,7 @@ export default function AddMerchantAccountPage() {
     setSuccess(null);
 
     try {
-      const response = await fetchApi(`/merchants/${data.merchantId}/accounts`, {
+      const response = await fetchApi(`/staff/${data.merchantId}/accounts`, {
         method: 'POST',
         body: JSON.stringify({
           email: data.email,
@@ -67,8 +67,8 @@ export default function AddMerchantAccountPage() {
           <Users className="h-5 w-5 text-indigo-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Add Merchant Account</h2>
-          <p className="text-muted-foreground">Register a new staff/admin account for a specific merchant.</p>
+          <h2 className="text-2xl font-bold tracking-tight">Add Merchant (Staff) Account</h2>
+          <p className="text-muted-foreground">Register a new staff/admin account for a specific merchant staff entity.</p>
         </div>
       </div>
 

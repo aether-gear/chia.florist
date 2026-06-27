@@ -12,7 +12,7 @@ type PaymentAccount struct {
 
 	AccountName   string
 	AccountNumber *string
-	PhoneNumber   string
+	PhoneNumber   *string
 	QRString      *string
 
 	IsActive bool
@@ -37,7 +37,7 @@ func (pA *PaymentAccount) ValidateForMethod(methodType PaymentMethodType) error 
 		}
 
 	case TypeEWallet:
-		if pA.PhoneNumber == "" {
+		if pA.PhoneNumber == nil || *pA.PhoneNumber == "" {
 			return ErrInvalidPhoneNumber
 		}
 

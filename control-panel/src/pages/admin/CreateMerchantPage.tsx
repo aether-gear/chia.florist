@@ -32,14 +32,14 @@ export default function CreateMerchantPage() {
     setSuccess(null);
 
     try {
-      const response = await fetchApi('/merchants', {
+      const response = await fetchApi('/staff', {
         method: 'POST',
         body: JSON.stringify(data),
       });
-      setSuccess(response?.message || 'Merchant created successfully!');
+      setSuccess(response?.message || 'Staff created successfully!');
       reset();
     } catch (err: any) {
-      setError(err.message || 'Failed to create merchant');
+      setError(err.message || 'Failed to create staff');
     } finally {
       setLoading(false);
     }
@@ -52,8 +52,8 @@ export default function CreateMerchantPage() {
           <Store className="h-5 w-5 text-indigo-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Create Merchant</h2>
-          <p className="text-muted-foreground">Register a new merchant entity in the system.</p>
+          <h2 className="text-2xl font-bold tracking-tight">Create Merchant (Staff)</h2>
+          <p className="text-muted-foreground">Register a new merchant staff entity in the system.</p>
         </div>
       </div>
 

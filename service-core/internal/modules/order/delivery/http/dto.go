@@ -34,7 +34,7 @@ type createOrderRequest struct {
 type createOrderPaymentAccountResponse struct {
 	AccountName   string  `json:"account_name"`
 	AccountNumber *string `json:"account_number,omitempty"`
-	PhoneNumber   string  `json:"phone_number,omitempty"`
+	PhoneNumber   *string `json:"phone_number,omitempty"`
 	QRString      *string `json:"qr_string,omitempty"`
 }
 
