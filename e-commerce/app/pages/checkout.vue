@@ -52,30 +52,17 @@ const fetchShops = async () => {
   }
 }
 
-const FALLBACK_PAYMENT_METHODS = [
-  { id: '0137d751-5188-447a-b630-1bf858f4f866', name: 'QRIS', type: 'qr_code', description: 'QRIS payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
-  { id: '074b02e4-e047-4f60-bdb0-cfeb5481d002', name: 'DANA', type: 'ewallet', description: 'DANA via Midtrans', fee: 0, subtotal: 0, total: 0 },
-  { id: '24ce2aac-bd73-4c29-9ab9-2f53282b2679', name: 'Mandiri', type: 'bank_transfer', description: 'Mandiri Bill Payment via Midtrans', fee: 0, subtotal: 0, total: 0 },
-  { id: '5de3fdf1-7cf2-4354-bf31-a288a6706c41', name: 'GoPay', type: 'ewallet', description: 'GoPay via Midtrans', fee: 0, subtotal: 0, total: 0 },
-  { id: '8ef6ab35-008d-42c4-a66b-7d0a81fdd727', name: 'ShopeePay', type: 'ewallet', description: 'ShopeePay via Midtrans', fee: 0, subtotal: 0, total: 0 },
-  { id: 'aa90abf7-dc0b-445a-aac1-dc34976708de', name: 'SeaBank', type: 'bank_transfer', description: 'SeaBank transfer via Midtrans', fee: 0, subtotal: 0, total: 0 }
-]
-
-const paymentMethodTypes = computed(() => {
-  const types = new Set<string>()
-  paymentMethods.value.forEach(method => {
-    types.add(method.type)
-  })
-  return Array.from(types)
-})
+const paymentMethodTypes = ['qr_code', 'ewallet', 'bank_transfer']
 
 const paymentMethodsGroupedByType = computed(() => {
   const groups: Record<string, PaymentMethod[]> = {}
+  paymentMethodTypes.forEach(t => {
+    groups[t] = []
+  })
   paymentMethods.value.forEach(method => {
-    if (!groups[method.type]) {
-      groups[method.type] = []
+    if (groups[method.type]) {
+      groups[method.type]!.push(method)
     }
-    groups[method.type]!.push(method)
   })
   return groups
 })
@@ -109,7 +96,7 @@ const buyNowItem = computed<CartItem | null>(() => {
     quantity: Number(route.query.qty || 1),
     size: (route.query.size as string) || undefined,
     color: (route.query.color as string) || undefined,
-    shopId: (route.query.shopId as string) || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+    shopId: (route.query.shopId as string) || '99ef0062-1040-4574-a4be-0123abce5670'
   }
 })
 
@@ -150,7 +137,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     // Group ALL items by shopId
     const itemsByShop: Record<string, typeof checkoutItems.value> = {}
     checkoutItems.value.forEach(item => {
-      const sId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      const sId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
       if (!itemsByShop[sId]) {
         itemsByShop[sId] = []
       }
@@ -250,7 +237,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
   const customShopsMap: Record<string, typeof customItems> = {}
   customItems.forEach(item => {
-    const sId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+    const sId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
     if (!customShopsMap[sId]) {
       customShopsMap[sId] = []
     }
@@ -372,7 +359,7 @@ onMounted(async () => {
     const shopsMap: Record<string, { product_id: string; quantity: number }[]> = {}
     checkoutItems.value.forEach(item => {
       if (item.isCustom) return
-      const shopId = item.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+      const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
       if (!shopsMap[shopId]) {
         shopsMap[shopId] = []
       }
@@ -412,13 +399,13 @@ onMounted(async () => {
       if (mergedData.payment_methods && mergedData.payment_methods.length > 0) {
         paymentMethods.value = mergedData.payment_methods
       } else {
-        paymentMethods.value = JSON.parse(JSON.stringify(FALLBACK_PAYMENT_METHODS))
+        paymentMethods.value = []
       }
 
       const firstMethod = paymentMethods.value[0]
       if (firstMethod) {
         selectedPaymentMethodId.value = firstMethod.id
-        paymentMethodTypes.value.forEach(type => {
+        paymentMethodTypes.forEach(type => {
           openedCategories.value[type] = true
         })
       }
@@ -670,8 +657,8 @@ const handlePlaceOrder = async () => {
     alert('Please select a shipping address before completing your order.')
     return
   }
-  if (!selectedPaymentMethodId.value) {
-    alert('Please select a payment method before completing your order.')
+  if (paymentMethods.value.length === 0 || !selectedPaymentMethodId.value) {
+    alert('No payment method available or selected. Please select a payment method before completing your order.')
     return
   }
 
@@ -707,7 +694,7 @@ const handlePlaceOrder = async () => {
       address_id: selectedAddressId.value,
       selected_payment: {
         id: selectedPaymentMethodId.value,
-        is_manual: true
+        is_manual: isManualTransfer.value
       },
       shops: shopsPayload
     }
@@ -1038,7 +1025,7 @@ const handlePlaceOrder = async () => {
 
             <button 
               @click="handlePlaceOrder"
-              :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || (!isManualTransfer && !selectedPaymentMethodId)"
+              :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || paymentMethods.length === 0 || !selectedPaymentMethodId"
               class="w-full bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
             >
               <span v-if="isProcessing">Processing Order...</span>

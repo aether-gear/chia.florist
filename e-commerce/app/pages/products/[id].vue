@@ -54,7 +54,7 @@ const handleAddToCart = () => {
     image: activeImage.value,
     size: selectedSize.value,
     color: selectedColor.value,
-    shopId: product.value.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1',
+    shopId: product.value.shopId || '99ef0062-1040-4574-a4be-0123abce5670',
     isCustom: false
   }, quantity.value)
   navigateTo('/cart')
@@ -62,7 +62,7 @@ const handleAddToCart = () => {
 
 const handleBuyNow = () => {
   if (!product.value) return
-  const shopId = product.value.shopId || '333f6432-a01c-412f-99f4-0f08ca0d8eb1'
+  const shopId = product.value.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
   navigateTo({
     path: '/checkout',
     query: {
