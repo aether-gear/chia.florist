@@ -93,6 +93,11 @@ const handleFileUpload = async (event: Event) => {
       if (authVm.currentUser.value) {
         authVm.currentUser.value.avatarUrl = urls.signedUrl || urls.publicUrl
       }
+
+      // Sync avatar URL with Go backend
+      await authVm.updateUserProfile({
+        avatar_url: urls.signedUrl || urls.publicUrl
+      })
     } else {
       uploadError.value = 'Failed to upload image. Please try again.'
     }
@@ -123,12 +128,38 @@ const handleRemovePicture = async () => {
       if (authVm.currentUser.value) {
         authVm.currentUser.value.avatarUrl = null
       }
+
+      // Clear avatar URL in Go backend
+      await authVm.updateUserProfile({
+        avatar_url: ''
+      })
     } catch (err) {
       console.error('Failed to remove profile picture:', err)
       alert('Failed to remove profile picture.')
     } finally {
       isUploading.value = false
     }
+  }
+}
+
+const handleUpdateProfile = async () => {
+  if (!user.value.name) {
+    alert('Full name is required.')
+    return
+  }
+
+  try {
+    const res = await authVm.updateUserProfile({
+      name: user.value.name,
+      phone: user.value.phone
+    })
+    if (res.success) {
+      alert('Profile updated successfully!')
+    } else {
+      alert(res.message || 'Failed to update profile.')
+    }
+  } catch (err: any) {
+    alert(err.message || 'An error occurred while updating profile.')
   }
 }
 
@@ -439,7 +470,10 @@ const triggerAlert = (message: string) => {
               </div>
               
               <div class="flex justify-end">
-                <button class="bg-[#1b4332] hover:bg-[#143326] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-sm transition">Save Changes</button>
+                <button @click="handleUpdateProfile" :disabled="authVm.isLoading.value" class="bg-[#1b4332] hover:bg-[#143326] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-sm transition disabled:opacity-50 flex items-center gap-2 cursor-pointer">
+                  <span v-if="authVm.isLoading.value" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                  <span>Save Changes</span>
+                </button>
               </div>
             </div>
           </div>
@@ -955,6 +989,8 @@ const triggerAlert = (message: string) => {
             </button>
           </div>
         </div>
+
+
 
       </div>
     </div>

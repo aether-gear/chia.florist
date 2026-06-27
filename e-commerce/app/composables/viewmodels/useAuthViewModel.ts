@@ -32,18 +32,20 @@ export const useAuthViewModel = () => {
 
         let profileDetails: any = null
         try {
-          const profileRes = await authService.getCurrentUser(cookieHeader)
-          if (profileRes && profileRes.me) {
-            profileDetails = profileRes.me
+          const profileRes = await authService.getProfile(cookieHeader)
+          if (profileRes && profileRes.profile) {
+            profileDetails = profileRes.profile
           }
         } catch (profileErr) {
           console.warn('Failed to fetch profile details from Golang backend:', profileErr)
         }
         
         let avatarUrlVal: string | null = null
-        if (import.meta.client) {
+        if (profileDetails && profileDetails.AvatarURL) {
+          avatarUrlVal = profileDetails.AvatarURL
+        } else if (import.meta.client) {
           try {
-            const urls = await supabaseService.getAvatarUrls(profileDetails?.id || response.account_id)
+            const urls = await supabaseService.getAvatarUrls(profileDetails?.user_id || response.account_id)
             if (urls) {
               avatarUrlVal = urls.signedUrl || urls.publicUrl
             }
@@ -54,12 +56,12 @@ export const useAuthViewModel = () => {
 
         if (profileDetails) {
           userProfile.value = {
-            id: profileDetails.id,
-            name: profileDetails.name || 'Customer',
-            username: profileDetails.username || 'customer',
-            email: profileDetails.email || userProfile.value?.email || '',
-            phone: profileDetails.phone || '',
-            last_login_at: profileDetails.last_login_at || new Date().toISOString(),
+            id: profileDetails.user_id,
+            name: profileDetails.Name || 'Customer',
+            username: profileDetails.Username || 'customer',
+            email: userProfile.value?.email || '',
+            phone: profileDetails.Phone || '',
+            last_login_at: profileDetails.LastLoginAt || new Date().toISOString(),
             avatarUrl: avatarUrlVal
           }
         } else if (!userProfile.value) {
@@ -299,6 +301,39 @@ export const useAuthViewModel = () => {
     }
   }
 
+  /**
+   * Update the user profile details using the PUT /profile API.
+   */
+  const updateUserProfile = async (data: { name?: string; phone?: string; avatar_url?: string }) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await authService.updateProfile(data)
+      if (response && response.profile) {
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        const profile = response.profile
+        
+        // Update user cookie
+        userProfile.value = {
+          ...userProfile.value,
+          name: profile.Name || userProfile.value?.name || 'Customer',
+          username: profile.Username || userProfile.value?.username || 'customer',
+          phone: profile.Phone || userProfile.value?.phone || '',
+          avatarUrl: profile.AvatarURL || userProfile.value?.avatarUrl || null
+        }
+        
+        currentUser.value = userProfile.value as UserMe
+        return { success: true, profile: response.profile }
+      }
+      return { success: false, message: 'Update failed: Empty response' }
+    } catch (err: any) {
+      error.value = err.data?.message || err.message || 'Failed to update profile'
+      return { success: false, message: error.value }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   // Restore active challenge details on instantiation on the client
   if (import.meta.client && !registrationEmail.value) {
     registrationEmail.value = localStorage.getItem('register_email')
@@ -318,6 +353,7 @@ export const useAuthViewModel = () => {
     login,
     register,
     verifyOtp,
-    logout
+    logout,
+    updateUserProfile
   }
 }

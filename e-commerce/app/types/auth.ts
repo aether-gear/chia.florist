@@ -54,3 +54,25 @@ export interface GetMeResponse {
   account_type: string
   is_authenticated: boolean
 }
+
+export interface UserProfile {
+  customer_id: string
+  user_id: string
+  Name: string
+  Username: string
+  Phone: string
+  AvatarURL: string | null
+  LastLoginAt: string | null
+  CreatedAt: string
+  UpdatedAt: string | null
+}
+
+export interface GetProfileResponse {
+  profile: UserProfile
+}
+
+export interface UpdateProfileRequest {
+  name?: string
+  phone?: string
+  avatar_url?: string
+}
