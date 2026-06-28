@@ -1,0 +1,105 @@
+# Chia Florist — Render Infrastructure-as-Code
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy all services:
+#   Connect this repo to Render → New Blueprint → point to this file
+
+services:
+
+  # --- service-core (Go REST API) --- #
+  - type: web
+    name: chia-service-core
+    runtime: docker
+    dockerfilePath: ./service-core/Dockerfile
+    dockerContext: ./service-core
+    region: singapore
+    plan: starter
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: MY_APP_SAYA_HOST
+        value: 0.0.0.0
+      - key: MY_APP_SAYA_PORT
+        value: "7129"
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        sync: false
+      - key: POSTGRES_DB_HOST
+        sync: false
+      - key: POSTGRES_DB_PORT
+        value: "5432"
+      - key: POSTGRES_DB_NAME
+        sync: false
+      - key: POSTGRES_DB_USER
+        sync: false
+      - key: POSTGRES_DB_PASSWORD
+        sync: false
+      - key: POSTGRES_DB_SSLMODE
+        value: disable
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: RAJAONGKIR_DESTINATION_URL
+        sync: false
+      - key: RAJAONGKIR_CALCULATE_URL
+        sync: false
+      - key: RAJAONGKIR_SHIPPING
+        sync: false
+      - key: RAJAONGKIR_PAYMENT
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+  # --- e-commerce (Nuxt 4 SSR) --- #
+  - type: web
+    name: chia-e-commerce
+    runtime: docker
+    dockerfilePath: ./e-commerce/Dockerfile
+    dockerContext: ./e-commerce
+    region: singapore
+    plan: starter
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "4000"
+      - key: NODE_ENV
+        value: production
+      - key: SERVICE_CORE_API_URL
+        fromService:
+          name: chia-service-core
+          type: web
+          property: host
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+
+  # --- control-panel (React SPA) --- #
+  # NOTE: Primary is Netlify. This is provided as a Render alternative.
+  - type: web
+    name: chia-control-panel
+    runtime: docker
+    dockerfilePath: ./control-panel/Dockerfile
+    dockerContext: ./control-panel
+    region: singapore
+    plan: starter
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
