@@ -27,9 +27,10 @@ const villagesList = ref<any[]>([])
 // User basic info state
 const user = ref({
   name: 'Loading...',
+  username: 'Loading...',
   email: 'Loading...',
   phone: 'Loading...',
-  address: '12 Melati Street, East Jakarta'
+  lastLoginAt: '' as string | null
 })
 
 // Supabase avatar states
@@ -151,6 +152,7 @@ const handleUpdateProfile = async () => {
   try {
     const res = await authVm.updateUserProfile({
       name: user.value.name,
+      username: user.value.username,
       phone: user.value.phone
     })
     if (res.success) {
@@ -167,8 +169,10 @@ const handleUpdateProfile = async () => {
 watch(() => authVm.currentUser.value, (me) => {
   if (me) {
     user.value.name = me.name || ''
+    user.value.username = me.username || ''
     user.value.email = me.email || ''
     user.value.phone = me.phone || ''
+    user.value.lastLoginAt = me.last_login_at || null
   }
 }, { immediate: true })
 
@@ -439,18 +443,21 @@ const triggerAlert = (message: string) => {
                   <input type="text" v-model="user.name" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
                 </div>
                 <div class="space-y-1.5">
-                  <label class="text-xs font-bold text-gray-500">Email Address</label>
-                  <input type="email" v-model="user.email" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
+                  <label class="text-xs font-bold text-gray-500">Username</label>
+                  <input type="text" v-model="user.username" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="text-xs font-bold text-gray-500">Phone Number</label>
                   <input type="text" v-model="user.phone" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
                 </div>
+                <div class="space-y-1.5">
+                  <label class="text-xs font-bold text-gray-500">Email Address</label>
+                  <input type="email" :value="user.email" disabled class="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-semibold outline-none text-gray-500 cursor-not-allowed" />
+                </div>
               </div>
-              
-              <div class="space-y-1.5">
-                <label class="text-xs font-bold text-gray-500">Shipping Address (Legacy)</label>
-                <textarea rows="3" v-model="user.address" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold resize-none outline-none focus:bg-white focus:border-[#1b4332] transition-all"></textarea>
+
+              <div v-if="user.lastLoginAt" class="flex justify-end mt-2">
+                <p class="text-[10px] text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-md border border-gray-100">Last Login: {{ new Date(user.lastLoginAt).toLocaleString() }}</p>
               </div>
               
               <div class="flex justify-end">
