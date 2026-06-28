@@ -304,7 +304,7 @@ export const useAuthViewModel = () => {
   /**
    * Update the user profile details using the PUT /profile API.
    */
-  const updateUserProfile = async (data: { name?: string; phone?: string; avatar_url?: string }) => {
+  const updateUserProfile = async (data: UpdateProfileRequest) => {
     isLoading.value = true
     error.value = null
     try {

@@ -73,6 +73,7 @@ export interface GetProfileResponse {
 
 export interface UpdateProfileRequest {
   name?: string
+  username?: string
   phone?: string
   avatar_url?: string
 }

@@ -7,7 +7,7 @@ import { useAddress } from '~/composables/useAddress'
 import { cartService } from '~/services/cartService'
 import { orderService } from '~/services/orderService'
 import { bootstrapConfig } from '~/utils/bootstrap'
-import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod } from '~/types/checkout'
+import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod, CheckoutShop } from '~/types/checkout'
 import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { triggerAuthAlert } from '~/composables/useSessionState'
@@ -147,34 +147,13 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     Object.keys(itemsByShop).forEach(sId => {
       const items = itemsByShop[sId] || []
       const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
-      const mockOptions = [
-        { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 },
-        { code: 'tiki', name: 'TIKI', service: 'REG', etd: '2-4 Days', fee: 18000 },
-        { code: 'pos', name: 'POS', service: 'REG', etd: '3-5 Days', fee: 15000 }
-      ]
       
-      if (!courierOptionsMap.value[sId]) {
-        courierOptionsMap.value[sId] = mockOptions
-      }
-      
-      const selected = selectedCouriers.value[sId] || { code: 'jne', service: 'REG' }
-      if (!selectedCouriers.value[sId]) {
-        selectedCouriers.value[sId] = selected
-      }
-      
-      const defaultOption = { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 }
-      const matchedOption = mockOptions.find(o => o.code === selected.code && o.service === selected.service) || mockOptions[0] || defaultOption
-      
-      const shopEntry = {
+      const shopEntry: CheckoutShop = {
         shop_id: sId,
         name: shopsMap.value[sId] || 'Chia Florist',
         subtotal: subtotal,
-        total: subtotal + matchedOption.fee,
-        selected_courier: {
-          code: matchedOption.code,
-          service: matchedOption.service,
-          fee: matchedOption.fee
-        },
+        total: subtotal,
+        selected_courier: null,
         items: items.map(item => ({
           product_id: item.id,
           shop_id: sId,
@@ -185,15 +164,14 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
           size: item.size,
           color: item.color
         })),
-        cost_couriers: mockOptions
+        cost_couriers: []
       }
       merged.shops.push(shopEntry)
-      merged.total_shipping += matchedOption.fee
     })
     
     merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
-    merged.total_shipping = merged.shops.reduce((acc, s) => acc + (s.selected_courier ? s.selected_courier.fee : 0), 0)
-    merged.total = merged.subtotal + merged.total_shipping
+    merged.total_shipping = 0
+    merged.total = merged.subtotal
     
     return merged
   } else {
@@ -380,11 +358,8 @@ onMounted(async () => {
       try {
         res = await cartService.checkout(payload)
       } catch (checkoutErr: any) {
-        if (checkoutErr.status === 409 || (checkoutErr.data?.message && checkoutErr.data.message.includes('address'))) {
-          console.warn('Backend returned address conflict on mount, using fallback client estimation:', checkoutErr)
-        } else {
-          throw checkoutErr
-        }
+        console.warn('Backend returned error during checkout initialization, using fallback client estimation:', checkoutErr)
+        // Fallback gracefully without throwing so the UI can still load
       }
     }
 
@@ -490,7 +465,11 @@ const runCalculate = async () => {
         payment_method_id: selectedPaymentMethodId.value,
         shops: backendShopsPayload
       }
-      res = await cartService.checkoutCalculate(payload)
+      try {
+        res = await cartService.checkoutCalculate(payload)
+      } catch (calcErr: any) {
+        console.warn('Backend returned error during calculate, using fallback client estimation:', calcErr)
+      }
     }
 
     let newCheckoutData: CheckoutResponse
@@ -524,7 +503,7 @@ const runCalculate = async () => {
     }
   } catch (err: any) {
     console.error('Failed to calculate shipping:', err)
-    if (err.status === 409 || (err.data?.message && err.data.message.includes('default address'))) {
+    if (err.status === 409 && err.data?.message && err.data.message.includes('address')) {
       const addresses = addressVm.addresses.value
       const defaultAddr = addresses.find(a => a.is_default)
       if (!defaultAddr && addresses.length > 0) {
@@ -640,11 +619,17 @@ const liveShippingFee = computed(() => {
 })
 const livePaymentFee = computed(() => {
   if (isManualTransfer.value) return 0
+  if (checkoutData.value?.selected_payment_method?.id === selectedPaymentMethodId.value) {
+    return checkoutData.value.selected_payment_method.fee
+  }
   const activeMethod = paymentMethods.value.find(m => m.id === selectedPaymentMethodId.value)
   return activeMethod ? activeMethod.fee : 0
 })
 const liveTotalPayment = computed(() => {
   if (!checkoutData.value) return cartSubtotal.value - discount.value
+  if (checkoutData.value.selected_payment_method?.id === selectedPaymentMethodId.value) {
+    return checkoutData.value.total - discount.value
+  }
   const sub = checkoutData.value.subtotal
   const ship = checkoutData.value.total_shipping
   const fee = livePaymentFee.value
