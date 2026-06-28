@@ -1,0 +1,41 @@
+# Chia Florist — e-commerce Netlify Config (Nuxt 4 SSR via Edge Functions)
+# Alternative to Railway for the storefront — uses Nuxt's Netlify preset.
+#
+# Usage:
+#   Set NITRO_PRESET=netlify in Netlify environment variables
+#   Nuxt will output to .output/ with Netlify edge function support
+
+[build]
+  command = "npm install -g bun && bun install --frozen-lockfile && NITRO_PRESET=netlify bun run build"
+  publish = ".output/public"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Nuxt Netlify preset generates the functions automatically
+[[redirects]]
+  from   = "/api/core/*"
+  to     = "https://api.chia.florist/:splat"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from   = "/*"
+  to     = "/.netlify/functions/server"
+  status = 200
+
+# --- Security Headers --- #
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+
+[context.production]
+  [context.production.environment]
+    SERVICE_CORE_API_URL = "https://api.chia.florist"
+
+[context.staging]
+  [context.staging.environment]
+    SERVICE_CORE_API_URL = "https://api.staging.chia.florist"

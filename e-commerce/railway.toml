@@ -1,0 +1,20 @@
+# Chia Florist — e-commerce Railway Config
+# Docs: https://docs.railway.com/reference/config-as-code
+#
+# Required Railway Variables (set in dashboard per environment):
+#   HOST, PORT, SERVICE_CORE_API_URL, SUPABASE_URL, SUPABASE_KEY
+#
+# SERVICE_CORE_API_URL points to the Railway internal URL of service-core:
+#   production:  https://api.chia.florist  (or Railway private URL)
+#   staging:     https://api.staging.chia.florist
+
+[build]
+builder        = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath        = "/"
+healthcheckTimeout     = 300
+restartPolicyType      = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+numReplicas            = 1
