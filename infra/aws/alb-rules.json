@@ -1,0 +1,60 @@
+{
+  "_comment": "ALB Listener Rules for chia.florist — ap-southeast-1. Replace TARGET_GROUP_ARN_* with real ARNs after creating target groups.",
+  "listenerArn": "arn:aws:elasticloadbalancing:ap-southeast-1:ACCOUNT_ID:listener/app/chia-florist-alb/LISTENER_ID",
+  "rules": [
+    {
+      "_comment": "api.chia.florist → service-core target group",
+      "Priority": "1",
+      "Conditions": [
+        {
+          "Field": "host-header",
+          "HostHeaderConfig": {
+            "Values": ["api.chia.florist", "api.staging.chia.florist"]
+          }
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "forward",
+          "TargetGroupArn": "TARGET_GROUP_ARN_SERVICE_CORE"
+        }
+      ]
+    },
+    {
+      "_comment": "panel.chia.florist → control-panel target group",
+      "Priority": "2",
+      "Conditions": [
+        {
+          "Field": "host-header",
+          "HostHeaderConfig": {
+            "Values": ["panel.chia.florist", "panel.staging.chia.florist"]
+          }
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "forward",
+          "TargetGroupArn": "TARGET_GROUP_ARN_CONTROL_PANEL"
+        }
+      ]
+    },
+    {
+      "_comment": "app.chia.florist + chia.florist → e-commerce target group (default)",
+      "Priority": "3",
+      "Conditions": [
+        {
+          "Field": "host-header",
+          "HostHeaderConfig": {
+            "Values": ["app.chia.florist", "chia.florist", "*.staging.chia.florist"]
+          }
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "forward",
+          "TargetGroupArn": "TARGET_GROUP_ARN_E_COMMERCE"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# Chia Florist — control-panel Cloud Run Service Definition
+# NOTE: Primary deployment is Netlify. This is for GCP-only deployments.
+# Deploy:
+#   gcloud run services replace infra/gcp/control-panel.cloudrun.yaml
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: chia-florist-control-panel
+  labels:
+    app: chia-florist
+    module: control-panel
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+    spec:
+      containerConcurrency: 200
+      timeoutSeconds: 30
+      containers:
+        - image: IMAGE_URL   # e.g. asia-southeast1-docker.pkg.dev/PROJECT/chia-florist/control-panel:latest
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: 256Mi

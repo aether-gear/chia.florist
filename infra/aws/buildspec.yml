@@ -1,0 +1,70 @@
+# Chia Florist — AWS CodeBuild Spec
+# Used with AWS CodePipeline to build and push images to ECR.
+# Set these CodeBuild environment variables:
+#   AWS_ACCOUNT_ID, AWS_DEFAULT_REGION, IMAGE_TAG
+
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: ap-southeast-1
+    ECR_REPO_PREFIX: chia-florist
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION |
+          docker login --username AWS
+            --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
+      - echo Image tag is $IMAGE_TAG
+
+  build:
+    commands:
+      - echo Building service-core...
+      - docker build -t $ECR_REPO_PREFIX/service-core:$IMAGE_TAG ./service-core
+      - docker tag $ECR_REPO_PREFIX/service-core:$IMAGE_TAG
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/service-core:$IMAGE_TAG
+      - docker tag $ECR_REPO_PREFIX/service-core:$IMAGE_TAG
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/service-core:latest
+
+      - echo Building e-commerce...
+      - docker build -t $ECR_REPO_PREFIX/e-commerce:$IMAGE_TAG ./e-commerce
+      - docker tag $ECR_REPO_PREFIX/e-commerce:$IMAGE_TAG
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/e-commerce:$IMAGE_TAG
+      - docker tag $ECR_REPO_PREFIX/e-commerce:$IMAGE_TAG
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/e-commerce:latest
+
+      - echo Building control-panel...
+      - docker build -t $ECR_REPO_PREFIX/control-panel:$IMAGE_TAG ./control-panel
+      - docker tag $ECR_REPO_PREFIX/control-panel:$IMAGE_TAG
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/control-panel:$IMAGE_TAG
+      - docker tag $ECR_REPO_PREFIX/control-panel:$IMAGE_TAG
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/control-panel:latest
+
+  post_build:
+    commands:
+      - echo Pushing images to ECR...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/service-core:$IMAGE_TAG
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/service-core:latest
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/e-commerce:$IMAGE_TAG
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/e-commerce:latest
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/control-panel:$IMAGE_TAG
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/control-panel:latest
+      - echo Writing image definitions file...
+      - printf '[{"name":"service-core","imageUri":"%s"}]'
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/service-core:$IMAGE_TAG
+          > imagedefinitions-service-core.json
+      - printf '[{"name":"e-commerce","imageUri":"%s"}]'
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/e-commerce:$IMAGE_TAG
+          > imagedefinitions-e-commerce.json
+      - printf '[{"name":"control-panel","imageUri":"%s"}]'
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_PREFIX/control-panel:$IMAGE_TAG
+          > imagedefinitions-control-panel.json
+
+artifacts:
+  files:
+    - imagedefinitions-service-core.json
+    - imagedefinitions-e-commerce.json
+    - imagedefinitions-control-panel.json
