@@ -20,8 +20,7 @@ const (
 type Shipment struct {
 	ID uuid.UUID
 
-	OrderID  uuid.UUID
-	MethodID uuid.UUID
+	OrderID uuid.UUID
 
 	Status         ShipmentStatus
 	TrackingNumber *string

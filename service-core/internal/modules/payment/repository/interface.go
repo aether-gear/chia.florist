@@ -22,6 +22,12 @@ type PaymentRepository interface {
 		orderID uuid.UUID,
 	) (*domain.Payment, error)
 
+	ListByOrderIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderIDs []uuid.UUID,
+	) ([]domain.Payment, error)
+
 	UpdateStatus(
 		ctx context.Context,
 		exec transaction.Executor,

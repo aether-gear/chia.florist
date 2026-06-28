@@ -1,0 +1,45 @@
+# Chia Florist — control-panel Netlify Config
+# Primary deployment platform for the React SPA.
+#
+# Required Netlify Environment Variables (set in Netlify dashboard):
+#   VITE_API_BASE_URL — e.g. https://api.chia.florist
+
+[build]
+  command     = "npm ci && npm run build"
+  publish     = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# --- SPA Redirect Rule --- #
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# --- Security Headers --- #
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options       = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection      = "1; mode=block"
+    Referrer-Policy       = "strict-origin-when-cross-origin"
+
+# Cache fingerprinted assets forever
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# --- Context-specific Build Overrides --- #
+[context.production]
+  command = "npm ci && npm run build"
+
+[context.staging]
+  command = "npm ci && npm run build"
+  [context.staging.environment]
+    VITE_API_BASE_URL = "https://api.staging.chia.florist"
+
+[context.deploy-preview]
+  command = "npm ci && npm run build"

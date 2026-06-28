@@ -1,0 +1,17 @@
+# Chia Florist — control-panel Cloudflare Pages Config
+# Docs: https://developers.cloudflare.com/pages/
+#
+# Deploy:
+#   npm install -g wrangler
+#   wrangler pages deploy dist --project-name chia-control-panel
+#
+# Or connect GitHub repo to Cloudflare Pages dashboard.
+
+name            = "chia-control-panel"
+pages_build_output_dir = "dist"
+
+[env.production]
+# Set VITE_API_BASE_URL in Cloudflare Pages dashboard (Settings > Variables)
+
+[env.staging]
+# Override in Cloudflare Pages > staging environment

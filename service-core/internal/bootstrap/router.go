@@ -190,6 +190,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		orderHandler = orderH.NewOrderHandler(
 			&c.FindOrders,
+			&c.GetOrder,
 			&c.CreateOrder,
 		)
 	)
@@ -277,6 +278,11 @@ func NewRouter(c *Container) *chi.Mux {
 				r.Post("/", chains.CustomerOnly(addressHandler.SaveUserAddress))
 				r.Delete("/{addressID}", chains.CustomerOnly(addressHandler.DeleteUserAddress))
 			})
+
+			r.Route("/orders", func(r chi.Router) {
+				r.Get("/", chains.CustomerOnly(orderHandler.ListMyOrders))
+				r.Get("/{orderID}", chains.CustomerOnly(orderHandler.GetMyOrder))
+			})
 		})
 
 		r.Route("/shops", func(r chi.Router) {
@@ -332,6 +338,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/orders", func(r chi.Router) {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
+			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
 		})
 	})
 

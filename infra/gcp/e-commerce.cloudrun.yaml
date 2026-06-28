@@ -1,0 +1,38 @@
+# Chia Florist — e-commerce Cloud Run Service Definition
+# Deploy:
+#   gcloud run services replace infra/gcp/e-commerce.cloudrun.yaml
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: chia-florist-e-commerce
+  labels:
+    app: chia-florist
+    module: e-commerce
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 50
+      timeoutSeconds: 120
+      containers:
+        - image: IMAGE_URL   # e.g. asia-southeast1-docker.pkg.dev/PROJECT/chia-florist/e-commerce:latest
+          ports:
+            - containerPort: 4000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "4000"
+            - name: NODE_ENV
+              value: production
+            - name: SERVICE_CORE_API_URL
+              value: https://api.chia.florist

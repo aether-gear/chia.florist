@@ -15,11 +15,15 @@ CREATE TABLE shipments (
     order_id UUID NOT NULL UNIQUE,
 
     status shipment_status_enum NOT NULL DEFAULT 'pending',
-
-    courier_name TEXT NOT NULL,
     tracking_number TEXT UNIQUE,
 
+    courier_name TEXT NOT NULL,
+    service TEXT NOT NULL,
+
     shipping_cost NUMERIC(15, 2) NOT NULL,
+    weight TEXT NOT NULL,
+    origin_id TEXT NOT NULL,
+    destination_id TEXT NOT NULL,
 
     shipped_at TIMESTAMPTZ,
     delivered_at TIMESTAMPTZ,
