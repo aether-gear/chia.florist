@@ -1,6 +1,8 @@
-package http
+﻿package http
 
 import "time"
+
+// ---- Request DTOs ----
 
 type createOrderItemRequest struct {
 	ProductID   string `json:"product_id"`
@@ -31,6 +33,8 @@ type createOrderRequest struct {
 	Shops           []createOrderShopRequest  `json:"shops"`
 }
 
+// ---- Response DTOs ----
+
 type createOrderPaymentAccountResponse struct {
 	AccountName   string  `json:"account_name"`
 	AccountNumber *string `json:"account_number,omitempty"`
@@ -58,16 +62,37 @@ type orderItemResponse struct {
 	ShippingFeeTotal int64   `json:"shipping_fee"`
 }
 
+type paymentDetailResponse struct {
+	ID        string     `json:"id"`
+	Status    string     `json:"status"`
+	Provider  string     `json:"provider"`
+	Amount    int64      `json:"amount"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type shipmentDetailResponse struct {
+	ID             string     `json:"id"`
+	Status         string     `json:"status"`
+	Courier        string     `json:"courier"`
+	Service        string     `json:"service"`
+	TrackingNumber *string    `json:"tracking_number,omitempty"`
+	Cost           int64      `json:"cost"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
 type orderResponse struct {
-	ID          string              `json:"id"`
-	Number      string              `json:"number"`
-	CustomerID  string              `json:"customer_id"`
-	AddressID   string              `json:"address_id"`
-	Status      string              `json:"status"`
-	Subtotal    int64               `json:"subtotal"`
-	ShippingFee int64               `json:"shipping_fee"`
-	Total       int64               `json:"total"`
-	CreatedAt   time.Time           `json:"created_at"`
-	UpdatedAt   *time.Time          `json:"updated_at,omitempty"`
-	Items       []orderItemResponse `json:"items"`
+	ID          string                  `json:"id"`
+	Number      string                  `json:"number"`
+	CustomerID  string                  `json:"customer_id"`
+	AddressID   string                  `json:"address_id"`
+	Status      string                  `json:"status"`
+	Subtotal    int64                   `json:"subtotal"`
+	ShippingFee int64                   `json:"shipping_fee"`
+	Total       int64                   `json:"total"`
+	CreatedAt   time.Time               `json:"created_at"`
+	UpdatedAt   *time.Time              `json:"updated_at,omitempty"`
+	Items       []orderItemResponse     `json:"items"`
+	Payment     *paymentDetailResponse  `json:"payment,omitempty"`
+	Shipment    *shipmentDetailResponse `json:"shipment,omitempty"`
 }

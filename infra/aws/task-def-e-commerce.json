@@ -1,0 +1,47 @@
+{
+  "family": "chia-florist-e-commerce",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/chia-florist-task-role",
+  "containerDefinitions": [
+    {
+      "name": "e-commerce",
+      "image": "ACCOUNT_ID.dkr.ecr.ap-southeast-1.amazonaws.com/chia-florist/e-commerce:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 4000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "HOST",     "value": "0.0.0.0" },
+        { "name": "PORT",     "value": "4000" },
+        { "name": "NODE_ENV", "value": "production" }
+      ],
+      "secrets": [
+        { "name": "SERVICE_CORE_API_URL", "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SERVICE_CORE_API_URL" },
+        { "name": "SUPABASE_URL",         "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_PROJECT_URL" },
+        { "name": "SUPABASE_KEY",         "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_SERVICE_ROLE_KEY" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:4000/ || exit 1"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 20
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chia-florist/e-commerce",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+# Chia Florist — Manual Full-Stack Deploy
+# Triggers all three module pipelines sequentially:
+#   service-core → e-commerce → control-panel
+#
+# Use this for:
+#   - Initial full deployment
+#   - Coordinated releases across all modules
+#   - Emergency rollbacks (provide a specific image tag)
+#
+# Trigger: GitHub Actions → Run workflow (manual)
+
+name: Deploy All — Full Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      image_tag:
+        description: 'Image tag to deploy (e.g. v1.2.3 or sha-abc1234). Leave empty for latest.'
+        required: false
+        default: 'latest'
+
+jobs:
+
+  # --- Deploy service-core first (backend dependency) --- #
+  deploy-service-core:
+    name: 1. Deploy service-core
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy service-core
+        working-directory: service-core
+        run: |
+          railway up \
+            --service ${{ github.event.inputs.environment == 'production' && secrets.RAILWAY_SERVICE_CORE_PROD_ID || secrets.RAILWAY_SERVICE_CORE_STG_ID }} \
+            --environment ${{ github.event.inputs.environment }} \
+            --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # --- Deploy e-commerce after service-core --- #
+  deploy-e-commerce:
+    name: 2. Deploy e-commerce
+    runs-on: ubuntu-latest
+    needs: deploy-service-core
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy e-commerce
+        working-directory: e-commerce
+        run: |
+          railway up \
+            --service ${{ github.event.inputs.environment == 'production' && secrets.RAILWAY_ECOMMERCE_PROD_ID || secrets.RAILWAY_ECOMMERCE_STG_ID }} \
+            --environment ${{ github.event.inputs.environment }} \
+            --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # --- Deploy control-panel last --- #
+  deploy-control-panel:
+    name: 3. Deploy control-panel (Netlify)
+    runs-on: ubuntu-latest
+    needs: deploy-service-core
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: control-panel/package-lock.json
+
+      - name: Install and build
+        working-directory: control-panel
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_BASE_URL: ${{ github.event.inputs.environment == 'production' && 'https://api.chia.florist' || 'https://api.staging.chia.florist' }}
+
+      - name: Deploy to Netlify
+        uses: netlify/actions/cli@master
+        with:
+          args: deploy --dir=control-panel/dist --prod
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ github.event.inputs.environment == 'production' && secrets.NETLIFY_SITE_ID || secrets.NETLIFY_SITE_ID_STG }}
+
+  # --- Notify on completion --- #
+  notify:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: [deploy-service-core, deploy-e-commerce, deploy-control-panel]
+    if: always()
+    steps:
+      - name: Report deployment status
+        run: |
+          echo "           .     .          "
+          echo "      ..   8"=,,88,   _.    "
+          echo "       8""=""8'  "88a88'    "
+          echo "  .. .;88m a8   ,8"" "8     "
+          echo "   "8"'  "88"  A"     8;    "
+          echo "    "8   8,  8,       "8    "
+          echo "     8,  "8, "8,    ___8,   "
+          echo "     "8,  "8, "8mm""""""8m. "
+          echo "      "8,am888i"'   ,mm"    "
+          echo "      ,8"  _8"  .m888"      "
+          echo "     ,88P"""""I888888       "
+          echo "     "'         "I888       "
+          echo "                  "I8_      "
+          echo "      ,mmeem.m""i, I8""  ,mmeem,'.     "
+          echo "     m""    . "8.8 I8  ,8"   .  "88    "
+          echo "    i8  . '  ,mi""8I8 ,8 . '  ,8" 88   "
+          echo "    88.' ,mm""    "8I88"m,,mm'"    8   "
+          echo "    "8_m""         "I8   ""'           "
+          echo "     "8             I8_             "
+          echo "   "
+          echo "   ▄▄▄▄ ▄▄ ▄▄ ▄▄  ▄▄▄    "
+          echo "  ██▀▀▀ ██▄██ ██ ██▀██   "
+          echo "  ▀████ ██ ██ ██ ██▀██ ▄ "
+          echo "  ▄▄▄▄▄ ▄▄     ▄▄▄  ▄▄▄▄  ▄▄  ▄▄▄▄ ▄▄▄▄▄▄ "
+          echo "  ██▄▄  ██    ██▀██ ██▄█▄ ██ ███▄▄   ██   "
+          echo "  ██    ██▄▄▄ ▀███▀ ██ ██ ██ ▄▄██▀   ██   "
+          echo "========================================"
+          echo "Deployment Summary"
+          echo "Environment : ${{ github.event.inputs.environment }}"
+          echo "Image Tag   : ${{ github.event.inputs.image_tag }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "service-core : ${{ needs.deploy-service-core.result }}"
+          echo "e-commerce   : ${{ needs.deploy-e-commerce.result }}"
+          echo "control-panel: ${{ needs.deploy-control-panel.result }}"
+          echo "========================================"

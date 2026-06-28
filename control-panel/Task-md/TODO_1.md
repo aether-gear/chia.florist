@@ -1,0 +1,5 @@
+- [ ] product catalog
+  - [ ] create product use overlay panel instead of new page
+  - [ ] product creation will handle the inventory as well
+- [ ] orders
+  - [ ] drop transaction page

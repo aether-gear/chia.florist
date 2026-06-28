@@ -19,6 +19,7 @@ import (
 	orderPersistence "service-core/internal/modules/order/infra/persistence"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
 	productPersistence "service-core/internal/modules/product/infra/persistence"
+	shipmentPersistence "service-core/internal/modules/shipment/infra/persistence"
 	shopPersistence "service-core/internal/modules/shop/infra/persistence"
 	staffPersistence "service-core/internal/modules/staff/infra/persistence"
 	userPersistence "service-core/internal/modules/user/infra/persistence"
@@ -113,6 +114,7 @@ type Container struct {
 
 	CreateOrder orderUsecase.CreateOrderUsecase
 	FindOrders  orderUsecase.FindOrdersUsecase
+	GetOrder    orderUsecase.GetOrderUsecase
 }
 
 func NewContainer(cfg Config,
@@ -149,6 +151,7 @@ func NewContainer(cfg Config,
 		orderItemRepo          = orderPersistence.NewOrderItemRepositoryImpl()
 		invoiceRepo            = orderPersistence.NewInvoiceRepositoryImpl()
 		invoiceItemRepo        = orderPersistence.NewInvoiceItemRepositoryImpl()
+		shipmentRepo           = shipmentPersistence.NewShipmentRepositoryImpl()
 	)
 
 	var (
@@ -558,6 +561,16 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				orderRepo,
 				orderItemRepo,
+				paymentRepo,
+				shipmentRepo,
+			),
+		GetOrder: *orderUsecase.
+			NewGetOrderUsecase(
+				infra.TransactionExecutor,
+				orderRepo,
+				orderItemRepo,
+				paymentRepo,
+				shipmentRepo,
 			),
 	}
 }

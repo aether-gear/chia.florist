@@ -1,0 +1,45 @@
+# Chia Florist — e-commerce Fly.io Config
+# Region: sin (Singapore)
+#
+# Setup:
+#   fly launch --no-deploy
+#   fly secrets set SUPABASE_URL=... SUPABASE_KEY=...
+#   fly deploy
+
+app            = "chia-florist-e-commerce"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  HOST             = "0.0.0.0"
+  PORT             = "4000"
+  NODE_ENV         = "production"
+  # Override in fly secrets: SERVICE_CORE_API_URL
+
+[http_service]
+  internal_port        = 4000
+  force_https          = true
+  auto_stop_machines   = true
+  auto_start_machines  = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type       = "connections"
+    soft_limit = 50
+    hard_limit = 80
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks]
+  [checks.health]
+    grace_period = "20s"
+    interval     = "30s"
+    method       = "GET"
+    path         = "/"
+    protocol     = "http"
+    timeout      = "10s"
+    type         = "http"
