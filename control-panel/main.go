@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +25,11 @@ const (
 	RulesFile   = "waf-rules.json"
 	BlockedFile = "waf-blocked.json" // Reusing this name for unified IP config
 	FiltersFile = "waf-filters.json"
+)
+
+// --- Globals ---
+var (
+	commentRegexp = regexp.MustCompile(`(?s)/\*.*?\*/`)
 )
 
 // --- Models ---
@@ -113,6 +121,17 @@ func loadLogs() {
 		fmt.Println("Error loading logs, starting fresh")
 		wafLogs = []WAFLog{}
 	} else {
+		modified := false
+		for i := range wafLogs {
+			if wafLogs[i].ID == "" {
+				wafLogs[i].ID = fmt.Sprintf("%d-%d", wafLogs[i].Timestamp.UnixNano(), i+1)
+				modified = true
+			}
+		}
+		if modified {
+			data, _ := json.MarshalIndent(wafLogs, "", "  ")
+			os.WriteFile(LogFile, data, 0644)
+		}
 		fmt.Printf("[INIT] Restored %d logs\n", len(wafLogs))
 	}
 }
@@ -258,6 +277,11 @@ func isRateLimited(ip string) bool {
 }
 
 func autoBanIP(ip, reason string) {
+	// Safety check: Never auto-ban localhost to prevent locking out the admin panel
+	if ip == "127.0.0.1" || ip == "::1" || ip == "localhost" {
+		return
+	}
+
 	ipMutex.Lock()
 	defer ipMutex.Unlock()
 	if _, exists := blockedIPs[ip]; !exists {
@@ -300,6 +324,12 @@ func WAFMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Bypass WAF rules evaluation completely for WAF admin APIs
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		filterMutex.RLock()
 		localFilters := filterConfig
 		filterMutex.RUnlock()
@@ -314,6 +344,13 @@ func WAFMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		// Read and restore body for WAF scanning
+		var bodyBytes []byte
+		if r.Body != nil && r.Body != http.NoBody {
+			bodyBytes, _ = io.ReadAll(r.Body)
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		}
+
 		decodedQuery := r.URL.RawQuery
 		// Mitigation: Double/Triple URL Encode Evasion
 		for i := 0; i < 3; i++ {
@@ -323,11 +360,34 @@ func WAFMiddleware(next http.Handler) http.Handler {
 				break
 			}
 		}
-
+		// Mitigation: IIS Unicode Evasion (%u00XX)
+		decodedQuery = decodeIISUnicode(decodedQuery)
 		// Mitigation: Null Byte Injection (%00 / \x00)
 		decodedQuery = strings.ReplaceAll(decodedQuery, "\x00", "")
 
-		payload := r.URL.Path + " " + decodedQuery
+		// Decode URL path for path-based traversal detection
+		decodedPath := r.URL.Path
+		for i := 0; i < 3; i++ {
+			if unescaped, err := url.PathUnescape(decodedPath); err == nil && unescaped != decodedPath {
+				decodedPath = unescaped
+			} else {
+				break
+			}
+		}
+		decodedPath = decodeIISUnicode(decodedPath)
+		decodedPath = strings.ReplaceAll(decodedPath, "\x00", "")
+
+		// Aggregate only specific headers to scan to avoid browser metadata false positives (like Sec-Ch-Ua)
+		headersStr := ""
+		for _, hName := range []string{"User-Agent", "Referer", "Cookie"} {
+			if vals := r.Header.Values(hName); len(vals) > 0 {
+				headersStr += fmt.Sprintf("%s: %s\n", hName, strings.Join(vals, ", "))
+			}
+		}
+
+		payload := fmt.Sprintf("%s %s\n%s\n%s", decodedPath, decodedQuery, headersStr, string(bodyBytes))
+		// Normalize SQL comments (e.g. UNION/**/SELECT -> UNION SELECT) to prevent comment obfuscation evasion
+		payload = commentRegexp.ReplaceAllString(payload, " ")
 		lowerPayload := strings.ToLower(payload)
 
 		// 2. Keyword Filtering Check
@@ -352,8 +412,11 @@ func WAFMiddleware(next http.Handler) http.Handler {
 			match, _ := regexp.MatchString(rule.Pattern, payload)
 			if match {
 				logRequest(r, "Blocked", "Matched Rule: "+rule.Description, rule.ID, rule.Description)
-				fmt.Printf("[WAF] BLOCKED %s from %s\n", rule.Description, ip)
-				autoBanIP(ip, "Rule Violation: "+rule.ID)
+				fmt.Printf("[WAF] BLOCKED %s from %s. Rule ID: %s. Payload: %q\n", rule.Description, ip, rule.ID, payload)
+				// Only auto-ban real IPs, not simulated IPs from test tools
+				if r.Header.Get("x-simulated-ip") == "" {
+					autoBanIP(ip, "Rule Violation: "+rule.ID)
+				}
 				http.Error(w, "403 Forbidden - WAF Blocked Request", http.StatusForbidden)
 				return
 			}
@@ -444,22 +507,87 @@ func logRequest(r *http.Request, status, details, ruleID, desc string) {
 
 	logsMutex.Lock()
 	wafLogs = append(wafLogs, entry)
+	// Cap to last 1000 logs for memory and performance optimization, prioritizing keeping Blocked threats
+	if len(wafLogs) > 1000 {
+		var pruned []WAFLog
+		// First pass: keep all Blocked logs (up to 800)
+		for _, logEntry := range wafLogs {
+			if logEntry.Status == "Blocked" {
+				pruned = append(pruned, logEntry)
+				if len(pruned) >= 800 {
+					break
+				}
+			}
+		}
+		// Fill the rest of the 1000 capacity with the most recent Allowed/other logs
+		allowedNeeded := 1000 - len(pruned)
+		if allowedNeeded > 0 {
+			var allowedLogs []WAFLog
+			for i := len(wafLogs) - 1; i >= 0; i-- {
+				if wafLogs[i].Status != "Blocked" {
+					allowedLogs = append([]WAFLog{wafLogs[i]}, allowedLogs...)
+					if len(allowedLogs) >= allowedNeeded {
+						break
+					}
+				}
+			}
+			pruned = append(pruned, allowedLogs...)
+		}
+		// Sort the pruned logs by timestamp to keep chronological order
+		sort.Slice(pruned, func(i, j int) bool {
+			return pruned[i].Timestamp.Before(pruned[j].Timestamp)
+		})
+		wafLogs = pruned
+	}
+	// Write synchronously inside the write lock to prevent race conditions
+	data, _ := json.MarshalIndent(wafLogs, "", "  ")
+	os.WriteFile(LogFile, data, 0644)
 	logsMutex.Unlock()
-
-	go func() {
-		logsMutex.RLock()
-		defer logsMutex.RUnlock()
-		data, _ := json.MarshalIndent(wafLogs, "", "  ")
-		os.WriteFile(LogFile, data, 0644)
-	}()
 }
 
 // --- API Handlers ---
 func handleStats(w http.ResponseWriter, r *http.Request) {
 	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		var req struct {
+			IDs []string `json:"ids"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		logsMutex.Lock()
+		defer logsMutex.Unlock()
+
+		idMap := make(map[string]bool)
+		for _, id := range req.IDs {
+			idMap[id] = true
+		}
+
+		newLogs := []WAFLog{}
+		for _, log := range wafLogs {
+			if !idMap[log.ID] {
+				newLogs = append(newLogs, log)
+			}
+		}
+		wafLogs = newLogs
+
+		data, _ := json.MarshalIndent(wafLogs, "", "  ")
+		os.WriteFile(LogFile, data, 0644)
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	logsMutex.RLock()
 	defer logsMutex.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"total_requests": len(wafLogs),
 		"logs":           wafLogs,
@@ -703,4 +831,22 @@ func main() {
 	if err := http.ListenAndServe(ServerPort, WAFMiddleware(mux)); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func decodeIISUnicode(s string) string {
+	for {
+		idx := strings.Index(s, "%u")
+		if idx == -1 || idx+6 > len(s) {
+			break
+		}
+		hexStr := s[idx+2 : idx+6]
+		val, err := strconv.ParseUint(hexStr, 16, 16)
+		if err != nil {
+			s = s[:idx] + "%%u" + s[idx+2:]
+			continue
+		}
+		char := string(rune(val))
+		s = s[:idx] + char + s[idx+6:]
+	}
+	return s
 }

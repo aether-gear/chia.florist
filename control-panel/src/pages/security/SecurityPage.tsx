@@ -14,6 +14,16 @@ const formatDateTimeLocal = (timestamp: number) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const parseSafeDate = (dateStr: any): Date => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  const match = String(dateStr).match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3})\d+([+-]\d{2}:\d{2}|Z)$/);
+  if (match) {
+    return new Date(match[1] + match[2]);
+  }
+  return new Date(dateStr);
+};
+
 export default function SecurityPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [wafSummary, setWafSummary] = useState({ total: 0, blocked: 0, allowed: 0, threatLevel: 'Low' });
@@ -29,8 +39,118 @@ export default function SecurityPage() {
   const [rangeType, setRangeType] = useState<"Today" | "Custom">("Today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [tempStart, setTempStart] = useState("");
+  const [tempEnd, setTempEnd] = useState("");
+  const [selectedLogIds, setSelectedLogIds] = useState<Record<string, boolean>>({});
+  const [selectedIPs, setSelectedIPs] = useState<Record<string, boolean>>({});
   const [refAreaLeft, setRefAreaLeft] = useState<number | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<number | null>(null);
+
+  const handleApplyCustomRange = () => {
+    setCustomStart(tempStart);
+    setCustomEnd(tempEnd);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    const nextSelected: Record<string, boolean> = {};
+    if (checked) {
+      displayLogs.forEach(log => {
+        const logId = log.id || `${log.timestamp}-${log.ip}`;
+        nextSelected[logId] = true;
+      });
+    }
+    setSelectedLogIds(nextSelected);
+  };
+
+  const handleSelectLog = (logId: string, checked: boolean) => {
+    setSelectedLogIds(prev => ({
+      ...prev,
+      [logId]: checked
+    }));
+  };
+
+  const handleBulkIPAction = async (action: string) => {
+    const selectedIds = Object.keys(selectedLogIds).filter(id => selectedLogIds[id]);
+    if (selectedIds.length === 0) return;
+
+    // Retrieve unique IPs of the selected logs
+    const selectedLogs = logs.filter(l => {
+      const logId = l.id || `${l.timestamp}-${l.ip}`;
+      return selectedLogIds[logId];
+    });
+    const uniqueIPs = Array.from(new Set(selectedLogs.map(l => l.ip).filter(Boolean)));
+
+    if (uniqueIPs.length === 0) return;
+
+    try {
+      await Promise.all(
+        uniqueIPs.map(ip =>
+          fetch('http://localhost:8080/api/ip', {
+            method: 'POST',
+            body: JSON.stringify({ ip, action, reason: `Bulk ${action} from Logs` }),
+          })
+        )
+      );
+      setSelectedLogIds({});
+      fetchIpList();
+    } catch (e) {
+      console.error("Bulk IP action failed", e);
+    }
+  };
+
+  const handleBulkDeleteLogs = async () => {
+    const selectedIds = Object.keys(selectedLogIds).filter(id => selectedLogIds[id]);
+    if (selectedIds.length === 0) return;
+
+    try {
+      await fetch('http://localhost:8080/api/stats?t=' + Date.now(), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      // Optimistic local update: remove deleted logs from local state immediately
+      setLogs(prev => prev.filter(log => {
+        const logId = log.id || `${log.timestamp}-${log.ip}`;
+        return !selectedLogIds[logId];
+      }));
+      setSelectedLogIds({});
+      // Fetch latest state from server to sync
+      fetchLogs();
+    } catch (e) {
+      console.error("Bulk delete failed", e);
+    }
+  };
+
+  const handleBulkIPActionFromManager = async (action: 'ban' | 'whitelist' | 'remove') => {
+    const ips = Object.keys(selectedIPs).filter(ip => selectedIPs[ip]);
+    if (ips.length === 0) return;
+
+    try {
+      await Promise.all(
+        ips.map(ip =>
+          fetch('http://localhost:8080/api/ip', {
+            method: 'POST',
+            body: JSON.stringify({ ip, action, reason: action === 'remove' ? '' : 'Bulk Action' }),
+          })
+        )
+      );
+      // Optimistic local UI updates
+      if (action === 'remove') {
+        setIpList(prev => prev.filter(entry => !selectedIPs[entry.ip]));
+      } else {
+        setIpList(prev => prev.map(entry => {
+          if (selectedIPs[entry.ip]) {
+            return { ...entry, status: action === 'ban' ? 'Banned' : 'Whitelisted', reason: 'Bulk Action' };
+          }
+          return entry;
+        }));
+      }
+      setSelectedIPs({});
+      fetchIpList();
+    } catch (e) {
+      console.error("Bulk manager IP action failed", e);
+    }
+  };
 
   // Security Logs filter and pagination
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
@@ -69,7 +189,7 @@ export default function SecurityPage() {
 
   const fetchRules = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/rules');
+      const res = await fetch('http://localhost:8080/api/rules?t=' + Date.now());
       setRules(await res.json());
     } catch (e) {
       console.error(e);
@@ -78,7 +198,7 @@ export default function SecurityPage() {
 
   const fetchIpList = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/ip');
+      const res = await fetch('http://localhost:8080/api/ip?t=' + Date.now());
       setIpList((await res.json()) || []);
     } catch (e) {
       console.error(e);
@@ -87,10 +207,10 @@ export default function SecurityPage() {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/stats');
+      const res = await fetch('http://localhost:8080/api/stats?t=' + Date.now());
       const data = await res.json();
       const rawLogs = data.logs || [];
-      const sorted = [...rawLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      const sorted = [...rawLogs].sort((a, b) => parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime());
       setLogs(sorted);
       
       const total = rawLogs.length;
@@ -131,15 +251,14 @@ export default function SecurityPage() {
       endTime = startTime + 24 * 60 * 60 * 1000;
       step = 1000 * 60 * 10; // 10-minute intervals for today (144 points)
     } else if (rangeType === 'Custom') {
-      startTime = customStart ? new Date(customStart).getTime() : 0;
-      endTime = customEnd ? new Date(customEnd).getTime() : Number.MAX_SAFE_INTEGER;
+      const now = new Date();
+      startTime = customStart ? new Date(customStart).getTime() : now.getTime() - 24 * 60 * 60 * 1000;
+      endTime = customEnd ? new Date(customEnd).getTime() : now.getTime();
       
-      if (startTime > 0 && endTime < Number.MAX_SAFE_INTEGER) {
-        const diff = endTime - startTime;
-        if (diff > 0) {
-          // Keep number of points bounded for performance
-          step = Math.max(1000 * 60 * 5, Math.floor(diff / 150));
-        }
+      const diff = endTime - startTime;
+      if (diff > 0) {
+        // Keep number of points bounded for performance
+        step = Math.max(1000 * 60 * 5, Math.floor(diff / 150));
       }
     }
 
@@ -151,16 +270,17 @@ export default function SecurityPage() {
     }
 
     logs.forEach(log => {
-      const ts = new Date(log.timestamp).getTime();
+      const ts = parseSafeDate(log.timestamp).getTime();
       if (ts >= startTime && ts <= endTime) {
         // Round to nearest step
         const roundedTs = Math.floor(ts / step) * step;
-        if (dataMap[roundedTs]) {
-          if (log.status === 'Blocked') {
-            dataMap[roundedTs].blocked += 1;
-          } else {
-            dataMap[roundedTs].allowed += 1;
-          }
+        if (!dataMap[roundedTs]) {
+          dataMap[roundedTs] = { time: roundedTs, blocked: 0, allowed: 0 };
+        }
+        if (log.status === 'Blocked') {
+          dataMap[roundedTs].blocked += 1;
+        } else {
+          dataMap[roundedTs].allowed += 1;
         }
       }
     });
@@ -169,7 +289,7 @@ export default function SecurityPage() {
   }, [logs, rangeType, customStart, customEnd]);
 
   const displayLogs = logs.filter(log => {
-    const ts = new Date(log.timestamp).getTime();
+    const ts = parseSafeDate(log.timestamp).getTime();
     let startTime = 0;
     let endTime = Number.MAX_SAFE_INTEGER;
     if (rangeType === 'Today') {
@@ -219,6 +339,17 @@ export default function SecurityPage() {
     });
     fetchRules();
   };
+
+  const now = new Date();
+  let activeStartTime = 0;
+  let activeEndTime = Number.MAX_SAFE_INTEGER;
+  if (rangeType === 'Today') {
+    activeStartTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    activeEndTime = activeStartTime + 24 * 60 * 60 * 1000;
+  } else if (rangeType === 'Custom') {
+    activeStartTime = customStart ? new Date(customStart).getTime() : now.getTime() - 24 * 60 * 60 * 1000;
+    activeEndTime = customEnd ? new Date(customEnd).getTime() : now.getTime();
+  }
 
   return (
     <div className="space-y-6">
@@ -284,20 +415,40 @@ export default function SecurityPage() {
             <select 
               className="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm"
               value={rangeType}
-              onChange={(e) => setRangeType(e.target.value as any)}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                setRangeType(val);
+                if (val === 'Today') {
+                  setCustomStart("");
+                  setCustomEnd("");
+                  setTempStart("");
+                  setTempEnd("");
+                } else {
+                  const now = new Date();
+                  const startStr = formatDateTimeLocal(now.getTime() - 24 * 60 * 60 * 1000);
+                  const endStr = formatDateTimeLocal(now.getTime());
+                  setTempStart(startStr);
+                  setTempEnd(endStr);
+                  setCustomStart(startStr);
+                  setCustomEnd(endStr);
+                }
+              }}
             >
               <option value="Today">Today (00:00 - 24:00)</option>
               <option value="Custom">Custom Range</option>
             </select>
             {rangeType === 'Custom' && (
               <div className="flex items-center gap-2">
-                <Input type="datetime-local" className="h-8 text-xs" value={customStart} onChange={e => setCustomStart(e.target.value)} />
+                <Input type="datetime-local" className="h-8 text-xs w-[170px]" value={tempStart} onChange={e => setTempStart(e.target.value)} />
                 <span className="text-slate-400 text-sm">to</span>
-                <Input type="datetime-local" className="h-8 text-xs" value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
+                <Input type="datetime-local" className="h-8 text-xs w-[170px]" value={tempEnd} onChange={e => setTempEnd(e.target.value)} />
+                <Button size="sm" className="h-8 bg-slate-900 hover:bg-slate-800 text-white font-medium px-3" onClick={handleApplyCustomRange}>
+                  Apply
+                </Button>
               </div>
             )}
             {rangeType === 'Custom' && (
-              <Button size="sm" variant="outline" onClick={() => { setRangeType("Today"); setCustomStart(""); setCustomEnd(""); }}>
+              <Button size="sm" variant="outline" onClick={() => { setRangeType("Today"); setCustomStart(""); setCustomEnd(""); setTempStart(""); setTempEnd(""); }}>
                 Reset Zoom
               </Button>
             )}
@@ -316,8 +467,12 @@ export default function SecurityPage() {
                   if (start > end) [start, end] = [end, start];
                   if (end - start > 1000 * 60) { // Zoom only if dragging at least 1 minute
                     setRangeType("Custom");
-                    setCustomStart(formatDateTimeLocal(start));
-                    setCustomEnd(formatDateTimeLocal(end));
+                    const startStr = formatDateTimeLocal(start);
+                    const endStr = formatDateTimeLocal(end);
+                    setTempStart(startStr);
+                    setTempEnd(endStr);
+                    setCustomStart(startStr);
+                    setCustomEnd(endStr);
                   }
                 }
                 setRefAreaLeft(null);
@@ -339,7 +494,7 @@ export default function SecurityPage() {
                 dataKey="time" 
                 type="number"
                 scale="time"
-                domain={['dataMin', 'dataMax']}
+                domain={[activeStartTime, activeEndTime]}
                 axisLine={false} 
                 tickLine={false} 
                 tick={{ fontSize: 12 }} 
@@ -401,10 +556,60 @@ export default function SecurityPage() {
             </div>
           </div>
 
+          {Object.keys(selectedIPs).filter(ip => selectedIPs[ip]).length > 0 && (
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <span className="text-xs font-semibold text-slate-700">
+                {Object.keys(selectedIPs).filter(ip => selectedIPs[ip]).length} IP(s) selected
+              </span>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  className="h-8 text-xs font-medium" 
+                  onClick={() => handleBulkIPActionFromManager('ban')}
+                >
+                  Bulk Ban
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium" 
+                  onClick={() => handleBulkIPActionFromManager('whitelist')}
+                >
+                  Bulk Whitelist
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-8 text-xs border-slate-300 hover:bg-slate-100 text-slate-700 font-medium" 
+                  onClick={() => handleBulkIPActionFromManager('remove')}
+                >
+                  Bulk Remove / Forget
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50">
+                  <TableHead className="w-[40px]">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                      checked={ipList.length > 0 && ipList.every(entry => selectedIPs[entry.ip])}
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        const updated: Record<string, boolean> = {};
+                        if (checked) {
+                          ipList.forEach(entry => {
+                            updated[entry.ip] = true;
+                          });
+                        }
+                        setSelectedIPs(updated);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>IP Address</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Reason</TableHead>
@@ -414,11 +619,24 @@ export default function SecurityPage() {
               <TableBody>
                 {ipList.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-slate-500 py-8">No IPs configured yet.</TableCell>
+                    <TableCell colSpan={5} className="text-center text-slate-500 py-8">No IPs configured yet.</TableCell>
                   </TableRow>
                 )}
                 {ipList.map((entry: any) => (
                   <TableRow key={entry.ip}>
+                    <TableCell>
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                        checked={!!selectedIPs[entry.ip]}
+                        onChange={e => {
+                          setSelectedIPs(prev => ({
+                            ...prev,
+                            [entry.ip]: e.target.checked
+                          }));
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-slate-700">{entry.ip}</TableCell>
                     <TableCell>
                       {entry.status === 'Banned' && <Badge variant="destructive">Banned</Badge>}
@@ -523,9 +741,52 @@ export default function SecurityPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length > 0 && (
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <span className="text-xs font-semibold text-slate-700">
+                  {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length} log(s) selected
+                </span>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    className="h-8 text-xs font-medium" 
+                    onClick={() => handleBulkIPAction('ban')}
+                  >
+                    Bulk Ban IPs
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium" 
+                    onClick={() => handleBulkIPAction('whitelist')}
+                  >
+                    Bulk Whitelist IPs
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-8 text-xs border-slate-300 hover:bg-slate-100 text-slate-700 font-medium" 
+                    onClick={handleBulkDeleteLogs}
+                  >
+                    Delete Logs
+                  </Button>
+                </div>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                      checked={displayLogs.length > 0 && displayLogs.every(l => {
+                        const logId = l.id || `${l.timestamp}-${l.ip}`;
+                        return selectedLogIds[logId];
+                      })}
+                      onChange={e => handleSelectAll(e.target.checked)}
+                    />
+                  </TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>IP</TableHead>
                   <TableHead>Payload</TableHead>
@@ -534,35 +795,46 @@ export default function SecurityPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayLogs.slice(0, rowsPerPage).map((log, index) => (
-                  <TableRow key={log.id || `${log.timestamp}-${log.ip}-${index}`}>
-                    <TableCell className="text-xs whitespace-nowrap">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{log.ip}</TableCell>
-                    <TableCell 
-                      className="text-xs truncate max-w-[150px] cursor-pointer hover:bg-slate-50 transition-colors text-blue-600 underline-offset-4 hover:underline" 
-                      title="Click to view full payload"
-                      onClick={() => setSelectedLog(log)}
-                    >
-                      <span className="font-bold mr-1 text-slate-800">{log.method}</span>
-                      {log.url}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {log.rule_id ? <Badge variant="secondary" className="text-[10px]">{log.rule_id}</Badge> : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {log.status === 'Blocked' ? (
-                        <Badge variant="destructive" className="text-[10px]">Blocked</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px]">Allowed</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {displayLogs.slice(0, rowsPerPage).map((log, index) => {
+                  const logId = log.id || `${log.timestamp}-${log.ip}`;
+                  return (
+                    <TableRow key={logId}>
+                      <TableCell>
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                          checked={!!selectedLogIds[logId]}
+                          onChange={e => handleSelectLog(logId, e.target.checked)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {parseSafeDate(log.timestamp).toLocaleTimeString()}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{log.ip}</TableCell>
+                      <TableCell 
+                        className="text-xs truncate max-w-[150px] cursor-pointer hover:bg-slate-50 transition-colors text-blue-600 underline-offset-4 hover:underline" 
+                        title="Click to view full payload"
+                        onClick={() => setSelectedLog(log)}
+                      >
+                        <span className="font-bold mr-1 text-slate-800">{log.method}</span>
+                        {log.url}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {log.rule_id ? <Badge variant="secondary" className="text-[10px]">{log.rule_id}</Badge> : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {log.status === 'Blocked' ? (
+                          <Badge variant="destructive" className="text-[10px]">Blocked</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">Allowed</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {displayLogs.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-slate-500 py-6">
+                    <TableCell colSpan={6} className="text-center text-slate-500 py-6">
                       No logs found matching filters.
                     </TableCell>
                   </TableRow>
@@ -586,7 +858,7 @@ export default function SecurityPage() {
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-y-3 text-sm">
                 <div className="font-semibold text-slate-500">Timestamp</div>
-                <div>{new Date(selectedLog.timestamp).toLocaleString()}</div>
+                <div>{parseSafeDate(selectedLog.timestamp).toLocaleString()}</div>
                 
                 <div className="font-semibold text-slate-500">IP Address</div>
                 <div className="font-mono">{selectedLog.ip}</div>

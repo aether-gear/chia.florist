@@ -1,22 +1,5 @@
 {
-  "blocked_ips": [
-    {
-      "ip": "71.6.146.185",
-      "reason": "Auto-Banned: Rate Limit Exceeded (\u003e50 req/sec)"
-    },
-    {
-      "ip": "80.82.77.139",
-      "reason": "Auto-Banned: Rate Limit Exceeded (\u003e50 req/sec)"
-    },
-    {
-      "ip": "61.146.163.4",
-      "reason": "Auto-Banned: Rate Limit Exceeded (\u003e50 req/sec)"
-    },
-    {
-      "ip": "70.34.245.215",
-      "reason": "Auto-Banned: Rate Limit Exceeded (\u003e50 req/sec)"
-    }
-  ],
+  "blocked_ips": [],
   "whitelisted_ips": [],
   "ignored_ips": []
 }
