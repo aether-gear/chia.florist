@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api/core': {
-          target: env.SERVICE_CORE_API_URL || 'http://127.0.0.1:7129/api/core',
+          target: env.SERVICE_CORE_API_URL || 'http://127.0.0.1:7129',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/core/, ''),
         },
