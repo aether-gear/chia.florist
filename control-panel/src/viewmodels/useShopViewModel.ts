@@ -1,113 +1,141 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchApi } from '../lib/api';
-import type { ShopAddressesResponse, ShopCouriersResponse, ShopProductsResponse } from '../models/Shop';
 
 export function useShopViewModel() {
-  const [addresses, setAddresses] = useState<ShopAddressesResponse | null>(null);
-  const [couriers, setCouriers] = useState<ShopCouriersResponse | null>(null);
-  const [products, setProducts] = useState<ShopProductsResponse | null>(null);
-  const [shopId, setShopId] = useState<string | null>(null);
-  const [shopInfo, setShopInfo] = useState<any | null>(null);
+  const [shops, setShops] = useState<any[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+  const [selectedShopInfo, setSelectedShopInfo] = useState<any | null>(null);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [couriers, setCouriers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   
   const [loading, setLoading] = useState<boolean>(true);
+  const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
-  const fetchShopDetails = useCallback(async () => {
+  const fetchShops = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Fetch shops to get a shopId
       const shopsData = await fetchApi('/shops');
-      const shop = shopsData?.shops?.[0];
-      const id = shop?.id;
-      
-      if (!id) {
-        throw new Error('No shop found');
-      }
-      setShopId(id);
-      setShopInfo(shop);
-
-      // Fetch each resource individually and propagate errors
-      const addrRes = await fetchApi(`/shops/${id}/addresses`);
-      setAddresses(addrRes);
-
-      const courRes = await fetchApi(`/shops/${id}/couriers`);
-      setCouriers(courRes);
-
-      const prodRes = await fetchApi(`/shops/${id}/products`);
-      setProducts(prodRes);
-      
+      setShops(shopsData?.shops || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch shop details');
-      setShopId(null);
-      setShopInfo(null);
-      setAddresses(null);
-      setCouriers(null);
-      setProducts(null);
+      setError(err.message || 'Failed to fetch shops');
+      setShops([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchShopDetails();
+  const fetchShopDetails = useCallback(async (id: string) => {
+    try {
+      setDetailsLoading(true);
+      setDetailsError(null);
+      setSelectedShopId(id);
+
+      const [addrRes, courRes, prodRes] = await Promise.all([
+        fetchApi(`/shops/${id}/addresses`).catch(e => { console.error(e); return null; }),
+        fetchApi(`/shops/${id}/couriers`).catch(e => { console.error(e); return null; }),
+        fetchApi(`/shops/${id}/products`).catch(e => { console.error(e); return null; })
+      ]);
+
+      setAddresses(addrRes?.addresses || []);
+      setCouriers(courRes?.couriers || []);
+      setProducts(prodRes?.products || []);
+    } catch (err: any) {
+      setDetailsError(err.message || 'Failed to fetch shop details');
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, []);
+
+  const selectShop = useCallback((shop: any) => {
+    setSelectedShopInfo(shop);
+    if (shop?.id) {
+      fetchShopDetails(shop.id);
+    } else {
+      setSelectedShopId(null);
+      setAddresses([]);
+      setCouriers([]);
+      setProducts([]);
+    }
   }, [fetchShopDetails]);
 
+  useEffect(() => {
+    fetchShops();
+  }, [fetchShops]);
+
   const createAddress = async (data: any) => {
-    if (!shopId) return false;
+    if (!selectedShopId) return false;
     const isActiveValue = data.is_active ? "true" : "false";
     try {
-      setLoading(true);
-      await fetchApi(`/shops/${shopId}/addresses`, {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${selectedShopId}/addresses`, {
         method: 'POST',
         body: JSON.stringify({
           ...data,
-          shop_id: shopId,
+          shop_id: selectedShopId,
           is_active: isActiveValue
         })
       });
-      await fetchShopDetails();
+      await fetchShopDetails(selectedShopId);
       return true;
     } catch (err) {
       console.error(err);
       return false;
     } finally {
-      setLoading(false);
+      setDetailsLoading(false);
     }
   };
 
   const saveShop = async (data: { name: string; description?: string; is_active: string }) => {
+    if (!selectedShopId) return false;
     try {
-      setLoading(true);
+      setDetailsLoading(true);
       await fetchApi('/shops', {
         method: 'POST',
         body: JSON.stringify({
-          id: shopId,
+          id: selectedShopId,
           ...data
         })
       });
-      await fetchShopDetails();
+      // Refresh the list of shops
+      const shopsData = await fetchApi('/shops');
+      const updatedShops = shopsData?.shops || [];
+      setShops(updatedShops);
+      
+      // Update selected shop info
+      const updated = updatedShops.find((s: any) => s.id === selectedShopId);
+      if (updated) {
+        setSelectedShopInfo(updated);
+      }
       return true;
     } catch (err) {
       console.error(err);
       return false;
     } finally {
-      setLoading(false);
+      setDetailsLoading(false);
     }
   };
 
   return {
-    shopId,
-    shopInfo,
-    addresses: addresses?.addresses || [],
-    couriers: couriers?.couriers || [],
-    products: products?.products || [],
+    shops,
+    selectedShopId,
+    selectedShopInfo,
+    addresses,
+    couriers,
+    products,
     loading,
+    detailsLoading,
     error,
+    detailsError,
     createAddress,
     saveShop,
-    refresh: fetchShopDetails
+    selectShop,
+    fetchShopDetails,
+    refresh: fetchShops
   };
 }
 

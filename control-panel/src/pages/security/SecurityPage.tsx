@@ -795,7 +795,7 @@ export default function SecurityPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayLogs.slice(0, rowsPerPage).map((log, index) => {
+                {displayLogs.slice(0, rowsPerPage).map((log) => {
                   const logId = log.id || `${log.timestamp}-${log.ip}`;
                   return (
                     <TableRow key={logId}>
