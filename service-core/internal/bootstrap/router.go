@@ -123,6 +123,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
+			&c.AuthenticateOAuth,
+			c.GoogleOAuth,
 		)
 
 		staffHandler = staffH.NewStaffHandler(
@@ -215,6 +217,9 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Post("/verify", chains.Core(authHandler.VerifyAccount))
 			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
 			r.Get("/me", chains.CoreAuth(authHandler.Me))
+
+			r.Get("/google/login", chains.Core(authHandler.GoogleLogin))
+			r.Get("/google/callback", chains.Core(authHandler.GoogleCallback))
 		})
 
 		r.Route("/staff", func(r chi.Router) {

@@ -1,25 +1,36 @@
 package http
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"time"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	appcookie "service-core/internal/common/http/cookie"
 	authdomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/usecase"
+	appconfig "service-core/internal/shared/config"
 
 	"github.com/google/uuid"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 type authHandler struct {
-	me               *usecase.MeUsecase
-	logout           *usecase.LogoutUsecase
-	loginCustomer    *usecase.LoginCustomerUsecase
-	loginStaff       *usecase.LoginStaffUsecase
-	registerCustomer *usecase.RegisterCustomerUsecase
-	verifyAccount    *usecase.VerifyAccountUsecase
-	getAccount       *usecase.GetAccountUsecase
+	me                *usecase.MeUsecase
+	logout            *usecase.LogoutUsecase
+	loginCustomer     *usecase.LoginCustomerUsecase
+	loginStaff        *usecase.LoginStaffUsecase
+	registerCustomer  *usecase.RegisterCustomerUsecase
+	verifyAccount     *usecase.VerifyAccountUsecase
+	getAccount        *usecase.GetAccountUsecase
+	authenticateOAuth *usecase.AuthenticateOAuthUsecase
+	googleCfg         appconfig.GoogleOAuthConfig
 }
 
 func NewAuthHandler(
@@ -30,15 +41,19 @@ func NewAuthHandler(
 	registerCustomer *usecase.RegisterCustomerUsecase,
 	verifyAccount *usecase.VerifyAccountUsecase,
 	getAccount *usecase.GetAccountUsecase,
+	authenticateOAuth *usecase.AuthenticateOAuthUsecase,
+	googleCfg appconfig.GoogleOAuthConfig,
 ) *authHandler {
 	return &authHandler{
-		me:               me,
-		logout:           logout,
-		loginCustomer:    loginCustomer,
-		loginStaff:       loginStaff,
-		registerCustomer: registerCustomer,
-		verifyAccount:    verifyAccount,
-		getAccount:       getAccount,
+		me:                me,
+		logout:            logout,
+		loginCustomer:     loginCustomer,
+		loginStaff:        loginStaff,
+		registerCustomer:  registerCustomer,
+		verifyAccount:     verifyAccount,
+		getAccount:        getAccount,
+		authenticateOAuth: authenticateOAuth,
+		googleCfg:         googleCfg,
 	}
 }
 
@@ -293,5 +308,134 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) error {
+	oauth2Config := &oauth2.Config{
+		ClientID:     h.googleCfg.ClientID,
+		ClientSecret: h.googleCfg.ClientSecret,
+		RedirectURL:  h.googleCfg.RedirectURL,
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		},
+		Endpoint: google.Endpoint,
+	}
+
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return apperrors.NewInternal(fmt.Errorf("failed to generate state: %w", err))
+	}
+	state := base64.URLEncoding.EncodeToString(b)
+
+	appcookie.Bind(
+		w,
+		appcookie.CookieOAuthState,
+		state,
+		time.Now().Add(10*time.Minute),
+	)
+
+	url := oauth2Config.AuthCodeURL(state, oauth2.AccessTypeOnline)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	return nil
+}
+
+func (h *authHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) error {
+	cookie, err := appcookie.
+		Extract(r, appcookie.CookieOAuthState)
+	if err != nil {
+		return apperrors.NewBadRequest("missing oauth state cookie")
+	}
+
+	stateParam := r.URL.Query().Get("state")
+	if stateParam == "" || stateParam != cookie {
+		return apperrors.NewBadRequest("invalid oauth state")
+	}
+
+	appcookie.Clear(w, appcookie.CookieOAuthState)
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		return apperrors.NewBadRequest("missing oauth code")
+	}
+
+	oauth2Config := &oauth2.Config{
+		ClientID:     h.googleCfg.ClientID,
+		ClientSecret: h.googleCfg.ClientSecret,
+		RedirectURL:  h.googleCfg.RedirectURL,
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		},
+		Endpoint: google.Endpoint,
+	}
+
+	token, err := oauth2Config.Exchange(r.Context(), code)
+	if err != nil {
+		return apperrors.NewUnauthorized(fmt.Sprintf("failed to exchange code: %v", err))
+	}
+
+	client := oauth2Config.Client(r.Context(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+	if err != nil {
+		return apperrors.NewInternal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return apperrors.NewInternal(fmt.Errorf("google userinfo returned status code %d", resp.StatusCode))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return apperrors.NewInternal(err)
+	}
+
+	var googleUser struct {
+		Sub     string  `json:"sub"`
+		Name    string  `json:"name"`
+		Email   string  `json:"email"`
+		Picture *string `json:"picture"`
+	}
+	if err := json.Unmarshal(body, &googleUser); err != nil {
+		return apperrors.NewInternal(err)
+	}
+
+	if googleUser.Email == "" {
+		return apperrors.NewBadRequest("google did not provide email address")
+	}
+
+	userAgent := r.UserAgent()
+	ipAddress := r.RemoteAddr
+
+	params := usecase.AuthenticateOAuthParams{
+		UserAgent: &userAgent,
+		IPAddress: &ipAddress,
+		Provider:  authdomain.OAuthProviderGoogle,
+		Subject:   googleUser.Sub,
+		Email:     googleUser.Email,
+		Name:      googleUser.Name,
+		AvatarURL: googleUser.Picture,
+	}
+
+	result, err := h.authenticateOAuth.
+		Execute(r.Context(), params)
+	if err != nil {
+		return err
+	}
+
+	appcookie.Bind(
+		w,
+		appcookie.CookieAccess,
+		result.AccessToken.Token,
+		result.AccessToken.ExpiresAt,
+	)
+
+	successRedirectURL := h.googleCfg.SuccessRedirectURL
+	if successRedirectURL == "" {
+		successRedirectURL = "/"
+	}
+	http.Redirect(w, r, successRedirectURL, http.StatusTemporaryRedirect)
 	return nil
 }

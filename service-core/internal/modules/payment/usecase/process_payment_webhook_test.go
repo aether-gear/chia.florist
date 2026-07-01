@@ -54,6 +54,20 @@ func (m *mockPaymentRepo) GetByOrderID(ctx context.Context, exec transaction.Exe
 	return nil, nil
 }
 
+func (m *mockPaymentRepo) ListByOrderIDs(ctx context.Context, exec transaction.Executor, orderIDs []uuid.UUID) ([]paymentDomain.Payment, error) {
+	var result []paymentDomain.Payment
+	orderIDMap := make(map[uuid.UUID]bool)
+	for _, id := range orderIDs {
+		orderIDMap[id] = true
+	}
+	for _, p := range m.payments {
+		if orderIDMap[p.OrderID] {
+			result = append(result, *p)
+		}
+	}
+	return result, nil
+}
+
 func (m *mockPaymentRepo) UpdateStatus(ctx context.Context, exec transaction.Executor, id uuid.UUID, status paymentDomain.PaymentStatus) error {
 	if p, ok := m.payments[id]; ok {
 		p.Status = status

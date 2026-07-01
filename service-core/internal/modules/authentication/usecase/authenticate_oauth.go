@@ -1,0 +1,333 @@
+package usecase
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	apperrors "service-core/internal/common/errors"
+	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/repository"
+	customerDomain "service-core/internal/modules/customer/domain"
+	customerRepo "service-core/internal/modules/customer/repository"
+	userRepo "service-core/internal/modules/user/repository"
+	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
+)
+
+type AuthenticateOAuthUsecase struct {
+	executor         transaction.Executor
+	transactor       transaction.Transactor
+	accountRepo      repository.AccountRepository
+	oauthRepo        repository.OAuthConnectionRepository
+	userRepo         userRepo.UserRepository
+	customerRepo     customerRepo.CustomerRepository
+	tokenHasher      repository.TokenHasher
+	tokenSvc         repository.TokenService
+	sessionRepo      repository.SessionRepository
+	refreshTokenRepo repository.RefreshTokenRepository
+}
+
+func NewAuthenticateOAuthUsecase(
+	executor transaction.Executor,
+	transactor transaction.Transactor,
+	accountRepo repository.AccountRepository,
+	oauthRepo repository.OAuthConnectionRepository,
+	userRepo userRepo.UserRepository,
+	customerRepo customerRepo.CustomerRepository,
+	tokenHasher repository.TokenHasher,
+	tokenSvc repository.TokenService,
+	sessionRepo repository.SessionRepository,
+	refreshTokenRepo repository.RefreshTokenRepository,
+) *AuthenticateOAuthUsecase {
+	return &AuthenticateOAuthUsecase{
+		executor:         executor,
+		transactor:       transactor,
+		accountRepo:      accountRepo,
+		oauthRepo:        oauthRepo,
+		userRepo:         userRepo,
+		customerRepo:     customerRepo,
+		tokenHasher:      tokenHasher,
+		tokenSvc:         tokenSvc,
+		sessionRepo:      sessionRepo,
+		refreshTokenRepo: refreshTokenRepo,
+	}
+}
+
+type AuthenticateOAuthParams struct {
+	UserAgent *string
+	IPAddress *string
+	Provider  domain.OAuthProvider
+	Subject   string
+	Email     string
+	Name      string
+	AvatarURL *string
+}
+
+type AuthenticateOAuthResult struct {
+	AccessToken  repository.GeneratedToken
+	RefreshToken repository.GeneratedToken
+}
+
+func (u *AuthenticateOAuthUsecase) Execute(
+	ctx context.Context,
+	input AuthenticateOAuthParams,
+) (*AuthenticateOAuthResult, error) {
+	now := time.Now()
+
+	conn, err := u.oauthRepo.
+		GetByProviderAndSubject(
+			ctx,
+			u.executor,
+			input.Provider,
+			input.Subject,
+		)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve oauth connection: %w", err)
+	}
+
+	var userID uuid.UUID
+	var account *domain.Account
+
+	if conn != nil {
+		userID = conn.UserID
+		err = u.oauthRepo.
+			UpdateLastLogin(
+				ctx,
+				u.executor,
+				conn.ID,
+				now,
+			)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update last login: %w", err)
+		}
+
+		account, err = u.accountRepo.
+			GetByUserID(
+				ctx,
+				u.executor,
+				userID,
+			)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get account: %w", err)
+		}
+		if account == nil {
+			return nil, apperrors.NewNotFound("account not found")
+		}
+		if account.Status != domain.AccountActive &&
+			account.Status != domain.AccountPending {
+			return nil, apperrors.NewForbidden("account is suspended or locked")
+		}
+
+		if account.Status == domain.AccountPending {
+			err = u.accountRepo.
+				ActivateByUserID(
+					ctx,
+					u.executor,
+					userID,
+				)
+			if err != nil {
+				return nil, fmt.Errorf("failed to activate account: %w", err)
+			}
+			account.Status = domain.AccountActive
+		}
+	} else {
+		account, err = u.accountRepo.
+			GetByEmail(
+				ctx,
+				u.executor,
+				input.Email,
+			)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve account by email: %w", err)
+		}
+
+		if account != nil {
+			// Account exists with this email, link it to this OAuth identity.
+			// The schema enforces user_id UNIQUE, so check if they already have any OAuth connection.
+			existingConn, err := u.oauthRepo.
+				GetByUserID(
+					ctx,
+					u.executor,
+					account.UserID,
+				)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check existing connection by user id: %w", err)
+			}
+			if existingConn != nil {
+				return nil, apperrors.NewConflict("this email is already linked with another OAuth account")
+			}
+
+			userID = account.UserID
+
+			if account.Status == domain.AccountPending {
+				err = u.accountRepo.
+					ActivateByUserID(
+						ctx,
+						u.executor,
+						userID,
+					)
+				if err != nil {
+					return nil, fmt.Errorf("failed to activate account: %w", err)
+				}
+				account.Status = domain.AccountActive
+			}
+
+			newConn := domain.OAuthConnection{
+				ID:          uuid.New(),
+				UserID:      userID,
+				Provider:    input.Provider,
+				Subject:     input.Subject,
+				Email:       &input.Email,
+				LastLoginAt: &now,
+				CreatedAt:   now,
+			}
+
+			err = u.oauthRepo.
+				Create(
+					ctx,
+					u.executor,
+					newConn,
+				)
+			if err != nil {
+				return nil, fmt.Errorf("failed to link oauth connection: %w", err)
+			}
+		} else {
+			userID = uuid.New()
+			accountID := uuid.New()
+			customerID := uuid.New()
+
+			baseUsername := input.Email
+			username := fmt.Sprintf("%s_%s", baseUsername, uuid.New().String()[:8])
+
+			userProps := userRepo.CreateUserProps{
+				ID:        userID,
+				Name:      input.Name,
+				Username:  username,
+				AvatarURL: input.AvatarURL,
+				CreatedAt: now,
+			}
+
+			newAcc := domain.Account{
+				ID:        accountID,
+				UserID:    userID,
+				Email:     input.Email,
+				Password:  "",
+				Status:    domain.AccountActive,
+				Type:      domain.AccountTypeCustomer,
+				CreatedAt: now,
+			}
+
+			cust := customerDomain.Customer{
+				ID:        customerID,
+				UserID:    userID,
+				CreatedAt: now,
+			}
+
+			newConn := domain.OAuthConnection{
+				ID:          uuid.New(),
+				UserID:      userID,
+				Provider:    input.Provider,
+				Subject:     input.Subject,
+				Email:       &input.Email,
+				LastLoginAt: &now,
+				CreatedAt:   now,
+			}
+
+			err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+				if err := u.userRepo.
+					CreateUser(ctx, exec, userProps); err != nil {
+					return fmt.Errorf("failed to create user: %w", err)
+				}
+				if err := u.customerRepo.
+					Create(ctx, exec, cust); err != nil {
+					return fmt.Errorf("failed to create customer profile: %w", err)
+				}
+				if err := u.accountRepo.
+					Create(ctx, exec, newAcc); err != nil {
+					return fmt.Errorf("failed to create account: %w", err)
+				}
+				if err := u.oauthRepo.
+					Create(ctx, exec, newConn); err != nil {
+					return fmt.Errorf("failed to create oauth connection: %w", err)
+				}
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			account = &newAcc
+		}
+	}
+
+	session := domain.Session{
+		ID:        uuid.New(),
+		UserID:    userID,
+		UserAgent: input.UserAgent,
+		IPAddress: input.IPAddress,
+		ExpiresAt: now.Add(7 * 24 * time.Hour),
+		CreatedAt: now,
+	}
+
+	var customerID *uuid.UUID
+	custProfile, err := u.customerRepo.GetByUserID(ctx, u.executor, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve customer profile: %w", err)
+	}
+	if custProfile != nil {
+		customerID = &custProfile.ID
+	}
+
+	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
+		UserID:     userID,
+		SessionID:  session.ID,
+		CustomerID: customerID,
+		Type:       domain.TokenTypeAccess,
+		Duration:   30 * time.Minute,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	refreshTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
+		UserID:     userID,
+		SessionID:  session.ID,
+		CustomerID: customerID,
+		Type:       domain.TokenTypeRefresh,
+		Duration:   7 * 24 * time.Hour,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	refreshTknHashed := u.tokenHasher.Hash(refreshTkn.Token)
+	refreshTknDomain := domain.RefreshToken{
+		ID:        uuid.New(),
+		SessionID: session.ID,
+		TokenHash: refreshTknHashed,
+		ExpiresAt: now.Add(7 * 24 * time.Hour),
+		CreatedAt: now,
+	}
+
+	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.sessionRepo.
+			Save(ctx, exec, session); err != nil {
+			return fmt.Errorf("failed to save session: %w", err)
+		}
+		if err := u.refreshTokenRepo.
+			Save(ctx, exec, refreshTknDomain); err != nil {
+			return fmt.Errorf("failed to save refresh token: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthenticateOAuthResult{
+		AccessToken:  accessTkn,
+		RefreshToken: refreshTkn,
+	}, nil
+}
