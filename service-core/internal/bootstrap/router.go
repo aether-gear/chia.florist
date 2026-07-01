@@ -63,8 +63,8 @@ func NewRouteChains(c *Container) *RouteChains {
 		CoreAuth: buildChain(
 			c.Authenticator.RequireAnyAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenCookieName,
-				appcookie.AccessTokenStaffCookieName,
+				appcookie.CookieAccess,
+				appcookie.CookieStaff,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(
@@ -75,7 +75,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		StaffOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenStaffCookieName,
+				appcookie.CookieStaff,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
@@ -83,7 +83,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenStaffCookieName,
+				appcookie.CookieStaff,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
@@ -92,7 +92,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		CustomerOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenCookieName,
+				appcookie.CookieAccess,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),

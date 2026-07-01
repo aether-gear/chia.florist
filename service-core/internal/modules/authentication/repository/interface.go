@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	appcookie "service-core/internal/common/http/cookie"
 	appmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
 	transaction "service-core/internal/shared/transaction"
@@ -112,11 +113,11 @@ type TokenHasher interface {
 type Authenticator interface {
 	RequireAuth(
 		exec transaction.Executor,
-		cookie string,
+		cookie appcookie.CookieName,
 	) appmiddleware.Middleware
 
 	RequireAnyAuth(
 		exec transaction.Executor,
-		cookies ...string,
+		cookies ...appcookie.CookieName,
 	) appmiddleware.Middleware
 }

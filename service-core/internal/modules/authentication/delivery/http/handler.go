@@ -131,15 +131,12 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     appcookie.AccessTokenCookieName,
-		Value:    tokens.AccessToken.Token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		Expires:  tokens.AccessToken.ExpiresAt,
-	})
+	appcookie.Bind(
+		w,
+		appcookie.CookieAccess,
+		tokens.AccessToken.Token,
+		tokens.AccessToken.ExpiresAt,
+	)
 
 	response := map[string]string{
 		"message": "login success",
@@ -218,15 +215,12 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     appcookie.AccessTokenCookieName,
-		Value:    tokens.AccessToken.Token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		Expires:  tokens.AccessToken.ExpiresAt,
-	})
+	appcookie.Bind(
+		w,
+		appcookie.CookieAccess,
+		tokens.AccessToken.Token,
+		tokens.AccessToken.ExpiresAt,
+	)
 
 	response := map[string]string{
 		"message": "verify success",
@@ -262,15 +256,12 @@ func (h *authHandler) SignInStaffEmail(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     appcookie.AccessTokenStaffCookieName,
-		Value:    tokens.AccessToken.Token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		Expires:  tokens.AccessToken.ExpiresAt,
-	})
+	appcookie.Bind(
+		w,
+		appcookie.CookieStaff,
+		tokens.AccessToken.Token,
+		tokens.AccessToken.ExpiresAt,
+	)
 
 	response := map[string]string{
 		"message": "login success",
@@ -289,6 +280,12 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 	err := h.logout.Execute(r.Context(), *authCtx)
 	if err != nil {
 		return err
+	}
+
+	if authCtx.CustomerID != nil {
+		appcookie.Clear(w, appcookie.CookieAccess)
+	} else if authCtx.StaffID != nil {
+		appcookie.Clear(w, appcookie.CookieStaff)
 	}
 
 	response := map[string]string{

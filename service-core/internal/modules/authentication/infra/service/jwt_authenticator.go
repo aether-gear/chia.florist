@@ -32,11 +32,11 @@ func NewJWTAuthenticator(
 
 func (aM *jwtAuthenticator) RequireAuth(
 	exec transaction.Executor,
-	cookie string,
+	cookie appcookie.CookieName,
 ) commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
-			token, err := appcookie.CookieValue(r, cookie)
+			token, err := appcookie.Extract(r, cookie)
 			if err != nil {
 				return apperrors.
 					NewUnauthorized(domain.ErrAuthenticationRequired.Error())
@@ -65,12 +65,12 @@ func (aM *jwtAuthenticator) RequireAuth(
 
 func (aM *jwtAuthenticator) RequireAnyAuth(
 	exec transaction.Executor,
-	cookies ...string,
+	cookies ...appcookie.CookieName,
 ) commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			for _, cookie := range cookies {
-				token, err := appcookie.CookieValue(r, cookie)
+				token, err := appcookie.Extract(r, cookie)
 				if err != nil {
 					continue
 				}
