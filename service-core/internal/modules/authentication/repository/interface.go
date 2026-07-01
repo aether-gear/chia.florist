@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"time"
 
+	appcookie "service-core/internal/common/http/cookie"
 	appmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
 	transaction "service-core/internal/shared/transaction"
@@ -112,11 +114,39 @@ type TokenHasher interface {
 type Authenticator interface {
 	RequireAuth(
 		exec transaction.Executor,
-		cookie string,
+		cookie appcookie.CookieName,
 	) appmiddleware.Middleware
 
 	RequireAnyAuth(
 		exec transaction.Executor,
-		cookies ...string,
+		cookies ...appcookie.CookieName,
 	) appmiddleware.Middleware
+}
+
+type OAuthConnectionRepository interface {
+	GetByProviderAndSubject(
+		ctx context.Context,
+		exec transaction.Executor,
+		provider domain.OAuthProvider,
+		subject string,
+	) (*domain.OAuthConnection, error)
+
+	GetByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) (*domain.OAuthConnection, error)
+
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		conn domain.OAuthConnection,
+	) error
+
+	UpdateLastLogin(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		lastLoginAt time.Time,
+	) error
 }
