@@ -17,22 +17,21 @@ on:
     branches:
       - main
     paths:
-      - 'service-core/**'
-      - '.github/workflows/ci-service-core.yml'
+      - "service-core/**"
+      - ".github/workflows/ci-service-core.yml"
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main
     paths:
-      - 'service-core/**'
+      - "service-core/**"
 
 env:
-  REGISTRY:   ghcr.io
+  REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/service-core
 
 jobs:
-
   # --- Test --- #
   test:
     name: Test (Go)
@@ -44,7 +43,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file:      service-core/go.mod
+          go-version-file: service-core/go.mod
           cache-dependency-path: service-core/go.sum
 
       - name: Vet
@@ -53,7 +52,7 @@ jobs:
 
       - name: Test
         working-directory: service-core
-        run: go test -race -coverprofile=coverage.out ./internal/...
+        run: go test -race -coverprofile coverage.out ./internal/...
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -105,12 +104,12 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context:   ./service-core
-          push:      true
-          tags:      ${{ steps.meta.outputs.tags }}
-          labels:    ${{ steps.meta.outputs.labels }}
+          context: ./service-core
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to:   type=gha,mode=max
+          cache-to: type=gha,mode=max
 
   # --- Deploy to Railway (production) --- #
   deploy-production:
