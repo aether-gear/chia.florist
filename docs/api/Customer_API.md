@@ -10,6 +10,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [X] Sign Up
     - [X] Verify Account
     - [X] Sign In
+    - [ ] Google Sign In
   - [X] Products
     - [X] Find Products
     - [X] Get Product Detail
@@ -140,7 +141,7 @@ No authentication is required for these endpoints.
 
 #### Response `200 OK`
 
-- **Set-Cookie**: `<access_token_cookie>=<value>`
+- **Set-Cookie**: `chast=<value>`
 - **Body**:
   ```json
   { "message": "login success" }
@@ -152,6 +153,22 @@ No authentication is required for these endpoints.
 |--------------------|-----------|
 | `400 Bad Request`  | `email` or `password` is missing or empty. |
 | `401 Unauthorized` | Invalid email or password. |
+
+### Google Sign In
+
+- **Method**: `GET`
+- **Endpoint**: `/auth/google/login`
+- **Description**: Authenticate a user with _Google_ account, for both sign up and sign in.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Response `200 OK`
+
+- **Set-Cookie**: `chast=<value>`
+- **Body**:
+  ```json
+  { "message": "login success" }
+  ```
 
 ## Products
 
