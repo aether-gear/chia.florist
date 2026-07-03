@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PackageOpen, Search, Loader2, FileText, ChevronLeft, ChevronRight, ArrowUpDown, Eye } from 'lucide-react';
+import { PackageOpen, Search, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
@@ -27,7 +27,6 @@ export default function OrdersPage() {
     searchNumber,
     statusFilter,
     setPage,
-    setLimit,
     setSort,
     setSearchNumber,
     setStatusFilter,

@@ -1,0 +1,15 @@
+# Chia Florist — Client side for Staff and Admin
+# Usage:
+#   docker compose up --build
+
+services:
+  control-panel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chia-florist/control-panel:local
+    container_name: chia-control-panel
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    

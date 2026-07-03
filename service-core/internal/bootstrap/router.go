@@ -63,8 +63,8 @@ func NewRouteChains(c *Container) *RouteChains {
 		CoreAuth: buildChain(
 			c.Authenticator.RequireAnyAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenCookieName,
-				appcookie.AccessTokenStaffCookieName,
+				appcookie.CookieAccess,
+				appcookie.CookieStaff,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(
@@ -75,7 +75,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		StaffOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenStaffCookieName,
+				appcookie.CookieStaff,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
@@ -83,7 +83,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenStaffCookieName,
+				appcookie.CookieStaff,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
@@ -92,7 +92,7 @@ func NewRouteChains(c *Container) *RouteChains {
 		CustomerOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
-				appcookie.AccessTokenCookieName,
+				appcookie.CookieAccess,
 			),
 			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
@@ -123,6 +123,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.RegisterCustomer,
 			&c.VerifyAccount,
 			&c.GetAccount,
+			&c.AuthenticateOAuth,
+			c.GoogleOAuth,
 		)
 
 		staffHandler = staffH.NewStaffHandler(
@@ -198,6 +200,12 @@ func NewRouter(c *Container) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Route("/", func(r chi.Router) {
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"healthy"}`))
+		})
+
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
 			r.Post("/", chains.StaffOnly(productHandler.CreateProduct))
@@ -215,6 +223,9 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Post("/verify", chains.Core(authHandler.VerifyAccount))
 			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
 			r.Get("/me", chains.CoreAuth(authHandler.Me))
+
+			r.Get("/google/login", chains.Core(authHandler.GoogleLogin))
+			r.Get("/google/callback", chains.Core(authHandler.GoogleCallback))
 		})
 
 		r.Route("/staff", func(r chi.Router) {

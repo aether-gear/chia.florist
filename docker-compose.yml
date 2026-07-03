@@ -1,28 +1,29 @@
 # Chia Florist — Full Local Development Stack
 # Usage:
-#   cp .env.compose.example .env.compose
-#   docker compose --env-file .env.compose up --build
+#   docker compose up --build
 #
-# Subdomains (add to /etc/hosts or use a wildcard DNS tool like dnsmasq):
+# Subdomains (add to C:\Windows\System32\drivers\etc\hosts):
 #   127.0.0.1  app.chia.florist api.chia.florist panel.chia.florist
 
 services:
 
-  # --- PostgreSQL (local dev only — production uses Supabase) --- #
+  # --- PostgreSQL (local dev only) --- #
   postgres:
     image: postgres:17-alpine
     container_name: chia-postgres
     restart: unless-stopped
+    env_file:
+      - ./service-core/.env
     environment:
-      POSTGRES_DB:       ${POSTGRES_DB_NAME:-chia_florase}
-      POSTGRES_USER:     ${POSTGRES_DB_USER:-chiaw}
-      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD:-chiaw_dev_pass}
+      POSTGRES_DB: ${POSTGRES_DB_NAME}
+      POSTGRES_USER: ${POSTGRES_DB_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_DB_USER:-chiaw}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_DB_USER:-chiaw} -d $${POSTGRES_DB_NAME:-chia_florase}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,33 +36,13 @@ services:
     image: chia-florist/service-core:local
     container_name: chia-service-core
     restart: unless-stopped
+    env_file:
+      - ./service-core/.env
     environment:
-      MY_APP_SAYA_HOST:          0.0.0.0
-      MY_APP_SAYA_PORT:          7129
-      APP_ENV:                   development
-      APP_CORS_ALLOWED_ORIGINS:  http://localhost:4000,http://localhost:5173
-      # Local Postgres (override for Supabase in .env.compose)
-      POSTGRES_DB_HOST:          postgres
-      POSTGRES_DB_PORT:          5432
-      POSTGRES_DB_NAME:          ${POSTGRES_DB_NAME:-chia_florase}
-      POSTGRES_DB_USER:          ${POSTGRES_DB_USER:-chiaw}
-      POSTGRES_DB_PASSWORD:      ${POSTGRES_DB_PASSWORD:-chiaw_dev_pass}
-      POSTGRES_DB_SSLMODE:       disable
-      # Secrets (from .env.compose)
-      JWT_SECRET:                ${JWT_SECRET}
-      STORAGE_BUCKET:            ${STORAGE_BUCKET}
-      STORAGE_SIGNED_URL_EXPIRY: ${STORAGE_SIGNED_URL_EXPIRY:-1500}
-      SUPABASE_PROJECT_URL:      ${SUPABASE_PROJECT_URL}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      RAJAONGKIR_DESTINATION_URL: ${RAJAONGKIR_DESTINATION_URL}
-      RAJAONGKIR_CALCULATE_URL:   ${RAJAONGKIR_CALCULATE_URL}
-      RAJAONGKIR_SHIPPING:        ${RAJAONGKIR_SHIPPING}
-      RAJAONGKIR_PAYMENT:         ${RAJAONGKIR_PAYMENT}
-      SMTP_HOST:                  ${SMTP_HOST}
-      SMTP_PORT:                  ${SMTP_PORT:-587}
-      SMTP_USERNAME:              ${SMTP_USERNAME}
-      SMTP_PASSWORD:              ${SMTP_PASSWORD}
-      SMTP_FROM:                  ${SMTP_FROM}
+      POSTGRES_DB_HOST: postgres
+      POSTGRES_DB_PORT: 5432
+      MY_APP_SAYA_HOST: 0.0.0.0
+      MY_APP_SAYA_PORT: 7129
     ports:
       - "7129:7129"
     depends_on:
@@ -82,12 +63,12 @@ services:
     image: chia-florist/e-commerce:local
     container_name: chia-e-commerce
     restart: unless-stopped
+    env_file:
+      - ./e-commerce/.env
     environment:
-      HOST:                 0.0.0.0
-      PORT:                 4000
+      HOST: 0.0.0.0
+      PORT: 4000
       SERVICE_CORE_API_URL: http://service-core:7129
-      SUPABASE_URL:         ${SUPABASE_PROJECT_URL}
-      SUPABASE_KEY:         ${SUPABASE_SERVICE_ROLE_KEY}
     ports:
       - "4000:4000"
     depends_on:
@@ -99,13 +80,11 @@ services:
     build:
       context: ./control-panel
       dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7129}
     image: chia-florist/control-panel:local
     container_name: chia-control-panel
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "3000:80"
     depends_on:
       - service-core
 

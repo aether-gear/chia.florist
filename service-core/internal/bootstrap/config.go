@@ -15,6 +15,7 @@ type Config struct {
 	SMTP       config.SMTPConfig
 	MidTrans   config.MidTransConfig
 	RajaOngkir config.RajaOngkirConfig
+	GoogleOAuth config.GoogleOAuthConfig
 }
 
 func LoadConfig() Config {
@@ -51,5 +52,6 @@ func LoadConfig() Config {
 		SMTP:       config.LoadSMTPConfig(),
 		MidTrans:   config.LoadMidTransConfig(),
 		RajaOngkir: config.LoadRajaOngkirConfig(),
+		GoogleOAuth: config.LoadGoogleOAuthConfig(),
 	}
 }

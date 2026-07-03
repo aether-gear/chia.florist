@@ -8,6 +8,7 @@ import (
 	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
 	"service-core/internal/shared/transaction"
+	appconfig "service-core/internal/shared/config"
 
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
@@ -52,6 +53,7 @@ type Container struct {
 	Authenticator      authenRepo.Authenticator
 	Authorizer         authorRepo.Authorizer
 	DBExecutor         transaction.Executor
+	GoogleOAuth        appconfig.GoogleOAuthConfig
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
@@ -59,13 +61,14 @@ type Container struct {
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
-	Me               authenUsecase.MeUsecase
-	LoginCustomer    authenUsecase.LoginCustomerUsecase
-	LoginStaff       authenUsecase.LoginStaffUsecase
-	RegisterCustomer authenUsecase.RegisterCustomerUsecase
-	VerifyAccount    authenUsecase.VerifyAccountUsecase
-	GetAccount       authenUsecase.GetAccountUsecase
-	Logout           authenUsecase.LogoutUsecase
+	Me                authenUsecase.MeUsecase
+	LoginCustomer     authenUsecase.LoginCustomerUsecase
+	LoginStaff        authenUsecase.LoginStaffUsecase
+	RegisterCustomer  authenUsecase.RegisterCustomerUsecase
+	VerifyAccount     authenUsecase.VerifyAccountUsecase
+	GetAccount        authenUsecase.GetAccountUsecase
+	Logout            authenUsecase.LogoutUsecase
+	AuthenticateOAuth authenUsecase.AuthenticateOAuthUsecase
 
 	FindStaff       staffUsecase.FindStaffUsecase
 	CreateStaff     staffUsecase.CreateStaffUsecase
@@ -129,6 +132,7 @@ func NewContainer(cfg Config,
 		inventoryRepo          = inventoryPersistence.NewInventoryRepository()
 		accountRepo            = authenPersistence.NewAccountRepository()
 		challengeRepo          = authenPersistence.NewChallengeRepository()
+		oauthRepo              = authenPersistence.NewOAuthConnectionRepository()
 		sessionRepo            = authenPersistence.NewSessionRepositoryImpl()
 		refreshTokenRepo       = authenPersistence.NewRefreshTokenRepositoryImpl()
 		cartRepo               = cartPersistence.NewCartRepositoryImpl()
@@ -206,6 +210,7 @@ func NewContainer(cfg Config,
 		Authenticator:      authMidd,
 		Authorizer:         authorMdwr,
 		DBExecutor:         infra.TransactionExecutor,
+		GoogleOAuth:        cfg.GoogleOAuth,
 
 		FindProducts: *productUsecase.
 			NewFindProductsUsecase(
@@ -339,6 +344,18 @@ func NewContainer(cfg Config,
 				accountRepo,
 				infra.TransactionExecutor,
 			),
+		AuthenticateOAuth: *authenUsecase.NewAuthenticateOAuthUsecase(
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			accountRepo,
+			oauthRepo,
+			userRepo,
+			customerRepo,
+			tokenHasher,
+			tokenSvc,
+			sessionRepo,
+			refreshTokenRepo,
+		),
 
 		GetCart: *cartUsecase.
 			NewGetCartUsecase(

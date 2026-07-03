@@ -10,6 +10,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [X] Sign Up
     - [X] Verify Account
     - [X] Sign In
+    - [ ] Google Sign In
   - [X] Products
     - [X] Find Products
     - [X] Get Product Detail
@@ -32,6 +33,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
   - [ ] Profile
     - [ ] Get Current User
     - [ ] Update User
+    - [ ] List Orders
   - [X] Addresses
     - [X] List My Addresses
     - [X] Save My Address
@@ -139,7 +141,7 @@ No authentication is required for these endpoints.
 
 #### Response `200 OK`
 
-- **Set-Cookie**: `<access_token_cookie>=<value>`
+- **Set-Cookie**: `chast=<value>`
 - **Body**:
   ```json
   { "message": "login success" }
@@ -151,6 +153,22 @@ No authentication is required for these endpoints.
 |--------------------|-----------|
 | `400 Bad Request`  | `email` or `password` is missing or empty. |
 | `401 Unauthorized` | Invalid email or password. |
+
+### Google Sign In
+
+- **Method**: `GET`
+- **Endpoint**: `/auth/google/login`
+- **Description**: Authenticate a user with _Google_ account, for both sign up and sign in.
+- **Authentication**: None
+- **Request Body**: None
+
+#### Response `200 OK`
+
+- **Set-Cookie**: `chast=<value>`
+- **Body**:
+  ```json
+  { "message": "login success" }
+  ```
 
 ## Products
 
@@ -990,140 +1008,140 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 ```json
 {
-    "address": {
-        "id": "95120305-02ad-468e-9103-2bb113d41cd7",
-        "recipient_name": "My Belle Gweh",
-        "phone": "000",
-        "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
-    },
-    "shops": [
-        {
+  "address": {
+    "id": "95120305-02ad-468e-9103-2bb113d41cd7",
+    "recipient_name": "My Belle Gweh",
+    "phone": "000",
+    "full_address": "Blok LA 22B, Jl Sokekarno Saya akan lawan"
+  },
+  "shops": [
+    {
+      "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
+      "name": "Chia Medan Satria",
+      "slug": "chia-medan-satria",
+      "subtotal": 21600000,
+      "total": 21850000,
+      "items": [
+          {
+            "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
             "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-            "name": "Chia Medan Satria",
-            "slug": "chia-medan-satria",
-            "subtotal": 21600000,
-            "total": 21850000,
-            "items": [
-                {
-                    "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
-                    "shop_id": "8fad2c68-82a2-4578-a550-c625a1691d8a",
-                    "name": "Grand Opening",
-                    "price": 150000,
-                    "quantity": 144,
-                    "subtotal": 21600000
-                }
-            ],
-            "cost_couriers": [
-                {
-                    "code": "tiki",
-                    "name": "Citra Van Titipan Kilat (TIKI)",
-                    "service": "TRC",
-                    "etd": "5 day",
-                    "fee": 50000
-                },
-                {
-                    "code": "jne",
-                    "name": "Jalur Nugraha Ekakurir (JNE)",
-                    "service": "REG",
-                    "etd": "1 day",
-                    "fee": 150000
-                },
-                {
-                    "code": "lion",
-                    "name": "Lion Parcel",
-                    "service": "REGPACK",
-                    "etd": "1-2 day",
-                    "fee": 144450
-                },
-                {
-                    "code": "pos",
-                    "name": "POS Indonesia (POS)",
-                    "service": "PAKETPOS VALUABLE GOODS",
-                    "etd": "3 day",
-                    "fee": 247500
-                }
-            ]
+            "name": "Grand Opening",
+            "price": 150000,
+            "quantity": 144,
+            "subtotal": 21600000
+          }
+      ],
+      "cost_couriers": [
+        {
+          "code": "tiki",
+          "name": "Citra Van Titipan Kilat (TIKI)",
+          "service": "TRC",
+          "etd": "5 day",
+          "fee": 50000
         },
         {
+          "code": "jne",
+          "name": "Jalur Nugraha Ekakurir (JNE)",
+          "service": "REG",
+          "etd": "1 day",
+          "fee": 150000
+        },
+        {
+          "code": "lion",
+          "name": "Lion Parcel",
+          "service": "REGPACK",
+          "etd": "1-2 day",
+          "fee": 144450
+        },
+        {
+          "code": "pos",
+          "name": "POS Indonesia (POS)",
+          "service": "PAKETPOS VALUABLE GOODS",
+          "etd": "3 day",
+          "fee": 247500
+        }
+      ]
+    },
+    {
+      "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
+      "name": "Chia Cipinang",
+      "slug": "chia-cipinang",
+      "subtotal": 825000,
+      "total": 870000,
+      "items": [
+          {
+            "product_id": "71be3ee1-17b4-4bb8-8f80-eae6ad93a844",
             "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
-            "name": "Chia Cipinang",
-            "slug": "chia-cipinang",
-            "subtotal": 825000,
-            "total": 870000,
-            "items": [
-                {
-                    "product_id": "71be3ee1-17b4-4bb8-8f80-eae6ad93a844",
-                    "shop_id": "333f6432-a01c-412f-99f4-0f08ca0d8eb1",
-                    "name": "Graduate",
-                    "price": 55000,
-                    "quantity": 15,
-                    "subtotal": 825000
-                }
-            ],
-            "cost_couriers": [
-                {
-                    "code": "tiki",
-                    "name": "Citra Van Titipan Kilat (TIKI)",
-                    "service": "TRC",
-                    "etd": "5 day",
-                    "fee": 50000
-                },
-                {
-                    "code": "jne",
-                    "name": "Jalur Nugraha Ekakurir (JNE)",
-                    "service": "REG",
-                    "etd": "1 day",
-                    "fee": 150000
-                },
-                {
-                    "code": "lion",
-                    "name": "Lion Parcel",
-                    "service": "REGPACK",
-                    "etd": "1-2 day",
-                    "fee": 144450
-                },
-                {
-                    "code": "pos",
-                    "name": "POS Indonesia (POS)",
-                    "service": "PAKETPOS VALUABLE GOODS",
-                    "etd": "3 day",
-                    "fee": 247500
-                }
-            ]
-        }
-    ],
-    "subtotal": 22425000,
-    "total_shipping": 295000,
-    "total": 22720000,
-    "payment_methods": [
-        {
-            "id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
-            "name": "GoPay",
-            "type": "ewallet",
-            "description": "GoPay via Midtrans",
-            "fee": 0,
-            "subtotal": 22720000,
-            "total": 22720000
-        },
-        {
-            "id": "074b02e4-e047-4f60-bdb0-cfeb5481d002",
-            "name": "DANA",
-            "type": "ewallet",
-            "description": "DANA via Midtrans",
-            "fee": 0,
-            "subtotal": 22720000,
-            "total": 22720000
-        },
-        {
-            "id": "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
-            "name": "Mandiri",
-            "type": "bank_transfer",
-            "description": "Mandiri Bill Payment via Midtrans",
-            "fee": 0,
-            "subtotal": 22720000,
-            "total": 22720000
-        }
-    ]
+            "name": "Graduate",
+            "price": 55000,
+            "quantity": 15,
+            "subtotal": 825000
+          }
+        ],
+        "cost_couriers": [
+          {
+            "code": "tiki",
+            "name": "Citra Van Titipan Kilat (TIKI)",
+            "service": "TRC",
+            "etd": "5 day",
+            "fee": 50000
+          },
+          {
+            "code": "jne",
+            "name": "Jalur Nugraha Ekakurir (JNE)",
+            "service": "REG",
+            "etd": "1 day",
+            "fee": 150000
+          },
+          {
+            "code": "lion",
+            "name": "Lion Parcel",
+            "service": "REGPACK",
+            "etd": "1-2 day",
+            "fee": 144450
+          },
+          {
+            "code": "pos",
+            "name": "POS Indonesia (POS)",
+            "service": "PAKETPOS VALUABLE GOODS",
+            "etd": "3 day",
+            "fee": 247500
+          }
+        ]
+    }
+  ],
+  "subtotal": 22425000,
+  "total_shipping": 295000,
+  "total": 22720000,
+  "payment_methods": [
+    {
+      "id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
+      "name": "GoPay",
+      "type": "ewallet",
+      "description": "GoPay via Midtrans",
+      "fee": 0,
+      "subtotal": 22720000,
+      "total": 22720000
+    },
+    {
+      "id": "074b02e4-e047-4f60-bdb0-cfeb5481d002",
+      "name": "DANA",
+      "type": "ewallet",
+      "description": "DANA via Midtrans",
+      "fee": 0,
+      "subtotal": 22720000,
+      "total": 22720000
+    },
+    {
+      "id": "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
+      "name": "Mandiri",
+      "type": "bank_transfer",
+      "description": "Mandiri Bill Payment via Midtrans",
+      "fee": 0,
+      "subtotal": 22720000,
+      "total": 22720000
+    }
+  ]
 }
 ```
 
@@ -1271,6 +1289,182 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 ## Orders
 
+### Find My Orders
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me/orders`
+- **Description**: Retrieve the user's orders.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `page`    | int    | No       | Page number. Defaults to `1`. |
+| `limit`   | int    | No       | Number of results per page. Defaults to `10`. |
+| `sort`    | string | No       | Comma-separated sort expressions. |
+| `status`    | string | No       | Filter by order status. |
+
+#### Sort Fields
+
+| Field      | Example              | Description                       |
+|------------|----------------------|-----------------------------------|
+| `latest`   | `sort=latest:desc`   | Sort by creation date.            |
+| `date`     | `sort=date:asc`      | Sort by order date.               |
+| `number`   | `sort=number:asc`    | Sort by order number.             |
+| `total`    | `sort=total:desc`    | Sort by total amount.             |
+| `status`   | `sort=status:asc`    | Sort by order status.             |
+| `modified` | `sort=modified:desc` | Sort by last modified date.       |
+
+> Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=latest:asc,number:desc`.
+
+**Examples**:
+- `GET /users/me/orders?page=1&limit=10`
+- `GET /users/me/orders?status=pending`
+- `GET /users/me/orders?sort=total:desc`
+
+#### Response `200 OK`
+
+```json
+{
+	"limit": 10,
+	"orders": [
+		{
+			"id": "00e9dc8e-e96d-4cb7-b9ea-8d5d5c8d930f",
+			"number": "ORD-20260627-63E4B3",
+			"customer_id": "7466a260-6dd9-45db-8a70-3254bfc2dc98",
+			"address_id": "f279f798-2de1-4ebd-a660-568b835b3a52",
+			"status": "pending",
+			"subtotal": 450000,
+			"shipping_fee": 770000,
+			"total": 1220000,
+			"created_at": "2026-06-27T10:09:05.904647Z",
+			"items": [
+				{
+					"id": "e73f9f49-b3b3-4c8e-8fee-dc5d4a0207ab",
+					"product_id": "480eec7c-d950-4927-a570-1fc3dc20df67",
+					"product_name": "Prosperity Grand Opening Stand",
+					"quantity": 3,
+					"unit_price": 150000,
+					"subtotal": 450000,
+					"shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
+					"shop_name": "dayum",
+					"courier_code": "tiki",
+					"courier_service": "SDS",
+					"shipping_fee": 770000
+				}
+			],
+			"payment": {
+				"id": "1d3a0355-ce51-4346-a07c-b8bc839e85f1",
+				"status": "pending",
+				"provider": "midtrans",
+				"amount": 1220000,
+				"expires_at": "2026-06-28T10:09:09Z",
+				"created_at": "2026-06-27T10:09:05.904647Z"
+			}
+		},
+		{
+			"id": "01606ea8-5952-40c8-a4cf-ac206dbbf096",
+			"number": "ORD-20260627-56D32D",
+			"customer_id": "7466a260-6dd9-45db-8a70-3254bfc2dc98",
+			"address_id": "f279f798-2de1-4ebd-a660-568b835b3a52",
+			"status": "pending",
+			"subtotal": 1100000,
+			"shipping_fee": 1100000,
+			"total": 2200000,
+			"created_at": "2026-06-27T10:05:48.635958Z",
+			"items": [
+				{
+					"id": "97e40886-5a36-47e5-8c1b-7d30e62b05e6",
+					"product_id": "1aa696a8-ddf6-4718-9d30-bc510646ad70",
+					"product_name": "The Scholar’s Cap Arrangement",
+					"quantity": 20,
+					"unit_price": 55000,
+					"subtotal": 1100000,
+					"shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
+					"shop_name": "dayum",
+					"courier_code": "tiki",
+					"courier_service": "SDS",
+					"shipping_fee": 1100000
+				}
+			],
+			"payment": {
+				"id": "58826ccf-a45b-437e-8bc5-23bb37590954",
+				"status": "pending",
+				"provider": "midtrans",
+				"amount": 2200000,
+				"expires_at": "2026-06-28T10:05:52Z",
+				"created_at": "2026-06-27T10:05:48.635958Z"
+			}
+		}
+	],
+	"page": 1,
+	"total": 2
+}
+```
+
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | User profile not found.     |
+
+### Get Order
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me/orders/{id}`
+- **Description**: Retrieve the order by its ID.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+	"id": "00e9dc8e-e96d-4cb7-b9ea-8d5d5c8d930f",
+	"number": "ORD-20260627-63E4B3",
+	"customer_id": "7466a260-6dd9-45db-8a70-3254bfc2dc98",
+	"address_id": "f279f798-2de1-4ebd-a660-568b835b3a52",
+	"status": "pending",
+	"subtotal": 450000,
+	"shipping_fee": 770000,
+	"total": 1220000,
+	"created_at": "2026-06-27T10:09:05.904647Z",
+	"items": [
+		{
+			"id": "e73f9f49-b3b3-4c8e-8fee-dc5d4a0207ab",
+			"product_id": "480eec7c-d950-4927-a570-1fc3dc20df67",
+			"product_name": "Prosperity Grand Opening Stand",
+			"quantity": 3,
+			"unit_price": 150000,
+			"subtotal": 450000,
+			"shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
+			"shop_name": "dayum",
+			"courier_code": "tiki",
+			"courier_service": "SDS",
+			"shipping_fee": 770000
+		}
+	],
+	"payment": {
+		"id": "1d3a0355-ce51-4346-a07c-b8bc839e85f1",
+		"status": "pending",
+		"provider": "midtrans",
+		"amount": 1220000,
+		"expires_at": "2026-06-28T10:09:09Z",
+		"created_at": "2026-06-27T10:09:05.904647Z"
+	}
+}
+```
+
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | User profile not found.     |
+
 ### Create Order
 
 - **Method**: `POST`
@@ -1350,4 +1544,3 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `403 Forbidden`    | Requesting a non-manual payment method (gateway integration is not available yet). |
 | `404 Not Found`    | Payment method or address not found. |
 | `409 Conflict`     | System conflict including **no available payment account**, **insufficient stock**, or **courier/shipping issues**. |
-

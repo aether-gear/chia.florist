@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Search, Plus, Loader2 } from 'lucide-react';
+import { Package, Search, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
@@ -103,6 +103,14 @@ export default function ProductsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => refresh()}
+              className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
             <Button onClick={() => navigate('/products/create')}>
               <Plus className="mr-2 h-4 w-4" /> Add Product
             </Button>
