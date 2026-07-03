@@ -1,0 +1,22 @@
+# Chia Florist — Customer Client Side
+# Usage:
+#   docker compose up --build
+
+services:
+  e-commerce:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chia-florist/e-commerce:local
+    container_name: chia-e-commerce
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      

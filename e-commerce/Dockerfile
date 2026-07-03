@@ -1,4 +1,4 @@
-# --- Stage 1: Build --- #
+# --- Build --- #
 FROM oven/bun:1.2-alpine AS builder
 
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-# --- Stage 2: Runtime --- #
+# --- Runtime --- #
 FROM node:22-alpine AS runtime
 
 RUN apk add --no-cache wget

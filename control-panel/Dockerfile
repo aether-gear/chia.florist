@@ -1,4 +1,4 @@
-# --- Stage 1: Build --- #
+# --- Build --- #
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -8,13 +8,12 @@ RUN npm ci
 
 COPY . .
 
-# Inject build argument for Vite compilation
-ARG VITE_API_BASE_URL
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ARG VITE_WAF_API_URL
+ENV VITE_WAF_API_URL=$VITE_WAF_API_URL
 
 RUN npm run build
 
-# --- Stage 2: Runtime (nginx) --- #
+# --- Runtime (nginx) --- #
 FROM nginx:1.27-alpine AS runtime
 
 # Remove default nginx config

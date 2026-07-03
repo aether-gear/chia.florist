@@ -1,0 +1,10 @@
+.git
+
+# Nuxt dev/build outputs
+.output
+.nuxt
+.nitro
+dist
+
+# Node dependencies
+node_modules
