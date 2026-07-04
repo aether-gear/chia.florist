@@ -15,13 +15,25 @@ var (
 type CookieName string
 
 const (
-	// CookieAccess is the cookie name used to
-	// store the user's access token
+	// This cookie represents the user's refresh token
+	// and is used to authenticate the user for
+	// API requests
 	CookieAccess CookieName = "chast"
 
-	// CookieStaff is the cookie name used for
-	// staff authentication sessions
+	// This cookie represents the user's refresh token
+	// and is used to obtain a new access token when the
+	// current one expires
+	CookieCustomerRefresh CookieName = "malkist"
+
+	// This cookie represents the user's staff authentication
+	// token and is used to authenticate the user for
+	// staff API requests
 	CookieStaff CookieName = "hotpot"
+
+	// This cookie represents the user's staff refresh token
+	// and is used to obtain a new staff authentication token
+	// when the current one expires
+	CookieStaffRefresh CookieName = "ladle"
 
 	// CookieOAuthState is the cookie name used to
 	// store OAuth state during authentication flow

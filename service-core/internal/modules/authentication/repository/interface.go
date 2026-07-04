@@ -83,6 +83,12 @@ type VerificationChallengeRepository interface {
 }
 
 type RefreshTokenRepository interface {
+	GetBySessionID(
+		ctx context.Context,
+		exec transaction.Executor,
+		sessionID uuid.UUID,
+	) (*domain.RefreshToken, error)
+
 	RevokeBySessionID(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -114,11 +120,13 @@ type TokenHasher interface {
 type Authenticator interface {
 	RequireAuth(
 		exec transaction.Executor,
+		tran transaction.Transactor,
 		cookie appcookie.CookieName,
 	) appmiddleware.Middleware
 
 	RequireAnyAuth(
 		exec transaction.Executor,
+		tran transaction.Transactor,
 		cookies ...appcookie.CookieName,
 	) appmiddleware.Middleware
 }
