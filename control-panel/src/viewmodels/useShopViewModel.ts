@@ -120,6 +120,25 @@ export function useShopViewModel() {
     }
   };
 
+  const createShop = async (data: { name: string; description?: string; is_active: string }) => {
+    try {
+      setLoading(true);
+      await fetchApi('/shops', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      // Refresh the list of shops
+      const shopsData = await fetchApi('/shops');
+      setShops(shopsData?.shops || []);
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     shops,
     selectedShopId,
@@ -133,6 +152,7 @@ export function useShopViewModel() {
     detailsError,
     createAddress,
     saveShop,
+    createShop,
     selectShop,
     fetchShopDetails,
     refresh: fetchShops
