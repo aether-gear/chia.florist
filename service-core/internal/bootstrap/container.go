@@ -118,6 +118,7 @@ type Container struct {
 	CreateOrder orderUsecase.CreateOrderUsecase
 	FindOrders  orderUsecase.FindOrdersUsecase
 	GetOrder    orderUsecase.GetOrderUsecase
+	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
 }
 
 func NewContainer(cfg Config,
@@ -588,6 +589,17 @@ func NewContainer(cfg Config,
 				orderItemRepo,
 				paymentRepo,
 				shipmentRepo,
+			),
+		UpdateOrderStatus: *orderUsecase.
+			NewUpdateOrderStatusUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
+				shipmentRepo,
+				addressRepo,
+				addressShopRepo,
+				infra.LogisticsProvider,
 			),
 	}
 }

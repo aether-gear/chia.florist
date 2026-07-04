@@ -7,6 +7,7 @@ import (
 	apphttp "service-core/internal/common/http"
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
+	orderDomain "service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/usecase"
 	paymentDomain "service-core/internal/modules/payment/domain"
 	shipmentDomain "service-core/internal/modules/shipment/domain"
@@ -16,20 +17,23 @@ import (
 )
 
 type orderHandler struct {
-	findOrders  *usecase.FindOrdersUsecase
-	getOrder    *usecase.GetOrderUsecase
-	createOrder *usecase.CreateOrderUsecase
+	findOrders        *usecase.FindOrdersUsecase
+	getOrder          *usecase.GetOrderUsecase
+	createOrder       *usecase.CreateOrderUsecase
+	updateOrderStatus *usecase.UpdateOrderStatusUsecase
 }
 
 func NewOrderHandler(
 	findOrders *usecase.FindOrdersUsecase,
 	getOrder *usecase.GetOrderUsecase,
 	createOrder *usecase.CreateOrderUsecase,
+	updateOrderStatus *usecase.UpdateOrderStatusUsecase,
 ) *orderHandler {
 	return &orderHandler{
-		findOrders:  findOrders,
-		getOrder:    getOrder,
-		createOrder: createOrder,
+		findOrders:        findOrders,
+		getOrder:          getOrder,
+		createOrder:       createOrder,
+		updateOrderStatus: updateOrderStatus,
 	}
 }
 
@@ -408,6 +412,51 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 			QRString:      result.PaymentAccount.QRString,
 		}
 	}
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+// UpdateOrderStatus handles PATCH /orders/{orderID}/status — staff-only.
+// Transitions the order to the requested status. When the target status is
+// "shipped", the system automatically creates a Komerce logistics order and
+// a Shipment record; no additional fields are required from the caller.
+func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.Type != authenDomain.AccountTypeStaff {
+		return apperrors.NewForbidden("forbidden: staff account required")
+	}
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	var req updateOrderStatusRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+	if req.Status == "" {
+		return apperrors.NewBadRequest("status is required")
+	}
+
+	result, err := h.updateOrderStatus.Execute(r.Context(), usecase.UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatus(req.Status),
+	})
+	if err != nil {
+		return err
+	}
+
+	resp := buildOrderResponse(usecase.OrderSearchResult{
+		Order:    result.Order,
+		Items:    []orderDomain.OrderItem{},
+		Shipment: result.Shipment,
+	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
