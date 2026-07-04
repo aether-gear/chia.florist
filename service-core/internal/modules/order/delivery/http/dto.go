@@ -33,6 +33,10 @@ type createOrderRequest struct {
 	Shops           []createOrderShopRequest  `json:"shops"`
 }
 
+type updateOrderStatusRequest struct {
+	Status string `json:"status"`
+}
+
 // ---- Response DTOs ----
 
 type createOrderPaymentAccountResponse struct {

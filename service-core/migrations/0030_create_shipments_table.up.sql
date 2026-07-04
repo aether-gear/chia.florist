@@ -1,8 +1,10 @@
 CREATE TYPE shipment_status_enum AS ENUM (
-    'pending',
-    'processing',
-    'shipped',
+    'created',
+    'packed',
+    'labelled',
+    'picked_up',
     'in_transit',
+    'out_for_delivery',
     'delivered',
     'failed',
     'returned',
@@ -14,7 +16,7 @@ CREATE TABLE shipments (
 
     order_id UUID NOT NULL UNIQUE,
 
-    status shipment_status_enum NOT NULL DEFAULT 'pending',
+    status shipment_status_enum NOT NULL DEFAULT 'created',
     tracking_number TEXT UNIQUE,
 
     courier_name TEXT NOT NULL,

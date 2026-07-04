@@ -194,6 +194,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.FindOrders,
 			&c.GetOrder,
 			&c.CreateOrder,
+			&c.UpdateOrderStatus,
 		)
 	)
 
@@ -350,6 +351,7 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/orders", func(r chi.Router) {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
+			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
 		})
 	})
 
