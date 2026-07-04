@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"service-core/internal/modules/authentication/domain"
@@ -9,12 +10,52 @@ import (
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type refreshTokenRepositoryImpl struct{}
 
 func NewRefreshTokenRepositoryImpl() repository.RefreshTokenRepository {
 	return &refreshTokenRepositoryImpl{}
+}
+
+func (r *refreshTokenRepositoryImpl) GetBySessionID(
+	ctx context.Context,
+	exec transaction.Executor,
+	sessionID uuid.UUID,
+) (*domain.RefreshToken, error) {
+	query := `
+		SELECT
+			id,
+			session_id,
+			token_hash,
+			expires_at,
+			revoked_at,
+			created_at
+		FROM
+			refresh_tokens
+		WHERE
+			session_id = $1
+		LIMIT 1
+	`
+
+	var tkn domain.RefreshToken
+	err := exec.QueryRow(ctx, query, sessionID).Scan(
+		&tkn.ID,
+		&tkn.SessionID,
+		&tkn.TokenHash,
+		&tkn.ExpiresAt,
+		&tkn.RevokedAt,
+		&tkn.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query to get refresh token by session id failed: %w", err)
+	}
+
+	return &tkn, nil
 }
 
 func (r *refreshTokenRepositoryImpl) RevokeBySessionID(

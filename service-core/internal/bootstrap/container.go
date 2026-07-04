@@ -3,12 +3,12 @@ package bootstrap
 import (
 	applogger "service-core/internal/common/logger"
 
+	appconfig "service-core/internal/shared/config"
 	imgSvc "service-core/internal/shared/image"
 	mailerSvc "service-core/internal/shared/mailer"
 	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
 	"service-core/internal/shared/transaction"
-	appconfig "service-core/internal/shared/config"
 
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
@@ -53,6 +53,7 @@ type Container struct {
 	Authenticator      authenRepo.Authenticator
 	Authorizer         authorRepo.Authorizer
 	DBExecutor         transaction.Executor
+	DBTransactor       transaction.Transactor
 	GoogleOAuth        appconfig.GoogleOAuthConfig
 
 	FindProducts     productUsecase.FindProductsUsecase
@@ -83,7 +84,7 @@ type Container struct {
 	ListLocations locationUsecase.ListLocationUsecase
 
 	GetUser              userUsecase.GetUserUsecase
-	GetCurrentProfile   userUsecase.GetCurrentProfileUsecase
+	GetCurrentProfile    userUsecase.GetCurrentProfileUsecase
 	UpdateCurrentProfile userUsecase.UpdateCurrentProfileUsecase
 
 	FindCustomers customerUsecase.FindCustomersUsecase
@@ -115,9 +116,9 @@ type Container struct {
 
 	EstimateShippingOptions shipmentUsecase.EstimateShippingOptionsUsecase
 
-	CreateOrder orderUsecase.CreateOrderUsecase
-	FindOrders  orderUsecase.FindOrdersUsecase
-	GetOrder    orderUsecase.GetOrderUsecase
+	CreateOrder       orderUsecase.CreateOrderUsecase
+	FindOrders        orderUsecase.FindOrdersUsecase
+	GetOrder          orderUsecase.GetOrderUsecase
 	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
 }
 
@@ -166,6 +167,8 @@ func NewContainer(cfg Config,
 		authMidd    = authenSvc.NewJWTAuthenticator(
 			tokenSvc,
 			sessionRepo,
+			tokenHasher,
+			refreshTokenRepo,
 		)
 
 		actorSvc = authorSvc.NewActorService(
@@ -211,6 +214,7 @@ func NewContainer(cfg Config,
 		Authenticator:      authMidd,
 		Authorizer:         authorMdwr,
 		DBExecutor:         infra.TransactionExecutor,
+		DBTransactor:       infra.TransactionProvider,
 		GoogleOAuth:        cfg.GoogleOAuth,
 
 		FindProducts: *productUsecase.
