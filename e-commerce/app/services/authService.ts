@@ -41,6 +41,14 @@ export const authService = {
     })
   },
   /**
+   * Sign in user via Google.
+   */
+  async signInWithGoogle(): Promise<SignInResponse> {
+    return $fetch<SignInResponse>('/api/auth/google', {
+      method: 'GET'
+    })
+  },
+  /**
    * Retrieve session state from local server route.
    */
   async getMe(cookieHeader?: string): Promise<GetMeResponse> {

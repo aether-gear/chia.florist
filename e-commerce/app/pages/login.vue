@@ -49,6 +49,14 @@ const handleLogin = async () => {
     }
   }
 }
+
+const handleGoogleLogin = () => {
+  // Signal to auth-init that we're coming back from Google OAuth.
+  // sessionStorage survives page navigation in the same tab, so this
+  // flag will still be present when the backend redirects us back to /.
+  sessionStorage.setItem('google_auth_pending', '1')
+  window.location.href = '/api/auth/google'
+}
 </script>
 
 <template>
@@ -111,8 +119,10 @@ const handleLogin = async () => {
               </button>
 
               <button 
-                type="button" 
+                type="button"
+                @click="handleGoogleLogin"
                 class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all cursor-pointer"
+                :disabled="authVm.isLoading.value"
               >
                 <img src="/images/google.png" class="w-5 h-5" alt="Google Icon" />
                 Login with Google

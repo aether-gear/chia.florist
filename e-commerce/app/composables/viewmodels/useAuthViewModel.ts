@@ -154,6 +154,58 @@ export const useAuthViewModel = () => {
   }
 
   /**
+   * Authenticate user via Google.
+   */
+  const loginWithGoogle = async () => {
+    isLoading.value = true
+    error.value = null
+    
+    try {
+      const response = await authService.signInWithGoogle()
+      if (response.message === 'login success') {
+        if (import.meta.client) {
+          localStorage.removeItem('chia-florist-cart-cache')
+        }
+        // Fetch profile to populate global user state
+        await fetchCurrentUser()
+        
+        if (!isAuthenticated.value) {
+          clearLocalSession()
+          const errMsg = error.value || 'Access forbidden: Insufficient account permissions.'
+          error.value = errMsg
+          throw new Error(errMsg)
+        }
+
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        // In fetchCurrentUser it should have been updated by getProfile, 
+        // but just in case we provide a default state:
+        userProfile.value = {
+          id: currentUser.value?.id || 'temp-id',
+          name: currentUser.value?.name || 'Google User',
+          username: currentUser.value?.username || 'googleuser',
+          email: currentUser.value?.email || '',
+          phone: currentUser.value?.phone || '',
+          last_login_at: new Date().toISOString()
+        }
+        
+        const isLoggedIn = useCookie('is_logged_in')
+        isLoggedIn.value = 'true'
+        
+        currentUser.value = userProfile.value as UserMe
+        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || userProfile.value.name || 'Customer'}!`)
+        return true
+      }
+      return false
+    } catch (err: any) {
+      error.value = err.data?.message || err.message || 'Google Login failed. Please try again.'
+      currentUser.value = null
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
    * Register a new user account.
    */
   const register = async (signUpData: SignUpRequest) => {
@@ -351,6 +403,7 @@ export const useAuthViewModel = () => {
     fetchCurrentUser,
     clearLocalSession,
     login,
+    loginWithGoogle,
     register,
     verifyOtp,
     logout,
