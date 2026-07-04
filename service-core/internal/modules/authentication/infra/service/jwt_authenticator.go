@@ -12,51 +12,66 @@ import (
 	commonmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
+	authorzDomain "service-core/internal/modules/authorization/domain"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type jwtAuthenticator struct {
-	tokenSvc    repository.TokenService
-	sessionRepo repository.SessionRepository
+	tokenSvc         repository.TokenService
+	sessionRepo      repository.SessionRepository
+	tokenHasher      repository.TokenHasher
+	refreshTokenRepo repository.RefreshTokenRepository
 }
 
 func NewJWTAuthenticator(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
+	tokenHasher repository.TokenHasher,
+	refreshTokenRepo repository.RefreshTokenRepository,
 ) repository.Authenticator {
 	return &jwtAuthenticator{
-		tokenSvc:    tokenSvc,
-		sessionRepo: sessionRepo,
+		tokenSvc:         tokenSvc,
+		sessionRepo:      sessionRepo,
+		tokenHasher:      tokenHasher,
+		refreshTokenRepo: refreshTokenRepo,
 	}
 }
 
 func (aM *jwtAuthenticator) RequireAuth(
 	exec transaction.Executor,
+	tran transaction.Transactor,
 	cookie appcookie.CookieName,
 ) commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			token, err := appcookie.Extract(r, cookie)
-			if err != nil {
-				return apperrors.
-					NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+
+			var authCtx *domain.AuthContext
+			if err == nil {
+				authCtx, err = aM.
+					authenticate(r.Context(), exec, token)
 			}
 
-			authCtx, err := aM.authenticate(
+			if err != nil {
+				var refreshErr error
+				authCtx, refreshErr = aM.
+					trySilentRefresh(
+						r.Context(),
+						exec,
+						tran,
+						w,
+						r,
+						cookie,
+					)
+				if refreshErr != nil {
+					return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+				}
+			}
+
+			r = r.WithContext(domain.WithAuthContext(
 				r.Context(),
-				exec,
-				token,
-			)
-			if err != nil {
-				return err
-			}
-
-			r = r.WithContext(
-				domain.WithAuthContext(
-					r.Context(),
-					authCtx,
-				),
-			)
+				authCtx,
+			))
 
 			return next(w, r)
 		}
@@ -65,39 +80,197 @@ func (aM *jwtAuthenticator) RequireAuth(
 
 func (aM *jwtAuthenticator) RequireAnyAuth(
 	exec transaction.Executor,
+	tran transaction.Transactor,
 	cookies ...appcookie.CookieName,
 ) commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			for _, cookie := range cookies {
 				token, err := appcookie.Extract(r, cookie)
-				if err != nil {
-					continue
+
+				var authCtx *domain.AuthContext
+				if err == nil {
+					authCtx, err = aM.
+						authenticate(r.Context(), exec, token)
 				}
 
-				authCtx, err := aM.authenticate(
+				if err != nil {
+					var refreshErr error
+					authCtx, refreshErr = aM.
+						trySilentRefresh(
+							r.Context(),
+							exec,
+							tran,
+							w,
+							r,
+							cookie,
+						)
+					if refreshErr != nil {
+						continue
+					}
+				}
+
+				r = r.WithContext(domain.WithAuthContext(
 					r.Context(),
-					exec,
-					token,
-				)
-				if err != nil {
-					continue
-				}
-
-				r = r.WithContext(
-					domain.WithAuthContext(
-						r.Context(),
-						authCtx,
-					),
-				)
+					authCtx,
+				))
 
 				return next(w, r)
 			}
 
-			return apperrors.
-				NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+			return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
 		}
 	}
+}
+
+func (aM *jwtAuthenticator) trySilentRefresh(
+	ctx context.Context,
+	exec transaction.Executor,
+	tran transaction.Transactor,
+	w http.ResponseWriter,
+	r *http.Request,
+	cookieName appcookie.CookieName,
+) (*domain.AuthContext, error) {
+	var refreshCookie appcookie.CookieName
+	switch cookieName {
+	case appcookie.CookieAccess:
+		refreshCookie = appcookie.CookieCustomerRefresh
+	case appcookie.CookieStaff:
+		refreshCookie = appcookie.CookieStaffRefresh
+	default:
+		return nil, fmt.Errorf("unknown cookie type: %s", cookieName)
+	}
+
+	refreshTokenStr, err := appcookie.
+		Extract(r, refreshCookie)
+	if err != nil {
+		return nil, fmt.Errorf("refresh token not found: %w", err)
+	}
+
+	claims, err := aM.tokenSvc.
+		Validate(refreshTokenStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	if claims.Type != domain.TokenTypeRefresh {
+		return nil, fmt.Errorf("invalid token type for refresh: %s", claims.Type)
+	}
+
+	session, err := aM.sessionRepo.
+		GetByID(ctx, exec, claims.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	if session == nil ||
+		session.RevokedAt != nil ||
+		session.ExpiresAt.Before(time.Now()) {
+
+		return nil, fmt.Errorf("session is invalid, revoked or expired")
+	}
+
+	dbRefreshToken, err := aM.refreshTokenRepo.
+		GetBySessionID(
+			ctx,
+			exec,
+			claims.SessionID,
+		)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get refresh token: %w", err)
+	}
+
+	if dbRefreshToken == nil ||
+		dbRefreshToken.RevokedAt != nil ||
+		dbRefreshToken.ExpiresAt.Before(time.Now()) {
+
+		return nil, fmt.Errorf("refresh token in db is invalid, revoked or expired")
+	}
+
+	if !aM.tokenHasher.Compare(
+		dbRefreshToken.TokenHash,
+		refreshTokenStr,
+	) {
+		return nil, fmt.Errorf("refresh token hash mismatch")
+	}
+
+	roleCodes := make([]authorzDomain.RoleCode, len(claims.Roles))
+	for i, rCode := range claims.Roles {
+		roleCodes[i] = authorzDomain.RoleCode(rCode)
+	}
+
+	newAccessTkn, err := aM.tokenSvc.
+		Generate(repository.GenerateTokenParams{
+			UserID:     claims.UserID,
+			SessionID:  claims.SessionID,
+			StaffID:    claims.StaffID,
+			CustomerID: claims.CustomerID,
+			Roles:      roleCodes,
+			Type:       domain.TokenTypeAccess,
+			Duration:   30 * time.Minute,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate new access token: %w", err)
+	}
+
+	newRefreshTkn, err := aM.tokenSvc.
+		Generate(repository.GenerateTokenParams{
+			UserID:     claims.UserID,
+			SessionID:  claims.SessionID,
+			StaffID:    claims.StaffID,
+			CustomerID: claims.CustomerID,
+			Roles:      roleCodes,
+			Type:       domain.TokenTypeRefresh,
+			Duration:   7 * 24 * time.Hour,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate new refresh token: %w", err)
+	}
+
+	now := time.Now()
+	session.ExpiresAt = now.Add(7 * 24 * time.Hour)
+	session.LastActivityAt = &now
+
+	newRefreshTknHashed := aM.tokenHasher.Hash(newRefreshTkn.Token)
+	dbRefreshToken.TokenHash = newRefreshTknHashed
+	dbRefreshToken.ExpiresAt = now.Add(7 * 24 * time.Hour)
+
+	if err := tran.WithinTransaction(ctx, func(e transaction.Executor) error {
+		if err := aM.sessionRepo.
+			Save(
+				ctx,
+				e,
+				*session,
+			); err != nil {
+			return fmt.Errorf("failed to save updated session: %w", err)
+		}
+		if err := aM.refreshTokenRepo.
+			Save(
+				ctx,
+				e,
+				*dbRefreshToken,
+			); err != nil {
+			return fmt.Errorf("failed to save updated refresh token: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	appcookie.Bind(w, cookieName, newAccessTkn.Token, newAccessTkn.ExpiresAt)
+	appcookie.Bind(w, refreshCookie, newRefreshTkn.Token, newRefreshTkn.ExpiresAt)
+
+	result := domain.AuthContext{
+		UserID:          claims.UserID,
+		SessionID:       claims.SessionID,
+		TokenType:       domain.TokenTypeAccess,
+		IsAuthenticated: true,
+		StaffID:         claims.StaffID,
+		CustomerID:      claims.CustomerID,
+		Roles:           claims.Roles,
+	}
+
+	return &result, nil
 }
 
 func (aM *jwtAuthenticator) authenticate(
@@ -114,11 +287,12 @@ func (aM *jwtAuthenticator) authenticate(
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidToken.Error())
 	}
 
-	session, err := aM.sessionRepo.GetByID(
-		ctx,
-		exec,
-		claims.SessionID,
-	)
+	session, err := aM.sessionRepo.
+		GetByID(
+			ctx,
+			exec,
+			claims.SessionID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load session: %w", err)
 	}
@@ -127,6 +301,7 @@ func (aM *jwtAuthenticator) authenticate(
 		session.UserID != claims.UserID ||
 		session.RevokedAt != nil ||
 		session.ExpiresAt.Before(time.Now()) {
+
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidSession.Error())
 	}
 

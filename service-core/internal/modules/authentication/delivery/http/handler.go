@@ -71,7 +71,7 @@ func (h *authHandler) GetByID(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewNotFound("account not found")
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"id":            acc.ID,
 		"email":         acc.Email,
 		"last_login_at": acc.LastLoginAt,
@@ -146,11 +146,22 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
+	// Access token is bound to the response cookie
+	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
 		appcookie.CookieAccess,
 		tokens.AccessToken.Token,
 		tokens.AccessToken.ExpiresAt,
+	)
+
+	// Refresh token is bound to the response cookie
+	// so it can be used to obtain a new access token
+	appcookie.Bind(
+		w,
+		appcookie.CookieCustomerRefresh,
+		tokens.RefreshToken.Token,
+		tokens.RefreshToken.ExpiresAt,
 	)
 
 	response := map[string]string{
@@ -230,11 +241,22 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
+	// Access token is bound to the response cookie
+	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
 		appcookie.CookieAccess,
 		tokens.AccessToken.Token,
 		tokens.AccessToken.ExpiresAt,
+	)
+
+	// Refresh token is bound to the response cookie
+	// so it can be used to obtain a new access token
+	appcookie.Bind(
+		w,
+		appcookie.CookieCustomerRefresh,
+		tokens.RefreshToken.Token,
+		tokens.RefreshToken.ExpiresAt,
 	)
 
 	response := map[string]string{
@@ -271,11 +293,22 @@ func (h *authHandler) SignInStaffEmail(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
+	// Access token is bound to the response cookie
+	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
 		appcookie.CookieStaff,
 		tokens.AccessToken.Token,
 		tokens.AccessToken.ExpiresAt,
+	)
+
+	// Refresh token is bound to the response cookie
+	// so it can be used to obtain a new access token
+	appcookie.Bind(
+		w,
+		appcookie.CookieStaffRefresh,
+		tokens.RefreshToken.Token,
+		tokens.RefreshToken.ExpiresAt,
 	)
 
 	response := map[string]string{
@@ -299,8 +332,10 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 
 	if authCtx.CustomerID != nil {
 		appcookie.Clear(w, appcookie.CookieAccess)
+		appcookie.Clear(w, appcookie.CookieCustomerRefresh)
 	} else if authCtx.StaffID != nil {
 		appcookie.Clear(w, appcookie.CookieStaff)
+		appcookie.Clear(w, appcookie.CookieStaffRefresh)
 	}
 
 	response := map[string]string{
@@ -425,11 +460,22 @@ func (h *authHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 
+	// Access token is bound to the response cookie
+	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
 		appcookie.CookieAccess,
 		result.AccessToken.Token,
 		result.AccessToken.ExpiresAt,
+	)
+
+	// Refresh token is bound to the response cookie
+	// so it can be used to obtain a new access token
+	appcookie.Bind(
+		w,
+		appcookie.CookieCustomerRefresh,
+		result.RefreshToken.Token,
+		result.RefreshToken.ExpiresAt,
 	)
 
 	successRedirectURL := h.googleCfg.SuccessRedirectURL
