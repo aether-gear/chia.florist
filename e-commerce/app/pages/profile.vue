@@ -1,11 +1,13 @@
 <!-- app/pages/profile.vue -->
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useCart } from '~/composables/useCart'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useAddress } from '~/composables/useAddress'
+import { useOrders } from '~/composables/useOrders'
+import type { OrderTab } from '~/composables/useOrders'
 import { supabaseService } from '~/services/supabaseService'
 import type { UserAddress } from '~/types/address'
+import type { BackendOrder } from '~/types/order'
 
 useHead({ title: 'My Profile - Chia Florist' })
 
@@ -275,36 +277,35 @@ const handleDeleteAddress = async (id: string) => {
   }
 }
 
-// INTEGRASI: Ambil fungsi orders dan helper formatRupiah murni dari useCart()
-const { orders, formatRupiah } = useCart()
+// ─── Orders ────────────────────────────────────────────────────────
+const ordersVm = useOrders()
+
+// Load orders whenever the orders tab or sub-status tab is activated
+const loadOrders = (tab: OrderTab = activeOrderStatus.value as OrderTab, page = 1) => {
+  ordersVm.fetchOrders(tab, page)
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'orders') {
+    loadOrders(activeOrderStatus.value as OrderTab)
+  }
+})
+
+watch(activeOrderStatus, (status) => {
+  if (activeTab.value === 'orders') {
+    loadOrders(status as OrderTab)
+  }
+})
 
 // Logout
 const handleLogout = async () => {
   await authVm.logout()
 }
 
-// Filter orders
-const filteredOrders = computed(() => {
-  if (!orders || !orders.value) return []
-  return orders.value.filter(order => {
-    const status = order.status
-    if (activeOrderStatus.value === 'pending') {
-      return status === 'pending' || status === 'pembayaran'
-    } else if (activeOrderStatus.value === 'processing') {
-      return status === 'confirmed' || status === 'processing' || status === 'pengemasan'
-    } else if (activeOrderStatus.value === 'shipping') {
-      return status === 'shipped' || status === 'delivered' || status === 'pengiriman'
-    } else if (activeOrderStatus.value === 'done') {
-      return status === 'finished' || status === 'cancelled' || status === 'ulasan'
-    }
-    return false
-  })
-})
-
-const selectedOrder = ref<any | null>(null)
+const selectedOrder = ref<BackendOrder | null>(null)
 const showShippingOverlay = ref(false)
 
-const openOrderDetail = (order: any) => {
+const openOrderDetail = (order: BackendOrder) => {
   selectedOrder.value = order
 }
 
@@ -542,78 +543,100 @@ const triggerAlert = (message: string) => {
               </button>
             </div>
 
-            <div v-if="filteredOrders.length > 0" class="space-y-4">
-              <div v-for="order in filteredOrders" :key="order.orderId" class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition duration-300">
-                <div class="space-y-3 flex-1">
-                  <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-xs font-bold text-gray-400">🗓️ {{ order.date }}</span>
-                    <span class="text-xs font-mono font-bold text-gray-900 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">{{ order.orderId }}</span>
-                    <div>
-                      <span v-if="order.status === 'pending' || order.status === 'pembayaran'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">
-                        Pending Payment
-                      </span>
-                      <span v-else-if="order.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">
-                        Confirmed
-                      </span>
-                      <span v-else-if="order.status === 'processing' || order.status === 'pengemasan'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">
-                        Arranging Flowers
-                      </span>
-                      <span v-else-if="order.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">
-                        Shipped
-                      </span>
-                      <span v-else-if="order.status === 'delivered' || order.status === 'pengiriman'" class="px-2.5 py-0.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-full border border-sky-100">
-                        Delivered
-                      </span>
-                      <span v-else-if="order.status === 'finished' || order.status === 'ulasan'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">
-                        Finished
-                      </span>
-                      <span v-else-if="order.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">
-                        Cancelled
-                      </span>
-                    </div>
-                  </div>
+            <!-- Loading State -->
+            <div v-if="ordersVm.isLoading.value" class="bg-white border border-gray-100 rounded-2xl p-12 flex flex-col items-center gap-4 shadow-sm">
+              <div class="animate-spin rounded-full h-10 w-10 border-4 border-[#1b4332] border-t-transparent"></div>
+              <p class="text-sm text-gray-400 font-semibold">Loading your orders...</p>
+            </div>
 
-                  <div class="flex items-center gap-4 py-1">
-                    <div class="flex -space-x-3 overflow-hidden">
-                      <img 
-                        v-for="(item, idx) in order.items.slice(0, 3)" 
-                        :key="idx"
-                        :src="item.image || '/images/custom-preview.png'" 
-                        class="inline-block h-10 w-10 rounded-lg ring-2 ring-white object-cover border border-gray-100 bg-gray-50"
-                      />
-                      <div v-if="order.items.length > 3" class="inline-flex items-center justify-center h-10 w-10 rounded-lg ring-2 ring-white bg-gray-100 border border-gray-100 text-xs font-bold text-gray-500">
-                        +{{ order.items.length - 3 }}
+            <!-- Error State -->
+            <div v-else-if="ordersVm.error.value" class="bg-red-50 border border-red-100 rounded-2xl p-8 text-center shadow-sm">
+              <div class="text-4xl mb-3">⚠️</div>
+              <h4 class="font-bold text-red-700 text-sm">Failed to load orders</h4>
+              <p class="text-xs text-red-500 mt-1">{{ ordersVm.error.value }}</p>
+              <button @click="loadOrders()" class="mt-4 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition cursor-pointer">Retry</button>
+            </div>
+
+            <!-- Orders list -->
+            <template v-else>
+              <div v-if="ordersVm.orders.value.length > 0" class="space-y-4">
+                <div v-for="order in ordersVm.orders.value" :key="order.id" class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition duration-300">
+                  <div class="space-y-3 flex-1">
+                    <div class="flex flex-wrap items-center gap-3">
+                      <span class="text-xs font-bold text-gray-400">🗓️ {{ ordersVm.formatDate(order.created_at) }}</span>
+                      <span class="text-xs font-mono font-bold text-gray-900 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">{{ order.number }}</span>
+                      <div>
+                        <span v-if="order.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
+                        <span v-else-if="order.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">Confirmed</span>
+                        <span v-else-if="order.status === 'processing'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">Arranging Flowers</span>
+                        <span v-else-if="order.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">Shipped</span>
+                        <span v-else-if="order.status === 'delivered'" class="px-2.5 py-0.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-full border border-sky-100">Delivered</span>
+                        <span v-else-if="order.status === 'finished'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">Finished</span>
+                        <span v-else-if="order.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">Cancelled</span>
+                        <span v-else class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full border border-gray-200">{{ order.status }}</span>
                       </div>
                     </div>
-                    <div class="min-w-0">
-                      <p class="text-xs font-bold text-gray-900 truncate max-w-md">
-                        {{ order.items[0]?.name }}{{ order.items.length > 1 ? ` and ${order.items.length - 1} other item(s)` : '' }}
-                      </p>
-                      <p class="text-[10px] text-gray-400 mt-0.5">Total Quantity: {{ order.items.reduce((acc, item) => acc + item.quantity, 0) }}</p>
+
+                    <div class="flex items-center gap-4 py-1">
+                      <div class="flex -space-x-3 overflow-hidden">
+                        <div 
+                          v-for="(item, idx) in order.items.slice(0, 3)" 
+                          :key="idx"
+                          class="inline-flex items-center justify-center h-10 w-10 rounded-lg ring-2 ring-white bg-emerald-50 border border-emerald-100 text-xs font-bold text-[#1b4332]"
+                        >
+                          🌸
+                        </div>
+                        <div v-if="order.items.length > 3" class="inline-flex items-center justify-center h-10 w-10 rounded-lg ring-2 ring-white bg-gray-100 border border-gray-100 text-xs font-bold text-gray-500">
+                          +{{ order.items.length - 3 }}
+                        </div>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-xs font-bold text-gray-900 truncate max-w-md">
+                          {{ order.items[0]?.product_name }}{{ order.items.length > 1 ? ` and ${order.items.length - 1} other item(s)` : '' }}
+                        </p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Total Qty: {{ order.items.reduce((acc, item) => acc + item.quantity, 0) }}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-gray-50 pt-4 md:pt-0">
-                  <div class="text-left md:text-right">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Bill</p>
-                    <p class="text-base font-extrabold text-[#1b4332] mt-0.5">{{ formatRupiah(order.total) }}</p>
+                  <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-gray-50 pt-4 md:pt-0">
+                    <div class="text-left md:text-right">
+                      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Bill</p>
+                      <p class="text-base font-extrabold text-[#1b4332] mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
+                    </div>
+                    <button 
+                      @click="openOrderDetail(order)" 
+                      class="bg-[#1b4332] hover:bg-[#143326] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                    >
+                      View Details
+                    </button>
                   </div>
-                  <button 
-                    @click="openOrderDetail(order)" 
-                    class="bg-[#1b4332] hover:bg-[#143326] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
-                  >
-                    View Details
-                  </button>
                 </div>
               </div>
-            </div>
 
-            <div v-else class="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
-              <div class="text-5xl mb-4">📑</div>
-              <h4 class="font-bold text-gray-900 text-lg">No Orders Found</h4>
-              <p class="text-sm text-gray-400 mt-1">There are no transactions in the "{{ activeOrderStatus }}" status tab yet.</p>
-            </div>
+              <div v-else class="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
+                <div class="text-5xl mb-4">📑</div>
+                <h4 class="font-bold text-gray-900 text-lg">No Orders Found</h4>
+                <p class="text-sm text-gray-400 mt-1">There are no orders with the "{{ activeOrderStatus }}" status yet.</p>
+              </div>
+
+              <!-- Pagination -->
+              <div v-if="ordersVm.totalPages.value > 1" class="flex items-center justify-center gap-2">
+                <button
+                  @click="loadOrders(activeOrderStatus as OrderTab, ordersVm.currentPage.value - 1)"
+                  :disabled="ordersVm.currentPage.value <= 1"
+                  class="px-3 py-2 text-xs font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >← Prev</button>
+                <span class="text-xs text-gray-500 font-semibold px-2">
+                  Page {{ ordersVm.currentPage.value }} of {{ ordersVm.totalPages.value }}
+                </span>
+                <button
+                  @click="loadOrders(activeOrderStatus as OrderTab, ordersVm.currentPage.value + 1)"
+                  :disabled="ordersVm.currentPage.value >= ordersVm.totalPages.value"
+                  class="px-3 py-2 text-xs font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >Next →</button>
+              </div>
+            </template>
           </div>
 
         </main>
@@ -713,9 +736,9 @@ const triggerAlert = (message: string) => {
           <div>
             <div class="flex items-center gap-3">
               <h3 class="font-extrabold text-gray-900 text-base">Order Details</h3>
-              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{{ selectedOrder.orderId }}</span>
+              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{{ selectedOrder.number }}</span>
             </div>
-            <p class="text-[11px] text-gray-400 mt-0.5">Placed on {{ selectedOrder.date }}</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Placed on {{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
           </div>
           <button @click="closeOrderDetail" class="text-gray-400 hover:text-black font-bold text-lg cursor-pointer">✕</button>
         </div>
@@ -727,27 +750,14 @@ const triggerAlert = (message: string) => {
             <div>
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Status</p>
               <div class="mt-1 flex items-center gap-2">
-                <span v-if="selectedOrder.status === 'pending' || selectedOrder.status === 'pembayaran'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">
-                  Pending Payment
-                </span>
-                <span v-else-if="selectedOrder.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">
-                  Confirmed
-                </span>
-                <span v-else-if="selectedOrder.status === 'processing' || selectedOrder.status === 'pengemasan'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">
-                  Arranging Flowers
-                </span>
-                <span v-else-if="selectedOrder.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">
-                  Shipped
-                </span>
-                <span v-else-if="selectedOrder.status === 'delivered' || selectedOrder.status === 'pengiriman'" class="px-2.5 py-0.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-full border border-sky-100">
-                  Delivered
-                </span>
-                <span v-else-if="selectedOrder.status === 'finished' || selectedOrder.status === 'ulasan'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">
-                  Finished
-                </span>
-                <span v-else-if="selectedOrder.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">
-                  Cancelled
-                </span>
+                <span v-if="selectedOrder.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
+                <span v-else-if="selectedOrder.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">Confirmed</span>
+                <span v-else-if="selectedOrder.status === 'processing'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">Arranging Flowers</span>
+                <span v-else-if="selectedOrder.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">Shipped</span>
+                <span v-else-if="selectedOrder.status === 'delivered'" class="px-2.5 py-0.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-full border border-sky-100">Delivered</span>
+                <span v-else-if="selectedOrder.status === 'finished'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">Finished</span>
+                <span v-else-if="selectedOrder.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">Cancelled</span>
+                <span v-else class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full border border-gray-200">{{ selectedOrder.status }}</span>
               </div>
             </div>
 
@@ -766,22 +776,18 @@ const triggerAlert = (message: string) => {
             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ordered Items</h4>
             <div class="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/20">
               <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-4 items-center p-4 bg-white">
-                <div class="w-14 h-14 bg-gray-50 rounded-xl overflow-hidden border border-gray-100 flex-shrink-0">
-                  <img :src="item.image || '/images/custom-preview.png'" class="w-full h-full object-cover" />
+                <div class="w-14 h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-2xl">
+                  🌸
                 </div>
                 <div class="flex-1 min-w-0">
-                  <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">{{ item.name }}</h5>
+                  <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">{{ item.product_name }}</h5>
                   <div class="flex gap-2 mt-1.5 text-[10px] text-gray-500 font-semibold">
-                    <span v-if="item.size" class="bg-gray-100 px-2 py-0.5 rounded">Size: {{ item.size }}</span>
-                    <span v-if="item.color" class="flex items-center gap-1">
-                      Color:
-                      <span :style="{ backgroundColor: item.color }" class="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block"></span>
-                    </span>
-                    <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-black">Custom Design</span>
+                    <span class="bg-gray-100 px-2 py-0.5 rounded">{{ item.shop_name }}</span>
+                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{{ item.courier_code }} {{ item.courier_service }}</span>
                   </div>
                 </div>
                 <div class="text-right text-xs">
-                  <p class="font-bold text-gray-900">{{ formatRupiah(item.price) }}</p>
+                  <p class="font-bold text-gray-900">{{ ordersVm.formatRupiah(item.unit_price) }}</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Qty: {{ item.quantity }}</p>
                 </div>
               </div>
@@ -794,15 +800,15 @@ const triggerAlert = (message: string) => {
             <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 text-xs space-y-3 font-semibold text-gray-600">
               <div class="flex justify-between">
                 <span>Items Subtotal</span>
-                <span class="text-gray-900 font-bold">{{ formatRupiah(selectedOrder.total - (selectedOrder.shipping?.cost || 20000)) }}</span>
+                <span class="text-gray-900 font-bold">{{ ordersVm.formatRupiah(selectedOrder.subtotal) }}</span>
               </div>
               <div class="flex justify-between">
                 <span>Shipping Cost</span>
-                <span class="text-gray-900 font-bold">{{ formatRupiah(selectedOrder.shipping?.cost || 20000) }}</span>
+                <span class="text-gray-900 font-bold">{{ ordersVm.formatRupiah(selectedOrder.shipping_fee) }}</span>
               </div>
               <div class="border-t border-gray-100 pt-3 flex justify-between text-sm font-bold text-gray-900">
                 <span>Total Amount Paid</span>
-                <span class="text-base text-[#1b4332] font-black">{{ formatRupiah(selectedOrder.total) }}</span>
+                <span class="text-base text-[#1b4332] font-black">{{ ordersVm.formatRupiah(selectedOrder.total) }}</span>
               </div>
             </div>
           </div>
@@ -816,23 +822,23 @@ const triggerAlert = (message: string) => {
           </button>
 
           <div>
-            <div v-if="selectedOrder.status === 'pending' || selectedOrder.status === 'pembayaran'">
-              <button @click="triggerAlert('Our team is reviewing your transaction recipe. Please wait max 15 minutes.')" class="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer">
-                Check Bank Receipt
+            <div v-if="selectedOrder.status === 'pending'">
+              <button @click="triggerAlert('Our team is reviewing your payment. Please wait up to 15 minutes.')" class="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer">
+                Check Payment Status
               </button>
             </div>
-            <div v-else-if="selectedOrder.status === 'confirmed' || selectedOrder.status === 'processing' || selectedOrder.status === 'pengemasan'">
+            <div v-else-if="selectedOrder.status === 'confirmed' || selectedOrder.status === 'processing'">
               <button @click="triggerAlert('Your flower board is being carefully arranged by our expert florists.')" class="px-5 py-2.5 bg-[#1b4332] text-white hover:bg-[#143326] text-xs font-bold rounded-xl transition cursor-pointer">
                 View Workshop Progress
               </button>
             </div>
-            <div v-else-if="selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered' || selectedOrder.status === 'pengiriman'">
-              <button @click="contactDriver(selectedOrder.orderId)" class="px-5 py-2.5 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer">
+            <div v-else-if="selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered'">
+              <button @click="contactDriver(selectedOrder.id)" class="px-5 py-2.5 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer">
                 Contact Courier (WhatsApp)
               </button>
             </div>
-            <div v-else-if="selectedOrder.status === 'finished' || selectedOrder.status === 'ulasan'">
-              <button @click="leaveReview(selectedOrder.orderId)" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer">
+            <div v-else-if="selectedOrder.status === 'finished'">
+              <button @click="leaveReview(selectedOrder.id)" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer">
                 Write Product Review
               </button>
             </div>
@@ -860,40 +866,43 @@ const triggerAlert = (message: string) => {
 
           <!-- Overlay Body -->
           <div class="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
-            <!-- Courier Summary -->
+            <!-- Courier Summary (from first item) -->
             <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 space-y-2">
               <div class="flex justify-between font-semibold">
                 <span class="text-gray-400">Courier Partner</span>
-                <span class="text-gray-900 font-bold">{{ selectedOrder.shipping?.courier || 'JNE Express' }} ({{ selectedOrder.shipping?.service || 'REG' }})</span>
+                <span class="text-gray-900 font-bold">
+                  {{ selectedOrder.items[0]?.courier_code || '—' }}
+                  <span v-if="selectedOrder.items[0]?.courier_service"> ({{ selectedOrder.items[0].courier_service }})</span>
+                </span>
               </div>
               <div class="flex justify-between font-semibold">
-                <span class="text-gray-400">Tracking Code</span>
-                <span class="text-gray-900 font-mono font-bold">{{ selectedOrder.shipping?.trackingNumber || 'AWB-8839214751' }}</span>
+                <span class="text-gray-400">Shipping Fee</span>
+                <span class="text-gray-900 font-mono font-bold">{{ ordersVm.formatRupiah(selectedOrder.shipping_fee) }}</span>
               </div>
             </div>
 
-            <!-- Destination Address -->
-            <div class="space-y-2">
-              <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Shipping Destination</h4>
+            <!-- Payment Info -->
+            <div class="space-y-2" v-if="selectedOrder.payment">
+              <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Payment Information</h4>
               <div class="border border-gray-100 rounded-2xl p-4 space-y-2 font-semibold">
                 <div class="flex justify-between">
-                  <span class="text-gray-400">Recipient</span>
-                  <span class="text-gray-900">{{ selectedOrder.shipping?.recipientName || 'Jane Doe' }}</span>
+                  <span class="text-gray-400">Provider</span>
+                  <span class="text-gray-900 uppercase">{{ selectedOrder.payment.provider }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-400">Contact Number</span>
-                  <span class="text-gray-900">{{ selectedOrder.shipping?.phone || '081234567890' }}</span>
+                  <span class="text-gray-400">Amount</span>
+                  <span class="text-gray-900">{{ ordersVm.formatRupiah(selectedOrder.payment.amount) }}</span>
                 </div>
-                <div class="border-t border-gray-50 pt-2 mt-2">
-                  <p class="text-gray-400 mb-1">Full Address</p>
-                  <p class="text-gray-700 leading-normal font-medium">{{ selectedOrder.shipping?.address || 'Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan, 12110' }}</p>
+                <div class="flex justify-between">
+                  <span class="text-gray-400">Payment Status</span>
+                  <span :class="['font-bold', selectedOrder.payment.status === 'paid' ? 'text-emerald-600' : 'text-amber-600']">{{ selectedOrder.payment.status }}</span>
                 </div>
               </div>
             </div>
 
             <!-- Shipping Timeline -->
             <div class="space-y-4">
-              <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tracking Timeline</h4>
+              <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order Timeline</h4>
               
               <div class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
                 <!-- Milestone: Placed -->
@@ -903,23 +912,23 @@ const triggerAlert = (message: string) => {
                     :class="[selectedOrder.status !== 'cancelled' ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-red-500 ring-4 ring-red-100']"
                   ></span>
                   <p class="font-bold text-gray-900">Order Placed Successfully</p>
-                  <p class="text-[10px] text-gray-400 mt-0.5">Mock Date: 2026-06-26 10:00 AM</p>
+                  <p class="text-[10px] text-gray-400 mt-0.5">{{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
                 </div>
 
                 <!-- Milestone: Payment (for non-pending) -->
-                <div v-if="selectedOrder.status !== 'pending' && selectedOrder.status !== 'pembayaran' && selectedOrder.status !== 'cancelled'" class="relative">
+                <div v-if="selectedOrder.status !== 'pending' && selectedOrder.status !== 'cancelled'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Payment Verified by Admin</p>
-                  <p class="text-[10px] text-gray-400 mt-0.5">Mock Date: 2026-06-26 10:15 AM</p>
+                  <p class="text-[10px] text-gray-400 mt-0.5">Payment confirmed &amp; order accepted</p>
                 </div>
                 <div v-else-if="selectedOrder.status !== 'cancelled'" class="relative opacity-40">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-gray-200"></span>
                   <p class="font-bold text-gray-500">Payment Verification</p>
-                  <p class="text-[10px] text-gray-400 mt-0.5">Awaiting bank receipt upload / review</p>
+                  <p class="text-[10px] text-gray-400 mt-0.5">Awaiting payment confirmation</p>
                 </div>
 
                 <!-- Milestone: Arranging Flowers (for processing or later) -->
-                <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
+                <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative"> <!-- Milestone: Arranging Flowers -->
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Flower Arrangement Complete</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Expert florist team finished production</p>
@@ -938,7 +947,7 @@ const triggerAlert = (message: string) => {
                 <div v-if="['shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Handed Over to Courier</p>
-                  <p class="text-[10px] text-gray-400 mt-0.5">Parcel picked up by {{ selectedOrder.shipping?.courier || 'JNE' }} partner</p>
+                  <p class="text-[10px] text-gray-400 mt-0.5">Parcel picked up by {{ selectedOrder.items[0]?.courier_code || 'courier' }} partner</p>
                 </div>
                 <div v-else-if="selectedOrder.status !== 'cancelled'" class="relative opacity-40">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-gray-200"></span>
