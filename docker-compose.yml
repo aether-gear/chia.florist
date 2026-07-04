@@ -15,9 +15,9 @@ services:
     env_file:
       - ./service-core/.env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB_NAME}
-      POSTGRES_USER: ${POSTGRES_DB_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_NAME:-chia_florase}
+      POSTGRES_USER: ${POSTGRES_DB_USER:-chiaw}
+      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD:-chiaw_florist!810189}
     ports:
       - "5432:5432"
     volumes:
@@ -69,6 +69,7 @@ services:
       HOST: 0.0.0.0
       PORT: 4000
       SERVICE_CORE_API_URL: http://service-core:7129
+      NUXT_PUBLIC_SERVICE_CORE_API_URL: http://service-core:7129
     ports:
       - "4000:4000"
     depends_on:
