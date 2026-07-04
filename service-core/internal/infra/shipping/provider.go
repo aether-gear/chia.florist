@@ -2,6 +2,7 @@ package shipping
 
 import (
 	"context"
+	"time"
 
 	locationDomain "service-core/internal/modules/location/domain"
 )
@@ -52,4 +53,54 @@ type Provider interface {
 		ctx context.Context,
 		districtID string,
 	) ([]locationDomain.Village, error)
+}
+
+type CreateOrderInput struct {
+	OriginAreaID      int
+	DestinationAreaID int
+	UniqueOrderID     string
+	CourierCode       string
+	CourierService    string
+	Weight            int
+
+	ItemName  string
+	ItemPrice int64
+	ItemQty   int
+
+	ShipperName     string
+	ShipperPhone    string
+	ShipperAddress  string
+	ReceiverName    string
+	ReceiverPhone   string
+	ReceiverAddress string
+}
+
+type CreateOrderResult struct {
+	KomerceOrderNo string
+	TrackingNumber string
+}
+
+type TrackShipmentInput struct {
+	Courier        string
+	TrackingNumber string
+	LastPhone      *string
+}
+
+type TrackingEvent struct {
+	Status      string
+	Description string
+	Location    string
+	Timestamp   time.Time
+}
+
+type LogisticsProvider interface {
+	CreateOrder(
+		ctx context.Context,
+		input CreateOrderInput,
+	) (*CreateOrderResult, error)
+
+	TrackShipment(
+		ctx context.Context,
+		input TrackShipmentInput,
+	) ([]TrackingEvent, error)
 }

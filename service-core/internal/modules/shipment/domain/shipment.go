@@ -9,12 +9,16 @@ import (
 type ShipmentStatus string
 
 const (
-	Pending   ShipmentStatus = "pending"
-	Paid      ShipmentStatus = "paid"
-	Shipped   ShipmentStatus = "shipped"
-	InTransit ShipmentStatus = "in_transit"
-	Delivered ShipmentStatus = "delivered"
-	Cancelled ShipmentStatus = "cancelled"
+	ShipmentStatusCreated        ShipmentStatus = "created"
+	ShipmentStatusPacked         ShipmentStatus = "packed"
+	ShipmentStatusLabelled       ShipmentStatus = "labelled"
+	ShipmentStatusPickedUp       ShipmentStatus = "picked_up"
+	ShipmentStatusInTransit      ShipmentStatus = "in_transit"
+	ShipmentStatusOutForDelivery ShipmentStatus = "out_for_delivery"
+	ShipmentStatusDelivered      ShipmentStatus = "delivered"
+	ShipmentStatusFailed         ShipmentStatus = "failed"
+	ShipmentStatusReturned       ShipmentStatus = "returned"
+	ShipmentStatusCancelled      ShipmentStatus = "cancelled"
 )
 
 type Shipment struct {
@@ -66,7 +70,18 @@ func (d *Shipment) Validate() error {
 
 func (s ShipmentStatus) IsValid() bool {
 	switch s {
-	case Pending, Paid, Shipped, InTransit, Delivered, Cancelled:
+	case
+		ShipmentStatusCreated,
+		ShipmentStatusPacked,
+		ShipmentStatusLabelled,
+		ShipmentStatusPickedUp,
+		ShipmentStatusInTransit,
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusDelivered,
+		ShipmentStatusFailed,
+		ShipmentStatusReturned,
+		ShipmentStatusCancelled:
+
 		return true
 	default:
 		return false

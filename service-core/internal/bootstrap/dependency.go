@@ -7,6 +7,7 @@ import (
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	midtransGateway "service-core/internal/infra/payment-gateway/midtrans"
 	"service-core/internal/infra/shipping"
+	komerceProvider "service-core/internal/infra/shipping/komerce"
 	"service-core/internal/infra/shipping/rajaongkir"
 	storage "service-core/internal/infra/storage"
 	supabaseStorage "service-core/internal/infra/storage/supabase"
@@ -20,6 +21,7 @@ type Dependency struct {
 	TransactionExecutor transaction.Executor
 	PaymentGateway      paymentgateway.Provider
 	ShippingProvider    shipping.Provider
+	LogisticsProvider   shipping.LogisticsProvider
 }
 
 func NewDependency(cfg Config) (*Dependency, error) {
@@ -45,6 +47,12 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		return nil, err
 	}
 
+	logistics, err := komerceProvider.
+		NewKomerceProvider(cfg.Komerce)
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := database.
 		NewConnection(cfg.DB)
 	if err != nil {
@@ -58,6 +66,7 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		TransactionExecutor: db.Pool,
 		PaymentGateway:      gateway,
 		ShippingProvider:    shipping,
+		LogisticsProvider:   logistics,
 	}, nil
 }
 
