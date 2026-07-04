@@ -79,6 +79,8 @@ services:
     build:
       context: ./control-panel
       dockerfile: Dockerfile
+      args:
+        - VITE_WAF_API_URL=/api/waf
     container_name: chia-mono-panel
     restart: unless-stopped
     expose:
@@ -104,3 +106,4 @@ services:
 volumes:
   postgres_monolith_data:
     name: chia-florist-monolith-postgres-data
+    
