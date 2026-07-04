@@ -47,6 +47,7 @@ export default function ShopManagementPage() {
     detailsError,
     createAddress,
     saveShop,
+    createShop,
     selectShop,
     refresh
   } = useShopViewModel();
@@ -70,6 +71,14 @@ export default function ShopManagementPage() {
   const [shopIsActive, setShopIsActive] = useState(false);
   const [isSavingShop, setIsSavingShop] = useState(false);
 
+  // Add Shop states
+  const [isAddShopOpen, setIsAddShopOpen] = useState(false);
+  const [newShopName, setNewShopName] = useState('');
+  const [newShopDesc, setNewShopDesc] = useState('');
+  const [newShopIsActive, setNewShopIsActive] = useState(false);
+  const [isCreatingShop, setIsCreatingShop] = useState(false);
+  const [addShopError, setAddShopError] = useState<string | null>(null);
+
   // Sync shop info to form
   useEffect(() => {
     if (selectedShopInfo) {
@@ -78,6 +87,32 @@ export default function ShopManagementPage() {
       setShopIsActive(selectedShopInfo.is_active || false);
     }
   }, [selectedShopInfo]);
+
+  const handleAddShopSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newShopName) return;
+    setIsCreatingShop(true);
+    setAddShopError(null);
+    try {
+      const success = await createShop({
+        name: newShopName,
+        description: newShopDesc || undefined,
+        is_active: newShopIsActive ? "true" : "false"
+      });
+      if (success) {
+        setIsAddShopOpen(false);
+        setNewShopName('');
+        setNewShopDesc('');
+        setNewShopIsActive(false);
+      } else {
+        setAddShopError("Failed to add shop. Please check your inputs or try again.");
+      }
+    } catch (err: any) {
+      setAddShopError(err.message || "Failed to add shop");
+    } finally {
+      setIsCreatingShop(false);
+    }
+  };
 
   const handleSaveShop = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +320,6 @@ export default function ShopManagementPage() {
             </p>
           </div>
         </div>
-
         <Card className="shadow-md border-0 bg-white/70 backdrop-blur-md">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <div>
@@ -294,15 +328,25 @@ export default function ShopManagementPage() {
                 You have {shops.length} shop locations registered.
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refresh()}
-              className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refresh()}
+                className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsAddShopOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Add Shop
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border border-slate-100 overflow-hidden">
@@ -846,6 +890,71 @@ export default function ShopManagementPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add Shop Sheet */}
+      <Sheet open={isAddShopOpen} onOpenChange={setIsAddShopOpen}>
+        <SheetContent className="sm:max-w-md overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Add New Shop</SheetTitle>
+            <SheetDescription>
+              Create a new store branch location.
+            </SheetDescription>
+          </SheetHeader>
+
+          {addShopError && (
+            <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100 mb-4">
+              {addShopError}
+            </div>
+          )}
+
+          <form onSubmit={handleAddShopSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newShopName">Shop Name</Label>
+              <Input
+                id="newShopName"
+                placeholder="e.g. Depok Warehouse, Surabaya Branch"
+                value={newShopName}
+                onChange={(e) => setNewShopName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newShopDesc">Description</Label>
+              <textarea
+                id="newShopDesc"
+                className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Brief description of the shop..."
+                value={newShopDesc}
+                onChange={(e) => setNewShopDesc(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <input
+                id="newShopIsActive"
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
+                checked={newShopIsActive}
+                onChange={(e) => setNewShopIsActive(e.target.checked)}
+              />
+              <Label htmlFor="newShopIsActive" className="text-sm font-medium leading-none cursor-pointer">
+                Shop is Active (Staff Admin Only)
+              </Label>
+            </div>
+
+            <div className="pt-4 flex justify-end gap-2">
+              <SheetClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </SheetClose>
+              <Button type="submit" disabled={isCreatingShop} className="bg-indigo-600 hover:bg-indigo-700">
+                {isCreatingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Shop
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
