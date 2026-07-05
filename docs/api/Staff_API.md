@@ -1,4 +1,4 @@
-﻿# Staff API Documentation
+# Staff API Documentation
 
 This document covers the staff and admin-facing APIs for the Chia Florist service.
 Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
@@ -39,6 +39,9 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
   - [ ] Orders
     - [ ] List Orders
     - [ ] Get Order
+  - [ ] Audit Logs
+    - [ ] Find Audit Logs
+    - [ ] Get Audit Log
 
 # Public API
 
@@ -1086,3 +1089,116 @@ These endpoints require a valid staff session with the **staff admin** role.
 |--------------------|-----------------------------|
 | `401 Unauthorized` | Missing or invalid session. |
 | `404 Not Found`    | User profile not found.     |
+
+## Audit Logs
+
+### Find Audit Logs
+
+- **Method**: `GET`
+- **Endpoint**: `/api/stats`
+- **Description**: Retrieve a paginated list of audit logs with optional filtering and sorting.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `page` | `integer` | No | `1` | Page number for pagination. Must be `>= 1`. |
+| `limit` | `integer` | No | `10` | Number of items per page. Must be `>= 1`. |
+| `sort` | `string` | No | `date:desc` | Sorting criteria. Format: `field:direction` (e.g. `date:asc`, `action:desc`). Multiple sorts can be comma-separated. |
+| `action` | `string` | No | - | Filter by exact audit action. |
+| `user_id` | `string` | No | - | Filter by the user ID (actor_id) who performed the action. |
+| `start_date` | `string` | No | - | Start date of the range to query (RFC3339 format, e.g. `2026-07-05T00:00:00Z` or `YYYY-MM-DD`). |
+| `end_date` | `string` | No | - | End date of the range to query (RFC3339 format, e.g. `2026-07-05T23:59:59Z` or `YYYY-MM-DD`). |
+
+#### Sort Fields
+
+| Field | Example | Description |
+| :--- | :--- | :--- |
+| `date` | `sort=date:desc` | Sort by log creation date. |
+| `action` | `sort=action:asc` | Sort alphabetically by action name. |
+
+**Examples**:
+
+- `GET /api/stats?page=1&limit=20`
+- `GET /api/stats?action=signin&user_id=8ce91a56-deea-46ac-9330-de65d64daa32`
+- `GET /api/stats?start_date=2026-07-01&end_date=2026-07-05T23:59:59Z&sort=date:asc`
+
+#### Response `200 OK`
+
+```json
+{
+  "audit_logs": [
+    {
+      "id": "e4a31771-4638-4e89-a292-624e723927d1",
+      "category": "user_action",
+      "action": "signin",
+      "resource": "session",
+      "resource_id": "session_12345",
+      "actor_id": "8ce91a56-deea-46ac-9330-de65d64daa32",
+      "outcome": "success",
+      "request_id": "req-01ef82a",
+      "client_ip": "127.0.0.1",
+      "metadata": {
+        "user_agent": "Mozilla/5.0"
+      },
+      "created_at": "2026-07-05T08:45:00Z"
+    }
+  ],
+  "page": 1,
+  "limit": 10,
+  "total": 1
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+| :--- | :--- |
+| `400 Bad Request` | Invalid UUID or invalid date format. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff admin role. |
+
+### Get Audit Log
+
+- **Method**: `GET`
+- **Endpoint**: `/api/stats/{id}`
+- **Description**: Retrieve the details of a single audit log by its ID.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `string (UUID)` | Yes | The ID of the audit log to retrieve. |
+
+#### Response `200 OK`
+
+```json
+{
+  "id": "e4a31771-4638-4e89-a292-624e723927d1",
+  "category": "user_action",
+  "action": "signin",
+  "resource": "session",
+  "resource_id": "session_12345",
+  "actor_id": "8ce91a56-deea-46ac-9330-de65d64daa32",
+  "outcome": "success",
+  "request_id": "req-01ef82a",
+  "client_ip": "127.0.0.1",
+  "metadata": {
+    "user_agent": "Mozilla/5.0"
+  },
+  "created_at": "2026-07-05T08:45:00Z"
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+| :--- | :--- |
+| `400 Bad Request` | The provided `id` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff admin role. |
+| `404 Not Found` | Audit log with the given ID does not exist. |
