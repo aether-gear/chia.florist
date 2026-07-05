@@ -36,12 +36,24 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] List Payment Method
     - [x] List Payment Account
     - [x] Create Payment Account
-  - [x] Orders
-    - [x] List Orders
-    - [x] Get Order
-  - [x] Audit Logs
-    - [x] Find Audit Logs
-    - [x] Get Audit Log
+  - [X] Orders
+    - [X] List Orders
+    - [X] Get Order
+  - [X] Audit Logs
+    - [X] Find Audit Logs
+    - [X] Get Audit Log
+  - [ ] WAF Security Policy
+    - [ ] WAF Rules
+      - [ ] List Rules
+      - [ ] Create Rule
+      - [ ] Toggle Rule
+      - [ ] Delete Rule
+    - [ ] IP Access Control
+      - [ ] List IP Config
+      - [ ] Update IP Action
+    - [ ] Filters
+      - [ ] Get Filters
+      - [ ] Update Filter
 
 # Public API
 
@@ -1202,3 +1214,313 @@ These endpoints require a valid staff session with the **staff admin** role.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden` | Authenticated user does not have the staff admin role. |
 | `404 Not Found` | Audit log with the given ID does not exist. |
+
+## WAF Security Policy
+
+All WAF management endpoints are scoped to the `/api/` prefix and are protected by **Staff Admin** authentication.
+They are intentionally bypassed by the WAF middleware itself — the WAF only inspects traffic outside `/api/`.
+
+### WAF Rules
+
+#### List Rules
+
+- **Method**: `GET`
+- **Endpoint**: `/api/rules`
+- **Description**: Retrieve all configured WAF detection rules.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+##### Response `200 OK`
+
+```json
+{
+  "rules": [
+    {
+      "id": "1000",
+      "description": "SQL Injection Detection (Basic)",
+      "pattern": "(?i)(union\\s+select|select\\s+.*\\s+from|delete\\s+from|drop\\s+table)",
+      "tags": ["sqli", "owasp"],
+      "impact": "high",
+      "enabled": true,
+      "created_at": "2026-07-05T10:00:00Z",
+      "updated_at": "2026-07-05T10:00:00Z"
+    }
+  ]
+}
+```
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+---
+
+#### Create Rule
+
+- **Method**: `POST`
+- **Endpoint**: `/api/rules`
+- **Description**: Add a new WAF detection rule. The `id` is auto-generated. The rule is enabled by default.
+- **Authentication**: Staff Admin
+- **Request Body**:
+
+  ```json
+  {
+    "description": "string (required)",
+    "pattern":     "string (required) — must be a valid Go regular expression",
+    "tags":        ["string"],
+    "impact":      "string (optional) — e.g. \"high\", \"medium\", \"low\""
+  }
+  ```
+
+##### Response `201 Created`
+
+```json
+{
+  "id": "1001",
+  "description": "XSS Detection",
+  "pattern": "(?i)<script",
+  "tags": ["xss"],
+  "impact": "medium",
+  "enabled": true,
+  "created_at": "2026-07-05T12:00:00Z",
+  "updated_at": "2026-07-05T12:00:00Z"
+}
+```
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `description` or `pattern` is empty, or `pattern` is not a valid regular expression. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+---
+
+#### Toggle Rule
+
+- **Method**: `PUT`
+- **Endpoint**: `/api/rules/{id}`
+- **Description**: Enable or disable an existing WAF rule by ID.
+- **Authentication**: Staff Admin
+- **Request Body**:
+
+  ```json
+  {
+    "enabled": true
+  }
+  ```
+
+##### Path Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | string | Yes      | The rule ID (e.g. `"1001"`). |
+
+##### Response `204 No Content`
+
+Empty body.
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `id` path parameter is missing. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No rule with the given `id` exists. |
+
+---
+
+#### Delete Rule
+
+- **Method**: `DELETE`
+- **Endpoint**: `/api/rules/{id}`
+- **Description**: Permanently remove a WAF detection rule by ID.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+##### Path Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | string | Yes      | The rule ID to delete. |
+
+##### Response `204 No Content`
+
+Empty body.
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `id` path parameter is missing. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No rule with the given `id` exists. |
+
+---
+
+### IP Access Control
+
+#### List IP Config
+
+- **Method**: `GET`
+- **Endpoint**: `/api/ip`
+- **Description**: Retrieve all IP addresses that are currently banned, whitelisted, or ignored by the WAF.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+##### Response `200 OK`
+
+```json
+{
+  "entries": [
+    { "ip": "1.2.3.4",   "status": "banned",      "reason": "Auto-Banned: SQL Injection" },
+    { "ip": "10.0.0.1",  "status": "whitelisted",  "reason": "" },
+    { "ip": "192.168.1.5", "status": "ignored",    "reason": "" }
+  ]
+}
+```
+
+##### IP Status Values
+
+| Status        | Effect |
+|---------------|--------|
+| `banned`      | All requests from this IP are blocked with `403 Forbidden`. |
+| `whitelisted` | All WAF rule and keyword checks are skipped for this IP. |
+| `ignored`     | Requests pass through; audit logging is suppressed for this IP. |
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+---
+
+#### Update IP Action
+
+- **Method**: `POST`
+- **Endpoint**: `/api/ip`
+- **Description**: Set or clear the access control status for an IP address. This is idempotent — submitting the same action twice is safe.
+- **Authentication**: Staff Admin
+- **Request Body**:
+
+  ```json
+  {
+    "ip":     "string (required) — the IP address to act on",
+    "action": "string (required) — one of: \"ban\", \"whitelist\", \"ignore\", \"reset\"",
+    "reason": "string (optional) — only meaningful when action is \"ban\""
+  }
+  ```
+
+##### Action Values
+
+| Action        | Effect |
+|---------------|--------|
+| `ban`         | Blocks the IP. Sets status to `banned`. |
+| `whitelist`   | Bypasses WAF checks for the IP. Sets status to `whitelisted`. |
+| `ignore`      | Suppresses audit logging for the IP. Sets status to `ignored`. |
+| `reset`       | Removes the IP from all access control lists entirely. |
+
+> **Note**: An IP can only hold one status at a time. Submitting a new action always replaces the previous one.
+
+##### Response `204 No Content`
+
+Empty body.
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `ip` or `action` is missing, or `action` is not one of the valid values. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+---
+
+### Filters
+
+#### Get Filters
+
+- **Method**: `GET`
+- **Endpoint**: `/api/filters`
+- **Description**: Retrieve the current keyword blocklist and URL whitelist used by the WAF payload inspector.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+##### Response `200 OK`
+
+```json
+{
+  "keywords":         ["xp_cmdshell", "eval(", "<script"],
+  "whitelisted_urls": ["/health", "/public/"]
+}
+```
+
+##### Field Descriptions
+
+| Field             | Description |
+|-------------------|-------------|
+| `keywords`        | Strings whose presence anywhere in the request payload (path, query, headers, body) causes an immediate block. Case-insensitive. |
+| `whitelisted_urls` | URL path prefixes that bypass all WAF rule and keyword evaluation. Matched with `strings.HasPrefix`. |
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+---
+
+#### Update Filter
+
+- **Method**: `POST`
+- **Endpoint**: `/api/filters`
+- **Description**: Add or remove a single keyword or URL whitelist entry.
+- **Authentication**: Staff Admin
+- **Request Body**:
+
+  ```json
+  {
+    "type":   "string (required) — \"keyword\" or \"url\"",
+    "action": "string (required) — \"add\" or \"remove\"",
+    "value":  "string (required) — the keyword or URL prefix to add/remove"
+  }
+  ```
+
+##### Examples
+
+```json
+// Block a new keyword
+{ "type": "keyword", "action": "add",    "value": "xp_cmdshell" }
+
+// Remove an existing keyword
+{ "type": "keyword", "action": "remove", "value": "xp_cmdshell" }
+
+// Whitelist a URL prefix (bypasses WAF checks)
+{ "type": "url",     "action": "add",    "value": "/webhooks/" }
+
+// Remove a URL whitelist entry
+{ "type": "url",     "action": "remove", "value": "/webhooks/" }
+```
+
+> **Note**: Adding a `keyword` entry is idempotent (duplicate inserts are silently ignored).
+
+##### Response `204 No Content`
+
+Empty body.
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `value` is empty, `type` is not `keyword` or `url`, or `action` is not `add` or `remove`. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |

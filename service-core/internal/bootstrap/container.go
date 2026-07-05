@@ -14,6 +14,9 @@ import (
 	auditPersistence "service-core/internal/modules/audit/infra/persistence"
 	auditUsecase "service-core/internal/modules/audit/usecase"
 
+	secPolicyPersistence "service-core/internal/modules/security_policy/infra/persistence"
+	secPolicyUsecase "service-core/internal/modules/security_policy/usecase"
+
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
@@ -128,6 +131,17 @@ type Container struct {
 
 	FindAuditLogs auditUsecase.FindAuditLogsUsecase
 	GetAuditLog   auditUsecase.GetAuditLogUsecase
+
+	WAFAutoBanEnabled bool
+	ListRules         secPolicyUsecase.ListRulesUsecase
+	CreateRule        secPolicyUsecase.CreateRuleUsecase
+	ToggleRule        secPolicyUsecase.ToggleRuleUsecase
+	DeleteRule        secPolicyUsecase.DeleteRuleUsecase
+	GetIPConfig       secPolicyUsecase.GetIPConfigUsecase
+	UpdateIPAction    secPolicyUsecase.UpdateIPActionUsecase
+	GetFilters        secPolicyUsecase.GetFiltersUsecase
+	UpdateFilter      secPolicyUsecase.UpdateFilterUsecase
+	InspectPayload    secPolicyUsecase.InspectPayloadUsecase
 }
 
 func NewContainer(cfg Config,
@@ -147,6 +161,7 @@ func NewContainer(cfg Config,
 		productRepo            = productPersistence.NewProductRepository()
 		productImageRepo       = productPersistence.NewProductImageRepository()
 		inventoryRepo          = inventoryPersistence.NewInventoryRepository()
+		secPolicyRepo          = secPolicyPersistence.NewSecurityPolicyRepository()
 		accountRepo            = authenPersistence.NewAccountRepository()
 		challengeRepo          = authenPersistence.NewChallengeRepository()
 		oauthRepo              = authenPersistence.NewOAuthConnectionRepository()
@@ -637,6 +652,44 @@ func NewContainer(cfg Config,
 		GetAuditLog: *auditUsecase.NewGetAuditLogUsecase(
 			infra.TransactionExecutor,
 			auditLogRepo,
+		),
+
+		WAFAutoBanEnabled: cfg.WAF.AutoBanEnabled,
+		ListRules: *secPolicyUsecase.NewListRulesUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		CreateRule: *secPolicyUsecase.NewCreateRuleUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		ToggleRule: *secPolicyUsecase.NewToggleRuleUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		DeleteRule: *secPolicyUsecase.NewDeleteRuleUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		GetIPConfig: *secPolicyUsecase.NewGetIPConfigUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		UpdateIPAction: *secPolicyUsecase.NewUpdateIPActionUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		GetFilters: *secPolicyUsecase.NewGetFiltersUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		UpdateFilter: *secPolicyUsecase.NewUpdateFilterUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		InspectPayload: *secPolicyUsecase.NewInspectPayloadUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
 		),
 	}
 }
