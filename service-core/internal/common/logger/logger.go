@@ -13,6 +13,11 @@ type (
 	// from security-relevant audit and WAF event logs
 	// when filtering in a log aggregator.
 	LogCategory string
+
+	// LogLayer identifies which architectural layer emitted a log entry.
+	// Used as a standard field to separate middleware, business, and
+	// infrastructure logs when filtering in a log aggregator.
+	LogLayer string
 )
 
 const (
@@ -24,6 +29,10 @@ const (
 	CategorySystem LogCategory = "system"
 	CategoryAudit  LogCategory = "audit"
 	CategoryWAF    LogCategory = "waf"
+
+	LayerMiddleware LogLayer = "middleware"
+	LayerUsecase    LogLayer = "usecase"
+	LayerInfra      LogLayer = "infra"
 )
 
 type Field struct {
