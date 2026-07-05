@@ -79,8 +79,8 @@ const encoders = {
 };
 
 let config = {
-    target: 'http://localhost:8080',
-    path: '/search?q=',
+    target: 'http://localhost:7129',
+    path: '/products?name=',
     payloadType: 'sqli',
     encoder: 'none'
 };
@@ -102,7 +102,7 @@ function showMenu() {
     console.log(`- 📂 Vector Type : ${config.payloadType.toUpperCase()}`);
     console.log(`- 🌀 Encoder     : ${config.encoder.toUpperCase()}`);
     console.log(`================================================================`);
-    console.log("1. 🎯  Change Target / Path (Default: http://localhost:8080/search?q=)");
+    console.log("1. 🎯  Change Target / Path (Default: http://localhost:7129/products?name=)");
     console.log("2. 📂  Select Attack Vector Type (SQLi, XSS, LFI)");
     console.log("3. 🌀  Select Obfuscation Encoder");
     console.log("4. ⚡  Run Evasion Audit Scan");
@@ -110,9 +110,9 @@ function showMenu() {
 
     rl.question('\nSelect Option: ', (choice) => {
         if (choice === '1') {
-            rl.question('Enter target hostname/port (default: http://localhost:8080): ', (tgt) => {
+            rl.question('Enter target hostname/port (default: http://localhost:7129): ', (tgt) => {
                 if (tgt.trim()) config.target = tgt.trim();
-                rl.question('Enter query parameter path (default: /search?q=): ', (pth) => {
+                rl.question('Enter query parameter path (default: /products?name=): ', (pth) => {
                     if (pth.trim()) config.path = pth.trim();
                     showMenu();
                 });
@@ -162,7 +162,8 @@ const sendRequest = (fullUrl, payloadText) => {
             method: 'GET',
             headers: {
                 'User-Agent': 'WAFNinja-JS/1.0',
-                'x-simulated-ip': '88.99.100.54' // spoof test IP
+                'x-simulated-ip': '88.99.100.54', // spoof test IP
+                'X-Forwarded-For': '88.99.100.54'
             }
         };
 

