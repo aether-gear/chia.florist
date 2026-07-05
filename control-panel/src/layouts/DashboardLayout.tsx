@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
@@ -39,6 +39,7 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: true },
       { name: 'Merchants', href: '/admin/merchants', icon: Store, adminOnly: true },
+      { name: 'Audit Logs', href: '/admin/audit-logs', icon: History, adminOnly: true },
       { name: 'Security', href: '/security', icon: ShieldAlert },
     ]
   },

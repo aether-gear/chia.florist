@@ -16,6 +16,7 @@ import ShopManagementPage from '../pages/shop/ShopManagementPage';
 import PaymentSettingsPage from '../pages/admin/payments/PaymentSettingsPage';
 import CreatePaymentAccountPage from '../pages/admin/payments/CreatePaymentAccountPage';
 import ProtectedRoute from '../components/ProtectedRoute';
+import AuditLogsPage from '../pages/admin/AuditLogsPage';
 
 export default function AppRoutes() {
   return (
@@ -43,6 +44,7 @@ export default function AppRoutes() {
             <Route path="/admin/merchants/create" element={<CreateMerchantPage />} />
             <Route path="/admin/merchants/accounts/add" element={<AddMerchantAccountPage />} />
             <Route path="/admin/merchants/:merchantId/accounts/add" element={<AddMerchantAccountPage />} />
+            <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
           </Route>
         </Route>
         

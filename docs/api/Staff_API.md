@@ -1,4 +1,4 @@
-# Staff API Documentation
+﻿# Staff API Documentation
 
 This document covers the staff and admin-facing APIs for the Chia Florist service.
 Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
@@ -36,12 +36,12 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] List Payment Method
     - [x] List Payment Account
     - [x] Create Payment Account
-  - [ ] Orders
-    - [ ] List Orders
-    - [ ] Get Order
-  - [ ] Audit Logs
-    - [ ] Find Audit Logs
-    - [ ] Get Audit Log
+  - [X] Orders
+    - [X] List Orders
+    - [X] Get Order
+  - [X] Audit Logs
+    - [X] Find Audit Logs
+    - [X] Get Audit Log
   - [ ] WAF Security Policy
     - [ ] WAF Rules
       - [ ] List Rules
@@ -1060,38 +1060,38 @@ These endpoints require a valid staff session with the **staff admin** role.
 
 ```json
 {
-	"id": "00e9dc8e-e96d-4cb7-b9ea-8d5d5c8d930f",
-	"number": "ORD-20260627-63E4B3",
-	"customer_id": "7466a260-6dd9-45db-8a70-3254bfc2dc98",
-	"address_id": "f279f798-2de1-4ebd-a660-568b835b3a52",
-	"status": "pending",
-	"subtotal": 450000,
-	"shipping_fee": 770000,
-	"total": 1220000,
-	"created_at": "2026-06-27T10:09:05.904647Z",
-	"items": [
-		{
-			"id": "e73f9f49-b3b3-4c8e-8fee-dc5d4a0207ab",
-			"product_id": "480eec7c-d950-4927-a570-1fc3dc20df67",
-			"product_name": "Prosperity Grand Opening Stand",
-			"quantity": 3,
-			"unit_price": 150000,
-			"subtotal": 450000,
-			"shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
-			"shop_name": "dayum",
-			"courier_code": "tiki",
-			"courier_service": "SDS",
-			"shipping_fee": 770000
-		}
-	],
-	"payment": {
-		"id": "1d3a0355-ce51-4346-a07c-b8bc839e85f1",
-		"status": "pending",
-		"provider": "midtrans",
-		"amount": 1220000,
-		"expires_at": "2026-06-28T10:09:09Z",
-		"created_at": "2026-06-27T10:09:05.904647Z"
-	}
+ "id": "00e9dc8e-e96d-4cb7-b9ea-8d5d5c8d930f",
+ "number": "ORD-20260627-63E4B3",
+ "customer_id": "7466a260-6dd9-45db-8a70-3254bfc2dc98",
+ "address_id": "f279f798-2de1-4ebd-a660-568b835b3a52",
+ "status": "pending",
+ "subtotal": 450000,
+ "shipping_fee": 770000,
+ "total": 1220000,
+ "created_at": "2026-06-27T10:09:05.904647Z",
+ "items": [
+  {
+   "id": "e73f9f49-b3b3-4c8e-8fee-dc5d4a0207ab",
+   "product_id": "480eec7c-d950-4927-a570-1fc3dc20df67",
+   "product_name": "Prosperity Grand Opening Stand",
+   "quantity": 3,
+   "unit_price": 150000,
+   "subtotal": 450000,
+   "shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
+   "shop_name": "dayum",
+   "courier_code": "tiki",
+   "courier_service": "SDS",
+   "shipping_fee": 770000
+  }
+ ],
+ "payment": {
+  "id": "1d3a0355-ce51-4346-a07c-b8bc839e85f1",
+  "status": "pending",
+  "provider": "midtrans",
+  "amount": 1220000,
+  "expires_at": "2026-06-28T10:09:09Z",
+  "created_at": "2026-06-27T10:09:05.904647Z"
+ }
 }
 ```
 
