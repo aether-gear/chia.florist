@@ -6,11 +6,12 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
-	userRepo "service-core/internal/modules/user/repository"
 	customerDomain "service-core/internal/modules/customer/domain"
 	customerRepo "service-core/internal/modules/customer/repository"
+	userRepo "service-core/internal/modules/user/repository"
 	mailer "service-core/internal/shared/mailer"
 	otp "service-core/internal/shared/otp"
 	transaction "service-core/internal/shared/transaction"
@@ -28,6 +29,7 @@ type RegisterCustomerUsecase struct {
 	challengeRepo repository.VerificationChallengeRepository
 	otpGen        otp.Generator
 	mailer        mailer.Sender
+	auditLogger   applogger.AuditLogger
 }
 
 func NewRegisterCustomerUsecase(
@@ -40,6 +42,7 @@ func NewRegisterCustomerUsecase(
 	challengeRepo repository.VerificationChallengeRepository,
 	otpGen otp.Generator,
 	mailer mailer.Sender,
+	auditLogger applogger.AuditLogger,
 ) *RegisterCustomerUsecase {
 	return &RegisterCustomerUsecase{
 		executor:      executor,
@@ -51,6 +54,7 @@ func NewRegisterCustomerUsecase(
 		challengeRepo: challengeRepo,
 		otpGen:        otpGen,
 		mailer:        mailer,
+		auditLogger:   auditLogger,
 	}
 }
 
@@ -80,6 +84,13 @@ func (u *RegisterCustomerUsecase) Execute(
 	}
 
 	if existAcc != nil || existUsr != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "register_customer",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": params.Email, "username": params.Username, "reason": "account or username already exists"},
+		})
 		return nil, apperrors.NewConflict(domain.ErrAccountAlreadyExists.Error())
 	}
 
@@ -172,6 +183,15 @@ func (u *RegisterCustomerUsecase) Execute(
 	if err := u.mailer.Send(mail); err != nil {
 		return nil, fmt.Errorf("failed to send otp: %w", err)
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "register_customer",
+		Resource:   "account",
+		ResourceID: acc.ID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"email": params.Email, "username": params.Username},
+	})
 
 	return &challenge.ID, nil
 }

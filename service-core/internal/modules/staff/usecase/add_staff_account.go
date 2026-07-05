@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authenRepo "service-core/internal/modules/authentication/repository"
 	authzDomain "service-core/internal/modules/authorization/domain"
@@ -24,6 +25,7 @@ type AddStaffAccountUsecase struct {
 	userRepo       userRepo.UserRepository
 	membershipRepo authzRepo.StaffMembershipRepository
 	roleRepo       authzRepo.RoleRepository
+	auditLogger    applogger.AuditLogger
 }
 
 func NewAddStaffAccountUsecase(
@@ -34,6 +36,7 @@ func NewAddStaffAccountUsecase(
 	userRepo userRepo.UserRepository,
 	membershipRepo authzRepo.StaffMembershipRepository,
 	roleRepo authzRepo.RoleRepository,
+	auditLogger applogger.AuditLogger,
 ) *AddStaffAccountUsecase {
 	return &AddStaffAccountUsecase{
 		executor:       executor,
@@ -43,6 +46,7 @@ func NewAddStaffAccountUsecase(
 		userRepo:       userRepo,
 		membershipRepo: membershipRepo,
 		roleRepo:       roleRepo,
+		auditLogger:    auditLogger,
 	}
 }
 
@@ -76,6 +80,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to verify actor membership: %w", err)
 	}
 	if actorMembership == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "actor membership not found"},
+		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -98,6 +109,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		}
 	}
 	if !found {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "actor lacks admin role"},
+		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -107,6 +125,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to check existing account: %w", err)
 	}
 	if existing != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "email already exists"},
+		})
 		return apperrors.NewConflict("an account with this email already exists")
 	}
 
@@ -176,6 +201,15 @@ func (u *AddStaffAccountUsecase) Execute(
 	if err != nil {
 		return err
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "add_staff_account",
+		Resource:   "staff_account",
+		ResourceID: newAccountID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "username": input.Username},
+	})
 
 	return nil
 }

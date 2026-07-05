@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	customerRepo "service-core/internal/modules/customer/repository"
@@ -24,6 +25,7 @@ type LoginCustomerUsecase struct {
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
 	customerRepo     customerRepo.CustomerRepository
+	auditLogger      applogger.AuditLogger
 }
 
 func NewLoginCustomerUsecase(
@@ -36,6 +38,7 @@ func NewLoginCustomerUsecase(
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
 	customerRepo customerRepo.CustomerRepository,
+	auditLogger applogger.AuditLogger,
 ) *LoginCustomerUsecase {
 	return &LoginCustomerUsecase{
 		executor:         executor,
@@ -47,6 +50,7 @@ func NewLoginCustomerUsecase(
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		customerRepo:     customerRepo,
+		auditLogger:      auditLogger,
 	}
 }
 
@@ -71,17 +75,45 @@ func (u *LoginCustomerUsecase) Execute(
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 	if existing == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_customer",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "account not found"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	if existing.Type != domain.AccountTypeCustomer {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_customer",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "invalid account type"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 	if existing.Status != domain.AccountActive {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_customer",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "account not active"},
+		})
 		return nil, apperrors.NewForbidden(domain.ErrEmailNotVerified.Error())
 	}
 
 	if err := u.pwHasher.Compare(existing.Password, input.Password); err != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_customer",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "invalid password"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
@@ -161,6 +193,15 @@ func (u *LoginCustomerUsecase) Execute(
 		AccessToken:  accessTkn,
 		RefreshToken: refreshTkn,
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "login_customer",
+		Resource:   "session",
+		ResourceID: session.ID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"email": input.Email},
+	})
 
 	return &result, nil
 }

@@ -130,9 +130,7 @@ func NewContainer(cfg Config,
 	infra *Dependency) *Container {
 	var (
 		log = applogger.NewZapLogger(cfg.App.Env)
-	)
 
-	var (
 		auditLogRepo = auditPersistence.NewAuditLogRepository()
 		auditLogger  = auditInfra.NewDBAuditLogger(
 			auditLogRepo,
@@ -281,6 +279,7 @@ func NewContainer(cfg Config,
 			infra.TransactionProvider,
 			refreshTokenRepo,
 			sessionRepo,
+			auditLogger,
 		),
 		LoginCustomer: *authenUsecase.
 			NewLoginCustomerUsecase(
@@ -293,6 +292,7 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				refreshTokenRepo,
 				customerRepo,
+				auditLogger,
 			),
 		LoginStaff: *authenUsecase.
 			NewLoginStaffUsecase(
@@ -306,6 +306,7 @@ func NewContainer(cfg Config,
 				refreshTokenRepo,
 				staffRepo,
 				membershipRepo,
+				auditLogger,
 			),
 
 		FindStaff: *staffUsecase.
@@ -319,6 +320,7 @@ func NewContainer(cfg Config,
 				userRepo,
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
+				auditLogger,
 			),
 		AddStaffAccount: *staffUsecase.
 			NewAddStaffAccountUsecase(
@@ -329,6 +331,7 @@ func NewContainer(cfg Config,
 				userRepo,
 				membershipRepo,
 				roleRepo,
+				auditLogger,
 			),
 
 		RegisterCustomer: *authenUsecase.
@@ -342,6 +345,7 @@ func NewContainer(cfg Config,
 				challengeRepo,
 				otpGen,
 				mailSender,
+				auditLogger,
 			),
 		VerifyAccount: *authenUsecase.
 			NewVerifyAccountUsecase(
@@ -357,6 +361,7 @@ func NewContainer(cfg Config,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
+				auditLogger,
 			),
 		GetAccount: *authenUsecase.
 			NewGetAccountUsecase(
@@ -374,6 +379,7 @@ func NewContainer(cfg Config,
 			tokenSvc,
 			sessionRepo,
 			refreshTokenRepo,
+			auditLogger,
 		),
 
 		GetCart: *cartUsecase.

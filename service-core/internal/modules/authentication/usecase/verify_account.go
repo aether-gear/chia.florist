@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	authorzDomain "service-core/internal/modules/authorization/domain"
@@ -30,6 +31,7 @@ type VerifyAccountUsecase struct {
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	auditLogger      applogger.AuditLogger
 }
 
 func NewVerifyAccountUsecase(
@@ -45,6 +47,7 @@ func NewVerifyAccountUsecase(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	auditLogger applogger.AuditLogger,
 ) *VerifyAccountUsecase {
 	return &VerifyAccountUsecase{
 		executor:         executor,
@@ -59,6 +62,7 @@ func NewVerifyAccountUsecase(
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
+		auditLogger:      auditLogger,
 	}
 }
 
@@ -85,19 +89,54 @@ func (u *VerifyAccountUsecase) Execute(
 		return nil, fmt.Errorf("failed to get challenge: %w", err)
 	}
 	if challenge == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "verify_account",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge not found"},
+		})
 		return nil, apperrors.NewNotFound(domain.ErrNotFoundChallenge.Error())
 	}
 
 	if challenge.ConsumedAt != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "verify_account",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge already consumed"},
+		})
 		return nil, apperrors.NewConflict(domain.ErrConsumedChallenge.Error())
 	}
 	if challenge.VerifiedAt != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "verify_account",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge already verified"},
+		})
 		return nil, apperrors.NewConflict(domain.ErrVerifiedChallenge.Error())
 	}
 	if challenge.ExpiresAt.Before(now) {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "verify_account",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge expired"},
+		})
 		return nil, apperrors.NewConflict(domain.ErrExpiredChallenge.Error())
 	}
 	if challenge.AttemptCount >= 5 {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "verify_account",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "maximum attempts reached"},
+		})
 		return nil, apperrors.NewConflict(domain.ErrMaxAttemptReached.Error())
 	}
 
@@ -119,6 +158,14 @@ func (u *VerifyAccountUsecase) Execute(
 				err,
 			)
 		}
+
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "verify_account",
+			Resource: "account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "attempt_count": challenge.AttemptCount, "reason": "invalid otp"},
+		})
 
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidOTP.Error())
 	}
@@ -254,6 +301,17 @@ func (u *VerifyAccountUsecase) Execute(
 	result := VerifyAccountResult{
 		AccessToken:  accessTkn,
 		RefreshToken: refreshTkn,
+	}
+
+	if account != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category:   "user_action",
+			Action:     "verify_account",
+			Resource:   "account",
+			ResourceID: account.ID.String(),
+			Outcome:    applogger.OutcomeSuccess,
+			Metadata:   map[string]any{"challenge_id": input.ChallengeID.String()},
+		})
 	}
 
 	return &result, nil

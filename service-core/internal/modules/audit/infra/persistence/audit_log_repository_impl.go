@@ -8,7 +8,8 @@ import (
 
 	"service-core/internal/modules/audit/domain"
 	"service-core/internal/modules/audit/repository"
-	"service-core/internal/shared/transaction"
+
+	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
@@ -63,7 +64,7 @@ func (r *auditLogRepositoryImpl) Save(
 		log.Outcome,
 		nullableString(log.RequestID),
 		nullableString(log.ClientIP),
-		metadata,
+		json.RawMessage(metadata),
 		log.CreatedAt,
 	)
 	if err != nil {

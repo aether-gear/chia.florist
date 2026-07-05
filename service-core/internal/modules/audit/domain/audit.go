@@ -1,12 +1,9 @@
 package domain
 
 import (
-	"context"
 	"time"
 
 	"github.com/google/uuid"
-
-	"service-core/internal/shared/transaction"
 )
 
 type (
@@ -57,17 +54,4 @@ type AuditLog struct {
 	Metadata map[string]any
 
 	CreatedAt time.Time
-}
-
-// AuditLogRepository is the persistence interface
-// for audit log records.
-//
-// Defined in the domain so the infra layer
-// depends inward, not outward.
-type AuditLogRepository interface {
-	Save(
-		ctx context.Context,
-		exec transaction.Executor,
-		log AuditLog,
-	) error
 }
