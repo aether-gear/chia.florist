@@ -2,6 +2,12 @@ package applogger
 
 import "context"
 
+const (
+	OutcomeSuccess = "success"
+	OutcomeFailure = "failure"
+	OutcomeBlocked = "blocked"
+)
+
 // AuditEvent describes a single security-relevant event to be recorded.
 // Callers only describe what happened — actor, request, and IP data
 // are extracted automatically from ctx using the Step 1 context helpers.
@@ -27,15 +33,9 @@ type AuditEvent struct {
 	Metadata map[string]any
 }
 
-// Audit event outcome constants.
-const (
-	OutcomeSuccess = "success"
-	OutcomeFailure = "failure"
-	OutcomeBlocked = "blocked"
-)
-
 // AuditLogger is the interface for recording security-relevant audit events.
-// It is intentionally separate from Logger — system operational logs and
+//
+// It is intentionally separate from Logger, system operational logs and
 // audit accountability logs have different lifetimes, sinks, and consumers.
 type AuditLogger interface {
 	Log(ctx context.Context, event AuditEvent)
