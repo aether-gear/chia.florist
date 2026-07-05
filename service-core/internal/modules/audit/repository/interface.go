@@ -5,6 +5,8 @@ import (
 
 	"service-core/internal/modules/audit/domain"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
 )
 
 // AuditLogRepository is the persistence interface
@@ -18,4 +20,16 @@ type AuditLogRepository interface {
 		exec transaction.Executor,
 		log domain.AuditLog,
 	) error
+
+	Find(
+		ctx context.Context,
+		exec transaction.Executor,
+		params FindAuditLogsParams,
+	) ([]domain.AuditLog, int, error)
+
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.AuditLog, error)
 }
