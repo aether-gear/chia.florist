@@ -17,6 +17,7 @@ type Config struct {
 	RajaOngkir  config.RajaOngkirConfig
 	Komerce     config.KomerceConfig
 	GoogleOAuth config.GoogleOAuthConfig
+	WAF         config.WAFConfig
 }
 
 func LoadConfig() Config {
@@ -55,5 +56,6 @@ func LoadConfig() Config {
 		RajaOngkir:  config.LoadRajaOngkirConfig(),
 		Komerce:     config.LoadKomerceConfig(),
 		GoogleOAuth: config.LoadGoogleOAuthConfig(),
+		WAF:         config.LoadWAFConfig(),
 	}
 }
