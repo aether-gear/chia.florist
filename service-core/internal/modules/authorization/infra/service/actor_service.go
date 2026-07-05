@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	apperrors "service-core/internal/common/errors"
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authenRepo "service-core/internal/modules/authentication/repository"
 	"service-core/internal/modules/authorization/domain"
@@ -46,6 +47,10 @@ func (s *ActorService) Load(
 	}
 
 	if actor.Type == authenDomain.AccountTypeStaff {
+		if staffID == nil {
+			return nil, apperrors.NewUnauthorized("staff account is not associated with a staff profile")
+		}
+
 		roles, err := s.membershipRepo.
 			ListRolesByAccountIDAndStaffID(
 				ctx,

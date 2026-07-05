@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"slices"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
@@ -37,10 +38,8 @@ func (s *authorizer) RequireAccountType(
 				return apperrors.NewUnauthorized("actor unauthorized")
 			}
 
-			for _, allowed := range allowedTypes {
-				if actor.Type == allowed {
-					return next(w, r)
-				}
+			if slices.Contains(allowedTypes, actor.Type) {
+				return next(w, r)
 			}
 
 			return apperrors.NewForbidden("insufficient account type")
@@ -64,11 +63,8 @@ func (s *authorizer) RequireStaffRole(
 
 			allowed := false
 			for _, actorRole := range actor.Roles {
-				for _, requiredRole := range allowedRoles {
-					if actorRole.Code == requiredRole {
-						allowed = true
-						break
-					}
+				if slices.Contains(allowedRoles, actorRole.Code) {
+					allowed = true
 				}
 				if allowed {
 					break
