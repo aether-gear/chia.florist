@@ -41,3 +41,56 @@ export interface CreateOrderResponse {
   instruction: string
   payment_account?: CreateOrderPaymentAccountResponse
 }
+
+// ─── List Orders API ───────────────────────────────────────────────
+
+export interface ListOrdersQuery {
+  page?: number
+  limit?: number
+  sort?: string
+  status?: string
+}
+
+export interface BackendOrderPayment {
+  id: string
+  status: string
+  provider: string
+  amount: number
+  expires_at: string
+  created_at: string
+}
+
+export interface BackendOrderItem {
+  id: string
+  product_id: string
+  product_name: string
+  quantity: number
+  unit_price: number
+  subtotal: number
+  shop_id: string
+  shop_name: string
+  courier_code: string
+  courier_service: string
+  shipping_fee: number
+}
+
+export interface BackendOrder {
+  id: string
+  number: string
+  customer_id: string
+  address_id: string
+  status: string
+  subtotal: number
+  shipping_fee: number
+  total: number
+  created_at: string
+  items: BackendOrderItem[]
+  payment: BackendOrderPayment
+}
+
+export interface ListOrdersResponse {
+  limit: number
+  orders: BackendOrder[]
+  page: number
+  total: number
+}

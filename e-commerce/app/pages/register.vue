@@ -18,6 +18,7 @@ const name = ref('')
 const username = ref('')
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const phone = ref('')
 const otpCode = ref('')
 const errorMessage = ref('')
@@ -162,15 +163,23 @@ const handleBackToRegister = () => {
               />
             </div>
 
-            <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
+            <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors flex items-center justify-between">
               <input 
-                type="password" 
+                :type="showPassword ? 'text' : 'password'" 
                 v-model="password"
                 placeholder="Password" 
                 class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
                 :disabled="authVm.isLoading.value"
                 required
               />
+              <button 
+                type="button" 
+                @click="showPassword = !showPassword" 
+                class="text-sm font-medium text-gray-500 hover:text-black focus:outline-none ml-2"
+                tabindex="-1"
+              >
+                {{ showPassword ? 'Hide' : 'Show' }}
+              </button>
             </div>
 
             <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
