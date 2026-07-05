@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -13,17 +14,20 @@ type LogoutUsecase struct {
 	transactor     transaction.Transactor
 	refreshTknRepo repository.RefreshTokenRepository
 	sessionRepo    repository.SessionRepository
+	auditLogger    applogger.AuditLogger
 }
 
 func NewLogoutUsecase(
 	transactor transaction.Transactor,
 	refreshTknRepo repository.RefreshTokenRepository,
 	sessionRepo repository.SessionRepository,
+	auditLogger applogger.AuditLogger,
 ) *LogoutUsecase {
 	return &LogoutUsecase{
 		transactor:     transactor,
 		refreshTknRepo: refreshTknRepo,
 		sessionRepo:    sessionRepo,
+		auditLogger:    auditLogger,
 	}
 }
 
@@ -58,6 +62,15 @@ func (u *LogoutUsecase) Execute(
 	if err != nil {
 		return err
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "logout",
+		Resource:   "session",
+		ResourceID: authCtx.SessionID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"user_id": authCtx.UserID.String()},
+	})
 
 	return nil
 }

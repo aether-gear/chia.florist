@@ -10,6 +10,9 @@ import (
 	sGen "service-core/internal/shared/slug"
 	"service-core/internal/shared/transaction"
 
+	auditInfra "service-core/internal/modules/audit/infra"
+	auditPersistence "service-core/internal/modules/audit/infra/persistence"
+
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
@@ -49,6 +52,7 @@ import (
 
 type Container struct {
 	Logger             applogger.Logger
+	AuditLogger        applogger.AuditLogger
 	CORSAllowedOrigins []string
 	Authenticator      authenRepo.Authenticator
 	Authorizer         authorRepo.Authorizer
@@ -126,6 +130,13 @@ func NewContainer(cfg Config,
 	infra *Dependency) *Container {
 	var (
 		log = applogger.NewZapLogger(cfg.App.Env)
+
+		auditLogRepo = auditPersistence.NewAuditLogRepository()
+		auditLogger  = auditInfra.NewDBAuditLogger(
+			auditLogRepo,
+			log,
+			infra.TransactionExecutor,
+		)
 	)
 
 	var (
@@ -210,6 +221,7 @@ func NewContainer(cfg Config,
 
 	return &Container{
 		Logger:             log,
+		AuditLogger:        auditLogger,
 		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
 		Authenticator:      authMidd,
 		Authorizer:         authorMdwr,
@@ -267,6 +279,7 @@ func NewContainer(cfg Config,
 			infra.TransactionProvider,
 			refreshTokenRepo,
 			sessionRepo,
+			auditLogger,
 		),
 		LoginCustomer: *authenUsecase.
 			NewLoginCustomerUsecase(
@@ -279,6 +292,7 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				refreshTokenRepo,
 				customerRepo,
+				auditLogger,
 			),
 		LoginStaff: *authenUsecase.
 			NewLoginStaffUsecase(
@@ -292,6 +306,7 @@ func NewContainer(cfg Config,
 				refreshTokenRepo,
 				staffRepo,
 				membershipRepo,
+				auditLogger,
 			),
 
 		FindStaff: *staffUsecase.
@@ -305,6 +320,7 @@ func NewContainer(cfg Config,
 				userRepo,
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
+				auditLogger,
 			),
 		AddStaffAccount: *staffUsecase.
 			NewAddStaffAccountUsecase(
@@ -315,6 +331,7 @@ func NewContainer(cfg Config,
 				userRepo,
 				membershipRepo,
 				roleRepo,
+				auditLogger,
 			),
 
 		RegisterCustomer: *authenUsecase.
@@ -328,6 +345,7 @@ func NewContainer(cfg Config,
 				challengeRepo,
 				otpGen,
 				mailSender,
+				auditLogger,
 			),
 		VerifyAccount: *authenUsecase.
 			NewVerifyAccountUsecase(
@@ -343,6 +361,7 @@ func NewContainer(cfg Config,
 				tokenSvc,
 				sessionRepo,
 				refreshTokenRepo,
+				auditLogger,
 			),
 		GetAccount: *authenUsecase.
 			NewGetAccountUsecase(
@@ -360,6 +379,7 @@ func NewContainer(cfg Config,
 			tokenSvc,
 			sessionRepo,
 			refreshTokenRepo,
+			auditLogger,
 		),
 
 		GetCart: *cartUsecase.

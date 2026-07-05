@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/staff/domain"
 	"service-core/internal/modules/staff/repository"
 	userRepo "service-core/internal/modules/user/repository"
@@ -15,10 +16,11 @@ import (
 )
 
 type CreateStaffUsecase struct {
-	staffRepo  repository.StaffRepository
-	userRepo   userRepo.UserRepository
-	executor   transaction.Executor
-	transactor transaction.Transactor
+	staffRepo   repository.StaffRepository
+	userRepo    userRepo.UserRepository
+	executor    transaction.Executor
+	transactor  transaction.Transactor
+	auditLogger applogger.AuditLogger
 }
 
 func NewCreateStaffUsecase(
@@ -26,12 +28,14 @@ func NewCreateStaffUsecase(
 	userRepo userRepo.UserRepository,
 	executor transaction.Executor,
 	transactor transaction.Transactor,
+	auditLogger applogger.AuditLogger,
 ) *CreateStaffUsecase {
 	return &CreateStaffUsecase{
-		staffRepo:  staffRepo,
-		userRepo:   userRepo,
-		executor:   executor,
-		transactor: transactor,
+		staffRepo:   staffRepo,
+		userRepo:    userRepo,
+		executor:    executor,
+		transactor:  transactor,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -86,7 +90,7 @@ func (u *CreateStaffUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.userRepo.CreateUser(ctx, exec, newUser); err != nil {
 			return fmt.Errorf("failed to create user for staff: %w", err)
 		}
@@ -95,4 +99,18 @@ func (u *CreateStaffUsecase) Execute(
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "create_staff_profile",
+		Resource:   "staff",
+		ResourceID: staff.ID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"name": input.Name, "user_id": newUserID.String()},
+	})
+
+	return nil
 }
