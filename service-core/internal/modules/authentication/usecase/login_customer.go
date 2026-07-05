@@ -70,8 +70,11 @@ func (u *LoginCustomerUsecase) Execute(
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
-
 	if existing == nil {
+		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
+	}
+
+	if existing.Type != domain.AccountTypeCustomer {
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 	if existing.Status != domain.AccountActive {
@@ -92,9 +95,9 @@ func (u *LoginCustomerUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	// Fetch the customer entity to embed CustomerID in the token
 	var customerID *uuid.UUID
-	cust, err := u.customerRepo.GetByUserID(ctx, u.executor, existing.UserID)
+	cust, err := u.customerRepo.
+		GetByUserID(ctx, u.executor, existing.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve customer: %w", err)
 	}
