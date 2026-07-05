@@ -12,6 +12,7 @@ import (
 
 	auditInfra "service-core/internal/modules/audit/infra"
 	auditPersistence "service-core/internal/modules/audit/infra/persistence"
+	auditUsecase "service-core/internal/modules/audit/usecase"
 
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
@@ -124,6 +125,9 @@ type Container struct {
 	FindOrders        orderUsecase.FindOrdersUsecase
 	GetOrder          orderUsecase.GetOrderUsecase
 	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
+
+	FindAuditLogs auditUsecase.FindAuditLogsUsecase
+	GetAuditLog   auditUsecase.GetAuditLogUsecase
 }
 
 func NewContainer(cfg Config,
@@ -625,5 +629,14 @@ func NewContainer(cfg Config,
 				addressShopRepo,
 				infra.LogisticsProvider,
 			),
+
+		FindAuditLogs: *auditUsecase.NewFindAuditLogsUsecase(
+			infra.TransactionExecutor,
+			auditLogRepo,
+		),
+		GetAuditLog: *auditUsecase.NewGetAuditLogUsecase(
+			infra.TransactionExecutor,
+			auditLogRepo,
+		),
 	}
 }

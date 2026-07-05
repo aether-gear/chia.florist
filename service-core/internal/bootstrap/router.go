@@ -11,6 +11,7 @@ import (
 	authorzDomain "service-core/internal/modules/authorization/domain"
 
 	addressH "service-core/internal/modules/address/delivery/http"
+	auditH "service-core/internal/modules/audit/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
 	cartH "service-core/internal/modules/cart/delivery/http"
 	courierH "service-core/internal/modules/courier/delivery/http"
@@ -200,6 +201,11 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.CreateOrder,
 			&c.UpdateOrderStatus,
 		)
+
+		auditHandler = auditH.NewAuditHandler(
+			&c.FindAuditLogs,
+			&c.GetAuditLog,
+		)
 	)
 
 	r := chi.NewRouter()
@@ -356,6 +362,11 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
+		})
+
+		r.Route("/api/stats", func(r chi.Router) {
+			r.Get("/", chains.StaffAdminOnly(auditHandler.ListAuditLogs))
+			r.Get("/{id}", chains.StaffAdminOnly(auditHandler.GetAuditLog))
 		})
 	})
 
