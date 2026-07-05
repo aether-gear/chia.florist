@@ -10,6 +10,9 @@ import (
 	sGen "service-core/internal/shared/slug"
 	"service-core/internal/shared/transaction"
 
+	auditInfra "service-core/internal/modules/audit/infra"
+	auditPersistence "service-core/internal/modules/audit/infra/persistence"
+
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
@@ -49,6 +52,7 @@ import (
 
 type Container struct {
 	Logger             applogger.Logger
+	AuditLogger        applogger.AuditLogger
 	CORSAllowedOrigins []string
 	Authenticator      authenRepo.Authenticator
 	Authorizer         authorRepo.Authorizer
@@ -126,6 +130,15 @@ func NewContainer(cfg Config,
 	infra *Dependency) *Container {
 	var (
 		log = applogger.NewZapLogger(cfg.App.Env)
+	)
+
+	var (
+		auditLogRepo = auditPersistence.NewAuditLogRepository()
+		auditLogger  = auditInfra.NewDBAuditLogger(
+			auditLogRepo,
+			log,
+			infra.TransactionExecutor,
+		)
 	)
 
 	var (
@@ -210,6 +223,7 @@ func NewContainer(cfg Config,
 
 	return &Container{
 		Logger:             log,
+		AuditLogger:        auditLogger,
 		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
 		Authenticator:      authMidd,
 		Authorizer:         authorMdwr,
