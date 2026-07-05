@@ -2,6 +2,40 @@ package applogger
 
 import "context"
 
+type (
+	// LogLevel represents the severity of a log entry.
+	//
+	// Log levels are ordered from least to most severe:
+	// ERROR, WARN, INFO, DEBUG.
+	LogLevel string
+
+	// LogCategory distinguishes operational system logs
+	// from security-relevant audit and WAF event logs
+	// when filtering in a log aggregator.
+	LogCategory string
+)
+
+const (
+	LogLevelError LogLevel = "ERROR"
+	LogLevelWarn  LogLevel = "WARN"
+	LogLevelInfo  LogLevel = "INFO"
+	LogLevelDebug LogLevel = "DEBUG"
+
+	CategorySystem LogCategory = "system"
+	CategoryAudit  LogCategory = "audit"
+	CategoryWAF    LogCategory = "waf"
+)
+
+type Field struct {
+	Key   string
+	Value any
+}
+
+// This interface defines the methods for structured
+// operational system logging.
+//
+// Implementations should log messages at the appropriate
+// log level, with fields enriched from the context where available.
 type Logger interface {
 	Info(ctx context.Context, msg string, fields ...Field)
 	Error(ctx context.Context, msg string, fields ...Field)
@@ -10,17 +44,3 @@ type Logger interface {
 
 	With(fields ...Field) Logger
 }
-
-type Field struct {
-	Key   string
-	Value any
-}
-
-type LogLevel string
-
-const (
-	LogLevelError LogLevel = "ERROR"
-	LogLevelWarn  LogLevel = "WARN"
-	LogLevelInfo  LogLevel = "INFO"
-	LogLevelDebug LogLevel = "DEBUG"
-)

@@ -23,19 +23,23 @@ func NewSlogLogger(env string) Logger {
 }
 
 func (l *slogLogger) Info(ctx context.Context, msg string, fields ...Field) {
-	l.log.InfoContext(ctx, msg, toAttrs(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.InfoContext(ctx, msg, toAttrs(all)...)
 }
 
 func (l *slogLogger) Error(ctx context.Context, msg string, fields ...Field) {
-	l.log.ErrorContext(ctx, msg, toAttrs(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.ErrorContext(ctx, msg, toAttrs(all)...)
 }
 
 func (l *slogLogger) Warn(ctx context.Context, msg string, fields ...Field) {
-	l.log.WarnContext(ctx, msg, toAttrs(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.WarnContext(ctx, msg, toAttrs(all)...)
 }
 
 func (l *slogLogger) Debug(ctx context.Context, msg string, fields ...Field) {
-	l.log.DebugContext(ctx, msg, toAttrs(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.DebugContext(ctx, msg, toAttrs(all)...)
 }
 
 func (l *slogLogger) With(fields ...Field) Logger {

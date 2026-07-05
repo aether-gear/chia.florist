@@ -39,19 +39,23 @@ func NewZapLogger(env string) Logger {
 }
 
 func (l *zapLogger) Info(ctx context.Context, msg string, fields ...Field) {
-	l.log.Info(msg, toZapFields(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.Info(msg, toZapFields(all)...)
 }
 
 func (l *zapLogger) Error(ctx context.Context, msg string, fields ...Field) {
-	l.log.Error(msg, toZapFields(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.Error(msg, toZapFields(all)...)
 }
 
 func (l *zapLogger) Warn(ctx context.Context, msg string, fields ...Field) {
-	l.log.Warn(msg, toZapFields(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.Warn(msg, toZapFields(all)...)
 }
 
 func (l *zapLogger) Debug(ctx context.Context, msg string, fields ...Field) {
-	l.log.Debug(msg, toZapFields(fields)...)
+	all := append(FieldsFromContext(ctx), fields...)
+	l.log.Debug(msg, toZapFields(all)...)
 }
 
 func (l *zapLogger) With(fields ...Field) Logger {
