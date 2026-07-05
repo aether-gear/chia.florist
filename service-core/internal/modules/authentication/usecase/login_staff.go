@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	authorzDomain "service-core/internal/modules/authorization/domain"
@@ -27,6 +28,7 @@ type LoginStaffUsecase struct {
 	refreshTokenRepo repository.RefreshTokenRepository
 	staffRepo        staffRepo.StaffRepository
 	membershipRepo   authorRepo.StaffMembershipRepository
+	auditLogger      applogger.AuditLogger
 }
 
 func NewLoginStaffUsecase(
@@ -40,6 +42,7 @@ func NewLoginStaffUsecase(
 	refreshTokenRepo repository.RefreshTokenRepository,
 	staffRepo staffRepo.StaffRepository,
 	membershipRepo authorRepo.StaffMembershipRepository,
+	auditLogger applogger.AuditLogger,
 ) *LoginStaffUsecase {
 	return &LoginStaffUsecase{
 		executor:         executor,
@@ -52,6 +55,7 @@ func NewLoginStaffUsecase(
 		refreshTokenRepo: refreshTokenRepo,
 		staffRepo:        staffRepo,
 		membershipRepo:   membershipRepo,
+		auditLogger:      auditLogger,
 	}
 }
 
@@ -73,17 +77,45 @@ func (u *LoginStaffUsecase) Execute(
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 	if existing == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_staff",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "account not found"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
 	if existing.Type != domain.AccountTypeStaff {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_staff",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "invalid account type"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 	if existing.Status != domain.AccountActive {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_staff",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "account not active"},
+		})
 		return nil, apperrors.NewForbidden(domain.ErrEmailNotVerified.Error())
 	}
 
 	if err := u.pwHasher.Compare(existing.Password, input.Password); err != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_staff",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "invalid password"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
@@ -93,6 +125,13 @@ func (u *LoginStaffUsecase) Execute(
 		return nil, fmt.Errorf("failed to retrieve membership: %w", err)
 	}
 	if memberStaff == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_staff",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "staff membership not found"},
+		})
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidCredentials.Error())
 	}
 
@@ -107,6 +146,13 @@ func (u *LoginStaffUsecase) Execute(
 		return nil, fmt.Errorf("failed to retrieve roles: %w", err)
 	}
 	if roles == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "login_staff",
+			Resource: "session",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"email": input.Email, "reason": "no roles associated"},
+		})
 		return nil, apperrors.NewForbidden("no role associated with this account")
 	}
 
@@ -142,7 +188,7 @@ func (u *LoginStaffUsecase) Execute(
 		Generate(repository.GenerateTokenParams{
 			UserID:    existing.UserID,
 			SessionID: session.ID,
-			StaffID:   &memberStaff.ID,
+			StaffID:   &memberStaff.StaffID,
 			Roles:     roleCodes,
 			Type:      domain.TokenTypeRefresh,
 			Duration:  7 * 24 * time.Hour,
@@ -179,6 +225,15 @@ func (u *LoginStaffUsecase) Execute(
 	if err != nil {
 		return nil, err
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "login_staff",
+		Resource:   "session",
+		ResourceID: session.ID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"email": input.Email},
+	})
 
 	return &LoginEmailResult{
 		AccessToken:  accessTkn,

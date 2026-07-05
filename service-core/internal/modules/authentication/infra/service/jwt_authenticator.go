@@ -44,9 +44,9 @@ func (aM *jwtAuthenticator) RequireAuth(
 ) commonmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
-			token, err := appcookie.Extract(r, cookie)
-
 			var authCtx *domain.AuthContext
+
+			token, err := appcookie.Extract(r, cookie)
 			if err == nil {
 				authCtx, err = aM.
 					authenticate(r.Context(), exec, token)
@@ -86,9 +86,9 @@ func (aM *jwtAuthenticator) RequireAnyAuth(
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			for _, cookie := range cookies {
-				token, err := appcookie.Extract(r, cookie)
-
 				var authCtx *domain.AuthContext
+
+				token, err := appcookie.Extract(r, cookie)
 				if err == nil {
 					authCtx, err = aM.
 						authenticate(r.Context(), exec, token)
@@ -237,19 +237,11 @@ func (aM *jwtAuthenticator) trySilentRefresh(
 
 	if err := tran.WithinTransaction(ctx, func(e transaction.Executor) error {
 		if err := aM.sessionRepo.
-			Save(
-				ctx,
-				e,
-				*session,
-			); err != nil {
+			Save(ctx, e, *session); err != nil {
 			return fmt.Errorf("failed to save updated session: %w", err)
 		}
 		if err := aM.refreshTokenRepo.
-			Save(
-				ctx,
-				e,
-				*dbRefreshToken,
-			); err != nil {
+			Save(ctx, e, *dbRefreshToken); err != nil {
 			return fmt.Errorf("failed to save updated refresh token: %w", err)
 		}
 		return nil

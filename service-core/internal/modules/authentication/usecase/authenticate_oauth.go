@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	customerDomain "service-core/internal/modules/customer/domain"
@@ -27,6 +28,7 @@ type AuthenticateOAuthUsecase struct {
 	tokenSvc         repository.TokenService
 	sessionRepo      repository.SessionRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	auditLogger      applogger.AuditLogger
 }
 
 func NewAuthenticateOAuthUsecase(
@@ -40,6 +42,7 @@ func NewAuthenticateOAuthUsecase(
 	tokenSvc repository.TokenService,
 	sessionRepo repository.SessionRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	auditLogger applogger.AuditLogger,
 ) *AuthenticateOAuthUsecase {
 	return &AuthenticateOAuthUsecase{
 		executor:         executor,
@@ -52,6 +55,7 @@ func NewAuthenticateOAuthUsecase(
 		tokenSvc:         tokenSvc,
 		sessionRepo:      sessionRepo,
 		refreshTokenRepo: refreshTokenRepo,
+		auditLogger:      auditLogger,
 	}
 }
 
@@ -113,10 +117,24 @@ func (u *AuthenticateOAuthUsecase) Execute(
 			return nil, fmt.Errorf("failed to get account: %w", err)
 		}
 		if account == nil {
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category: "user_action",
+				Action:   "oauth_login",
+				Resource: "session",
+				Outcome:  applogger.OutcomeFailure,
+				Metadata: map[string]any{"email": input.Email, "provider": string(input.Provider), "reason": "account not found"},
+			})
 			return nil, apperrors.NewNotFound("account not found")
 		}
 		if account.Status != domain.AccountActive &&
 			account.Status != domain.AccountPending {
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category: "user_action",
+				Action:   "oauth_login",
+				Resource: "session",
+				Outcome:  applogger.OutcomeFailure,
+				Metadata: map[string]any{"email": input.Email, "provider": string(input.Provider), "reason": "account suspended or locked"},
+			})
 			return nil, apperrors.NewForbidden("account is suspended or locked")
 		}
 
@@ -156,6 +174,13 @@ func (u *AuthenticateOAuthUsecase) Execute(
 				return nil, fmt.Errorf("failed to check existing connection by user id: %w", err)
 			}
 			if existingConn != nil {
+				u.auditLogger.Log(ctx, applogger.AuditEvent{
+					Category: "user_action",
+					Action:   "oauth_login",
+					Resource: "session",
+					Outcome:  applogger.OutcomeFailure,
+					Metadata: map[string]any{"email": input.Email, "provider": string(input.Provider), "reason": "email already linked to another OAuth account"},
+				})
 				return nil, apperrors.NewConflict("this email is already linked with another OAuth account")
 			}
 
@@ -325,6 +350,15 @@ func (u *AuthenticateOAuthUsecase) Execute(
 	if err != nil {
 		return nil, err
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "oauth_login",
+		Resource:   "session",
+		ResourceID: session.ID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"email": input.Email, "provider": string(input.Provider)},
+	})
 
 	return &AuthenticateOAuthResult{
 		AccessToken:  accessTkn,
