@@ -21,6 +21,7 @@ import (
 	orderH "service-core/internal/modules/order/delivery/http"
 	paymentH "service-core/internal/modules/payment/delivery/http"
 	productH "service-core/internal/modules/product/delivery/http"
+	secPolicyH "service-core/internal/modules/security_policy/delivery/http"
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
 	shopH "service-core/internal/modules/shop/delivery/http"
 	staffH "service-core/internal/modules/staff/delivery/http"
@@ -50,6 +51,12 @@ func NewRouteChains(c *Container) *RouteChains {
 			appmiddleware.Recovery(c.Logger),
 			appmiddleware.Logging(c.Logger),
 			appmiddleware.Response(),
+			appmiddleware.WAF(
+				&c.InspectPayload,
+				&c.UpdateIPAction,
+				c.AuditLogger,
+				c.WAFAutoBanEnabled,
+			),
 		}
 
 		mws := append(base, extra...)
@@ -205,6 +212,17 @@ func NewRouter(c *Container) *chi.Mux {
 		auditHandler = auditH.NewAuditHandler(
 			&c.FindAuditLogs,
 			&c.GetAuditLog,
+		)
+
+		secPolicyHandler = secPolicyH.NewSecurityPolicyHandler(
+			&c.ListRules,
+			&c.CreateRule,
+			&c.ToggleRule,
+			&c.DeleteRule,
+			&c.GetIPConfig,
+			&c.UpdateIPAction,
+			&c.GetFilters,
+			&c.UpdateFilter,
 		)
 	)
 
@@ -367,6 +385,23 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/api/stats", func(r chi.Router) {
 			r.Get("/", chains.StaffAdminOnly(auditHandler.ListAuditLogs))
 			r.Get("/{id}", chains.StaffAdminOnly(auditHandler.GetAuditLog))
+		})
+
+		r.Route("/api/rules", func(r chi.Router) {
+			r.Get("/", chains.StaffAdminOnly(secPolicyHandler.ListRules))
+			r.Post("/", chains.StaffAdminOnly(secPolicyHandler.CreateRule))
+			r.Put("/{id}", chains.StaffAdminOnly(secPolicyHandler.ToggleRule))
+			r.Delete("/{id}", chains.StaffAdminOnly(secPolicyHandler.DeleteRule))
+		})
+
+		r.Route("/api/ip", func(r chi.Router) {
+			r.Get("/", chains.StaffAdminOnly(secPolicyHandler.ListIPConfig))
+			r.Post("/", chains.StaffAdminOnly(secPolicyHandler.UpdateIPAction))
+		})
+
+		r.Route("/api/filters", func(r chi.Router) {
+			r.Get("/", chains.StaffAdminOnly(secPolicyHandler.GetFilters))
+			r.Post("/", chains.StaffAdminOnly(secPolicyHandler.UpdateFilter))
 		})
 	})
 
