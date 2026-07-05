@@ -4,9 +4,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ShieldAlert, ShieldX, Activity, CheckCircle2, ShieldCheck, Trash2 } from 'lucide-react';
+import { ShieldAlert, ShieldX, Activity, CheckCircle2, ShieldCheck, Trash2, Eye, FolderOpen, ListFilter } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceArea } from 'recharts';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { fetchApi } from '../../lib/api';
 
 const formatDateTimeLocal = (timestamp: number) => {
   const d = new Date(timestamp);
@@ -24,6 +26,33 @@ const parseSafeDate = (dateStr: any): Date => {
   return new Date(dateStr);
 };
 
+const getIPCategory = (reason: string): string => {
+  if (!reason) return 'Manual / Other';
+  const r = reason.toLowerCase();
+  if (r.includes('rate limit') || r.includes('brute force') || r.includes('spam') || r.includes('brute-force')) {
+    return 'Rate Limiting';
+  }
+  if (r.includes('sqli') || r.includes('sql') || r.includes('union') || r.includes('select')) {
+    return 'SQL Injection';
+  }
+  if (r.includes('xss') || r.includes('script')) {
+    return 'XSS Attacks';
+  }
+  if (r.includes('lfi') || r.includes('path') || r.includes('passwd') || r.includes('win.ini') || r.includes('traversal')) {
+    return 'Path Traversal (LFI)';
+  }
+  if (r.includes('rce') || r.includes('command') || r.includes('shellshock') || r.includes('jndi') || r.includes('ls -la') || r.includes('decode')) {
+    return 'RCE & Command Injection';
+  }
+  if (r.includes('scanner') || r.includes('sqlmap') || r.includes('nikto') || r.includes('user-agent')) {
+    return 'Malicious User-Agent';
+  }
+  if (r.includes('probe') || r.includes('admin') || r.includes('config') || r.includes('setup')) {
+    return 'Recon & Probing';
+  }
+  return 'Manual / Other';
+};
+
 export default function SecurityPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [wafSummary, setWafSummary] = useState({ total: 0, blocked: 0, allowed: 0, threatLevel: 'Low' });
@@ -34,6 +63,11 @@ export default function SecurityPage() {
   const [targetIP, setTargetIP] = useState("");
   const [targetReason, setTargetReason] = useState("");
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [ipRowsPerPage, setIpRowsPerPage] = useState<number>(5);
+  const [ipCurrentPage, setIpCurrentPage] = useState<number>(1);
+  const [selectedDetailIP, setSelectedDetailIP] = useState<string | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedAnalysisCategory, setSelectedAnalysisCategory] = useState("Rate Limiting");
 
   // Time Range & Brushing State
   const [rangeType, setRangeType] = useState<"Today" | "Custom">("Today");
@@ -83,11 +117,12 @@ export default function SecurityPage() {
     if (uniqueIPs.length === 0) return;
 
     try {
+      const mappedAction = action === 'remove' || action === 'reset' ? 'reset' : action;
       await Promise.all(
         uniqueIPs.map(ip =>
-          fetch('http://localhost:8080/api/ip', {
+          fetchApi('/api/ip', {
             method: 'POST',
-            body: JSON.stringify({ ip, action, reason: `Bulk ${action} from Logs` }),
+            body: JSON.stringify({ ip, action: mappedAction, reason: `Bulk ${action} from Logs` }),
           })
         )
       );
@@ -99,26 +134,12 @@ export default function SecurityPage() {
   };
 
   const handleBulkDeleteLogs = async () => {
-    const selectedIds = Object.keys(selectedLogIds).filter(id => selectedLogIds[id]);
-    if (selectedIds.length === 0) return;
-
-    try {
-      await fetch('http://localhost:8080/api/stats?t=' + Date.now(), {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selectedIds }),
-      });
-      // Optimistic local update: remove deleted logs from local state immediately
-      setLogs(prev => prev.filter(log => {
-        const logId = log.id || `${log.timestamp}-${log.ip}`;
-        return !selectedLogIds[logId];
-      }));
-      setSelectedLogIds({});
-      // Fetch latest state from server to sync
-      fetchLogs();
-    } catch (e) {
-      console.error("Bulk delete failed", e);
-    }
+    // Local optimistic delete only as audit logs are non-deletable on live Go backend
+    setLogs(prev => prev.filter(log => {
+      const logId = log.id || `${log.timestamp}-${log.ip}`;
+      return !selectedLogIds[logId];
+    }));
+    setSelectedLogIds({});
   };
 
   const handleBulkIPActionFromManager = async (action: 'ban' | 'whitelist' | 'remove') => {
@@ -126,11 +147,12 @@ export default function SecurityPage() {
     if (ips.length === 0) return;
 
     try {
+      const mappedAction = action === 'remove' ? 'reset' : action;
       await Promise.all(
         ips.map(ip =>
-          fetch('http://localhost:8080/api/ip', {
+          fetchApi('/api/ip', {
             method: 'POST',
-            body: JSON.stringify({ ip, action, reason: action === 'remove' ? '' : 'Bulk Action' }),
+            body: JSON.stringify({ ip, action: mappedAction, reason: action === 'remove' ? '' : 'Bulk Action' }),
           })
         )
       );
@@ -166,9 +188,8 @@ export default function SecurityPage() {
   const handleAddRule = async () => {
     if (!newRuleDesc || !newRulePattern) return;
     try {
-      await fetch('http://localhost:8080/api/rules', {
+      await fetchApi('/api/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           description: newRuleDesc,
           pattern: newRulePattern,
@@ -189,8 +210,8 @@ export default function SecurityPage() {
 
   const fetchRules = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/rules?t=' + Date.now());
-      setRules(await res.json());
+      const data = await fetchApi('/api/rules?t=' + Date.now());
+      setRules(data?.rules || []);
     } catch (e) {
       console.error(e);
     }
@@ -198,8 +219,8 @@ export default function SecurityPage() {
 
   const fetchIpList = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/ip?t=' + Date.now());
-      setIpList((await res.json()) || []);
+      const data = await fetchApi('/api/ip?t=' + Date.now());
+      setIpList(data?.entries || []);
     } catch (e) {
       console.error(e);
     }
@@ -207,14 +228,29 @@ export default function SecurityPage() {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/stats?t=' + Date.now());
-      const data = await res.json();
-      const rawLogs = data.logs || [];
-      const sorted = [...rawLogs].sort((a, b) => parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime());
+      const data = await fetchApi('/api/stats?limit=1000&t=' + Date.now());
+      const rawLogs = data?.audit_logs || [];
+      const mappedLogs = rawLogs.map((log: any) => {
+        const isBlocked = log.outcome === 'blocked' || log.action === 'request_blocked';
+        return {
+          id: log.id,
+          timestamp: log.created_at,
+          ip: log.client_ip || '127.0.0.1',
+          method: log.metadata?.method || 'GET',
+          url: log.metadata?.path || '/',
+          status: isBlocked ? 'Blocked' : 'Allowed',
+          ruleId: log.metadata?.rule_id || '-',
+          reason: log.metadata?.reason || '-',
+          payload: log.metadata?.payload || '-',
+          userAgent: log.metadata?.user_agent || '-'
+        };
+      });
+
+      const sorted = [...mappedLogs].sort((a, b) => parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime());
       setLogs(sorted);
       
-      const total = rawLogs.length;
-      const blocked = rawLogs.filter((l: any) => l.status === 'Blocked').length;
+      const total = mappedLogs.length;
+      const blocked = mappedLogs.filter((l: any) => l.status === 'Blocked').length;
       setWafSummary({
         total,
         blocked,
@@ -315,14 +351,17 @@ export default function SecurityPage() {
     return true;
   });
 
+  const displayedIps = ipList.slice((ipCurrentPage - 1) * ipRowsPerPage, ipCurrentPage * ipRowsPerPage);
+
   const handleIPSubmit = async (action: string, ipOverride?: string, reasonOverride?: string) => {
     const ip = ipOverride || targetIP;
     const reason = reasonOverride !== undefined ? reasonOverride : targetReason;
     if (!ip) return;
 
-    await fetch('http://localhost:8080/api/ip', {
+    const mappedAction = action === 'remove' || action === 'reset' ? 'reset' : action;
+    await fetchApi('/api/ip', {
       method: 'POST',
-      body: JSON.stringify({ ip, action, reason }),
+      body: JSON.stringify({ ip, action: mappedAction, reason }),
     });
 
     if (!ipOverride) {
@@ -333,9 +372,9 @@ export default function SecurityPage() {
   };
 
   const toggleRule = async (ruleId: string, currentStatus: boolean) => {
-    await fetch('http://localhost:8080/api/rules', {
+    await fetchApi(`/api/rules/${ruleId}`, {
       method: 'PUT',
-      body: JSON.stringify({ id: ruleId, enabled: !currentStatus }),
+      body: JSON.stringify({ enabled: !currentStatus }),
     });
     fetchRules();
   };
@@ -526,9 +565,19 @@ export default function SecurityPage() {
 
       {/* IP Blacklist Manager */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="text-emerald-500" /> IP Blacklist Manager</CardTitle>
-          <CardDescription>Control access and logging behavior for specific IPs.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2"><ShieldCheck className="text-emerald-500" /> IP Blacklist Manager</CardTitle>
+            <CardDescription>Control access and logging behavior for specific IPs.</CardDescription>
+          </div>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="h-9 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+            onClick={() => setIsCategoryModalOpen(true)}
+          >
+            <FolderOpen className="h-4 w-4" /> View Category Analysis
+          </Button>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
@@ -597,15 +646,17 @@ export default function SecurityPage() {
                     <input 
                       type="checkbox" 
                       className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
-                      checked={ipList.length > 0 && ipList.every(entry => selectedIPs[entry.ip])}
+                      checked={displayedIps.length > 0 && displayedIps.every(entry => selectedIPs[entry.ip])}
                       onChange={e => {
                         const checked = e.target.checked;
-                        const updated: Record<string, boolean> = {};
-                        if (checked) {
-                          ipList.forEach(entry => {
+                        const updated: Record<string, boolean> = { ...selectedIPs };
+                        displayedIps.forEach(entry => {
+                          if (checked) {
                             updated[entry.ip] = true;
-                          });
-                        }
+                          } else {
+                            delete updated[entry.ip];
+                          }
+                        });
                         setSelectedIPs(updated);
                       }}
                     />
@@ -622,7 +673,7 @@ export default function SecurityPage() {
                     <TableCell colSpan={5} className="text-center text-slate-500 py-8">No IPs configured yet.</TableCell>
                   </TableRow>
                 )}
-                {ipList.map((entry: any) => (
+                {displayedIps.map((entry: any) => (
                   <TableRow key={entry.ip}>
                     <TableCell>
                       <input 
@@ -637,7 +688,12 @@ export default function SecurityPage() {
                         }}
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-slate-700">{entry.ip}</TableCell>
+                    <TableCell 
+                      className="font-mono text-slate-700 hover:text-emerald-600 hover:underline cursor-pointer"
+                      onClick={() => setSelectedDetailIP(entry.ip)}
+                    >
+                      {entry.ip}
+                    </TableCell>
                     <TableCell>
                       {entry.status === 'Banned' && <Badge variant="destructive">Banned</Badge>}
                       {entry.status === 'Whitelisted' && <Badge className="bg-emerald-600">Whitelisted</Badge>}
@@ -645,6 +701,15 @@ export default function SecurityPage() {
                     </TableCell>
                     <TableCell className="text-slate-500 text-sm">{entry.reason || "-"}</TableCell>
                     <TableCell className="text-right space-x-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900" 
+                        onClick={() => setSelectedDetailIP(entry.ip)}
+                        title="View IP Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600" onClick={() => handleIPSubmit('remove', entry.ip)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -654,6 +719,53 @@ export default function SecurityPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination Controls */}
+          {ipList.length > 0 && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Rows per page:</span>
+                <select
+                  className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  value={ipRowsPerPage}
+                  onChange={(e) => {
+                    setIpRowsPerPage(Number(e.target.value));
+                    setIpCurrentPage(1);
+                  }}
+                >
+                  <option value={5}>5 rows</option>
+                  <option value={10}>10 rows</option>
+                  <option value={20}>20 rows</option>
+                  <option value={50}>50 rows</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">
+                  Page {ipCurrentPage} of {Math.ceil(ipList.length / ipRowsPerPage) || 1}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs px-2"
+                    disabled={ipCurrentPage === 1}
+                    onClick={() => setIpCurrentPage(prev => Math.max(1, prev - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs px-2"
+                    disabled={ipCurrentPage >= Math.ceil(ipList.length / ipRowsPerPage)}
+                    onClick={() => setIpCurrentPage(prev => Math.min(Math.ceil(ipList.length / ipRowsPerPage), prev + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -930,6 +1042,291 @@ export default function SecurityPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* IP Details Modal */}
+      <Dialog open={!!selectedDetailIP} onOpenChange={(open) => !open && setSelectedDetailIP(null)}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <ShieldAlert className="text-rose-500 h-5 w-5" /> IP Threat Profile
+            </DialogTitle>
+            <DialogDescription className="font-mono text-slate-500">
+              Details for IP Address: {selectedDetailIP}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDetailIP && (() => {
+            const entry = ipList.find(e => e.ip === selectedDetailIP) || { status: 'Banned', reason: 'Automatic WAF Ban' };
+            const ipLogs = logs.filter(l => l.ip === selectedDetailIP);
+            const blockedLogs = ipLogs.filter(l => l.status === 'Blocked');
+            const allowedLogs = ipLogs.filter(l => l.status === 'Allowed');
+            
+            return (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Access Status</div>
+                    <div className="mt-1 flex items-center gap-2">
+                      {entry.status === 'Banned' ? (
+                        <Badge variant="destructive" className="px-2.5 py-1">Banned (Access Blocked)</Badge>
+                      ) : entry.status === 'Whitelisted' ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1">Whitelisted</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="px-2.5 py-1">Muted / Ignored</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimated Category</div>
+                    <div className="mt-1">
+                      <Badge variant="outline" className="px-2 py-0.5 border-slate-300 text-slate-700 font-medium">
+                        {getIPCategory(entry.reason)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Action Trigger / Reason</div>
+                    <div className="mt-1 text-sm text-slate-700 font-medium">{entry.reason || "No reason specified."}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Threat Events</div>
+                    <div className="mt-1 text-sm font-semibold text-rose-600">{blockedLogs.length} events blocked</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Clean Requests Allowed</div>
+                    <div className="mt-1 text-sm font-semibold text-emerald-600">{allowedLogs.length} requests</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                    <Activity className="h-4 w-4 text-slate-500" /> Recent Activity Log ({ipLogs.length} records)
+                  </div>
+                  <div className="overflow-hidden border border-slate-200 rounded-md max-h-[250px] overflow-y-auto shadow-inner bg-white">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead className="text-xs py-2 h-9">Time</TableHead>
+                          <TableHead className="text-xs py-2 h-9">Method & URL</TableHead>
+                          <TableHead className="text-xs py-2 h-9">Rule Triggered</TableHead>
+                          <TableHead className="text-xs py-2 h-9 text-right">Result</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ipLogs.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-slate-400 py-6 text-xs">No recent traffic records found for this IP.</TableCell>
+                          </TableRow>
+                        ) : (
+                          ipLogs.map((l, idx) => (
+                            <TableRow key={idx} className="hover:bg-slate-50/50">
+                              <TableCell className="text-[11px] whitespace-nowrap text-slate-500 py-1.5">
+                                {parseSafeDate(l.timestamp).toLocaleTimeString()}
+                              </TableCell>
+                              <TableCell className="text-[11px] font-mono max-w-[280px] truncate text-slate-800 py-1.5" title={l.url}>
+                                <span className="font-bold mr-1">{l.method}</span>{l.url}
+                              </TableCell>
+                              <TableCell className="text-[11px] py-1.5">
+                                {l.rule_id ? <Badge variant="outline" className="text-[9px] px-1.5">{l.rule_id}</Badge> : <span className="text-slate-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right py-1.5">
+                                {l.status === 'Blocked' ? (
+                                  <Badge variant="destructive" className="text-[9px] px-1.5">Blocked</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[9px] px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50">Allowed</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center border-t pt-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
+                    onClick={() => {
+                      handleIPSubmit('remove', selectedDetailIP);
+                      setSelectedDetailIP(null);
+                    }}
+                  >
+                    Forget & Unban IP
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    className="h-9 bg-slate-900 text-white hover:bg-slate-800"
+                    onClick={() => setSelectedDetailIP(null)}
+                  >
+                    Close Profile
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Category Analysis Modal */}
+      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+        <DialogContent className="sm:max-w-[850px] p-0 overflow-hidden">
+          <div className="flex h-[550px] divide-x divide-slate-200">
+            {/* Sidebar Categories List */}
+            <div className="w-[280px] bg-slate-50 p-6 flex flex-col justify-between">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <ListFilter className="h-4 w-4 text-emerald-600" /> Categories
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">Select category to audit banned IPs</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  {[
+                    'Rate Limiting',
+                    'SQL Injection',
+                    'XSS Attacks',
+                    'Path Traversal (LFI)',
+                    'RCE & Command Injection',
+                    'Malicious User-Agent',
+                    'Recon & Probing',
+                    'Manual / Other'
+                  ].map((category) => {
+                    const count = ipList.filter(e => getIPCategory(e.reason) === category).length;
+                    const isActive = selectedAnalysisCategory === category;
+                    
+                    return (
+                      <button
+                        key={category}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          isActive 
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
+                            : 'hover:bg-slate-200/60 text-slate-700'
+                        }`}
+                        onClick={() => setSelectedAnalysisCategory(category)}
+                      >
+                        <span className="truncate mr-2">{category}</span>
+                        <Badge 
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                            isActive 
+                              ? 'bg-white/20 text-white border-transparent' 
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {count}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 border-t pt-4">
+                Powered by live Go WAF rules parser.
+              </div>
+            </div>
+
+            {/* Right Pane List of IPs */}
+            <div className="flex-1 p-6 flex flex-col justify-between bg-white">
+              <div className="space-y-4 overflow-hidden flex flex-col h-full">
+                <div className="border-b pb-3">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-emerald-100 text-emerald-800 border-transparent text-xs hover:bg-emerald-100 font-bold">
+                      Category
+                    </Badge>
+                    <h2 className="text-lg font-bold text-slate-900">{selectedAnalysisCategory}</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    IPs flagged by Go WAF matching signatures for this category.
+                  </p>
+                </div>
+
+                {(() => {
+                  const filteredIPs = ipList.filter(e => getIPCategory(e.reason) === selectedAnalysisCategory);
+                  
+                  return (
+                    <div className="flex-1 overflow-y-auto pr-1 min-h-0">
+                      {filteredIPs.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full py-12 text-center text-slate-400 space-y-2">
+                          <CheckCircle2 className="h-10 w-10 text-slate-300" />
+                          <p className="text-sm font-semibold">No IPs in this category</p>
+                          <p className="text-xs">No threats detected matching these signatures currently.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {filteredIPs.map((entry) => {
+                            const ipLogsCount = logs.filter(l => l.ip === entry.ip).length;
+                            return (
+                              <div 
+                                key={entry.ip} 
+                                className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span 
+                                      className="font-mono text-sm font-bold text-slate-800 cursor-pointer hover:underline hover:text-emerald-600"
+                                      onClick={() => {
+                                        setSelectedDetailIP(entry.ip);
+                                      }}
+                                    >
+                                      {entry.ip}
+                                    </span>
+                                    {entry.status === 'Banned' ? (
+                                      <Badge variant="destructive" className="text-[9px] px-1.5 py-0">Banned</Badge>
+                                    ) : (
+                                      <Badge className="bg-emerald-600 text-white text-[9px] px-1.5 py-0">Whitelist</Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 font-medium truncate max-w-[350px]" title={entry.reason}>
+                                    Reason: {entry.reason || "-"}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    Activity log count: {ipLogsCount} records
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-8 text-xs font-semibold"
+                                    onClick={() => setSelectedDetailIP(entry.ip)}
+                                  >
+                                    Details
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-semibold"
+                                    onClick={() => handleIPSubmit('remove', entry.ip)}
+                                  >
+                                    Unban
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="border-t pt-4 flex justify-end">
+                <Button 
+                  className="bg-slate-900 hover:bg-slate-800 text-white" 
+                  onClick={() => setIsCategoryModalOpen(false)}
+                >
+                  Close Analysis
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

