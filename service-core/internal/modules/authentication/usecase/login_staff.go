@@ -142,7 +142,7 @@ func (u *LoginStaffUsecase) Execute(
 		Generate(repository.GenerateTokenParams{
 			UserID:    existing.UserID,
 			SessionID: session.ID,
-			StaffID:   &memberStaff.ID,
+			StaffID:   &memberStaff.StaffID,
 			Roles:     roleCodes,
 			Type:      domain.TokenTypeRefresh,
 			Duration:  7 * 24 * time.Hour,

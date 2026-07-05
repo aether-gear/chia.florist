@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { fetchApi } from '../lib/api';
 
 export interface AuthRole {
   code: string;
@@ -33,13 +34,8 @@ export function useAuthMeViewModel() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch('/api/core/auth/me');
-        if (response.ok) {
-          const result = await response.json();
-          setData(result);
-          return;
-        }
-        throw new Error('Not authenticated');
+        const result = await fetchApi('/auth/me');
+        setData(result);
       } catch (err: any) {
         console.error('Backend /auth/me failed', err);
         setData(null);
