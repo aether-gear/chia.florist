@@ -3,6 +3,7 @@ import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity,
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
+import { fetchApi } from '../lib/api';
 
 type NavigationItem = {
   name: string;
@@ -62,7 +63,7 @@ export default function DashboardLayout() {
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
-      await fetch('/api/core/auth/logout', { method: 'POST' });
+      await fetchApi('/auth/logout', { method: 'POST' });
     } catch (err) {
       console.error(err);
     } finally {
