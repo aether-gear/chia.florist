@@ -1,6 +1,9 @@
 package bootstrap
 
 import (
+	"time"
+
+	applimiter "service-core/internal/common/limiter"
 	applogger "service-core/internal/common/logger"
 
 	appconfig "service-core/internal/shared/config"
@@ -131,11 +134,14 @@ type Container struct {
 
 	FindAuditLogs auditUsecase.FindAuditLogsUsecase
 	GetAuditLog   auditUsecase.GetAuditLogUsecase
+	DeleteAuditLogs auditUsecase.DeleteAuditLogsUsecase
 
 	WAFAutoBanEnabled bool
+	Limiter           applimiter.Limiter
 	ListRules         secPolicyUsecase.ListRulesUsecase
 	CreateRule        secPolicyUsecase.CreateRuleUsecase
 	ToggleRule        secPolicyUsecase.ToggleRuleUsecase
+	UpdateRule        secPolicyUsecase.UpdateRuleUsecase
 	DeleteRule        secPolicyUsecase.DeleteRuleUsecase
 	GetIPConfig       secPolicyUsecase.GetIPConfigUsecase
 	UpdateIPAction    secPolicyUsecase.UpdateIPActionUsecase
@@ -653,8 +659,13 @@ func NewContainer(cfg Config,
 			infra.TransactionExecutor,
 			auditLogRepo,
 		),
+		DeleteAuditLogs: *auditUsecase.NewDeleteAuditLogsUsecase(
+			infra.TransactionExecutor,
+			auditLogRepo,
+		),
 
 		WAFAutoBanEnabled: cfg.WAF.AutoBanEnabled,
+		Limiter:           applimiter.NewInMemorySlidingWindowLimiter(10*time.Second, 30),
 		ListRules: *secPolicyUsecase.NewListRulesUsecase(
 			infra.TransactionExecutor,
 			secPolicyRepo,
@@ -664,6 +675,10 @@ func NewContainer(cfg Config,
 			secPolicyRepo,
 		),
 		ToggleRule: *secPolicyUsecase.NewToggleRuleUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		UpdateRule: *secPolicyUsecase.NewUpdateRuleUsecase(
 			infra.TransactionExecutor,
 			secPolicyRepo,
 		),

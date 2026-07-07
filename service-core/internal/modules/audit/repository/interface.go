@@ -32,4 +32,15 @@ type AuditLogRepository interface {
 		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.AuditLog, error)
+
+	DeleteMultiple(
+		ctx context.Context,
+		exec transaction.Executor,
+		ids []uuid.UUID,
+	) error
+
+	DeleteAll(
+		ctx context.Context,
+		exec transaction.Executor,
+	) error
 }

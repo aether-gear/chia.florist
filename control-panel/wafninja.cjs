@@ -152,7 +152,15 @@ function showMenu() {
     });
 }
 
-const sendRequest = (fullUrl, payloadText) => {
+const generateRandomIP = () => {
+    const o1 = Math.floor(Math.random() * 220) + 1;
+    const o2 = Math.floor(Math.random() * 255);
+    const o3 = Math.floor(Math.random() * 255);
+    const o4 = Math.floor(Math.random() * 255);
+    return `${o1}.${o2}.${o3}.${o4}`;
+};
+
+const sendRequest = (fullUrl, payloadText, ip) => {
     return new Promise((resolve) => {
         const urlObj = new URL(fullUrl);
         const options = {
@@ -162,8 +170,8 @@ const sendRequest = (fullUrl, payloadText) => {
             method: 'GET',
             headers: {
                 'User-Agent': 'WAFNinja-JS/1.0',
-                'x-simulated-ip': '88.99.100.54', // spoof test IP
-                'X-Forwarded-For': '88.99.100.54'
+                'x-simulated-ip': ip, // spoof test IP
+                'X-Forwarded-For': ip
             }
         };
 
@@ -223,7 +231,8 @@ Active Encoder: ${config.encoder.toUpperCase()}
         console.log(`Obfuscated: ${obfuscated}`);
         console.log(`Encoder   : ${activeEnc.toUpperCase()}`);
 
-        const result = await sendRequest(fullUrl, rawPayload);
+        const testIP = generateRandomIP();
+        const result = await sendRequest(fullUrl, rawPayload, testIP);
 
         if (result.passed) {
             console.log(`🔴 RESULT : BYPASSED (Status: 200 OK) - Interception Failed!`);

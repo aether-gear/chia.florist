@@ -13,17 +13,20 @@ import (
 )
 
 type auditHandler struct {
-	findAuditLogs *usecase.FindAuditLogsUsecase
-	getAuditLog   *usecase.GetAuditLogUsecase
+	findAuditLogs   *usecase.FindAuditLogsUsecase
+	getAuditLog     *usecase.GetAuditLogUsecase
+	deleteAuditLogs *usecase.DeleteAuditLogsUsecase
 }
 
 func NewAuditHandler(
 	findAuditLogs *usecase.FindAuditLogsUsecase,
 	getAuditLog *usecase.GetAuditLogUsecase,
+	deleteAuditLogs *usecase.DeleteAuditLogsUsecase,
 ) *auditHandler {
 	return &auditHandler{
-		findAuditLogs: findAuditLogs,
-		getAuditLog:   getAuditLog,
+		findAuditLogs:   findAuditLogs,
+		getAuditLog:     getAuditLog,
+		deleteAuditLogs: deleteAuditLogs,
 	}
 }
 
@@ -155,5 +158,48 @@ func (h *auditHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) error
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *auditHandler) DeleteAuditLogs(w http.ResponseWriter, r *http.Request) error {
+	var input usecase.DeleteAuditLogsInput
+	var msg string
+
+	idStr := chi.URLParam(r, "id")
+	if idStr != "" {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid audit log id")
+		}
+
+		input.IDs = []uuid.UUID{id}
+		msg = "audit log deleted successfully"
+	} else {
+		var req deleteAuditLogsRequest
+		if err := apphttp.DecodeJSON(r, &req); err != nil {
+			return apperrors.NewBadRequest("invalid body request")
+		}
+
+		switch {
+		case req.All:
+			input.DeleteAll = true
+			msg = "all audit logs deleted successfully"
+
+		case len(req.IDs) == 0:
+			return apperrors.NewBadRequest("no valid audit log IDs provided for deletion")
+
+		default:
+			input.IDs = req.IDs
+			msg = "audit logs deleted successfully"
+		}
+	}
+
+	if err := h.deleteAuditLogs.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": msg,
+	})
 	return nil
 }

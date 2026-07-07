@@ -2,6 +2,7 @@ package apphttp
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -12,13 +13,24 @@ func DecodeJSON(r *http.Request, v any) error {
 }
 
 func ClientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		parts := strings.Split(ip, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
+	var ipVal string
+
+	xff := r.Header.Get("X-Forwarded-For")
+	realIP := strings.TrimSpace(r.Header.Get("X-Real-IP"))
+
+	if xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			xff = xff[:i]
+		}
+		ipVal = strings.TrimSpace(xff)
+	} else if realIP != "" {
+		ipVal = realIP
+	} else {
+		ipVal = r.RemoteAddr
 	}
 
-	return r.RemoteAddr
+	if host, _, err := net.SplitHostPort(ipVal); err == nil {
+		return host
+	}
+	return ipVal
 }

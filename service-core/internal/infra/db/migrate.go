@@ -14,9 +14,11 @@ import (
 func RunMigration(cfg config.DatabaseConfig) error {
 	log.Printf("database: running migration")
 
+	dsn := *cfg.DSN
+
 	m, err := migrate.New(
 		"file://migrations",
-		*cfg.DSN,
+		dsn,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to init migration: %w", err)

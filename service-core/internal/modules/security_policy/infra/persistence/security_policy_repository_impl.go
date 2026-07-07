@@ -36,7 +36,7 @@ func (r *securityPolicyRepositoryImpl) GetRules(
 			created_at,
 			updated_at
 		FROM waf_rules
-		ORDER BY created_at ASC
+		ORDER BY created_at DESC
 	`
 
 	rows, err := exec.Query(ctx, queryStr)
@@ -140,6 +140,13 @@ func (r *securityPolicyRepositoryImpl) SaveRule(
 			updated_at
 		)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		ON CONFLICT (id) DO UPDATE SET
+			description = EXCLUDED.description,
+			pattern = EXCLUDED.pattern,
+			tags = EXCLUDED.tags,
+			impact = EXCLUDED.impact,
+			enabled = EXCLUDED.enabled,
+			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := exec.Exec(ctx, queryStr,

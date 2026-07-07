@@ -343,9 +343,47 @@ func (r *auditLogRepositoryImpl) Find(
 	return results, total, nil
 }
 
+func (r *auditLogRepositoryImpl) DeleteMultiple(
+	ctx context.Context,
+	exec transaction.Executor,
+	ids []uuid.UUID,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	idStrings := make([]string, len(ids))
+	for i, id := range ids {
+		idStrings[i] = id.String()
+	}
+
+	queryStr := `DELETE FROM audit_logs WHERE id = ANY($1::uuid[])`
+
+	_, err := exec.Exec(ctx, queryStr, idStrings)
+	if err != nil {
+		return fmt.Errorf("audit log: failed to delete multiple logs: %w", err)
+	}
+
+	return nil
+}
+
+func (r *auditLogRepositoryImpl) DeleteAll(
+	ctx context.Context,
+	exec transaction.Executor,
+) error {
+	queryStr := `DELETE FROM audit_logs`
+
+	_, err := exec.Exec(ctx, queryStr)
+	if err != nil {
+		return fmt.Errorf("audit log: failed to delete all logs: %w", err)
+	}
+
+	return nil
+}
+
 // nullableString converts an empty string to nil so it maps to SQL NULL
 // rather than an empty string in nullable text columns.
-func nullableString(s string) interface{} {
+func nullableString(s string) any {
 	if s == "" {
 		return nil
 	}
