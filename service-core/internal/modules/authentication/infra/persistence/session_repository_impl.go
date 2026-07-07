@@ -90,6 +90,29 @@ func (r *sessionRepositoryImpl) RevokeByID(
 	return nil
 }
 
+func (r *sessionRepositoryImpl) RevokeAllByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) error {
+	query := `
+		UPDATE
+			sessions
+		SET
+			revoked_at = now()
+		WHERE
+			user_id = $1
+			AND revoked_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("query to revoke all sessions by user id: %w", err)
+	}
+
+	return nil
+}
+
 func (r *sessionRepositoryImpl) UpdateLastActivityByID(
 	ctx context.Context,
 	exec transaction.Executor,

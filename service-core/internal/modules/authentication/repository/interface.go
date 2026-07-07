@@ -35,6 +35,13 @@ type AccountRepository interface {
 		id uuid.UUID,
 	) error
 
+	UpdatePasswordByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		hashedPassword string,
+	) error
+
 	Create(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -53,6 +60,12 @@ type SessionRepository interface {
 		ctx context.Context,
 		exec transaction.Executor,
 		id uuid.UUID,
+	) error
+
+	RevokeAllByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
 	) error
 
 	UpdateLastActivityByID(

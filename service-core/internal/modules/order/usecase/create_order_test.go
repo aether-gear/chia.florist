@@ -107,6 +107,9 @@ func (m *coMockAccountRepo) ActivateByUserID(_ context.Context, _ transaction.Ex
 func (m *coMockAccountRepo) Create(_ context.Context, _ transaction.Executor, _ authenDomain.Account) error {
 	return nil
 }
+func (m *coMockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ string) error {
+	return nil
+}
 
 // --- payment method repo ---
 
