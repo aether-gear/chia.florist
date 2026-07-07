@@ -131,11 +131,13 @@ type Container struct {
 
 	FindAuditLogs auditUsecase.FindAuditLogsUsecase
 	GetAuditLog   auditUsecase.GetAuditLogUsecase
+	DeleteAuditLogs auditUsecase.DeleteAuditLogsUsecase
 
 	WAFAutoBanEnabled bool
 	ListRules         secPolicyUsecase.ListRulesUsecase
 	CreateRule        secPolicyUsecase.CreateRuleUsecase
 	ToggleRule        secPolicyUsecase.ToggleRuleUsecase
+	UpdateRule        secPolicyUsecase.UpdateRuleUsecase
 	DeleteRule        secPolicyUsecase.DeleteRuleUsecase
 	GetIPConfig       secPolicyUsecase.GetIPConfigUsecase
 	UpdateIPAction    secPolicyUsecase.UpdateIPActionUsecase
@@ -653,6 +655,10 @@ func NewContainer(cfg Config,
 			infra.TransactionExecutor,
 			auditLogRepo,
 		),
+		DeleteAuditLogs: *auditUsecase.NewDeleteAuditLogsUsecase(
+			infra.TransactionExecutor,
+			auditLogRepo,
+		),
 
 		WAFAutoBanEnabled: cfg.WAF.AutoBanEnabled,
 		ListRules: *secPolicyUsecase.NewListRulesUsecase(
@@ -664,6 +670,10 @@ func NewContainer(cfg Config,
 			secPolicyRepo,
 		),
 		ToggleRule: *secPolicyUsecase.NewToggleRuleUsecase(
+			infra.TransactionExecutor,
+			secPolicyRepo,
+		),
+		UpdateRule: *secPolicyUsecase.NewUpdateRuleUsecase(
 			infra.TransactionExecutor,
 			secPolicyRepo,
 		),

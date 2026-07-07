@@ -68,6 +68,12 @@ export default function SecurityPage() {
   const [selectedDetailIP, setSelectedDetailIP] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [selectedAnalysisCategory, setSelectedAnalysisCategory] = useState("Rate Limiting");
+  const [selectedRuleForDetail, setSelectedRuleForDetail] = useState<any | null>(null);
+  const [isEditingRule, setIsEditingRule] = useState(false);
+  const [editRuleDesc, setEditRuleDesc] = useState("");
+  const [editRulePattern, setEditRulePattern] = useState("");
+  const [editRuleTags, setEditRuleTags] = useState("");
+  const [editRuleImpact, setEditRuleImpact] = useState("5");
 
   // Time Range & Brushing State
   const [rangeType, setRangeType] = useState<"Today" | "Custom">("Today");
@@ -134,12 +140,44 @@ export default function SecurityPage() {
   };
 
   const handleBulkDeleteLogs = async () => {
-    // Local optimistic delete only as audit logs are non-deletable on live Go backend
-    setLogs(prev => prev.filter(log => {
-      const logId = log.id || `${log.timestamp}-${log.ip}`;
-      return !selectedLogIds[logId];
-    }));
-    setSelectedLogIds({});
+    const selectedIds = Object.keys(selectedLogIds).filter(id => selectedLogIds[id]);
+    if (selectedIds.length === 0) return;
+
+    const realIds = selectedIds.filter(id => id.length === 36);
+
+    try {
+      if (realIds.length > 0) {
+        await fetchApi('/api/stats', {
+          method: 'DELETE',
+          body: JSON.stringify({ ids: realIds }),
+        });
+      }
+
+      setLogs(prev => prev.filter(log => {
+        const logId = log.id || `${log.timestamp}-${log.ip}`;
+        return !selectedLogIds[logId];
+      }));
+      setSelectedLogIds({});
+      fetchLogs();
+    } catch (e) {
+      console.error("Failed to bulk delete audit logs", e);
+    }
+  };
+
+  const handleClearAllLogs = async () => {
+    if (!window.confirm("Are you sure you want to permanently clear ALL security logs from the database?")) return;
+    try {
+      await fetchApi('/api/stats', {
+        method: 'DELETE',
+        body: JSON.stringify({ all: true })
+      });
+      setLogs([]);
+      setSelectedLogIds({});
+      setWafSummary({ total: 0, blocked: 0, allowed: 0, threatLevel: 'Low' });
+      fetchLogs();
+    } catch (e) {
+      console.error("Failed to clear all audit logs", e);
+    }
   };
 
   const handleBulkIPActionFromManager = async (action: 'ban' | 'whitelist' | 'remove') => {
@@ -171,6 +209,25 @@ export default function SecurityPage() {
       fetchIpList();
     } catch (e) {
       console.error("Bulk manager IP action failed", e);
+    }
+  };
+
+  const handleClearAllIPs = async () => {
+    if (!window.confirm("Are you sure you want to forget and reset ALL configured IPs?")) return;
+    try {
+      await Promise.all(
+        ipList.map(entry =>
+          fetchApi('/api/ip', {
+            method: 'POST',
+            body: JSON.stringify({ ip: entry.ip, action: 'reset', reason: '' }),
+          })
+        )
+      );
+      setIpList([]);
+      setSelectedIPs({});
+      fetchIpList();
+    } catch (e) {
+      console.error("Failed to clear all IPs", e);
     }
   };
 
@@ -379,6 +436,45 @@ export default function SecurityPage() {
     fetchRules();
   };
 
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!window.confirm("Are you sure you want to delete this WAF rule?")) return;
+    try {
+      await fetchApi(`/api/rules/${ruleId}`, {
+        method: 'DELETE',
+      });
+      fetchRules();
+    } catch (e) {
+      console.error("Failed to delete rule", e);
+    }
+  };
+
+  const handleUpdateRule = async () => {
+    if (!selectedRuleForDetail) return;
+    try {
+      await fetchApi(`/api/rules/${selectedRuleForDetail.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          description: editRuleDesc,
+          pattern: editRulePattern,
+          tags: editRuleTags.split(',').map(t => t.trim()).filter(Boolean),
+          impact: editRuleImpact,
+        })
+      });
+      setIsEditingRule(false);
+      const updated = {
+        ...selectedRuleForDetail,
+        description: editRuleDesc,
+        pattern: editRulePattern,
+        tags: editRuleTags.split(',').map(t => t.trim()).filter(Boolean),
+        impact: editRuleImpact,
+      };
+      setSelectedRuleForDetail(updated);
+      fetchRules();
+    } catch (e) {
+      console.error("Failed to update rule", e);
+    }
+  };
+
   const now = new Date();
   let activeStartTime = 0;
   let activeEndTime = Number.MAX_SAFE_INTEGER;
@@ -543,7 +639,13 @@ export default function SecurityPage() {
                   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                 }}
               />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 12 }} 
+                allowDecimals={false}
+                padding={{ top: 30 }}
+              />
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <Tooltip 
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
@@ -570,14 +672,24 @@ export default function SecurityPage() {
             <CardTitle className="flex items-center gap-2"><ShieldCheck className="text-emerald-500" /> IP Blacklist Manager</CardTitle>
             <CardDescription>Control access and logging behavior for specific IPs.</CardDescription>
           </div>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="h-9 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-            onClick={() => setIsCategoryModalOpen(true)}
-          >
-            <FolderOpen className="h-4 w-4" /> View Category Analysis
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-9 gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-800"
+              onClick={handleClearAllIPs}
+            >
+              Reset / Forget All IPs
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-9 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+              onClick={() => setIsCategoryModalOpen(true)}
+            >
+              <FolderOpen className="h-4 w-4" /> View Category Analysis
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
@@ -646,17 +758,15 @@ export default function SecurityPage() {
                     <input 
                       type="checkbox" 
                       className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
-                      checked={displayedIps.length > 0 && displayedIps.every(entry => selectedIPs[entry.ip])}
+                      checked={ipList.length > 0 && ipList.every(entry => selectedIPs[entry.ip])}
                       onChange={e => {
                         const checked = e.target.checked;
-                        const updated: Record<string, boolean> = { ...selectedIPs };
-                        displayedIps.forEach(entry => {
-                          if (checked) {
+                        const updated: Record<string, boolean> = {};
+                        if (checked) {
+                          ipList.forEach(entry => {
                             updated[entry.ip] = true;
-                          } else {
-                            delete updated[entry.ip];
-                          }
-                        });
+                          });
+                        }
                         setSelectedIPs(updated);
                       }}
                     />
@@ -800,15 +910,33 @@ export default function SecurityPage() {
                         <Badge variant="outline" className="text-slate-400">Disabled</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                       <Button 
+                    <TableCell className="text-right whitespace-nowrap">
+                      <div className="flex gap-1.5 justify-end">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="h-8 text-xs font-medium border-slate-300 hover:bg-slate-100 text-slate-700"
+                          onClick={() => setSelectedRuleForDetail(rule)}
+                        >
+                          View
+                        </Button>
+                        <Button 
                           size="sm" 
                           variant={rule.enabled ? "outline" : "default"}
-                          className={!rule.enabled ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                          className={`h-8 text-xs font-medium ${!rule.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
                           onClick={() => toggleRule(rule.id, rule.enabled)}
-                       >
-                         {rule.enabled ? "Disable" : "Enable"}
-                       </Button>
+                        >
+                          {rule.enabled ? "Disable" : "Enable"}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          className="h-8 text-xs font-medium"
+                          onClick={() => handleDeleteRule(rule.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -831,6 +959,14 @@ export default function SecurityPage() {
               <CardDescription>Recent suspicious activities and blocks.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-8 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white"
+                onClick={handleClearAllLogs}
+              >
+                Clear All Logs
+              </Button>
               <select
                 className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
                 value={statusFilter}
@@ -1042,6 +1178,152 @@ export default function SecurityPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Rule Details Dialog */}
+      <Dialog open={!!selectedRuleForDetail} onOpenChange={(open) => { if (!open) { setSelectedRuleForDetail(null); setIsEditingRule(false); } }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <ShieldAlert className="text-emerald-500 h-5 w-5" /> WAF Rule Profile
+            </DialogTitle>
+            <DialogDescription>
+              {isEditingRule ? "Modify rule settings and signature pattern." : "Technical specifications and signature pattern for this rule."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedRuleForDetail && (
+            isEditingRule ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-semibold mb-1 block text-slate-700">Description</label>
+                  <Input 
+                    value={editRuleDesc} 
+                    onChange={(e) => setEditRuleDesc(e.target.value)} 
+                    placeholder="e.g. Detect SQL comment bypass"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1 block text-slate-700">Regex Pattern</label>
+                  <Input 
+                    value={editRulePattern} 
+                    onChange={(e) => setEditRulePattern(e.target.value)} 
+                    placeholder="e.g. (?i)(select|union)"
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Must be a valid Go regex pattern.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1 block text-slate-700">Tags (comma separated)</label>
+                  <Input 
+                    value={editRuleTags} 
+                    onChange={(e) => setEditRuleTags(e.target.value)} 
+                    placeholder="e.g. sqli, bypass"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1 block text-slate-700">Impact Score (1-10)</label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    max="10" 
+                    value={editRuleImpact} 
+                    onChange={(e) => setEditRuleImpact(e.target.value)} 
+                  />
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleUpdateRule}>Save Changes</Button>
+                  <Button variant="outline" onClick={() => setIsEditingRule(false)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Rule ID</div>
+                    <div className="mt-1 font-mono text-sm text-slate-800">{selectedRuleForDetail.id}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</div>
+                    <div className="mt-1">
+                      {selectedRuleForDetail.enabled ? (
+                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">Active</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-slate-400">Disabled</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Impact Score</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">{selectedRuleForDetail.impact || '5'}/10</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tags</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {selectedRuleForDetail.tags && selectedRuleForDetail.tags.length > 0 ? (
+                        selectedRuleForDetail.tags.map((t: string) => (
+                          <Badge key={t} variant="outline" className="text-[10px] bg-slate-100">{t}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-slate-400 text-xs">-</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-semibold text-slate-700 mb-1.5">Description</div>
+                  <div className="text-sm text-slate-800 bg-white border border-slate-200 rounded p-3 leading-relaxed shadow-sm">
+                    {selectedRuleForDetail.description}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-semibold text-slate-700 mb-1.5">Regular Expression Pattern</div>
+                  <div className="bg-slate-950 text-emerald-400 p-4 rounded-md text-xs font-mono break-all max-h-[150px] overflow-y-auto border border-slate-800 shadow-inner">
+                    {selectedRuleForDetail.pattern}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    variant="outline"
+                    className="border-slate-300 text-slate-700 hover:bg-slate-100"
+                    onClick={() => {
+                      setEditRuleDesc(selectedRuleForDetail.description || "");
+                      setEditRulePattern(selectedRuleForDetail.pattern || "");
+                      setEditRuleTags((selectedRuleForDetail.tags || []).join(", "));
+                      setEditRuleImpact(selectedRuleForDetail.impact || "5");
+                      setIsEditingRule(true);
+                    }}
+                  >
+                    Edit Rule
+                  </Button>
+                  <Button 
+                    variant={selectedRuleForDetail.enabled ? "outline" : "default"} 
+                    className={!selectedRuleForDetail.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
+                    onClick={() => {
+                      toggleRule(selectedRuleForDetail.id, selectedRuleForDetail.enabled);
+                      setSelectedRuleForDetail((prev: any) => prev ? { ...prev, enabled: !prev.enabled } : null);
+                    }}
+                  >
+                    {selectedRuleForDetail.enabled ? "Disable" : "Enable"}
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => {
+                      handleDeleteRule(selectedRuleForDetail.id);
+                      setSelectedRuleForDetail(null);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                  <Button variant="secondary" onClick={() => setSelectedRuleForDetail(null)}>Close</Button>
+                </div>
+              </div>
+            )
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* IP Details Modal */}
       <Dialog open={!!selectedDetailIP} onOpenChange={(open) => !open && setSelectedDetailIP(null)}>

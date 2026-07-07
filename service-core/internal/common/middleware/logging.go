@@ -2,6 +2,7 @@ package appmiddleware
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	apperrors "service-core/internal/common/errors"
@@ -16,7 +17,7 @@ func Logging(log applogger.Logger) Middleware {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			requestID := uuid.NewString()
 			ctx := applogger.WithRequestID(r.Context(), requestID)
-			ctx = applogger.WithClientIP(ctx, r.RemoteAddr)
+			ctx = applogger.WithClientIP(ctx, apphttp.ClientIP(r))
 			r = r.WithContext(ctx)
 
 			w.Header().Set("X-Request-ID", requestID)
@@ -58,7 +59,10 @@ func Logging(log applogger.Logger) Middleware {
 				}
 
 			} else {
-				log.Info(r.Context(), "request success", fields...)
+				// Mute successful logs for admin polling /api/ and /health routes to keep the console clean
+				if !strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/health" {
+					log.Info(r.Context(), "request success", fields...)
+				}
 			}
 
 			return err

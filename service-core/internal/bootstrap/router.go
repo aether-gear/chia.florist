@@ -212,12 +212,14 @@ func NewRouter(c *Container) *chi.Mux {
 		auditHandler = auditH.NewAuditHandler(
 			&c.FindAuditLogs,
 			&c.GetAuditLog,
+			&c.DeleteAuditLogs,
 		)
 
 		secPolicyHandler = secPolicyH.NewSecurityPolicyHandler(
 			&c.ListRules,
 			&c.CreateRule,
 			&c.ToggleRule,
+			&c.UpdateRule,
 			&c.DeleteRule,
 			&c.GetIPConfig,
 			&c.UpdateIPAction,
@@ -384,13 +386,15 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/api/stats", func(r chi.Router) {
 			r.Get("/", chains.StaffAdminOnly(auditHandler.ListAuditLogs))
+			r.Delete("/", chains.StaffAdminOnly(auditHandler.DeleteAuditLogs))
 			r.Get("/{id}", chains.StaffAdminOnly(auditHandler.GetAuditLog))
+			r.Delete("/{id}", chains.StaffAdminOnly(auditHandler.DeleteAuditLogs))
 		})
 
 		r.Route("/api/rules", func(r chi.Router) {
 			r.Get("/", chains.StaffAdminOnly(secPolicyHandler.ListRules))
 			r.Post("/", chains.StaffAdminOnly(secPolicyHandler.CreateRule))
-			r.Put("/{id}", chains.StaffAdminOnly(secPolicyHandler.ToggleRule))
+			r.Put("/{id}", chains.StaffAdminOnly(secPolicyHandler.UpdateRule))
 			r.Delete("/{id}", chains.StaffAdminOnly(secPolicyHandler.DeleteRule))
 		})
 

@@ -26,6 +26,14 @@ type toggleRuleRequest struct {
 	Enabled bool `json:"enabled"`
 }
 
+type updateRuleRequest struct {
+	Description *string  `json:"description,omitempty"`
+	Pattern     *string  `json:"pattern,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Impact      *string  `json:"impact,omitempty"`
+	Enabled     *bool    `json:"enabled,omitempty"`
+}
+
 // --- IP Access Control ---
 
 type ipEntryResponse struct {

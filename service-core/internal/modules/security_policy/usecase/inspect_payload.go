@@ -43,9 +43,10 @@ type InspectPayloadInput struct {
 }
 
 type InspectionResult struct {
-	Blocked bool
-	Reason  string
-	RuleID  string
+	Blocked        bool
+	Reason         string
+	RuleID         string
+	MatchedPayload string
 }
 
 func (u *InspectPayloadUsecase) Execute(
@@ -162,9 +163,10 @@ func (u *InspectPayloadUsecase) Execute(
 	for _, kw := range filters.Keywords {
 		if strings.Contains(lowerPayload, strings.ToLower(kw)) {
 			return &InspectionResult{
-				Blocked: true,
-				Reason:  "Blocked by keyword: " + kw,
-				RuleID:  "KW-BLOCK",
+				Blocked:        true,
+				Reason:         "Blocked by keyword: " + kw,
+				RuleID:         "KW-BLOCK",
+				MatchedPayload: kw,
 			}, nil
 		}
 	}
@@ -183,10 +185,23 @@ func (u *InspectPayloadUsecase) Execute(
 
 		matched, _ := regexp.MatchString(rule.Pattern, lowerPayload)
 		if matched {
+			var matchedStr string
+			re, err := regexp.Compile(rule.Pattern)
+			if err == nil {
+				matchedStr = re.FindString(lowerPayload)
+			}
+			if matchedStr == "" {
+				matchedStr = lowerPayload
+			}
+			if len(matchedStr) > 500 {
+				matchedStr = matchedStr[:500] + "..."
+			}
+
 			return &InspectionResult{
-				Blocked: true,
-				Reason:  "Matched rule: " + rule.Description,
-				RuleID:  rule.ID,
+				Blocked:        true,
+				Reason:         "Matched rule: " + rule.Description,
+				RuleID:         rule.ID,
+				MatchedPayload: matchedStr,
 			}, nil
 		}
 	}

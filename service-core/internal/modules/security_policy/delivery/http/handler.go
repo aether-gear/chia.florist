@@ -15,6 +15,7 @@ type securityPolicyHandler struct {
 	listRules      *usecase.ListRulesUsecase
 	createRule     *usecase.CreateRuleUsecase
 	toggleRule     *usecase.ToggleRuleUsecase
+	updateRule     *usecase.UpdateRuleUsecase
 	deleteRule     *usecase.DeleteRuleUsecase
 	getIPConfig    *usecase.GetIPConfigUsecase
 	updateIPAction *usecase.UpdateIPActionUsecase
@@ -26,6 +27,7 @@ func NewSecurityPolicyHandler(
 	listRules *usecase.ListRulesUsecase,
 	createRule *usecase.CreateRuleUsecase,
 	toggleRule *usecase.ToggleRuleUsecase,
+	updateRule *usecase.UpdateRuleUsecase,
 	deleteRule *usecase.DeleteRuleUsecase,
 	getIPConfig *usecase.GetIPConfigUsecase,
 	updateIPAction *usecase.UpdateIPActionUsecase,
@@ -36,6 +38,7 @@ func NewSecurityPolicyHandler(
 		listRules:      listRules,
 		createRule:     createRule,
 		toggleRule:     toggleRule,
+		updateRule:     updateRule,
 		deleteRule:     deleteRule,
 		getIPConfig:    getIPConfig,
 		updateIPAction: updateIPAction,
@@ -91,28 +94,36 @@ func (h *securityPolicyHandler) CreateRule(w http.ResponseWriter, r *http.Reques
 	return nil
 }
 
-func (h *securityPolicyHandler) ToggleRule(w http.ResponseWriter, r *http.Request) error {
+func (h *securityPolicyHandler) UpdateRule(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		return apperrors.NewBadRequest("rule id is required")
 	}
 
-	var req toggleRuleRequest
+	var req updateRuleRequest
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	if err := h.toggleRule.Execute(r.Context(), usecase.ToggleRuleInput{
-		ID:      id,
-		Enabled: req.Enabled,
-	}); err != nil {
-		if err == domain.ErrRuleNotFound {
+	rule, err := h.updateRule.Execute(r.Context(), usecase.UpdateRuleInput{
+		ID:          id,
+		Description: req.Description,
+		Pattern:     req.Pattern,
+		Tags:        req.Tags,
+		Impact:      req.Impact,
+		Enabled:     req.Enabled,
+	})
+	if err != nil {
+		if err == domain.ErrInvalidPattern {
+			return apperrors.NewBadRequest("pattern is not a valid regular expression")
+		}
+		if err.Error() == "update waf rule: rule not found" {
 			return apperrors.NewNotFound("waf rule not found")
 		}
 		return err
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	apphttp.WriteJSON(w, http.StatusOK, toRuleResponse(*rule))
 	return nil
 }
 

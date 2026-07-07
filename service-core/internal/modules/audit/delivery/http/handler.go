@@ -13,17 +13,20 @@ import (
 )
 
 type auditHandler struct {
-	findAuditLogs *usecase.FindAuditLogsUsecase
-	getAuditLog   *usecase.GetAuditLogUsecase
+	findAuditLogs   *usecase.FindAuditLogsUsecase
+	getAuditLog     *usecase.GetAuditLogUsecase
+	deleteAuditLogs *usecase.DeleteAuditLogsUsecase
 }
 
 func NewAuditHandler(
 	findAuditLogs *usecase.FindAuditLogsUsecase,
 	getAuditLog *usecase.GetAuditLogUsecase,
+	deleteAuditLogs *usecase.DeleteAuditLogsUsecase,
 ) *auditHandler {
 	return &auditHandler{
-		findAuditLogs: findAuditLogs,
-		getAuditLog:   getAuditLog,
+		findAuditLogs:   findAuditLogs,
+		getAuditLog:     getAuditLog,
+		deleteAuditLogs: deleteAuditLogs,
 	}
 }
 
@@ -155,5 +158,55 @@ func (h *auditHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) error
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *auditHandler) DeleteAuditLogs(w http.ResponseWriter, r *http.Request) error {
+	idStr := chi.URLParam(r, "id")
+	var ids []uuid.UUID
+
+	if idStr != "" {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid audit log id")
+		}
+		ids = append(ids, id)
+	} else {
+		var body struct {
+			IDs []string `json:"ids"`
+			All bool     `json:"all"`
+		}
+		if err := apphttp.DecodeJSON(r, &body); err == nil {
+			if body.All {
+				input := usecase.DeleteAuditLogsInput{
+					DeleteAll: true,
+				}
+				if err := h.deleteAuditLogs.Execute(r.Context(), input); err != nil {
+					return err
+				}
+				apphttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+				return nil
+			}
+			for _, idS := range body.IDs {
+				if id, err := uuid.Parse(idS); err == nil {
+					ids = append(ids, id)
+				}
+			}
+		}
+	}
+
+	if len(ids) == 0 {
+		return apperrors.NewBadRequest("no valid audit log IDs provided for deletion")
+	}
+
+	input := usecase.DeleteAuditLogsInput{
+		IDs: ids,
+	}
+
+	if err := h.deleteAuditLogs.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 	return nil
 }
