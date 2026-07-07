@@ -217,3 +217,29 @@ func (r *accountRepositoryImpl) Create(
 
 	return nil
 }
+
+func (r *accountRepositoryImpl) UpdatePasswordByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+	hashedPassword string,
+) error {
+	query := `
+		UPDATE accounts
+		SET
+			password = $1,
+			updated_at = NOW()
+		WHERE user_id = $2
+	`
+
+	result, err := exec.Exec(ctx, query, hashedPassword, id)
+	if err != nil {
+		return fmt.Errorf("query to update account password: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return apperrors.NewNotFound(domain.ErrNotFoundAccount.Error())
+	}
+
+	return nil
+}

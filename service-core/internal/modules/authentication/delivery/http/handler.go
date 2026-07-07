@@ -22,15 +22,18 @@ import (
 )
 
 type authHandler struct {
-	me                *usecase.MeUsecase
-	logout            *usecase.LogoutUsecase
-	loginCustomer     *usecase.LoginCustomerUsecase
-	loginStaff        *usecase.LoginStaffUsecase
-	registerCustomer  *usecase.RegisterCustomerUsecase
-	verifyAccount     *usecase.VerifyAccountUsecase
-	getAccount        *usecase.GetAccountUsecase
-	authenticateOAuth *usecase.AuthenticateOAuthUsecase
-	googleCfg         appconfig.GoogleOAuthConfig
+	me                   *usecase.MeUsecase
+	logout               *usecase.LogoutUsecase
+	loginCustomer        *usecase.LoginCustomerUsecase
+	loginStaff           *usecase.LoginStaffUsecase
+	registerCustomer     *usecase.RegisterCustomerUsecase
+	verifyAccount        *usecase.VerifyAccountUsecase
+	getAccount           *usecase.GetAccountUsecase
+	authenticateOAuth    *usecase.AuthenticateOAuthUsecase
+	requestPasswordReset *usecase.RequestPasswordResetUsecase
+	verifyPasswordReset  *usecase.VerifyPasswordResetUsecase
+	resetPassword        *usecase.ResetPasswordUsecase
+	googleCfg            appconfig.GoogleOAuthConfig
 }
 
 func NewAuthHandler(
@@ -42,18 +45,24 @@ func NewAuthHandler(
 	verifyAccount *usecase.VerifyAccountUsecase,
 	getAccount *usecase.GetAccountUsecase,
 	authenticateOAuth *usecase.AuthenticateOAuthUsecase,
+	requestPasswordReset *usecase.RequestPasswordResetUsecase,
+	verifyPasswordReset *usecase.VerifyPasswordResetUsecase,
+	resetPassword *usecase.ResetPasswordUsecase,
 	googleCfg appconfig.GoogleOAuthConfig,
 ) *authHandler {
 	return &authHandler{
-		me:                me,
-		logout:            logout,
-		loginCustomer:     loginCustomer,
-		loginStaff:        loginStaff,
-		registerCustomer:  registerCustomer,
-		verifyAccount:     verifyAccount,
-		getAccount:        getAccount,
-		authenticateOAuth: authenticateOAuth,
-		googleCfg:         googleCfg,
+		me:                   me,
+		logout:               logout,
+		loginCustomer:        loginCustomer,
+		loginStaff:           loginStaff,
+		registerCustomer:     registerCustomer,
+		verifyAccount:        verifyAccount,
+		getAccount:           getAccount,
+		authenticateOAuth:    authenticateOAuth,
+		requestPasswordReset: requestPasswordReset,
+		verifyPasswordReset:  verifyPasswordReset,
+		resetPassword:        resetPassword,
+		googleCfg:            googleCfg,
 	}
 }
 
@@ -483,5 +492,137 @@ func (h *authHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) err
 		successRedirectURL = "/"
 	}
 	http.Redirect(w, r, successRedirectURL, http.StatusTemporaryRedirect)
+	return nil
+}
+
+func (h *authHandler) ForgotPasswordCustomer(w http.ResponseWriter, r *http.Request) error {
+	var req forgotPasswordCustomerRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+	if req.Email == "" {
+		return apperrors.NewBadRequest("email is required")
+	}
+
+	input := usecase.RequestPasswordResetParams{
+		Email:       req.Email,
+		AccountType: authdomain.AccountTypeCustomer,
+	}
+
+	challengeID, err := h.requestPasswordReset.
+		Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := forgotPasswordResponse{
+		Message:     "if the email is registered you will receive a reset code shortly",
+		ChallengeID: challengeID,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) ForgotPasswordStaff(w http.ResponseWriter, r *http.Request) error {
+	var req forgotPasswordCustomerRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+	if req.Email == "" {
+		return apperrors.NewBadRequest("email is required")
+	}
+
+	input := usecase.RequestPasswordResetParams{
+		Email:       req.Email,
+		AccountType: authdomain.AccountTypeStaff,
+	}
+
+	challengeID, err := h.requestPasswordReset.
+		Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := forgotPasswordResponse{
+		Message:     "if the email is registered you will receive a reset code shortly",
+		ChallengeID: challengeID,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) VerifyPasswordReset(w http.ResponseWriter, r *http.Request) error {
+	var req verifyPasswordResetRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+	if req.ChallengeID == "" {
+		return apperrors.NewBadRequest("challenge_id is required")
+	}
+	challengeID, err := uuid.Parse(req.ChallengeID)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid challenge_id")
+	}
+	if len(req.OTP) != 6 {
+		return apperrors.NewBadRequest("invalid otp")
+	}
+
+	input := usecase.VerifyPasswordResetParams{
+		ChallengeID: challengeID,
+		OTP:         req.OTP,
+	}
+
+	verifiedID, err := h.verifyPasswordReset.
+		Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := verifyPasswordResetResponse{
+		Message:     "otp verified",
+		ChallengeID: *verifiedID,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) ResetPassword(w http.ResponseWriter, r *http.Request) error {
+	var req resetPasswordRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+	if req.ChallengeID == "" {
+		return apperrors.NewBadRequest("challenge_id is required")
+	}
+	challengeID, err := uuid.Parse(req.ChallengeID)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid challenge_id")
+	}
+	if req.NewPassword == "" {
+		return apperrors.NewBadRequest("new_password is required")
+	}
+
+	input := usecase.ResetPasswordParams{
+		ChallengeID: challengeID,
+		NewPassword: req.NewPassword,
+	}
+
+	if err := h.resetPassword.
+		Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "password reset successful",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
