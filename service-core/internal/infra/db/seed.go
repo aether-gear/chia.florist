@@ -21,5 +21,10 @@ func RunSeed(conn *Connection) error {
 	}
 	log.Printf("database: couriers seeded")
 
+	if err := seeds.SeedWafRules(ctx, conn.Pool); err != nil {
+		return fmt.Errorf("seed waf rules: %w", err)
+	}
+	log.Printf("database: waf rules seeded")
+
 	return nil
 }

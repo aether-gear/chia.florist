@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"service-core/internal/shared/config"
 
@@ -16,11 +15,6 @@ func RunMigration(cfg config.DatabaseConfig) error {
 	log.Printf("database: running migration")
 
 	dsn := *cfg.DSN
-	if strings.Contains(dsn, "?") {
-		dsn += "&x-no-lock=true"
-	} else {
-		dsn += "?x-no-lock=true"
-	}
 
 	m, err := migrate.New(
 		"file://migrations",
