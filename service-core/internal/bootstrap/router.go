@@ -138,6 +138,9 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.VerifyAccount,
 			&c.GetAccount,
 			&c.AuthenticateOAuth,
+			&c.RequestPasswordReset,
+			&c.VerifyPasswordReset,
+			&c.ResetPassword,
 			c.GoogleOAuth,
 		)
 
@@ -254,6 +257,12 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Post("/staff/signin", chains.Core(authHandler.SignInStaffEmail))
 			r.Post("/signup", chains.Core(authHandler.SignUpAccount))
 			r.Post("/verify", chains.Core(authHandler.VerifyAccount))
+
+			r.Post("/forgot-password", chains.Core(authHandler.ForgotPasswordCustomer))
+			r.Post("/staff/forgot-password", chains.Core(authHandler.ForgotPasswordStaff))
+			r.Post("/forgot-password/verify", chains.Core(authHandler.VerifyPasswordReset))
+			r.Post("/forgot-password/reset", chains.Core(authHandler.ResetPassword))
+
 			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
 			r.Get("/me", chains.CoreAuth(authHandler.Me))
 

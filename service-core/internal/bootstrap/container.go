@@ -73,14 +73,17 @@ type Container struct {
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
-	Me                authenUsecase.MeUsecase
-	LoginCustomer     authenUsecase.LoginCustomerUsecase
-	LoginStaff        authenUsecase.LoginStaffUsecase
-	RegisterCustomer  authenUsecase.RegisterCustomerUsecase
-	VerifyAccount     authenUsecase.VerifyAccountUsecase
-	GetAccount        authenUsecase.GetAccountUsecase
-	Logout            authenUsecase.LogoutUsecase
-	AuthenticateOAuth authenUsecase.AuthenticateOAuthUsecase
+	Me                   authenUsecase.MeUsecase
+	LoginCustomer        authenUsecase.LoginCustomerUsecase
+	LoginStaff           authenUsecase.LoginStaffUsecase
+	RegisterCustomer     authenUsecase.RegisterCustomerUsecase
+	VerifyAccount        authenUsecase.VerifyAccountUsecase
+	GetAccount           authenUsecase.GetAccountUsecase
+	Logout               authenUsecase.LogoutUsecase
+	AuthenticateOAuth    authenUsecase.AuthenticateOAuthUsecase
+	RequestPasswordReset authenUsecase.RequestPasswordResetUsecase
+	VerifyPasswordReset  authenUsecase.VerifyPasswordResetUsecase
+	ResetPassword        authenUsecase.ResetPasswordUsecase
 
 	FindStaff       staffUsecase.FindStaffUsecase
 	CreateStaff     staffUsecase.CreateStaffUsecase
@@ -393,19 +396,48 @@ func NewContainer(cfg Config,
 				accountRepo,
 				infra.TransactionExecutor,
 			),
-		AuthenticateOAuth: *authenUsecase.NewAuthenticateOAuthUsecase(
-			infra.TransactionExecutor,
-			infra.TransactionProvider,
-			accountRepo,
-			oauthRepo,
-			userRepo,
-			customerRepo,
-			tokenHasher,
-			tokenSvc,
-			sessionRepo,
-			refreshTokenRepo,
-			auditLogger,
-		),
+		AuthenticateOAuth: *authenUsecase.
+			NewAuthenticateOAuthUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				accountRepo,
+				oauthRepo,
+				userRepo,
+				customerRepo,
+				tokenHasher,
+				tokenSvc,
+				sessionRepo,
+				refreshTokenRepo,
+				auditLogger,
+			),
+		RequestPasswordReset: *authenUsecase.
+			NewRequestPasswordResetUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				accountRepo,
+				challengeRepo,
+				pwHasher,
+				otpGen,
+				mailSender,
+				auditLogger,
+			),
+		VerifyPasswordReset: *authenUsecase.
+			NewVerifyPasswordResetUsecase(
+				infra.TransactionExecutor,
+				challengeRepo,
+				pwHasher,
+				auditLogger,
+			),
+		ResetPassword: *authenUsecase.
+			NewResetPasswordUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				accountRepo,
+				sessionRepo,
+				challengeRepo,
+				pwHasher,
+				auditLogger,
+			),
 
 		GetCart: *cartUsecase.
 			NewGetCartUsecase(

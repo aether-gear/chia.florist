@@ -54,3 +54,27 @@ type meResponse struct {
 	Roles       []roleResponse       `json:"roles,omitempty"`
 	Permissions []permissionResponse `json:"permissions,omitempty"`
 }
+
+type forgotPasswordCustomerRequest struct {
+	Email string `json:"email"`
+}
+
+type forgotPasswordResponse struct {
+	Message     string     `json:"message"`
+	ChallengeID *uuid.UUID `json:"challenge_id,omitempty"`
+}
+
+type verifyPasswordResetRequest struct {
+	ChallengeID string `json:"challenge_id"`
+	OTP         string `json:"otp"`
+}
+
+type verifyPasswordResetResponse struct {
+	Message     string    `json:"message"`
+	ChallengeID uuid.UUID `json:"challenge_id"`
+}
+
+type resetPasswordRequest struct {
+	ChallengeID string `json:"challenge_id"`
+	NewPassword string `json:"new_password"`
+}
