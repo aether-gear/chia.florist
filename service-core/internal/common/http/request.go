@@ -14,11 +14,17 @@ func DecodeJSON(r *http.Request, v any) error {
 
 func ClientIP(r *http.Request) string {
 	var ipVal string
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		parts := strings.Split(ip, ",")
-		ipVal = strings.TrimSpace(parts[0])
-	} else if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		ipVal = ip
+
+	xff := r.Header.Get("X-Forwarded-For")
+	realIP := strings.TrimSpace(r.Header.Get("X-Real-IP"))
+
+	if xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			xff = xff[:i]
+		}
+		ipVal = strings.TrimSpace(xff)
+	} else if realIP != "" {
+		ipVal = realIP
 	} else {
 		ipVal = r.RemoteAddr
 	}

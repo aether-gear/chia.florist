@@ -1,6 +1,9 @@
 package bootstrap
 
 import (
+	"time"
+
+	applimiter "service-core/internal/common/limiter"
 	applogger "service-core/internal/common/logger"
 
 	appconfig "service-core/internal/shared/config"
@@ -134,6 +137,7 @@ type Container struct {
 	DeleteAuditLogs auditUsecase.DeleteAuditLogsUsecase
 
 	WAFAutoBanEnabled bool
+	Limiter           applimiter.Limiter
 	ListRules         secPolicyUsecase.ListRulesUsecase
 	CreateRule        secPolicyUsecase.CreateRuleUsecase
 	ToggleRule        secPolicyUsecase.ToggleRuleUsecase
@@ -661,6 +665,7 @@ func NewContainer(cfg Config,
 		),
 
 		WAFAutoBanEnabled: cfg.WAF.AutoBanEnabled,
+		Limiter:           applimiter.NewInMemorySlidingWindowLimiter(10*time.Second, 30),
 		ListRules: *secPolicyUsecase.NewListRulesUsecase(
 			infra.TransactionExecutor,
 			secPolicyRepo,

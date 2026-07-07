@@ -19,3 +19,8 @@ type auditLogResponse struct {
 	Metadata   map[string]any `json:"metadata,omitempty"`
 	CreatedAt  time.Time      `json:"created_at"`
 }
+
+type deleteAuditLogsRequest struct {
+	IDs []uuid.UUID `json:"ids"`
+	All bool        `json:"all"`
+}

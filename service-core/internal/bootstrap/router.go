@@ -55,6 +55,8 @@ func NewRouteChains(c *Container) *RouteChains {
 				&c.InspectPayload,
 				&c.UpdateIPAction,
 				c.AuditLogger,
+				c.Limiter,
+				c.Logger,
 				c.WAFAutoBanEnabled,
 			),
 		}

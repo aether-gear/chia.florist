@@ -59,7 +59,8 @@ func Logging(log applogger.Logger) Middleware {
 				}
 
 			} else {
-				// Mute successful logs for admin polling /api/ and /health routes to keep the console clean
+				// Mute successful logs for admin polling
+				// api audit and health routes to keep the console clean
 				if !strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/health" {
 					log.Info(r.Context(), "request success", fields...)
 				}

@@ -3,52 +3,17 @@ package appmiddleware
 import (
 	"bytes"
 	"io"
-	"log"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
+	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	applimiter "service-core/internal/common/limiter"
 	applogger "service-core/internal/common/logger"
 	secPolicyUsecase "service-core/internal/modules/security_policy/usecase"
 )
 
-var (
-	requestMu  sync.Mutex
-	ipRequests = make(map[string][]time.Time)
-)
-
-const (
-	rateLimitWindow = 10 * time.Second
-	rateLimitMax    = 30 // Max 30 requests per 10 seconds
-)
-
-func isRateLimited(ip string) bool {
-	requestMu.Lock()
-	defer requestMu.Unlock()
-
-	now := time.Now()
-	cutoff := now.Add(-rateLimitWindow)
-
-	// Clean up old timestamps
-	times := ipRequests[ip]
-	var validTimes []time.Time
-	for _, t := range times {
-		if t.After(cutoff) {
-			validTimes = append(validTimes, t)
-		}
-	}
-
-	if len(validTimes) >= rateLimitMax {
-		ipRequests[ip] = validTimes
-		return true
-	}
-
-	validTimes = append(validTimes, now)
-	ipRequests[ip] = validTimes
-	return false
-}
+// Rate limiting is handled via the injected limiter.Limiter dependency.
 
 // WAF returns a middleware that inspects every incoming
 // request against the configured WAF rules,
@@ -61,6 +26,8 @@ func WAF(
 	inspectPayload *secPolicyUsecase.InspectPayloadUsecase,
 	updateIPAction *secPolicyUsecase.UpdateIPActionUsecase,
 	auditLogger applogger.AuditLogger,
+	rateLimiter applimiter.Limiter,
+	logger applogger.Logger,
 	autoBanEnabled bool,
 ) Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
@@ -70,37 +37,38 @@ func WAF(
 			}
 
 			ip := apphttp.ClientIP(r)
+			if !rateLimiter.Allow(ip) {
+				logger.Warn(r.Context(), "WAF Rate Limit Blocked",
+					applogger.Field{Key: "ip", Value: ip},
+					applogger.Field{Key: "path", Value: r.URL.Path},
+				)
 
-			if isRateLimited(ip) {
-				log.Printf("⚠️  [WAF Rate Limit Blocked] IP: %s | Path: %s\n", ip, r.URL.Path)
 				if autoBanEnabled && !isLocalhost(ip) {
-					_ = updateIPAction.Execute(
-						r.Context(),
-						secPolicyUsecase.UpdateIPActionInput{
-							IP:     ip,
-							Action: "ban",
-							Reason: "Auto-Banned: Rate limit exceeded (Spam)",
-						},
-					)
+					input := secPolicyUsecase.UpdateIPActionInput{
+						IP:     ip,
+						Action: "ban",
+						Reason: "Auto-Banned: Rate limit exceeded (Spam)",
+					}
+
+					_ = updateIPAction.Execute(r.Context(), input)
 				}
 
-				auditLogger.Log(r.Context(), applogger.AuditEvent{
-					Category: "waf_event",
-					Action:   "rate_limit_exceeded",
-					Resource: "request",
-					Outcome:  applogger.OutcomeBlocked,
-					Metadata: map[string]any{
-						"path":   r.URL.Path,
-						"ip":     ip,
-						"reason": "Rate limit exceeded (max 30 reqs/10s)",
+				auditLogger.Log(
+					r.Context(),
+					applogger.AuditEvent{
+						Category: "waf_event",
+						Action:   "rate_limit_exceeded",
+						Resource: "request",
+						Outcome:  applogger.OutcomeBlocked,
+						Metadata: map[string]any{
+							"path":   r.URL.Path,
+							"ip":     ip,
+							"reason": "Rate limit exceeded (max 30 reqs/10s)",
+						},
 					},
-				})
+				)
 
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusTooManyRequests)
-				_, _ = w.Write([]byte(`{"error":"429 Too Many Requests - WAF Rate Limited"}`))
-
-				return nil
+				return apperrors.NewTooManyRequests(apperrors.ErrTooManyRequests.Error())
 			}
 
 			// Read and restore the request body
@@ -124,17 +92,15 @@ func WAF(
 				"Cookie":     r.Header.Get("Cookie"),
 			}
 
-			result, err := inspectPayload.
-				Execute(
-					r.Context(),
-					secPolicyUsecase.InspectPayloadInput{
-						ClientIP: ip,
-						Path:     r.URL.Path,
-						RawQuery: r.URL.RawQuery,
-						Headers:  headers,
-						Body:     bodyBytes,
-					},
-				)
+			input := secPolicyUsecase.InspectPayloadInput{
+				ClientIP: ip,
+				Path:     r.URL.Path,
+				RawQuery: r.URL.RawQuery,
+				Headers:  headers,
+				Body:     bodyBytes,
+			}
+
+			result, err := inspectPayload.Execute(r.Context(), input)
 			if err != nil {
 				// On an inspection error, system will allow the request
 				// to pass through rather than blocking legitimate traffic
@@ -158,7 +124,13 @@ func WAF(
 			}
 
 			if result.Blocked {
-				log.Printf("🛡️  [WAF Payload Blocked] IP: %s | Rule: %s | Reason: %s | Matched: %s\n", ip, result.RuleID, result.Reason, result.MatchedPayload)
+				logger.Warn(r.Context(), "WAF Payload Blocked",
+					applogger.Field{Key: "ip", Value: ip},
+					applogger.Field{Key: "rule_id", Value: result.RuleID},
+					applogger.Field{Key: "reason", Value: result.Reason},
+					applogger.Field{Key: "matched_payload", Value: result.MatchedPayload},
+				)
+
 				if autoBanEnabled &&
 					!isLocalhost(ip) {
 					_ = updateIPAction.Execute(
@@ -187,28 +159,21 @@ func WAF(
 					},
 				})
 
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write([]byte(`{"error":"403 Forbidden - WAF Blocked Request"}`))
-
-				return nil
+				return apperrors.NewForbidden("request bocked")
 			}
 
-			auditLogger.Log(
-				r.Context(),
-				applogger.AuditEvent{
-					Category: "waf_event",
-					Action:   "request_allowed",
-					Resource: "request",
-					Outcome:  applogger.OutcomeSuccess,
-					Metadata: map[string]any{
-						"path":       r.URL.RequestURI(),
-						"ip":         ip,
-						"method":     r.Method,
-						"user_agent": r.UserAgent(),
-					},
+			auditLogger.Log(r.Context(), applogger.AuditEvent{
+				Category: "waf_event",
+				Action:   "request_allowed",
+				Resource: "request",
+				Outcome:  applogger.OutcomeSuccess,
+				Metadata: map[string]any{
+					"path":       r.URL.RequestURI(),
+					"ip":         ip,
+					"method":     r.Method,
+					"user_agent": r.UserAgent(),
 				},
-			)
+			})
 
 			return next(w, r)
 		}
