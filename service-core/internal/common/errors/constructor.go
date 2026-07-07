@@ -46,6 +46,10 @@ func NewMethodNotAllowed(msg string) *AppError {
 	return newAppError(ErrTypeMethodNotAllowed, msg, 405, applogger.LogLevelWarn, nil)
 }
 
+func NewTooManyRequests(msg string) *AppError {
+	return newAppError(ErrTypeTooManyRequests, msg, 429, applogger.LogLevelWarn, nil)
+}
+
 func NewInternal(err error) *AppError {
 	return newAppError(ErrTypeInternal, "internal server error", 500, applogger.LogLevelError, err)
 }

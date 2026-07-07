@@ -16,6 +16,7 @@ const (
 	ErrTypeForbidden        ErrorType = "FORBIDDEN"
 	ErrTypeConflict         ErrorType = "CONFLICT"
 	ErrTypeMethodNotAllowed ErrorType = "METHOD_NOT_ALLOWED"
+	ErrTypeTooManyRequests  ErrorType = "TOO_MANY_REQUESTS"
 	ErrTypeInternal         ErrorType = "INTERNAL_ERROR"
 )
 
@@ -27,6 +28,7 @@ var (
 	ErrForbidden        = errors.New("forbidden")
 	ErrConflict         = errors.New("conflict")
 	ErrMethodNotAllowed = errors.New("method not allowed")
+	ErrTooManyRequests  = errors.New("too many request")
 	ErrInternal         = errors.New("internal server error")
 )
 
