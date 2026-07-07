@@ -11,6 +11,9 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [X] Verify Account
     - [X] Sign In
     - [ ] Google Sign In
+    - [ ] Forgot Password
+    - [ ] Verify Forgot Password
+    - [ ] Reset Password
   - [X] Products
     - [X] Find Products
     - [X] Get Product Detail
@@ -169,6 +172,100 @@ No authentication is required for these endpoints.
   ```json
   { "message": "login success" }
   ```
+
+### Forgot Password
+
+- **Method**: `POST`
+- **Endpoint**: `/forgot-password`
+- **Description**: Create session for forgot password on account based on input email.
+- **Authentication**: None
+- **Request Body**:
+  ```json
+  {
+    "email": "string (required)",
+  }
+  ```
+
+#### Response `200 OK`
+
+- **Body**:
+  ```json
+  {
+    "message": "if the email is registered you will receive a reset code shortly",
+    "challenge_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" // can be null
+  }
+  ```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `email` is missing or empty. |
+| `403 Forbidden`    | The email is not registered or type account missmatch. |
+
+### Verify Forgot Password
+
+- **Method**: `POST`
+- **Endpoint**: `/forgot-password/verify`
+- **Description**: Verify the forgot password challenge based on the challenge ID and reset code.
+- **Authentication**: None
+- **Request Body**:
+  ```json
+  {
+    "challenge_id": "string (required)",
+    "otp":          "string (required)"
+  }
+  ```
+
+#### Response `200 OK`
+
+- **Body**:
+  ```json
+  {
+    "message": "otp verified",
+    "challenge_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+  ```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `challenge_id` or `otp` is missing or empty. |
+| `404 Not Found`    | The challenge ID is not registered or type account missmatch. |
+| `409 Conflict`    | The session purpose is not reset the password, already consumed, already verified, or already expired. |
+
+### Reset Password
+
+- **Method**: `POST`
+- **Endpoint**: `/forgot-password/reset`
+- **Description**: Reset the password based on the challenge ID.
+- **Authentication**: None
+- **Request Body**:
+  ```json
+  {
+    "challenge_id": "string (required)",
+    "new_password": "string (required)"
+  }
+  ```
+
+#### Response `200 OK`
+
+- **Body**:
+  ```json
+  {
+    "message": "password reset successful",
+  }
+  ```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `challenge_id` or `new_password` is missing or empty. |
+| `403 Forbidden`    | The challenge is not verified or the session purpose is not reset the password. |
+| `404 Not Found`    | The challenge ID is not registered or the challenge purpose is invalid. |
+| `409 Conflict`     | The challenge is already consumed, already verified, or already expired. |
 
 ## Products
 
