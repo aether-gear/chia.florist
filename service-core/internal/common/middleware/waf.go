@@ -123,6 +123,15 @@ func WAF(
 				return next(w, r)
 			}
 
+			if result.Silent {
+				if result.Blocked {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte("403 Forbidden - IP blocked manually (Silent)"))
+					return nil
+				}
+				return next(w, r)
+			}
+
 			if result.Blocked {
 				logger.Warn(r.Context(), "WAF Payload Blocked",
 					applogger.Field{Key: "ip", Value: ip},

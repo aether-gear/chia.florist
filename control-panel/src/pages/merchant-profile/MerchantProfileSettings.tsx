@@ -64,7 +64,7 @@ export default function MerchantProfileSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Profile Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Profile Settings</h1>
         <p className="text-muted-foreground">Manage your staff account information.</p>
       </div>
 
@@ -90,14 +90,14 @@ export default function MerchantProfileSettings() {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">{profile?.Name}</h3>
+                  <h3 className="font-medium text-slate-900 dark:text-slate-100">{profile?.Name}</h3>
                   <p className="text-sm text-gray-500">@{profile?.Username}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="username">Username (Read-Only)</Label>
-                <Input id="username" value={profile?.Username || ''} disabled className="bg-gray-50" />
+                <Input id="username" value={profile?.Username || ''} disabled className="bg-gray-50 dark:bg-slate-900/50 dark:border-slate-800" />
               </div>
 
               <div className="space-y-2">
@@ -145,21 +145,21 @@ export default function MerchantProfileSettings() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium text-gray-500">Staff ID</p>
-              <p className="text-sm text-gray-900">{profile?.staff_id}</p>
+              <p className="text-sm text-slate-900 dark:text-slate-200">{profile?.staff_id}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">User ID</p>
-              <p className="text-sm text-gray-900">{profile?.user_id}</p>
+              <p className="text-sm text-slate-900 dark:text-slate-200">{profile?.user_id}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Account Created</p>
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-slate-900 dark:text-slate-200">
                 {profile?.CreatedAt ? new Date(profile.CreatedAt).toLocaleString() : 'N/A'}
               </p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Last Login</p>
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-slate-900 dark:text-slate-200">
                 {profile?.LastLoginAt ? new Date(profile.LastLoginAt).toLocaleString() : 'Current Session'}
               </p>
             </div>

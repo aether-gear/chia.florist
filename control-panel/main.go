@@ -297,8 +297,18 @@ func WAFMiddleware(next http.Handler) http.Handler {
 
 		ipMutex.RLock()
 		isWhite := whitelistedIPs[ip]
+		isIgnore := ignoredIPs[ip]
 		banReason, isBan := blockedIPs[ip]
 		ipMutex.RUnlock()
+
+		if isIgnore {
+			if isBan {
+				http.Error(w, "403 Forbidden - IP Banned manually (Silent)", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		if isWhite {
 			next.ServeHTTP(w, r)
@@ -668,19 +678,50 @@ func handleIPAction(w http.ResponseWriter, r *http.Request) {
 			Status string `json:"status"`
 			Reason string `json:"reason,omitempty"`
 		}
-		list := []IPEntry{} // Initialize as empty slice for valid JSON []
-
+		type TempEntry struct {
+			Reason   string
+			IsBan    bool
+			IsWhite  bool
+			IsIgnore bool
+		}
+		uniqueIPs := make(map[string]TempEntry)
 		for ip, reason := range blockedIPs {
-			list = append(list, IPEntry{IP: ip, Status: "Banned", Reason: reason})
+			uniqueIPs[ip] = TempEntry{Reason: reason, IsBan: true}
 		}
 		for ip := range whitelistedIPs {
-			list = append(list, IPEntry{IP: ip, Status: "Whitelisted"})
+			e := uniqueIPs[ip]
+			e.IsWhite = true
+			uniqueIPs[ip] = e
 		}
 		for ip := range ignoredIPs {
-			list = append(list, IPEntry{IP: ip, Status: "Ignored"})
+			e := uniqueIPs[ip]
+			e.IsIgnore = true
+			uniqueIPs[ip] = e
 		}
 
-		json.NewEncoder(w).Encode(list)
+		list := []IPEntry{}
+		for ip, e := range uniqueIPs {
+			status := "Ignored"
+			if e.IsBan {
+				if e.IsIgnore {
+					status = "banned_muted"
+				} else {
+					status = "Banned"
+				}
+			} else if e.IsWhite {
+				if e.IsIgnore {
+					status = "whitelisted_muted"
+				} else {
+					status = "Whitelisted"
+				}
+			}
+			list = append(list, IPEntry{IP: ip, Status: status, Reason: e.Reason})
+		}
+
+		type IPConfigResponse struct {
+			Entries []IPEntry `json:"entries"`
+		}
+		json.NewEncoder(w).Encode(IPConfigResponse{Entries: list})
 		return
 	}
 
@@ -710,6 +751,12 @@ func handleIPAction(w http.ResponseWriter, r *http.Request) {
 		case "whitelist":
 			whitelistedIPs[req.IP] = true
 		case "ignore":
+			ignoredIPs[req.IP] = true
+		case "banned_muted":
+			blockedIPs[req.IP] = req.Reason
+			ignoredIPs[req.IP] = true
+		case "whitelisted_muted":
+			whitelistedIPs[req.IP] = true
 			ignoredIPs[req.IP] = true
 		}
 
@@ -794,10 +841,10 @@ func handleGeoIP(w http.ResponseWriter, r *http.Request) {
 	apiKey := r.URL.Query().Get("key")
 
 	if apiKey == "" {
-		apiKey = "YOUR_FREE_KEY"
+		apiKey = "863EE843FB581979DB85BE72BE0CFD14"
 	}
 
-	resp, err := http.Get(fmt.Sprintf("https://api.ip2geoapi.com/ip/%s?key=%s&format=json", ip, apiKey))
+	resp, err := http.Get(fmt.Sprintf("https://api.ip2location.io/?ip=%s&key=%s", ip, apiKey))
 	if err != nil {
 		http.Error(w, "Geo API Error", http.StatusInternalServerError)
 		return

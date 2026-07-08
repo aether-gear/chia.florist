@@ -8,6 +8,8 @@ const (
 	IPStatusBanned      IPStatus = "banned"
 	IPStatusWhitelisted IPStatus = "whitelisted"
 	IPStatusIgnored     IPStatus = "ignored"
+	IPStatusBannedMuted      IPStatus = "banned_muted"
+	IPStatusWhitelistedMuted IPStatus = "whitelisted_muted"
 )
 
 // IPRecord associates a single IP address

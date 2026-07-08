@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown, History } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown, History, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
@@ -57,6 +58,27 @@ const allNavigation = navigationGroups.flatMap(g => g.items);
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem("dark_mode") === "true";
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const newValue = !prev;
+      localStorage.setItem("dark_mode", String(newValue));
+      return newValue;
+    });
+  };
+
   const { data: authData, isAdmin } = useAuthMeViewModel();
 
   const visibleNavigation = allNavigation.filter(n => isAdmin || !n.adminOnly);
@@ -136,30 +158,44 @@ export default function DashboardLayout() {
         </nav>
       </div>
       <div className="p-4 border-t border-slate-800">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <div className={`h-8 w-8 rounded-full flex items-center justify-center text-white font-bold text-xs uppercase ${isAdmin ? 'bg-amber-600' : 'bg-slate-700'}`}>
-              {isAdmin ? '★' : (authData?.account_type ? authData.account_type.substring(0, 2) : 'U')}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center min-w-0">
+            <div className="flex-shrink-0">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-white font-bold text-xs uppercase ${isAdmin ? 'bg-amber-600' : 'bg-slate-700'}`}>
+                {isAdmin ? '★' : (authData?.account_type ? authData.account_type.substring(0, 2) : 'U')}
+              </div>
+            </div>
+            <div className="ml-3 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {userEmail || (authData ? authData.account_type : 'Loading...')}
+              </p>
+              <p className="text-xs font-medium text-slate-400">
+                {isAdmin ? 'Administrator' : (authData?.roles[0]?.name || 'Merchant')}
+              </p>
             </div>
           </div>
-          <div className="ml-3 min-w-0">
-            <p className="text-sm font-medium text-white truncate">
-              {userEmail || (authData ? authData.account_type : 'Loading...')}
-            </p>
-            <p className="text-xs font-medium text-slate-400">
-              {isAdmin ? 'Administrator' : (authData?.roles[0]?.name || 'Merchant')}
-            </p>
-          </div>
+          {/* Dark Mode Toggle Button */}
+          <button
+            onClick={toggleDarkMode}
+            className="ml-2 p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none"
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? (
+              <Sun className="h-4 w-4 text-amber-400" />
+            ) : (
+              <Moon className="h-4 w-4 text-indigo-400" />
+            )}
+          </button>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen flex">
       {/* Mobile sidebar */}
       <Sheet>
-        <div className="lg:hidden flex items-center p-4 border-b bg-white w-full fixed top-0 z-10 h-16">
+        <div className={`lg:hidden flex items-center p-4 border-b w-full fixed top-0 z-10 h-16 transition-colors duration-300 ${isDarkMode ? 'dark bg-card border-border text-card-foreground' : 'bg-white border-slate-200 text-slate-800'}`}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="-ml-2">
               <Menu className="h-6 w-6" />
@@ -179,13 +215,13 @@ export default function DashboardLayout() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 lg:pl-64 flex flex-col pt-16 lg:pt-0 min-w-0">
-        <header className="hidden lg:flex h-16 flex-shrink-0 items-center justify-between border-b bg-white px-8">
-          <h1 className="text-xl font-semibold text-slate-800">
+      <div className={`flex-1 lg:pl-64 flex flex-col pt-16 lg:pt-0 min-w-0 transition-colors duration-300 ${isDarkMode ? 'dark bg-background text-foreground' : 'bg-slate-50 text-slate-800'}`}>
+        <header className={`hidden lg:flex h-16 flex-shrink-0 items-center justify-between border-b px-8 transition-colors duration-300 ${isDarkMode ? 'bg-card border-border text-card-foreground' : 'bg-white border-slate-200 text-slate-800'}`}>
+          <h1 className="text-xl font-semibold">
             {visibleNavigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
           </h1>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+            <Button variant="outline" size="sm" onClick={handleLogout} className={isDarkMode ? 'border-border text-card-foreground hover:bg-slate-800' : ''}>
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
             </Button>
