@@ -48,6 +48,7 @@ func (u *UpdateIPActionUsecase) Execute(ctx context.Context, input UpdateIPActio
 		record := domain.IPRecord{
 			IP:     input.IP,
 			Status: domain.IPStatusWhitelisted,
+			Reason: input.Reason,
 		}
 		if err := u.securityRepo.
 			UpsertIPRecord(ctx, u.executor, record); err != nil {
@@ -58,10 +59,33 @@ func (u *UpdateIPActionUsecase) Execute(ctx context.Context, input UpdateIPActio
 		record := domain.IPRecord{
 			IP:     input.IP,
 			Status: domain.IPStatusIgnored,
+			Reason: input.Reason,
 		}
 		if err := u.securityRepo.
 			UpsertIPRecord(ctx, u.executor, record); err != nil {
 			return fmt.Errorf("update ip action (ignore): %w", err)
+		}
+
+	case "banned_muted":
+		record := domain.IPRecord{
+			IP:     input.IP,
+			Status: domain.IPStatusBannedMuted,
+			Reason: input.Reason,
+		}
+		if err := u.securityRepo.
+			UpsertIPRecord(ctx, u.executor, record); err != nil {
+			return fmt.Errorf("update ip action (banned_muted): %w", err)
+		}
+
+	case "whitelisted_muted":
+		record := domain.IPRecord{
+			IP:     input.IP,
+			Status: domain.IPStatusWhitelistedMuted,
+			Reason: input.Reason,
+		}
+		if err := u.securityRepo.
+			UpsertIPRecord(ctx, u.executor, record); err != nil {
+			return fmt.Errorf("update ip action (whitelisted_muted): %w", err)
 		}
 
 	case "reset":
@@ -72,7 +96,7 @@ func (u *UpdateIPActionUsecase) Execute(ctx context.Context, input UpdateIPActio
 
 	default:
 		return apperrors.NewBadRequest(
-			fmt.Sprintf("unknown ip action %q: must be one of ban, whitelist, ignore, reset", input.Action),
+			fmt.Sprintf("unknown ip action %q: must be one of ban, whitelist, ignore, reset, banned_muted, whitelisted_muted", input.Action),
 		)
 	}
 

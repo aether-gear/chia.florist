@@ -47,6 +47,7 @@ type InspectionResult struct {
 	Reason         string
 	RuleID         string
 	MatchedPayload string
+	Silent         bool
 }
 
 func (u *InspectPayloadUsecase) Execute(
@@ -76,9 +77,30 @@ func (u *InspectPayloadUsecase) Execute(
 				Reason:  reason,
 				RuleID:  "IP-BAN",
 			}, nil
+		case domain.IPStatusBannedMuted:
+			reason := "IP is manually banned (Muted)"
+			if rec.Reason != "" {
+				reason += " (" + rec.Reason + ")"
+			}
+			return &InspectionResult{
+				Blocked: true,
+				Reason:  reason,
+				RuleID:  "IP-BAN-MUTED",
+				Silent:  true,
+			}, nil
 		case domain.IPStatusWhitelisted:
 			return &InspectionResult{
 				Blocked: false,
+			}, nil
+		case domain.IPStatusWhitelistedMuted:
+			return &InspectionResult{
+				Blocked: false,
+				Silent:  true,
+			}, nil
+		case domain.IPStatusIgnored:
+			return &InspectionResult{
+				Blocked: false,
+				Silent:  true,
 			}, nil
 		}
 		break
