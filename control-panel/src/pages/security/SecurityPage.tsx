@@ -24,6 +24,21 @@ const isPublicIp = (ip: string): boolean => {
   return true;
 };
 
+interface GeoPoint {
+  ip: string;
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
+  isBlocked: boolean;
+}
+
+interface ThreatDataPoint {
+  time: number;
+  blocked: number;
+  allowed: number;
+}
+
 const LEAFLET_MAP_HTML = `
 <!DOCTYPE html>
 <html>
@@ -236,7 +251,7 @@ export default function SecurityPage() {
   const [vtResult, setVtResult] = useState<any>(null);
   const [vtError, setVtError] = useState<string | null>(null);
 
-  const [geoPoints, setGeoPoints] = useState<any[]>([]);
+  const [geoPoints, setGeoPoints] = useState<GeoPoint[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // States for editing IP details from the popup profile
@@ -260,19 +275,25 @@ export default function SecurityPage() {
         } else if (s === 'whitelisted_muted') {
           mappedStatus = 'whitelisted_muted';
         }
-        setEditIPStatus(mappedStatus);
-        setEditIPReason(entry.reason || '');
+        setTimeout(() => {
+          setEditIPStatus(mappedStatus);
+          setEditIPReason(entry.reason || '');
+        }, 0);
       } else {
-        setEditIPStatus('ban');
-        setEditIPReason('');
+        setTimeout(() => {
+          setEditIPStatus('ban');
+          setEditIPReason('');
+        }, 0);
       }
     }
     prevSelectedDetailIPRef.current = selectedDetailIP;
   }, [selectedDetailIP, ipList]);
 
   useEffect(() => {
-    setVtResult(null);
-    setVtError(null);
+    setTimeout(() => {
+      setVtResult(null);
+      setVtError(null);
+    }, 0);
   }, [selectedLog]);
 
   // Real-time IP Geolocation Loader Effect
@@ -281,12 +302,14 @@ export default function SecurityPage() {
 
     const publicIps = Array.from(new Set(logs.map(l => l.ip).filter(isPublicIp)));
     if (publicIps.length === 0) {
-      setGeoPoints([]);
+      setTimeout(() => {
+        setGeoPoints([]);
+      }, 0);
       return;
     }
 
     const cacheKey = "waf_geo_cache";
-    let geoCache: Record<string, any> = {};
+    let geoCache: Record<string, { lat: number; lng: number; city: string; country: string }> = {};
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) geoCache = JSON.parse(cached);
@@ -311,9 +334,11 @@ export default function SecurityPage() {
           isBlocked: logs.some(l => l.ip === ip && l.status === 'Blocked')
         };
       })
-      .filter(Boolean) as any[];
+      .filter(Boolean) as GeoPoint[];
 
-    setGeoPoints(pointsList);
+    setTimeout(() => {
+      setGeoPoints(pointsList);
+    }, 0);
 
     if (toFetch.length === 0) return;
 
@@ -353,8 +378,10 @@ export default function SecurityPage() {
               isBlocked: logs.some(l => l.ip === ip && l.status === 'Blocked')
             };
           })
-          .filter(Boolean) as any[];
-        setGeoPoints(freshPoints);
+          .filter(Boolean) as GeoPoint[];
+        setTimeout(() => {
+          setGeoPoints(freshPoints);
+        }, 0);
       }
     };
 
@@ -743,7 +770,10 @@ export default function SecurityPage() {
       }
     });
 
-    setThreatData(Object.values(dataMap).sort((a, b) => a.time - b.time));
+    const sortedThreatData = Object.values(dataMap).sort((a: ThreatDataPoint, b: ThreatDataPoint) => a.time - b.time);
+    setTimeout(() => {
+      setThreatData(sortedThreatData);
+    }, 0);
   }, [logs, rangeType, customStart, customEnd]);
 
   const displayLogs = logs.filter(log => {

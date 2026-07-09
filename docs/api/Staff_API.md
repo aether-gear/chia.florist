@@ -1,4 +1,4 @@
-﻿# Staff API Documentation
+# Staff API Documentation
 
 This document covers the staff and admin-facing APIs for the Chia Florist service.
 Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.

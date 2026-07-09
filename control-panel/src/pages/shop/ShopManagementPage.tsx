@@ -320,7 +320,7 @@ export default function ShopManagementPage() {
             </p>
           </div>
         </div>
-        <Card className="shadow-md border border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-slate-900/40 backdrop-blur-md">
+        <Card className="shadow-md border-0 bg-white/70 backdrop-blur-md">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <div>
               <CardTitle className="text-xl font-semibold">Store Locations</CardTitle>
@@ -349,14 +349,14 @@ export default function ShopManagementPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border border-slate-100 dark:border-slate-800 overflow-hidden">
+            <div className="rounded-md border border-slate-100 overflow-hidden">
               <Table>
-                <TableHeader className="bg-slate-50/70 dark:bg-slate-900/50">
+                <TableHeader className="bg-slate-50/70">
                   <TableRow>
-                    <TableHead className="dark:text-slate-300">Shop Name</TableHead>
-                    <TableHead className="dark:text-slate-300">Description</TableHead>
-                    <TableHead className="dark:text-slate-300">Status</TableHead>
-                    <TableHead className="text-right dark:text-slate-300">Action</TableHead>
+                    <TableHead>Shop Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -370,13 +370,13 @@ export default function ShopManagementPage() {
                     shops.map((shop) => (
                       <TableRow
                         key={shop.id}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 cursor-pointer transition-colors"
+                        className="hover:bg-slate-50/50 cursor-pointer transition-colors"
                         onClick={() => handleOpenDetails(shop)}
                       >
-                        <TableCell className="font-semibold text-slate-800 dark:text-slate-200">
+                        <TableCell className="font-semibold text-slate-800">
                           {shop.name}
                         </TableCell>
-                        <TableCell className="text-slate-600 dark:text-slate-350 max-w-sm truncate">
+                        <TableCell className="text-slate-600 max-w-sm truncate">
                           {shop.description || '-'}
                         </TableCell>
                         <TableCell>
@@ -384,8 +384,8 @@ export default function ShopManagementPage() {
                             variant={shop.is_active ? 'default' : 'secondary'}
                             className={
                               shop.is_active
-                                ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-450 hover:bg-emerald-100/80 border-0'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-100/80 border-0'
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100/80 border-0'
+                                : 'bg-slate-100 text-slate-800 hover:bg-slate-100/80 border-0'
                             }
                           >
                             {shop.is_active ? 'Active' : 'Inactive'}
@@ -395,7 +395,7 @@ export default function ShopManagementPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenDetails(shop);
@@ -418,11 +418,11 @@ export default function ShopManagementPage() {
       {/* Shop Details Central Overlay Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader className="border-b dark:border-slate-800 pb-4">
-            <DialogTitle className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="text-2xl font-bold text-slate-800">
               {selectedShopInfo?.name || 'Shop Details'}
             </DialogTitle>
-            <DialogDescription className="text-slate-500 dark:text-slate-400">
+            <DialogDescription className="text-slate-500">
               {selectedShopInfo?.description || 'Manage parameters, addresses, couriers, and product inventory.'}
             </DialogDescription>
           </DialogHeader>
@@ -441,17 +441,17 @@ export default function ShopManagementPage() {
 
           {!detailsLoading && selectedShopInfo && (
             <Tabs defaultValue="products" className="space-y-4 pt-2">
-              <TabsList className="grid grid-cols-4 bg-slate-50 dark:bg-slate-900 p-1 rounded-lg border border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400">
-                <TabsTrigger value="info" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-950 data-[state=active]:text-slate-950 data-[state=active]:dark:text-slate-50 data-[state=active]:shadow-sm">
+              <TabsList className="grid grid-cols-4 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                <TabsTrigger value="info" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Info className="h-4 w-4" /> General
                 </TabsTrigger>
-                <TabsTrigger value="products" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-950 data-[state=active]:text-slate-950 data-[state=active]:dark:text-slate-50 data-[state=active]:shadow-sm">
+                <TabsTrigger value="products" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Package className="h-4 w-4" /> Products
                 </TabsTrigger>
-                <TabsTrigger value="addresses" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-950 data-[state=active]:text-slate-950 data-[state=active]:dark:text-slate-50 data-[state=active]:shadow-sm">
+                <TabsTrigger value="addresses" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <MapPin className="h-4 w-4" /> Addresses
                 </TabsTrigger>
-                <TabsTrigger value="couriers" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-950 data-[state=active]:text-slate-950 data-[state=active]:dark:text-slate-50 data-[state=active]:shadow-sm">
+                <TabsTrigger value="couriers" className="flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Truck className="h-4 w-4" /> Couriers
                 </TabsTrigger>
               </TabsList>
@@ -479,7 +479,7 @@ export default function ShopManagementPage() {
                         <Label htmlFor="shopDesc">Description</Label>
                         <textarea
                           id="shopDesc"
-                          className="flex min-h-[80px] w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                           value={shopDesc}
                           onChange={(e) => setShopDesc(e.target.value)}
                           placeholder="Brief description of the shop..."
@@ -489,7 +489,7 @@ export default function ShopManagementPage() {
                         <input
                           id="shopIsActive"
                           type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-850 bg-background text-indigo-600 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                           checked={shopIsActive}
                           onChange={(e) => setShopIsActive(e.target.checked)}
                         />
@@ -540,7 +540,7 @@ export default function ShopManagementPage() {
                             <Label htmlFor="productSelect">Select Product</Label>
                             <select
                               id="productSelect"
-                              className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               value={selectedProductId}
                               onChange={(e) => setSelectedProductId(e.target.value)}
                               required
@@ -684,7 +684,7 @@ export default function ShopManagementPage() {
                             <Label htmlFor="province">Province</Label>
                             <select
                               id="province"
-                              className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               value={provinceId}
                               onChange={(e) => handleProvinceChange(e.target.value)}
                               required
@@ -700,7 +700,7 @@ export default function ShopManagementPage() {
                             <Label htmlFor="city">City / Regency</Label>
                             <select
                               id="city"
-                              className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                               value={cityId}
                               onChange={(e) => handleCityChange(e.target.value)}
                               disabled={!provinceId}
@@ -717,7 +717,7 @@ export default function ShopManagementPage() {
                             <Label htmlFor="district">District</Label>
                             <select
                               id="district"
-                              className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                               value={districtId}
                               onChange={(e) => handleDistrictChange(e.target.value)}
                               disabled={!cityId}
@@ -734,7 +734,7 @@ export default function ShopManagementPage() {
                             <Label htmlFor="village">Village</Label>
                             <select
                               id="village"
-                              className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                               value={villageId}
                               onChange={(e) => setVillageId(e.target.value)}
                               disabled={!districtId}
@@ -751,7 +751,7 @@ export default function ShopManagementPage() {
                             <Label htmlFor="fullAddress">Full Address</Label>
                             <textarea
                               id="fullAddress"
-                              className="flex min-h-[80px] w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               placeholder="Street name, building number, unit, etc."
                               value={fullAddress}
                               onChange={(e) => setFullAddress(e.target.value)}
@@ -774,7 +774,7 @@ export default function ShopManagementPage() {
                             <input
                               id="isActive"
                               type="checkbox"
-                              className="h-4 w-4 rounded border-slate-300 dark:border-slate-850 bg-background text-indigo-600 focus:ring-indigo-500"
+                              className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                               checked={isActive}
                               onChange={(e) => setIsActive(e.target.checked)}
                             />

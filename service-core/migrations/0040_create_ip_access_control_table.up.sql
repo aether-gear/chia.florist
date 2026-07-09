@@ -1,4 +1,4 @@
-CREATE TYPE ip_status AS ENUM ('banned', 'whitelisted', 'ignored');
+CREATE TYPE ip_status AS ENUM ('banned', 'whitelisted', 'ignored', 'banned_muted', 'whitelisted_muted');
 
 CREATE TABLE ip_access_control (
     ip          TEXT        PRIMARY KEY,
