@@ -243,7 +243,7 @@ func TestAuthenticateOAuth_NewUserRegistration(t *testing.T) {
 	}
 }
 
-func TestAuthenticateOAuth_ExistingLinkedAccount_UpdatesLastLoginAndSyncsProfile(t *testing.T) {
+func TestAuthenticateOAuth_ExistingLinkedAccount_UpdatesLastLoginAndDoesNotSyncProfile(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 	existingConn := &domain.OAuthConnection{
@@ -263,18 +263,11 @@ func TestAuthenticateOAuth_ExistingLinkedAccount_UpdatesLastLoginAndSyncsProfile
 		},
 	}
 
-	var savedName string
-	var savedAvatar *string
+	var saveProfileCalled bool
 	userRepoMock := &mockUserRepo{
 		user: &userDomain.User{ID: userID, Name: "Old Name"},
 		saveProfile: func(props userRepo.SaveProfileProps) error {
-			if props.UserID != userID {
-				t.Errorf("expected UserID %v, got %v", userID, props.UserID)
-			}
-			if props.Name != nil {
-				savedName = *props.Name
-			}
-			savedAvatar = props.AvatarURL
+			saveProfileCalled = true
 			return nil
 		},
 	}
@@ -310,11 +303,8 @@ func TestAuthenticateOAuth_ExistingLinkedAccount_UpdatesLastLoginAndSyncsProfile
 	if oauthRepoMock.updateLastLoginCalls != 1 {
 		t.Errorf("expected UpdateLastLogin call, got %d", oauthRepoMock.updateLastLoginCalls)
 	}
-	if savedName != "New Name" {
-		t.Errorf("expected profile Name to be synchronized to 'New Name', got '%s'", savedName)
-	}
-	if savedAvatar == nil || *savedAvatar != avatar {
-		t.Errorf("expected profile AvatarURL to be synchronized, got %v", savedAvatar)
+	if saveProfileCalled {
+		t.Error("expected SaveProfile NOT to be called")
 	}
 
 	if accountRepoMock.updatePasswordCalls != 0 {
@@ -322,7 +312,7 @@ func TestAuthenticateOAuth_ExistingLinkedAccount_UpdatesLastLoginAndSyncsProfile
 	}
 }
 
-func TestAuthenticateOAuth_ExistingLocalAccount_LinksAndSyncsProfile(t *testing.T) {
+func TestAuthenticateOAuth_ExistingLocalAccount_LinksAndDoesNotSyncProfile(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 	accountRepoMock := &mockAccountRepo{
@@ -335,13 +325,11 @@ func TestAuthenticateOAuth_ExistingLocalAccount_LinksAndSyncsProfile(t *testing.
 	}
 	oauthRepoMock := &mockOAuthRepo{connection: nil} // No OAuth connection initially
 
-	var savedName string
+	var saveProfileCalled bool
 	userRepoMock := &mockUserRepo{
 		user: &userDomain.User{ID: userID, Name: "Local Name"},
 		saveProfile: func(props userRepo.SaveProfileProps) error {
-			if props.Name != nil {
-				savedName = *props.Name
-			}
+			saveProfileCalled = true
 			return nil
 		},
 	}
@@ -379,8 +367,8 @@ func TestAuthenticateOAuth_ExistingLocalAccount_LinksAndSyncsProfile(t *testing.
 	if oauthRepoMock.createCalls != 1 {
 		t.Errorf("expected 1 Create call on oauthRepo, got %d", oauthRepoMock.createCalls)
 	}
-	if savedName != "Google Name" {
-		t.Errorf("expected profile Name to be synchronized to 'Google Name', got '%s'", savedName)
+	if saveProfileCalled {
+		t.Error("expected SaveProfile NOT to be called during account linking")
 	}
 	if accountRepoMock.updatePasswordCalls != 0 {
 		t.Error("expected password NOT to be modified during account linking")
