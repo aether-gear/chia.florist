@@ -392,6 +392,57 @@ export const useAuthViewModel = () => {
     challengeId.value = localStorage.getItem('auth_challenge_id')
   }
 
+  /**
+   * Request a forgot password OTP via email.
+   */
+  const requestForgotPassword = async (email: string) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await authService.forgotPassword({ email })
+      return response
+    } catch (err: any) {
+      error.value = err.data?.message || err.message || 'Failed to request password reset.'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Verify the forgot password OTP.
+   */
+  const verifyForgotPasswordOtp = async (challengeIdVal: string, otp: string) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await authService.verifyForgotPassword({ challenge_id: challengeIdVal, otp })
+      return response
+    } catch (err: any) {
+      error.value = err.data?.message || err.message || 'OTP Verification failed.'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Reset the password after verification.
+   */
+  const resetPassword = async (challengeIdVal: string, newPassword: string) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await authService.resetPassword({ challenge_id: challengeIdVal, new_password: newPassword })
+      return response
+    } catch (err: any) {
+      error.value = err.data?.message || err.message || 'Failed to reset password.'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   return {
     currentUser: computed(() => currentUser.value),
     challengeId: computed(() => challengeId.value),
@@ -407,6 +458,9 @@ export const useAuthViewModel = () => {
     register,
     verifyOtp,
     logout,
-    updateUserProfile
+    updateUserProfile,
+    requestForgotPassword,
+    verifyForgotPasswordOtp,
+    resetPassword
   }
 }

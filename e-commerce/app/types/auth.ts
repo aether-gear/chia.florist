@@ -77,3 +77,31 @@ export interface UpdateProfileRequest {
   phone?: string
   avatar_url?: string
 }
+
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+export interface ForgotPasswordResponse {
+  message: string
+  challenge_id: string | null
+}
+
+export interface VerifyForgotPasswordRequest {
+  challenge_id: string
+  otp: string
+}
+
+export interface VerifyForgotPasswordResponse {
+  message: string
+  challenge_id: string
+}
+
+export interface ResetPasswordRequest {
+  challenge_id: string
+  new_password: string
+}
+
+export interface ResetPasswordResponse {
+  message: string
+}
