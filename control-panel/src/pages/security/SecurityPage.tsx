@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,161 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { fetchApi } from '../../lib/api';
+
+const isPublicIp = (ip: string): boolean => {
+  if (!ip) return false;
+  const cleanIp = ip.trim().replace(/^::ffff:/, '');
+  if (cleanIp === '127.0.0.1' || cleanIp === '::1' || cleanIp === 'localhost') return false;
+  if (cleanIp.startsWith('10.')) return false;
+  if (cleanIp.startsWith('192.168.')) return false;
+  if (cleanIp.startsWith('169.254.')) return false;
+  const parts = cleanIp.split('.').map(Number);
+  if (parts.length === 4) {
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
+  }
+  return true;
+};
+
+interface GeoPoint {
+  ip: string;
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
+  isBlocked: boolean;
+}
+
+interface ThreatDataPoint {
+  time: number;
+  blocked: number;
+  allowed: number;
+}
+
+const LEAFLET_MAP_HTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #0f172a;
+    }
+    .leaflet-popup-content-wrapper {
+      background: rgba(15, 23, 42, 0.95) !important;
+      color: #f8fafc !important;
+      border: 1px solid #334155 !important;
+      backdrop-filter: blur(4px);
+    }
+    .leaflet-popup-tip {
+      background: rgba(15, 23, 42, 0.95) !important;
+      border: 1px solid #334155 !important;
+    }
+    body.light .leaflet-popup-content-wrapper {
+      background: rgba(255, 255, 255, 0.95) !important;
+      color: #0f172a !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    body.light .leaflet-popup-tip {
+      background: rgba(255, 255, 255, 0.95) !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    let map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false,
+      minZoom: 2,
+      maxBounds: [[-90, -180], [90, 180]],
+      maxBoundsViscosity: 1.0
+    }).setView([20, 0], 2);
+
+    let currentTileLayer = null;
+    let activeTheme = null;
+
+    function setTileLayer(isDark) {
+      if (activeTheme === isDark) return;
+      activeTheme = isDark;
+      if (currentTileLayer) {
+        map.removeLayer(currentTileLayer);
+      }
+      if (isDark) {
+        document.body.classList.remove('light');
+        currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }).addTo(map);
+      } else {
+        document.body.classList.add('light');
+        currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }).addTo(map);
+      }
+    }
+
+    setTileLayer(true);
+
+    let markers = [];
+    let hasFittedBounds = false;
+    let lastPointsStr = "";
+
+    window.addEventListener('message', function(event) {
+      const data = event.data;
+      if (data.type === 'setTheme') {
+        setTileLayer(data.isDark);
+      } else if (data.type === 'setPoints') {
+        const points = data.points || [];
+        const pointsStr = JSON.stringify(points);
+        if (lastPointsStr === pointsStr) {
+          return; // Skip redrawing if points list has not changed
+        }
+        lastPointsStr = pointsStr;
+
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+
+        points.forEach(pt => {
+          if (!pt.lat || !pt.lng) return;
+          
+          let marker = L.circleMarker([pt.lat, pt.lng], {
+            radius: 6,
+            fillColor: pt.isBlocked ? '#ef4444' : '#10b981',
+            color: '#ffffff',
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 0.8
+          }).addTo(map);
+
+          let tooltipHtml = '<div style="font-family: sans-serif; font-size: 11px; line-height: 1.4; padding: 2px;">' +
+            '<strong style="color: ' + (pt.isBlocked ? '#ef4444' : '#10b981') + '; font-size: 12px;">' + pt.ip + '</strong><br/>' +
+            '<strong>Location:</strong> ' + (pt.city ? pt.city + ', ' : '') + (pt.country || 'Unknown') + '<br/>' +
+            '<strong>Status:</strong> ' + (pt.isBlocked ? 'Blocked Threat' : 'Allowed Request') +
+            '</div>';
+
+          marker.bindTooltip(tooltipHtml, {
+            permanent: false,
+            direction: 'top',
+            className: 'custom-tooltip'
+          });
+
+          markers.push(marker);
+        });
+
+        if (markers.length > 0 && !hasFittedBounds) {
+          let group = new L.featureGroup(markers);
+          map.fitBounds(group.getBounds().pad(0.15));
+          hasFittedBounds = true;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+`;
+
 
 const formatDateTimeLocal = (timestamp: number) => {
   const d = new Date(timestamp);
@@ -54,6 +209,16 @@ const getIPCategory = (reason: string): string => {
 };
 
 export default function SecurityPage() {
+  const [isDark, setIsDark] = useState<boolean>(() => document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const [logs, setLogs] = useState<any[]>([]);
   const [wafSummary, setWafSummary] = useState({ total: 0, blocked: 0, allowed: 0, threatLevel: 'Low' });
   const [threatData, setThreatData] = useState<any[]>([]);
@@ -74,6 +239,169 @@ export default function SecurityPage() {
   const [editRulePattern, setEditRulePattern] = useState("");
   const [editRuleTags, setEditRuleTags] = useState("");
   const [editRuleImpact, setEditRuleImpact] = useState("5");
+
+  // VirusTotal API Key Configuration (Paste your API key here)
+  const VIRUSTOTAL_API_KEY = "5e28d0fd12d4b881c0f32993e0d44e51997fbb16bf02cb9908294c5f833f9cc7"; // PASTE YOUR VIRUSTOTAL API KEY HERE
+
+  // IP2Location API Key Configuration (Paste your API key here)
+  const IP2LOCATION_API_KEY = "863EE843FB581979DB85BE72BE0CFD14";
+
+  // VirusTotal Reputation Check State
+  const [vtLoading, setVtLoading] = useState<boolean>(false);
+  const [vtResult, setVtResult] = useState<any>(null);
+  const [vtError, setVtError] = useState<string | null>(null);
+
+  const [geoPoints, setGeoPoints] = useState<GeoPoint[]>([]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // States for editing IP details from the popup profile
+  const [editIPStatus, setEditIPStatus] = useState<string>('ban');
+  const [editIPReason, setEditIPReason] = useState<string>('');
+
+  const prevSelectedDetailIPRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (selectedDetailIP && selectedDetailIP !== prevSelectedDetailIPRef.current) {
+      const entry = ipList.find(e => e.ip === selectedDetailIP);
+      if (entry) {
+        let mappedStatus = 'ban';
+        const s = String(entry.status).toLowerCase();
+        if (s === 'ignored' || s === 'ignore') {
+          mappedStatus = 'ignore';
+        } else if (s === 'whitelisted' || s === 'whitelist') {
+          mappedStatus = 'whitelist';
+        } else if (s === 'banned_muted') {
+          mappedStatus = 'banned_muted';
+        } else if (s === 'whitelisted_muted') {
+          mappedStatus = 'whitelisted_muted';
+        }
+        setTimeout(() => {
+          setEditIPStatus(mappedStatus);
+          setEditIPReason(entry.reason || '');
+        }, 0);
+      } else {
+        setTimeout(() => {
+          setEditIPStatus('ban');
+          setEditIPReason('');
+        }, 0);
+      }
+    }
+    prevSelectedDetailIPRef.current = selectedDetailIP;
+  }, [selectedDetailIP, ipList]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setVtResult(null);
+      setVtError(null);
+    }, 0);
+  }, [selectedLog]);
+
+  // Real-time IP Geolocation Loader Effect
+  useEffect(() => {
+    if (logs.length === 0) return;
+
+    const publicIps = Array.from(new Set(logs.map(l => l.ip).filter(isPublicIp)));
+    if (publicIps.length === 0) {
+      setTimeout(() => {
+        setGeoPoints([]);
+      }, 0);
+      return;
+    }
+
+    const cacheKey = "waf_geo_cache";
+    let geoCache: Record<string, { lat: number; lng: number; city: string; country: string }> = {};
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) geoCache = JSON.parse(cached);
+    } catch (err) {
+      console.error("Failed to parse geo cache", err);
+    }
+
+    // Identify which IPs we need to resolve
+    const toFetch = publicIps.filter(ip => !geoCache[ip]);
+
+    // Construct the initial list from cache
+    const pointsList = publicIps
+      .map(ip => {
+        const cached = geoCache[ip];
+        if (!cached || !cached.lat || !cached.lng) return null;
+        return {
+          ip,
+          lat: cached.lat,
+          lng: cached.lng,
+          city: cached.city,
+          country: cached.country,
+          isBlocked: logs.some(l => l.ip === ip && l.status === 'Blocked')
+        };
+      })
+      .filter(Boolean) as GeoPoint[];
+
+    setTimeout(() => {
+      setGeoPoints(pointsList);
+    }, 0);
+
+    if (toFetch.length === 0) return;
+
+    const fetchGeoData = async () => {
+      let updated = false;
+      for (const ip of toFetch) {
+        try {
+          const res = await fetch(`http://localhost:8080/api/geo/${ip}?key=${IP2LOCATION_API_KEY}`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.latitude && data.longitude) {
+            geoCache[ip] = {
+              lat: data.latitude,
+              lng: data.longitude,
+              city: data.city_name || "",
+              country: data.country_name || ""
+            };
+            updated = true;
+          }
+        } catch (err) {
+          console.error(`Failed to geolocate ${ip}`, err);
+        }
+      }
+
+      if (updated) {
+        localStorage.setItem(cacheKey, JSON.stringify(geoCache));
+        const freshPoints = publicIps
+          .map(ip => {
+            const cached = geoCache[ip];
+            if (!cached || !cached.lat || !cached.lng) return null;
+            return {
+              ip,
+              lat: cached.lat,
+              lng: cached.lng,
+              city: cached.city,
+              country: cached.country,
+              isBlocked: logs.some(l => l.ip === ip && l.status === 'Blocked')
+            };
+          })
+          .filter(Boolean) as GeoPoint[];
+        setTimeout(() => {
+          setGeoPoints(freshPoints);
+        }, 0);
+      }
+    };
+
+    fetchGeoData();
+  }, [logs]);
+
+  // Post messages to Leaflet iframe
+  useEffect(() => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'setTheme',
+        isDark
+      }, '*');
+
+      iframeRef.current.contentWindow.postMessage({
+        type: 'setPoints',
+        points: geoPoints
+      }, '*');
+    }
+  }, [geoPoints, isDark]);
 
   // Time Range & Brushing State
   const [rangeType, setRangeType] = useState<"Today" | "Custom">("Today");
@@ -179,8 +507,68 @@ export default function SecurityPage() {
       console.error("Failed to clear all audit logs", e);
     }
   };
+  const handleCheckReputation = async (ip: string) => {
+    setVtLoading(true);
+    setVtError(null);
+    setVtResult(null);
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (VIRUSTOTAL_API_KEY) {
+        headers["X-VT-Key"] = VIRUSTOTAL_API_KEY;
+      }
 
-  const handleBulkIPActionFromManager = async (action: 'ban' | 'whitelist' | 'remove') => {
+      const vtPromise = fetch(`http://localhost:8080/api/analyze/${ip}`, {
+        method: "GET",
+        headers,
+      }).then(async r => {
+        if (!r.ok) {
+          const errText = await r.text();
+          throw new Error(errText || `VirusTotal returned ${r.status}`);
+        }
+        return r.json();
+      });
+
+      const ip2locPromise = fetch(`http://localhost:8080/api/geo/${ip}?key=${IP2LOCATION_API_KEY}`)
+        .then(async r => {
+          if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(errText || `IP2Location returned ${r.status}`);
+          }
+          return r.json();
+        });
+
+      const [vtData, ip2locData] = await Promise.all([vtPromise, ip2locPromise]);
+
+      // Extract stats and info from standard VirusTotal v3 payload
+      const attrs = vtData?.data?.attributes;
+      if (!attrs) {
+        throw new Error("Invalid VirusTotal API response format");
+      }
+
+      const stats = attrs.last_analysis_stats || { harmless: 0, malicious: 0, suspicious: 0, undetected: 0 };
+      setVtResult({
+        stats,
+        asOwner: ip2locData.as || attrs.as_owner || "Unknown ISP / AS Owner",
+        country: ip2locData.country_name || attrs.country || "UNK",
+        countryCode: ip2locData.country_code || "UNK",
+        regionName: ip2locData.region_name || "",
+        cityName: ip2locData.city_name || "",
+        latitude: ip2locData.latitude || 0,
+        longitude: ip2locData.longitude || 0,
+        network: attrs.network || "N/A",
+        isProxy: ip2locData.is_proxy || false,
+      });
+    } catch (e: any) {
+      console.error("IP reputation or location scan failed", e);
+      setVtError(e.message || "An unknown error occurred during scanning");
+    } finally {
+      setVtLoading(false);
+    }
+  };
+
+  const handleBulkIPActionFromManager = async (action: 'ban' | 'whitelist' | 'ignore' | 'remove') => {
     const ips = Object.keys(selectedIPs).filter(ip => selectedIPs[ip]);
     if (ips.length === 0) return;
 
@@ -200,7 +588,11 @@ export default function SecurityPage() {
       } else {
         setIpList(prev => prev.map(entry => {
           if (selectedIPs[entry.ip]) {
-            return { ...entry, status: action === 'ban' ? 'Banned' : 'Whitelisted', reason: 'Bulk Action' };
+            return {
+              ...entry,
+              status: action === 'ban' ? 'Banned' : action === 'whitelist' ? 'Whitelisted' : 'Ignored',
+              reason: 'Bulk Action'
+            };
           }
           return entry;
         }));
@@ -305,7 +697,7 @@ export default function SecurityPage() {
 
       const sorted = [...mappedLogs].sort((a, b) => parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime());
       setLogs(sorted);
-      
+
       const total = mappedLogs.length;
       const blocked = mappedLogs.filter((l: any) => l.status === 'Blocked').length;
       setWafSummary({
@@ -337,7 +729,7 @@ export default function SecurityPage() {
     let startTime = 0;
     let endTime = Number.MAX_SAFE_INTEGER;
     let step = 1000 * 60 * 15; // Default to 15-minute intervals
-    
+
     if (rangeType === 'Today') {
       const now = new Date();
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -347,7 +739,7 @@ export default function SecurityPage() {
       const now = new Date();
       startTime = customStart ? new Date(customStart).getTime() : now.getTime() - 24 * 60 * 60 * 1000;
       endTime = customEnd ? new Date(customEnd).getTime() : now.getTime();
-      
+
       const diff = endTime - startTime;
       if (diff > 0) {
         // Keep number of points bounded for performance
@@ -378,7 +770,10 @@ export default function SecurityPage() {
       }
     });
 
-    setThreatData(Object.values(dataMap).sort((a, b) => a.time - b.time));
+    const sortedThreatData = Object.values(dataMap).sort((a: ThreatDataPoint, b: ThreatDataPoint) => a.time - b.time);
+    setTimeout(() => {
+      setThreatData(sortedThreatData);
+    }, 0);
   }, [logs, rangeType, customStart, customEnd]);
 
   const displayLogs = logs.filter(log => {
@@ -422,10 +817,10 @@ export default function SecurityPage() {
     });
 
     if (!ipOverride) {
-      setTargetIP(""); 
-      setTargetReason(""); 
+      setTargetIP("");
+      setTargetReason("");
     }
-    fetchIpList(); 
+    fetchIpList();
   };
 
   const toggleRule = async (ruleId: string, currentStatus: boolean) => {
@@ -474,6 +869,40 @@ export default function SecurityPage() {
       console.error("Failed to update rule", e);
     }
   };
+
+  useEffect(() => {
+    if (iframeRef.current) {
+      iframeRef.current.srcdoc = LEAFLET_MAP_HTML;
+    }
+  }, []);
+
+  const mapIframe = useMemo(() => {
+    return (
+      <iframe
+        ref={iframeRef}
+        title="IP Geolocation Map"
+        width="100%"
+        height="100%"
+        frameBorder="0"
+        scrolling="no"
+        marginHeight={0}
+        marginWidth={0}
+        onLoad={() => {
+          if (iframeRef.current && iframeRef.current.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({
+              type: 'setTheme',
+              isDark
+            }, '*');
+            iframeRef.current.contentWindow.postMessage({
+              type: 'setPoints',
+              points: geoPoints
+            }, '*');
+          }
+        }}
+        className="w-full h-full"
+      />
+    );
+  }, []);
 
   const now = new Date();
   let activeStartTime = 0;
@@ -543,12 +972,12 @@ export default function SecurityPage() {
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between">
           <div>
-            <CardTitle>Threat Landscape (Real Data)</CardTitle>
+            <CardTitle>Threat Landscape</CardTitle>
             <CardDescription>Volume of allowed vs blocked requests over time.</CardDescription>
           </div>
           <div className="flex items-center gap-3 mt-4 sm:mt-0">
-            <select 
-              className="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+            <select
+              className="bg-background text-foreground border border-input rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               value={rangeType}
               onChange={(e) => {
                 const val = e.target.value as any;
@@ -591,8 +1020,8 @@ export default function SecurityPage() {
         </CardHeader>
         <CardContent className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart 
-              data={threatData} 
+            <AreaChart
+              data={threatData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
               onMouseDown={(e) => { if (e && e.activeLabel) setRefAreaLeft(Number(e.activeLabel)); }}
               onMouseMove={(e) => { if (refAreaLeft !== null && e && e.activeLabel) setRefAreaRight(Number(e.activeLabel)); }}
@@ -617,51 +1046,83 @@ export default function SecurityPage() {
             >
               <defs>
                 <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorAllowed" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis 
-                dataKey="time" 
+              <XAxis
+                dataKey="time"
                 type="number"
                 scale="time"
                 domain={[activeStartTime, activeEndTime]}
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 12 }} 
-                dy={10} 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: isDark ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                dy={10}
                 tickFormatter={(unixTime) => {
                   const d = new Date(unixTime);
-                  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 }}
               />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 12 }} 
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: isDark ? "#94a3b8" : "#64748b", fontSize: 12 }}
                 allowDecimals={false}
                 padding={{ top: 30 }}
               />
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#334155" : "#e2e8f0"} />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: '8px',
+                  border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                  color: isDark ? '#f1f5f9' : '#0f172a'
+                }}
                 labelFormatter={(unixTime: any) => {
                   const d = new Date(unixTime);
-                  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 }}
               />
               <Area type="monotone" dataKey="allowed" name="Allowed Traffic" stroke="#10b981" fillOpacity={1} fill="url(#colorAllowed)" />
               <Area type="monotone" dataKey="blocked" name="Blocked Threats" stroke="#ef4444" fillOpacity={1} fill="url(#colorBlocked)" />
-              
+
               {refAreaLeft !== null && refAreaRight !== null ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#8884d8" />
               ) : null}
             </AreaChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Real-time Threat Geolocation Map */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-slate-900 dark:text-slate-100">
+            Real-time Threat Geolocation Map
+          </CardTitle>
+          <CardDescription className="text-slate-500 dark:text-slate-400">
+            Pinpoints the physical location of all audited public IP addresses in real-time. Hover over points for threat details.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="h-[400px] flex items-center justify-center bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden p-0 relative">
+            {mapIframe}
+            {geoPoints.length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/90 dark:bg-slate-950/90 text-center p-6 text-slate-500 dark:text-slate-400 space-y-2 z-20">
+                <div className="text-3xl">🌐</div>
+                <div className="font-medium text-slate-700 dark:text-slate-300">No Geolocation Data Available</div>
+                <div className="text-xs max-w-sm mx-auto text-slate-500 dark:text-slate-400">
+                  No public IP addresses have been logged yet. Local or private traffic will not appear on the threat map.
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -673,17 +1134,17 @@ export default function SecurityPage() {
             <CardDescription>Control access and logging behavior for specific IPs.</CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               className="h-9 gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-800"
               onClick={handleClearAllIPs}
             >
               Reset / Forget All IPs
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               className="h-9 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
               onClick={() => setIsCategoryModalOpen(true)}
             >
@@ -692,56 +1153,64 @@ export default function SecurityPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
+          <div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-100 dark:border-slate-800">
             <div className="space-y-2 flex-1 w-full">
-              <label className="text-xs font-medium text-slate-700">Target IP Address</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Target IP Address</label>
               <Input
                 placeholder="e.g. 192.168.1.5 or ::1"
-                className="bg-white border-slate-300 font-mono"
+                className="bg-background text-foreground border-slate-300 dark:border-slate-800 font-mono"
                 value={targetIP}
                 onChange={e => setTargetIP(e.target.value)}
               />
             </div>
             <div className="space-y-2 flex-1 w-full">
-              <label className="text-xs font-medium text-slate-700">Reason (Optional)</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Reason (Optional)</label>
               <Input
                 placeholder="e.g. Spamming API"
-                className="bg-white border-slate-300"
+                className="bg-background text-foreground border-slate-300 dark:border-slate-800"
                 value={targetReason}
                 onChange={e => setTargetReason(e.target.value)}
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <Button variant="destructive" className="flex-1 md:flex-none" onClick={() => handleIPSubmit('ban')}>Ban</Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 flex-1 md:flex-none" onClick={() => handleIPSubmit('whitelist')}>Whitelist</Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-none" onClick={() => handleIPSubmit('whitelist')}>Whitelist</Button>
+              <Button className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white flex-1 md:flex-none" onClick={() => handleIPSubmit('ignore')}>Mute</Button>
             </div>
           </div>
 
           {Object.keys(selectedIPs).filter(ip => selectedIPs[ip]).length > 0 && (
-            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-              <span className="text-xs font-semibold text-slate-700">
+            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 {Object.keys(selectedIPs).filter(ip => selectedIPs[ip]).length} IP(s) selected
               </span>
               <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  className="h-8 text-xs font-medium" 
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-8 text-xs font-medium"
                   onClick={() => handleBulkIPActionFromManager('ban')}
                 >
                   Bulk Ban
                 </Button>
-                <Button 
-                  size="sm" 
-                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium" 
+                <Button
+                  size="sm"
+                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                   onClick={() => handleBulkIPActionFromManager('whitelist')}
                 >
                   Bulk Whitelist
                 </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="h-8 text-xs border-slate-300 hover:bg-slate-100 text-slate-700 font-medium" 
+                <Button
+                  size="sm"
+                  className="h-8 text-xs bg-slate-700 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium"
+                  onClick={() => handleBulkIPActionFromManager('ignore')}
+                >
+                  Bulk Mute
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs border-slate-300 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium"
                   onClick={() => handleBulkIPActionFromManager('remove')}
                 >
                   Bulk Remove / Forget
@@ -753,10 +1222,10 @@ export default function SecurityPage() {
           <div className="overflow-x-auto border rounded-md">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
+                <TableRow className="bg-slate-50 dark:bg-slate-900/50">
                   <TableHead className="w-[40px]">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
                       checked={ipList.length > 0 && ipList.every(entry => selectedIPs[entry.ip])}
                       onChange={e => {
@@ -786,8 +1255,8 @@ export default function SecurityPage() {
                 {displayedIps.map((entry: any) => (
                   <TableRow key={entry.ip}>
                     <TableCell>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
                         checked={!!selectedIPs[entry.ip]}
                         onChange={e => {
@@ -798,23 +1267,35 @@ export default function SecurityPage() {
                         }}
                       />
                     </TableCell>
-                    <TableCell 
+                    <TableCell
                       className="font-mono text-slate-700 hover:text-emerald-600 hover:underline cursor-pointer"
                       onClick={() => setSelectedDetailIP(entry.ip)}
                     >
                       {entry.ip}
                     </TableCell>
                     <TableCell>
-                      {entry.status === 'Banned' && <Badge variant="destructive">Banned</Badge>}
-                      {entry.status === 'Whitelisted' && <Badge className="bg-emerald-600">Whitelisted</Badge>}
-                      {entry.status === 'Ignored' && <Badge variant="secondary">Muted (No Log)</Badge>}
+                      {(entry.status === 'Banned' || entry.status === 'banned') && <Badge variant="destructive">Banned</Badge>}
+                      {(entry.status === 'Whitelisted' || entry.status === 'whitelisted') && <Badge className="bg-emerald-600">Whitelisted</Badge>}
+                      {(entry.status === 'Ignored' || entry.status === 'ignored') && <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-0">(No Log)</Badge>}
+                      {(entry.status === 'banned_muted') && (
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="destructive">Banned</Badge>
+                          <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-0">Muted</Badge>
+                        </div>
+                      )}
+                      {(entry.status === 'whitelisted_muted') && (
+                        <div className="flex items-center gap-1.5">
+                          <Badge className="bg-emerald-600">Whitelisted</Badge>
+                          <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-0">Muted</Badge>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-slate-500 text-sm">{entry.reason || "-"}</TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900" 
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900"
                         onClick={() => setSelectedDetailIP(entry.ip)}
                         title="View IP Details"
                       >
@@ -836,7 +1317,7 @@ export default function SecurityPage() {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500">Rows per page:</span>
                 <select
-                  className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className="bg-background text-foreground border border-input rounded-md px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
                   value={ipRowsPerPage}
                   onChange={(e) => {
                     setIpRowsPerPage(Number(e.target.value));
@@ -912,24 +1393,24 @@ export default function SecurityPage() {
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <div className="flex gap-1.5 justify-end">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
-                          className="h-8 text-xs font-medium border-slate-300 hover:bg-slate-100 text-slate-700"
+                          className="h-8 text-xs font-medium border-slate-300 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-200"
                           onClick={() => setSelectedRuleForDetail(rule)}
                         >
                           View
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant={rule.enabled ? "outline" : "default"}
-                          className={`h-8 text-xs font-medium ${!rule.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+                          className={`h-8 text-xs font-medium ${!rule.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-850"}`}
                           onClick={() => toggleRule(rule.id, rule.enabled)}
                         >
                           {rule.enabled ? "Disable" : "Enable"}
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="destructive"
                           className="h-8 text-xs font-medium"
                           onClick={() => handleDeleteRule(rule.id)}
@@ -968,7 +1449,7 @@ export default function SecurityPage() {
                 Clear All Logs
               </Button>
               <select
-                className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                className="bg-background text-foreground border border-input rounded-md px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -977,7 +1458,7 @@ export default function SecurityPage() {
                 <option value="Blocked">Blocked</option>
               </select>
               <select
-                className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                className="bg-background text-foreground border border-input rounded-md px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
                 value={rowsPerPage}
                 onChange={(e) => setRowsPerPage(Number(e.target.value))}
               >
@@ -990,30 +1471,30 @@ export default function SecurityPage() {
           </CardHeader>
           <CardContent>
             {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length > 0 && (
-              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                <span className="text-xs font-semibold text-slate-700">
+              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                   {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length} log(s) selected
                 </span>
                 <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="destructive" 
-                    className="h-8 text-xs font-medium" 
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8 text-xs font-medium"
                     onClick={() => handleBulkIPAction('ban')}
                   >
                     Bulk Ban IPs
                   </Button>
-                  <Button 
-                    size="sm" 
-                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium" 
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                     onClick={() => handleBulkIPAction('whitelist')}
                   >
                     Bulk Whitelist IPs
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="h-8 text-xs border-slate-300 hover:bg-slate-100 text-slate-700 font-medium" 
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs border-slate-300 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-200 font-medium"
                     onClick={handleBulkDeleteLogs}
                   >
                     Delete Logs
@@ -1025,8 +1506,8 @@ export default function SecurityPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[40px]">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
                       checked={displayLogs.length > 0 && displayLogs.every(l => {
                         const logId = l.id || `${l.timestamp}-${l.ip}`;
@@ -1048,8 +1529,8 @@ export default function SecurityPage() {
                   return (
                     <TableRow key={logId}>
                       <TableCell>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
                           checked={!!selectedLogIds[logId]}
                           onChange={e => handleSelectLog(logId, e.target.checked)}
@@ -1059,16 +1540,16 @@ export default function SecurityPage() {
                         {parseSafeDate(log.timestamp).toLocaleTimeString()}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{log.ip}</TableCell>
-                      <TableCell 
-                        className="text-xs truncate max-w-[150px] cursor-pointer hover:bg-slate-50 transition-colors text-blue-600 underline-offset-4 hover:underline" 
+                      <TableCell
+                        className="text-xs truncate max-w-[150px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-blue-600 underline-offset-4 hover:underline"
                         title="Click to view full payload"
                         onClick={() => setSelectedLog(log)}
                       >
-                        <span className="font-bold mr-1 text-slate-800">{log.method}</span>
+                        <span className="font-bold mr-1 text-slate-800 dark:text-slate-200">{log.method}</span>
                         {log.url}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {log.rule_id ? <Badge variant="secondary" className="text-[10px]">{log.rule_id}</Badge> : '-'}
+                        {log.ruleId ? <Badge variant="secondary" className="text-[10px]">{log.ruleId}</Badge> : '-'}
                       </TableCell>
                       <TableCell>
                         {log.status === 'Blocked' ? (
@@ -1095,7 +1576,7 @@ export default function SecurityPage() {
 
       {/* Payload Details Sheet */}
       <Sheet open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <SheetContent className="sm:max-w-[500px]">
+        <SheetContent className="sm:max-w-[500px] overflow-y-auto">
           <SheetHeader className="mb-6">
             <SheetTitle>Payload Details</SheetTitle>
             <SheetDescription>
@@ -1107,10 +1588,10 @@ export default function SecurityPage() {
               <div className="grid grid-cols-2 gap-y-3 text-sm">
                 <div className="font-semibold text-slate-500">Timestamp</div>
                 <div>{parseSafeDate(selectedLog.timestamp).toLocaleString()}</div>
-                
+
                 <div className="font-semibold text-slate-500">IP Address</div>
                 <div className="font-mono">{selectedLog.ip}</div>
-                
+
                 <div className="font-semibold text-slate-500">Status</div>
                 <div>
                   {selectedLog.status === 'Blocked' ? (
@@ -1119,29 +1600,124 @@ export default function SecurityPage() {
                     <Badge variant="outline">Allowed</Badge>
                   )}
                 </div>
-                
+
                 <div className="font-semibold text-slate-500">Rule ID</div>
                 <div>{selectedLog.rule_id ? <Badge variant="secondary">{selectedLog.rule_id}</Badge> : '-'}</div>
-                
+
                 <div className="font-semibold text-slate-500">Method</div>
                 <div className="font-bold">{selectedLog.method}</div>
               </div>
 
               <div>
-                <div className="font-semibold text-slate-800 mb-2 text-sm">Full Request URL / Payload:</div>
-                <div className="bg-slate-950 text-emerald-400 p-4 rounded-md text-xs font-mono break-all max-h-[300px] overflow-y-auto border border-slate-800 shadow-inner">
+                <div className="font-semibold text-slate-800 dark:text-slate-250 mb-2 text-sm">Full Request URL / Payload:</div>
+                <div className="bg-slate-950 text-emerald-400 p-4 rounded-md text-xs font-mono break-all max-h-[220px] overflow-y-auto border border-slate-800 shadow-inner">
                   {selectedLog.url}
                 </div>
               </div>
-              
+
               {selectedLog.details && (
                 <div>
-                  <div className="font-semibold text-slate-800 mb-2 text-sm">Evaluation Details:</div>
-                  <div className="bg-slate-100 text-slate-800 p-3 rounded-md text-xs font-mono border border-slate-200">
+                  <div className="font-semibold text-slate-800 dark:text-slate-250 mb-2 text-sm">Evaluation Details:</div>
+                  <div className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-3 rounded-md text-xs font-mono border border-slate-200 dark:border-slate-800">
                     {selectedLog.details}
                   </div>
                 </div>
               )}
+
+              <hr className="border-slate-200 dark:border-slate-800" />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">IP Threat Intel & Location</div>
+                  {vtResult && (
+                    <Badge variant={vtResult.stats.malicious > 0 ? "destructive" : "secondary"} className={vtResult.stats.malicious > 0 ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}>
+                      {vtResult.stats.malicious > 0 ? `${vtResult.stats.malicious} Malicious` : "Clean / Harmless"}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Status indicator: Key set or Demo fallback */}
+                {!VIRUSTOTAL_API_KEY && (
+                  <p className="text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                    ℹ️ Running in demo mode. Configure your API key in <code>SecurityPage.tsx</code> to use your own limits.
+                  </p>
+                )}
+
+                {!vtResult && !vtLoading && (
+                  <Button
+                    size="sm"
+                    className="w-full h-9 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium flex items-center justify-center gap-1.5"
+                    onClick={() => handleCheckReputation(selectedLog.ip)}
+                  >
+                    <Activity className="h-4 w-4" /> Check Reputation & Location
+                  </Button>
+                )}
+
+                {vtLoading && (
+                  <div className="flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+                    <div className="flex flex-col items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-300 border-t-slate-800"></div>
+                      Fetching IP intelligence & coordinates...
+                    </div>
+                  </div>
+                )}
+
+                {vtError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-750 dark:text-red-400 text-xs rounded-lg border border-red-200 dark:border-red-900/50 font-medium">
+                    ⚠️ Error: {vtError}
+                  </div>
+                )}
+
+                {vtResult && (
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3 text-xs animate-in fade-in duration-200">
+                    <div className="grid grid-cols-2 gap-y-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
+                      <div className="text-slate-500 font-medium">ISP / AS Owner</div>
+                      <div className="font-semibold text-slate-850 dark:text-slate-100 break-words">{vtResult.asOwner}</div>
+
+                      <div className="text-slate-500 font-medium">Location</div>
+                      <div className="font-semibold text-slate-850 dark:text-slate-100">
+                        {vtResult.cityName && `${vtResult.cityName}, `}
+                        {vtResult.regionName && `${vtResult.regionName}, `}
+                        {vtResult.country} ({vtResult.countryCode})
+                      </div>
+
+                      <div className="text-slate-500 font-medium">Network (CIDR)</div>
+                      <div className="font-mono text-slate-850 dark:text-slate-200">{vtResult.network}</div>
+
+                      <div className="text-slate-500 font-medium">Proxy/VPN Status</div>
+                      <div>
+                        {vtResult.isProxy ? (
+                          <Badge variant="destructive" className="bg-red-100 text-red-800 text-[10px] font-semibold">VPN / Proxy Detected</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 text-[10px] font-semibold">Residential / Direct</Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="text-slate-500 font-medium pb-0.5">VirusTotal Engine Votes:</div>
+                      <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                        <div className="bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-400 rounded p-1.5 border border-red-100 dark:border-red-900/30 font-semibold">
+                          <span className="block text-xs font-bold text-red-600 dark:text-red-400">{vtResult.stats.malicious}</span>
+                          Malicious
+                        </div>
+                        <div className="bg-orange-50 dark:bg-orange-950/20 text-orange-800 dark:text-orange-400 rounded p-1.5 border border-orange-100 dark:border-orange-900/30 font-semibold">
+                          <span className="block text-xs font-bold text-orange-600 dark:text-orange-400">{vtResult.stats.suspicious}</span>
+                          Suspicious
+                        </div>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 rounded p-1.5 border border-emerald-100 dark:border-emerald-900/30 font-semibold">
+                          <span className="block text-xs font-bold text-emerald-600 dark:text-emerald-400">{vtResult.stats.harmless}</span>
+                          Harmless
+                        </div>
+                        <div className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded p-1.5 border border-slate-200 dark:border-slate-700 font-semibold">
+                          <span className="block text-xs font-bold text-slate-600 dark:text-slate-400">{vtResult.stats.undetected}</span>
+                          Undetected
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </SheetContent>
@@ -1158,23 +1734,23 @@ export default function SecurityPage() {
           </SheetHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block text-slate-700">Description</label>
+              <label className="text-sm font-medium mb-1 block text-slate-700 dark:text-slate-300">Description</label>
               <Input placeholder="e.g. Detect malicious payload" value={newRuleDesc} onChange={(e) => setNewRuleDesc(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block text-slate-700">Regex Pattern</label>
+              <label className="text-sm font-medium mb-1 block text-slate-700 dark:text-slate-300">Regex Pattern</label>
               <Input placeholder="e.g. (?i)(select|drop|union)" value={newRulePattern} onChange={(e) => setNewRulePattern(e.target.value)} />
               <p className="text-[10px] text-slate-500 mt-1">Must be a valid Go regex pattern.</p>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block text-slate-700">Tags (comma separated)</label>
+              <label className="text-sm font-medium mb-1 block text-slate-700 dark:text-slate-300">Tags (comma separated)</label>
               <Input placeholder="e.g. sqli, xss" value={newRuleTags} onChange={(e) => setNewRuleTags(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block text-slate-700">Impact Score (1-10)</label>
+              <label className="text-sm font-medium mb-1 block text-slate-700 dark:text-slate-300">Impact Score (1-10)</label>
               <Input type="number" min="1" max="10" value={newRuleImpact} onChange={(e) => setNewRuleImpact(e.target.value)} />
             </div>
-            <Button className="w-full mt-4" onClick={handleAddRule}>Save Rule</Button>
+            <Button className="w-full mt-4 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white" onClick={handleAddRule}>Save Rule</Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -1196,17 +1772,17 @@ export default function SecurityPage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-semibold mb-1 block text-slate-700">Description</label>
-                  <Input 
-                    value={editRuleDesc} 
-                    onChange={(e) => setEditRuleDesc(e.target.value)} 
+                  <Input
+                    value={editRuleDesc}
+                    onChange={(e) => setEditRuleDesc(e.target.value)}
                     placeholder="e.g. Detect SQL comment bypass"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-semibold mb-1 block text-slate-700">Regex Pattern</label>
-                  <Input 
-                    value={editRulePattern} 
-                    onChange={(e) => setEditRulePattern(e.target.value)} 
+                  <Input
+                    value={editRulePattern}
+                    onChange={(e) => setEditRulePattern(e.target.value)}
                     placeholder="e.g. (?i)(select|union)"
                     className="font-mono text-xs"
                   />
@@ -1214,20 +1790,20 @@ export default function SecurityPage() {
                 </div>
                 <div>
                   <label className="text-sm font-semibold mb-1 block text-slate-700">Tags (comma separated)</label>
-                  <Input 
-                    value={editRuleTags} 
-                    onChange={(e) => setEditRuleTags(e.target.value)} 
+                  <Input
+                    value={editRuleTags}
+                    onChange={(e) => setEditRuleTags(e.target.value)}
                     placeholder="e.g. sqli, bypass"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-semibold mb-1 block text-slate-700">Impact Score (1-10)</label>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    max="10" 
-                    value={editRuleImpact} 
-                    onChange={(e) => setEditRuleImpact(e.target.value)} 
+                  <Input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={editRuleImpact}
+                    onChange={(e) => setEditRuleImpact(e.target.value)}
                   />
                 </div>
                 <div className="flex justify-end gap-2 mt-6">
@@ -1237,31 +1813,31 @@ export default function SecurityPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-lg border border-slate-100 dark:border-slate-800">
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Rule ID</div>
-                    <div className="mt-1 font-mono text-sm text-slate-800">{selectedRuleForDetail.id}</div>
+                    <div className="mt-1 font-mono text-sm text-slate-800 dark:text-slate-200">{selectedRuleForDetail.id}</div>
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</div>
                     <div className="mt-1">
                       {selectedRuleForDetail.enabled ? (
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">Active</Badge>
+                        <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-450 border-0">Active</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-slate-400">Disabled</Badge>
+                        <Badge variant="outline" className="text-slate-400 border-slate-300 dark:border-slate-800">Disabled</Badge>
                       )}
                     </div>
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Impact Score</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-800">{selectedRuleForDetail.impact || '5'}/10</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedRuleForDetail.impact || '5'}/10</div>
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tags</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {selectedRuleForDetail.tags && selectedRuleForDetail.tags.length > 0 ? (
                         selectedRuleForDetail.tags.map((t: string) => (
-                          <Badge key={t} variant="outline" className="text-[10px] bg-slate-100">{t}</Badge>
+                          <Badge key={t} variant="outline" className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent">{t}</Badge>
                         ))
                       ) : (
                         <span className="text-slate-400 text-xs">-</span>
@@ -1271,23 +1847,23 @@ export default function SecurityPage() {
                 </div>
 
                 <div>
-                  <div className="text-sm font-semibold text-slate-700 mb-1.5">Description</div>
-                  <div className="text-sm text-slate-800 bg-white border border-slate-200 rounded p-3 leading-relaxed shadow-sm">
+                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Description</div>
+                  <div className="text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded p-3 leading-relaxed shadow-sm">
                     {selectedRuleForDetail.description}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-sm font-semibold text-slate-700 mb-1.5">Regular Expression Pattern</div>
+                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Regular Expression Pattern</div>
                   <div className="bg-slate-950 text-emerald-400 p-4 rounded-md text-xs font-mono break-all max-h-[150px] overflow-y-auto border border-slate-800 shadow-inner">
                     {selectedRuleForDetail.pattern}
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button 
+                  <Button
                     variant="outline"
-                    className="border-slate-300 text-slate-700 hover:bg-slate-100"
+                    className="border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={() => {
                       setEditRuleDesc(selectedRuleForDetail.description || "");
                       setEditRulePattern(selectedRuleForDetail.pattern || "");
@@ -1298,8 +1874,8 @@ export default function SecurityPage() {
                   >
                     Edit Rule
                   </Button>
-                  <Button 
-                    variant={selectedRuleForDetail.enabled ? "outline" : "default"} 
+                  <Button
+                    variant={selectedRuleForDetail.enabled ? "outline" : "default"}
                     className={!selectedRuleForDetail.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
                     onClick={() => {
                       toggleRule(selectedRuleForDetail.id, selectedRuleForDetail.enabled);
@@ -1308,7 +1884,7 @@ export default function SecurityPage() {
                   >
                     {selectedRuleForDetail.enabled ? "Disable" : "Enable"}
                   </Button>
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={() => {
                       handleDeleteRule(selectedRuleForDetail.id);
@@ -1338,37 +1914,44 @@ export default function SecurityPage() {
           </DialogHeader>
 
           {selectedDetailIP && (() => {
-            const entry = ipList.find(e => e.ip === selectedDetailIP) || { status: 'Banned', reason: 'Automatic WAF Ban' };
+            // Loaded entry from list
             const ipLogs = logs.filter(l => l.ip === selectedDetailIP);
             const blockedLogs = ipLogs.filter(l => l.status === 'Blocked');
             const allowedLogs = ipLogs.filter(l => l.status === 'Allowed');
-            
+
             return (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-lg border border-slate-100 dark:border-slate-800">
                   <div>
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Access Status</div>
-                    <div className="mt-1 flex items-center gap-2">
-                      {entry.status === 'Banned' ? (
-                        <Badge variant="destructive" className="px-2.5 py-1">Banned (Access Blocked)</Badge>
-                      ) : entry.status === 'Whitelisted' ? (
-                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1">Whitelisted</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="px-2.5 py-1">Muted / Ignored</Badge>
-                      )}
-                    </div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Access Status</div>
+                    <select
+                      className="bg-background text-foreground border border-input rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring w-full font-medium"
+                      value={editIPStatus}
+                      onChange={(e) => setEditIPStatus(e.target.value)}
+                    >
+                      <option value="ban">Banned (Blocked)</option>
+                      <option value="whitelist">Whitelisted (Allowed)</option>
+                      <option value="ignore">Muted (No Log)</option>
+                      <option value="banned_muted">Banned & Muted (Block, No Log)</option>
+                      <option value="whitelisted_muted">Whitelisted & Muted (Allow, No Log)</option>
+                    </select>
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimated Category</div>
-                    <div className="mt-1">
-                      <Badge variant="outline" className="px-2 py-0.5 border-slate-300 text-slate-700 font-medium">
-                        {getIPCategory(entry.reason)}
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Estimated Category</div>
+                    <div className="h-8 flex items-center">
+                      <Badge variant="outline" className="px-2 py-0.5 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium bg-background">
+                        {getIPCategory(editIPReason)}
                       </Badge>
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Action Trigger / Reason</div>
-                    <div className="mt-1 text-sm text-slate-700 font-medium">{entry.reason || "No reason specified."}</div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Action Trigger / Reason</div>
+                    <Input
+                      className="bg-background text-foreground border border-input rounded px-3 py-1.5 text-sm w-full"
+                      value={editIPReason}
+                      onChange={(e) => setEditIPReason(e.target.value)}
+                      placeholder="e.g. Local developer testing / DDoS source"
+                    />
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Threat Events</div>
@@ -1381,12 +1964,12 @@ export default function SecurityPage() {
                 </div>
 
                 <div>
-                  <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
                     <Activity className="h-4 w-4 text-slate-500" /> Recent Activity Log ({ipLogs.length} records)
                   </div>
-                  <div className="overflow-hidden border border-slate-200 rounded-md max-h-[250px] overflow-y-auto shadow-inner bg-white">
+                  <div className="overflow-hidden border border-slate-200 dark:border-slate-800 rounded-md max-h-[250px] overflow-y-auto shadow-inner bg-white dark:bg-slate-950">
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-slate-50 dark:bg-slate-900/60">
                         <TableRow>
                           <TableHead className="text-xs py-2 h-9">Time</TableHead>
                           <TableHead className="text-xs py-2 h-9">Method & URL</TableHead>
@@ -1401,11 +1984,11 @@ export default function SecurityPage() {
                           </TableRow>
                         ) : (
                           ipLogs.map((l, idx) => (
-                            <TableRow key={idx} className="hover:bg-slate-50/50">
+                            <TableRow key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                               <TableCell className="text-[11px] whitespace-nowrap text-slate-500 py-1.5">
                                 {parseSafeDate(l.timestamp).toLocaleTimeString()}
                               </TableCell>
-                              <TableCell className="text-[11px] font-mono max-w-[280px] truncate text-slate-800 py-1.5" title={l.url}>
+                              <TableCell className="text-[11px] font-mono max-w-[280px] truncate text-slate-800 dark:text-slate-205 py-1.5" title={l.url}>
                                 <span className="font-bold mr-1">{l.method}</span>{l.url}
                               </TableCell>
                               <TableCell className="text-[11px] py-1.5">
@@ -1415,7 +1998,7 @@ export default function SecurityPage() {
                                 {l.status === 'Blocked' ? (
                                   <Badge variant="destructive" className="text-[9px] px-1.5">Blocked</Badge>
                                 ) : (
-                                  <Badge variant="outline" className="text-[9px] px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50">Allowed</Badge>
+                                  <Badge variant="outline" className="text-[9px] px-1.5 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30 bg-emerald-50 dark:bg-emerald-950/20">Allowed</Badge>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -1427,10 +2010,10 @@ export default function SecurityPage() {
                 </div>
 
                 <div className="flex justify-between items-center border-t pt-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-9 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-700 dark:text-rose-450 dark:border-rose-900/50 font-medium"
                     onClick={() => {
                       handleIPSubmit('remove', selectedDetailIP);
                       setSelectedDetailIP(null);
@@ -1438,13 +2021,26 @@ export default function SecurityPage() {
                   >
                     Forget & Unban IP
                   </Button>
-                  <Button 
-                    size="sm" 
-                    className="h-9 bg-slate-900 text-white hover:bg-slate-800"
-                    onClick={() => setSelectedDetailIP(null)}
-                  >
-                    Close Profile
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      onClick={() => setSelectedDetailIP(null)}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                      onClick={async () => {
+                        await handleIPSubmit(editIPStatus, selectedDetailIP, editIPReason);
+                        setSelectedDetailIP(null);
+                      }}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
@@ -1455,15 +2051,15 @@ export default function SecurityPage() {
       {/* Category Analysis Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
         <DialogContent className="sm:max-w-[850px] p-0 overflow-hidden">
-          <div className="flex h-[550px] divide-x divide-slate-200">
+          <div className="flex h-[550px] divide-x divide-slate-200 dark:divide-slate-800">
             {/* Sidebar Categories List */}
-            <div className="w-[280px] bg-slate-50 p-6 flex flex-col justify-between">
+            <div className="w-[280px] bg-slate-50 dark:bg-slate-900 p-6 flex flex-col justify-between">
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     <ListFilter className="h-4 w-4 text-emerald-600" /> Categories
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1">Select category to audit banned IPs</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Select category to audit banned IPs</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1479,24 +2075,22 @@ export default function SecurityPage() {
                   ].map((category) => {
                     const count = ipList.filter(e => getIPCategory(e.reason) === category).length;
                     const isActive = selectedAnalysisCategory === category;
-                    
+
                     return (
                       <button
                         key={category}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                          isActive 
-                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                            : 'hover:bg-slate-200/60 text-slate-700'
-                        }`}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${isActive
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10'
+                          : 'hover:bg-slate-200/60 dark:hover:bg-slate-850/60 text-slate-700 dark:text-slate-350'
+                          }`}
                         onClick={() => setSelectedAnalysisCategory(category)}
                       >
                         <span className="truncate mr-2">{category}</span>
-                        <Badge 
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                            isActive 
-                              ? 'bg-white/20 text-white border-transparent' 
-                              : 'bg-slate-200 text-slate-700'
-                          }`}
+                        <Badge
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive
+                            ? 'bg-white/20 text-white border-transparent'
+                            : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
                         >
                           {count}
                         </Badge>
@@ -1506,50 +2100,50 @@ export default function SecurityPage() {
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-400 border-t pt-4">
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 border-t dark:border-slate-800 pt-4">
                 Powered by live Go WAF rules parser.
               </div>
             </div>
 
             {/* Right Pane List of IPs */}
-            <div className="flex-1 p-6 flex flex-col justify-between bg-white">
+            <div className="flex-1 p-6 flex flex-col justify-between bg-white dark:bg-slate-950">
               <div className="space-y-4 overflow-hidden flex flex-col h-full">
-                <div className="border-b pb-3">
+                <div className="border-b dark:border-slate-800 pb-3">
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-emerald-100 text-emerald-800 border-transparent text-xs hover:bg-emerald-100 font-bold">
+                    <Badge className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border-transparent text-xs hover:bg-emerald-100 font-bold">
                       Category
                     </Badge>
-                    <h2 className="text-lg font-bold text-slate-900">{selectedAnalysisCategory}</h2>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{selectedAnalysisCategory}</h2>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     IPs flagged by Go WAF matching signatures for this category.
                   </p>
                 </div>
 
                 {(() => {
                   const filteredIPs = ipList.filter(e => getIPCategory(e.reason) === selectedAnalysisCategory);
-                  
+
                   return (
                     <div className="flex-1 overflow-y-auto pr-1 min-h-0">
                       {filteredIPs.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full py-12 text-center text-slate-400 space-y-2">
-                          <CheckCircle2 className="h-10 w-10 text-slate-300" />
-                          <p className="text-sm font-semibold">No IPs in this category</p>
-                          <p className="text-xs">No threats detected matching these signatures currently.</p>
+                          <CheckCircle2 className="h-10 w-10 text-slate-300 dark:text-slate-700" />
+                          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No IPs in this category</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">No threats detected matching these signatures currently.</p>
                         </div>
                       ) : (
                         <div className="space-y-2.5">
                           {filteredIPs.map((entry) => {
                             const ipLogsCount = logs.filter(l => l.ip === entry.ip).length;
                             return (
-                              <div 
-                                key={entry.ip} 
-                                className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+                              <div
+                                key={entry.ip}
+                                className="flex items-center justify-between p-3 border border-slate-100 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors shadow-sm bg-card"
                               >
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <span 
-                                      className="font-mono text-sm font-bold text-slate-800 cursor-pointer hover:underline hover:text-emerald-600"
+                                    <span
+                                      className="font-mono text-sm font-bold text-slate-850 dark:text-slate-200 cursor-pointer hover:underline hover:text-emerald-600"
                                       onClick={() => {
                                         setSelectedDetailIP(entry.ip);
                                       }}
@@ -1562,26 +2156,26 @@ export default function SecurityPage() {
                                       <Badge className="bg-emerald-600 text-white text-[9px] px-1.5 py-0">Whitelist</Badge>
                                     )}
                                   </div>
-                                  <div className="text-[11px] text-slate-500 font-medium truncate max-w-[350px]" title={entry.reason}>
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[350px]" title={entry.reason}>
                                     Reason: {entry.reason || "-"}
                                   </div>
-                                  <div className="text-[10px] text-slate-400">
+                                  <div className="text-[10px] text-slate-400 dark:text-slate-500">
                                     Activity log count: {ipLogsCount} records
                                   </div>
                                 </div>
                                 <div className="flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="h-8 text-xs font-semibold"
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs font-semibold border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900"
                                     onClick={() => setSelectedDetailIP(entry.ip)}
                                   >
                                     Details
                                   </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-semibold"
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-semibold"
                                     onClick={() => handleIPSubmit('remove', entry.ip)}
                                   >
                                     Unban
@@ -1597,9 +2191,9 @@ export default function SecurityPage() {
                 })()}
               </div>
 
-              <div className="border-t pt-4 flex justify-end">
-                <Button 
-                  className="bg-slate-900 hover:bg-slate-800 text-white" 
+              <div className="border-t dark:border-slate-800 pt-4 flex justify-end">
+                <Button
+                  className="bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white"
                   onClick={() => setIsCategoryModalOpen(false)}
                 >
                   Close Analysis

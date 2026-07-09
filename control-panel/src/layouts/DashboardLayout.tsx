@@ -1,3 +1,4 @@
+import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { fetchApi } from '../lib/api';
 type NavigationItem = {
   name: string;
   href: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
 };
 
@@ -57,6 +58,7 @@ const allNavigation = navigationGroups.flatMap(g => g.items);
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+
   const { data: authData, isAdmin } = useAuthMeViewModel();
 
   const visibleNavigation = allNavigation.filter(n => isAdmin || !n.adminOnly);
@@ -76,7 +78,7 @@ export default function DashboardLayout() {
 
   const userEmail = localStorage.getItem('userEmail') || '';
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex h-full flex-col bg-slate-900">
       <div className="flex h-16 shrink-0 items-center px-6">
         <ShieldAlert className="h-8 w-8 text-indigo-500" />
@@ -159,7 +161,7 @@ export default function DashboardLayout() {
     <div className="min-h-screen bg-slate-50 flex">
       {/* Mobile sidebar */}
       <Sheet>
-        <div className="lg:hidden flex items-center p-4 border-b bg-white w-full fixed top-0 z-10 h-16">
+        <div className="lg:hidden flex items-center p-4 border-b bg-white w-full fixed top-0 z-10 h-16 text-slate-800">
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="-ml-2">
               <Menu className="h-6 w-6" />
@@ -169,19 +171,19 @@ export default function DashboardLayout() {
           <div className="ml-4 font-bold">WAF Control Panel</div>
         </div>
         <SheetContent side="left" className="p-0 w-64 border-r-0">
-          <SidebarContent />
+          {renderSidebarContent()}
         </SheetContent>
       </Sheet>
 
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 z-20">
-        <SidebarContent />
+        {renderSidebarContent()}
       </div>
 
       {/* Main Content */}
       <div className="flex-1 lg:pl-64 flex flex-col pt-16 lg:pt-0 min-w-0">
-        <header className="hidden lg:flex h-16 flex-shrink-0 items-center justify-between border-b bg-white px-8">
-          <h1 className="text-xl font-semibold text-slate-800">
+        <header className="hidden lg:flex h-16 flex-shrink-0 items-center justify-between border-b bg-white px-8 text-slate-800">
+          <h1 className="text-xl font-semibold">
             {visibleNavigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
           </h1>
           <div className="flex items-center space-x-4">
