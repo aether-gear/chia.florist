@@ -39,7 +39,7 @@ func (r *accountRepositoryImpl) GetByEmail(
 		FROM
 			accounts
 		WHERE
-			email = $1
+			email = $1 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -84,7 +84,7 @@ func (r *accountRepositoryImpl) GetByID(
 		FROM
 			accounts
 		WHERE
-			id = $1
+			id = $1 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -129,7 +129,7 @@ func (r *accountRepositoryImpl) GetByUserID(
 		FROM
 			accounts
 		WHERE
-			user_id = $1
+			user_id = $1 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -239,6 +239,29 @@ func (r *accountRepositoryImpl) UpdatePasswordByUserID(
 
 	if result.RowsAffected() == 0 {
 		return apperrors.NewNotFound(domain.ErrNotFoundAccount.Error())
+	}
+
+	return nil
+}
+
+func (r *accountRepositoryImpl) DeleteByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) error {
+	query := `
+		UPDATE accounts
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE user_id = $1 AND deleted_at IS NULL
+	`
+
+	res, err := exec.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("query to delete account by user id: %w", err)
+	}
+
+	if res.RowsAffected() == 0 {
+		return apperrors.NewNotFound("account not found or already deleted")
 	}
 
 	return nil

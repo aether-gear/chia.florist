@@ -51,6 +51,12 @@ type CustomerAddressRepository interface {
 		exec transaction.Executor,
 		addressID uuid.UUID,
 	) error
+
+	DeleteByCustomerID(
+		ctx context.Context,
+		exec transaction.Executor,
+		customerID uuid.UUID,
+	) error
 }
 
 type ShopAddressRepository interface {

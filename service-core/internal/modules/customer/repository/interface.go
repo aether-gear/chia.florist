@@ -39,4 +39,10 @@ type CustomerRepository interface {
 		exec transaction.Executor,
 		params FindCustomerParams,
 	) ([]domain.CustomerProfile, int, error)
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
 }

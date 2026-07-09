@@ -111,6 +111,9 @@ func (m *mockCustomerRepo) GetProfileByUserID(_ context.Context, _ transaction.E
 func (m *mockCustomerRepo) FindCustomers(_ context.Context, _ transaction.Executor, _ customerRepo.FindCustomerParams) ([]customerDomain.CustomerProfile, int, error) {
 	return nil, 0, nil
 }
+func (m *mockCustomerRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
 
 // User Repo Mock
 type mockUserRepo struct {
@@ -131,6 +134,9 @@ func (m *mockUserRepo) SaveProfile(_ context.Context, _ transaction.Executor, pr
 	if m.saveProfile != nil {
 		return m.saveProfile(props)
 	}
+	return nil
+}
+func (m *mockUserRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
 
@@ -163,6 +169,9 @@ func (m *mockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transactio
 	m.lastPasswordUpdateHash = hash
 	return nil
 }
+func (m *mockAccountRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
 
 // OAuth connection mock
 type mockOAuthRepo struct {
@@ -183,6 +192,9 @@ func (m *mockOAuthRepo) Create(_ context.Context, _ transaction.Executor, _ doma
 }
 func (m *mockOAuthRepo) UpdateLastLogin(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time) error {
 	m.updateLastLoginCalls++
+	return nil
+}
+func (m *mockOAuthRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
 

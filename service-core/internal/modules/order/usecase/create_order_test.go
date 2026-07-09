@@ -84,6 +84,9 @@ func (m *coMockUserRepo) CreateUser(_ context.Context, _ transaction.Executor, _
 func (m *coMockUserRepo) SaveProfile(_ context.Context, _ transaction.Executor, _ userRepo.SaveProfileProps) error {
 	return nil
 }
+func (m *coMockUserRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
 
 // --- account repo ---
 
@@ -108,6 +111,9 @@ func (m *coMockAccountRepo) Create(_ context.Context, _ transaction.Executor, _ 
 	return nil
 }
 func (m *coMockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ string) error {
+	return nil
+}
+func (m *coMockAccountRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
 
@@ -332,6 +338,9 @@ func (m *coMockCartRepo) NewCart(_ context.Context, _ transaction.Executor, _ uu
 }
 func (m *coMockCartRepo) Save(_ context.Context, _ transaction.Executor, _ *cartDomain.Cart) error {
 	m.saved = true
+	return nil
+}
+func (m *coMockCartRepo) DeleteByCustomerID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
 

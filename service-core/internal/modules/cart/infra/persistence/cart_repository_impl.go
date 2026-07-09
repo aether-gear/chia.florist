@@ -202,3 +202,25 @@ func (r *cartRepositoryImpl) Save(
 
 	return nil
 }
+
+func (r *cartRepositoryImpl) DeleteByCustomerID(
+	ctx context.Context,
+	exec transaction.Executor,
+	customerID uuid.UUID,
+) error {
+	query := `
+		UPDATE cart_items ci
+		SET deleted_at = NOW(), updated_at = NOW()
+		FROM carts c
+		WHERE ci.cart_id = c.id
+			AND c.customer_id = $1
+			AND ci.deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, customerID)
+	if err != nil {
+		return fmt.Errorf("delete customer cart items failed: %w", err)
+	}
+
+	return nil
+}

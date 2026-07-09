@@ -37,7 +37,9 @@ func (r *userRepositoryImpl) GetByID(
 			a.last_login_at
 		FROM users u
 		LEFT JOIN accounts a ON a.user_id = u.id
-		WHERE u.id = $1
+		WHERE
+			u.id = $1
+			AND u.deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -71,7 +73,7 @@ func (r *userRepositoryImpl) GetByUsername(
 	username string,
 ) (*domain.User, error) {
 	query := `
-		SELECT 
+		SELECT
 			u.id,
 			u.name,
 			u.username,
@@ -83,7 +85,9 @@ func (r *userRepositoryImpl) GetByUsername(
 			a.last_login_at
 		FROM users u
 		LEFT JOIN accounts a ON a.user_id = u.id
-		WHERE u.username = $1
+		WHERE
+			u.username = $1
+			AND u.deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -168,6 +172,33 @@ func (r *userRepositoryImpl) SaveProfile(
 	)
 	if err != nil {
 		return fmt.Errorf("save user profile failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *userRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
+	query := `
+		UPDATE users
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	res, err := exec.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("query to delete user failed: %w", err)
+	}
+
+	if res.RowsAffected() == 0 {
+		return fmt.Errorf("user not found or already deleted")
 	}
 
 	return nil
