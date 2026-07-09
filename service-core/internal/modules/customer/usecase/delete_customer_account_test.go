@@ -9,8 +9,8 @@ import (
 	addressDomain "service-core/internal/modules/address/domain"
 	authenDomain "service-core/internal/modules/authentication/domain"
 	cartDomain "service-core/internal/modules/cart/domain"
-	customerDomain "service-core/internal/modules/customer/domain"
-	customerRepo "service-core/internal/modules/customer/repository"
+	"service-core/internal/modules/customer/domain"
+	"service-core/internal/modules/customer/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -100,19 +100,19 @@ type mockCustomerRepo struct {
 	deleteErr   error
 }
 
-func (m *mockCustomerRepo) Create(_ context.Context, _ transaction.Executor, _ customerDomain.Customer) error {
+func (m *mockCustomerRepo) Create(_ context.Context, _ transaction.Executor, _ domain.Customer) error {
 	return nil
 }
-func (m *mockCustomerRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*customerDomain.Customer, error) {
+func (m *mockCustomerRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*domain.Customer, error) {
 	return nil, nil
 }
-func (m *mockCustomerRepo) GetByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*customerDomain.Customer, error) {
+func (m *mockCustomerRepo) GetByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*domain.Customer, error) {
 	return nil, nil
 }
-func (m *mockCustomerRepo) GetProfileByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*customerDomain.CustomerProfile, error) {
+func (m *mockCustomerRepo) GetProfileByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*domain.CustomerProfile, error) {
 	return nil, nil
 }
-func (m *mockCustomerRepo) FindCustomers(_ context.Context, _ transaction.Executor, _ customerRepo.FindCustomerParams) ([]customerDomain.CustomerProfile, int, error) {
+func (m *mockCustomerRepo) FindCustomers(_ context.Context, _ transaction.Executor, _ repository.FindCustomerParams) ([]domain.CustomerProfile, int, error) {
 	return nil, 0, nil
 }
 func (m *mockCustomerRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {

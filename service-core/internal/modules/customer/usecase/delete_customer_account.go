@@ -10,14 +10,14 @@ import (
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authenRepo "service-core/internal/modules/authentication/repository"
 	cartRepo "service-core/internal/modules/cart/repository"
-	customerRepo "service-core/internal/modules/customer/repository"
+	"service-core/internal/modules/customer/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type DeleteCustomerAccountUsecase struct {
 	transactor          transaction.Transactor
 	userDeletionService authenRepo.UserDeletionService
-	customerRepo        customerRepo.CustomerRepository
+	customerRepo        repository.CustomerRepository
 	addressRepo         addressRepo.CustomerAddressRepository
 	cartRepo            cartRepo.CartRepository
 	auditLogger         applogger.AuditLogger
@@ -26,7 +26,7 @@ type DeleteCustomerAccountUsecase struct {
 func NewDeleteCustomerAccountUsecase(
 	transactor transaction.Transactor,
 	userDeletionService authenRepo.UserDeletionService,
-	customerRepo customerRepo.CustomerRepository,
+	customerRepo repository.CustomerRepository,
 	addressRepo addressRepo.CustomerAddressRepository,
 	cartRepo cartRepo.CartRepository,
 	auditLogger applogger.AuditLogger,
