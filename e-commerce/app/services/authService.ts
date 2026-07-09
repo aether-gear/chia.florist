@@ -8,7 +8,13 @@ import type {
   GetCurrentUserResponse,
   GetMeResponse,
   GetProfileResponse,
-  UpdateProfileRequest
+  UpdateProfileRequest,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  VerifyForgotPasswordRequest,
+  VerifyForgotPasswordResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse
 } from '~/types/auth'
 import { bootstrapConfig } from '~/utils/bootstrap'
 
@@ -108,6 +114,33 @@ export const authService = {
     return bootstrapConfig.fetchApi<GetProfileResponse>('/profile', {
       method: 'PUT',
       headers,
+      body: data
+    })
+  },
+  /**
+   * Request a forgot password OTP via email.
+   */
+  async forgotPassword(data: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
+    return $fetch<ForgotPasswordResponse>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: data
+    })
+  },
+  /**
+   * Verify the forgot password OTP.
+   */
+  async verifyForgotPassword(data: VerifyForgotPasswordRequest): Promise<VerifyForgotPasswordResponse> {
+    return $fetch<VerifyForgotPasswordResponse>('/api/auth/forgot-password-verify', {
+      method: 'POST',
+      body: data
+    })
+  },
+  /**
+   * Reset the password after verification.
+   */
+  async resetPassword(data: ResetPasswordRequest): Promise<ResetPasswordResponse> {
+    return $fetch<ResetPasswordResponse>('/api/auth/forgot-password-reset', {
+      method: 'POST',
       body: data
     })
   }
