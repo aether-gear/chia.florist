@@ -316,6 +316,7 @@ func NewContainer(cfg Config,
 			accountRepo,
 			userRepo,
 			actorSvc,
+			oauthRepo,
 		),
 		Logout: *authenUsecase.NewLogoutUsecase(
 			infra.TransactionProvider,

@@ -49,6 +49,7 @@ func TestMeUsecase_Execute_Success(t *testing.T) {
 		accountRepoMock,
 		userRepoMock,
 		actorSvcMock,
+		&mockOAuthRepo{},
 	)
 
 	authCtx := domain.AuthContext{

@@ -53,6 +53,7 @@ type meResponse struct {
 	StaffID         *uuid.UUID           `json:"staff_id,omitempty"`
 	Roles           []roleResponse       `json:"roles,omitempty"`
 	Permissions     []permissionResponse `json:"permissions,omitempty"`
+	OAuthProvider   *string              `json:"oauth_provider,omitempty"`
 }
 
 type forgotPasswordCustomerRequest struct {

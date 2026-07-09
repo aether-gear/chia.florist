@@ -125,6 +125,12 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 		avatarURL = me.User.AvatarURL
 	}
 
+	var oauthProvider *string
+	if me.OAuth != nil {
+		providerStr := string(me.OAuth.Provider)
+		oauthProvider = &providerStr
+	}
+
 	response := meResponse{
 		AccountID:       me.Account.ID,
 		AccountType:     string(me.Account.Type),
@@ -133,6 +139,7 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 		StaffID:         me.Actor.StaffID,
 		Roles:           roles,
 		Permissions:     permissions,
+		OAuthProvider:   oauthProvider,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

@@ -19,6 +19,7 @@ type MeUsecase struct {
 	accountRepo repository.AccountRepository
 	userRepo    userRepo.UserRepository
 	actorSvc    authorRepo.ActorService
+	oauthRepo   repository.OAuthConnectionRepository
 }
 
 func NewMeUsecase(
@@ -26,12 +27,14 @@ func NewMeUsecase(
 	accountRepo repository.AccountRepository,
 	userRepo userRepo.UserRepository,
 	actorSvc authorRepo.ActorService,
+	oauthRepo repository.OAuthConnectionRepository,
 ) *MeUsecase {
 	return &MeUsecase{
 		exec:        exec,
 		accountRepo: accountRepo,
 		userRepo:    userRepo,
 		actorSvc:    actorSvc,
+		oauthRepo:   oauthRepo,
 	}
 }
 
@@ -39,6 +42,7 @@ type MeResult struct {
 	Account domain.Account
 	Actor   authorDomain.Actor
 	User    *userDomain.User
+	OAuth   *domain.OAuthConnection
 }
 
 func (u *MeUsecase) Execute(
@@ -57,6 +61,7 @@ func (u *MeUsecase) Execute(
 	if account == nil {
 		return nil, apperrors.NewNotFound("account not found")
 	}
+
 	if account.Status != domain.AccountActive {
 		return nil, apperrors.NewForbidden(domain.ErrEmailNotVerified.Error())
 	}
@@ -77,9 +82,19 @@ func (u *MeUsecase) Execute(
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
+	var oauthConn *domain.OAuthConnection
+	if u.oauthRepo != nil {
+		oauthConn, err = u.oauthRepo.
+			GetByUserID(ctx, u.exec, authCtx.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve oauth connection: %w", err)
+		}
+	}
+
 	return &MeResult{
 		Account: *account,
 		Actor:   *actor,
 		User:    user,
+		OAuth:   oauthConn,
 	}, nil
 }
