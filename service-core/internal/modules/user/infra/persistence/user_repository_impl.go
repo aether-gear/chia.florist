@@ -153,7 +153,8 @@ func (r *userRepositoryImpl) SaveProfile(
 			name       = COALESCE($2, name),
 			phone      = COALESCE($3, phone),
 			avatar_url = COALESCE($4, avatar_url),
-			updated_at = $5
+			username   = COALESCE($5, username),
+			updated_at = $6
 		WHERE id = $1;
 	`
 
@@ -162,6 +163,7 @@ func (r *userRepositoryImpl) SaveProfile(
 		props.Name,
 		props.Phone,
 		props.AvatarURL,
+		props.Username,
 		props.UpdatedAt,
 	)
 	if err != nil {

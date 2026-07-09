@@ -32,5 +32,6 @@ type SaveProfileProps struct {
 	Name      *string
 	Phone     *string
 	AvatarURL *string
+	Username  *string
 	UpdatedAt time.Time
 }
