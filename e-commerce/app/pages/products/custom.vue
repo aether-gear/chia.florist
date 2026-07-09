@@ -20,6 +20,15 @@ const TOTAL_STEPS = 4
 const stepFlash = ref(false)
 const isAddingToCart = ref(false)
 
+const showToast = ref(false)
+const toastInfo = ref({
+  name: '',
+  image: '',
+  quantity: 1,
+  size: ''
+})
+let toastTimeout: any = null
+
 // ─── FLOATING PARTICLES (SPLASH) ─────────────────────────────
 interface Particle { id: number; x: number; y: number; size: number; opacity: number; dur: number; color: string; delay: number }
 const particles = ref<Particle[]>([])
@@ -177,6 +186,12 @@ const triggerConfetti = () => {
 }
 
 // ─── ADD TO CART ──────────────────────────────────────────────
+const closeToastAndGoHome = () => {
+  showToast.value = false
+  if (toastTimeout) clearTimeout(toastTimeout)
+  navigateTo('/')
+}
+
 const handleCustomAddToCart = async () => {
   isAddingToCart.value = true
   await new Promise(r => setTimeout(r, 700))
@@ -190,7 +205,19 @@ const handleCustomAddToCart = async () => {
     shopId: '99ef0062-1040-4574-a4be-0123abce5670',
     isCustom: true
   }, 1)
-  navigateTo('/cart')
+  isAddingToCart.value = false
+  
+  toastInfo.value = {
+    name: `Custom Board — ${selection.value.text.header || 'My Design'}`,
+    image: '/images/custom-preview.png',
+    quantity: 1,
+    size: selection.value.size.label
+  }
+  showToast.value = true
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => {
+    closeToastAndGoHome()
+  }, 2000)
 }
 
 // ─── KEYBOARD NAV ─────────────────────────────────────────────
@@ -201,7 +228,11 @@ const handleKey = (e: KeyboardEvent) => {
 }
 
 onMounted(() => { initParticles(); window.addEventListener('keydown', handleKey) })
-onUnmounted(() => { window.removeEventListener('keydown', handleKey); if (priceTimer) clearTimeout(priceTimer) })
+onUnmounted(() => { 
+  window.removeEventListener('keydown', handleKey)
+  if (priceTimer) clearTimeout(priceTimer)
+  if (toastTimeout) clearTimeout(toastTimeout)
+})
 </script>
 
 <template>
@@ -849,6 +880,27 @@ onUnmounted(() => { window.removeEventListener('keydown', handleKey); if (priceT
         </div>
       </div>
 
+    </Transition>
+
+    <!-- Toast Notification -->
+    <Transition name="toast-cust">
+      <div v-if="showToast" class="cart-toast-custom" role="alert">
+        <div class="toast-body-custom">
+          <div class="toast-icon-check-custom">✓</div>
+          <div class="toast-img-wrap-custom">
+            <img :src="toastInfo.image" class="toast-img-custom" />
+          </div>
+          <div class="toast-details-custom">
+            <h4 class="toast-title-custom">Added to Cart!</h4>
+            <p class="toast-name-custom">{{ toastInfo.name }}</p>
+            <p class="toast-meta-custom">Qty: {{ toastInfo.quantity }} | {{ toastInfo.size }}</p>
+          </div>
+        </div>
+        <div class="toast-actions-custom">
+          <NuxtLink to="/cart" class="btn-toast-view-custom">View Cart</NuxtLink>
+          <button @click="closeToastAndGoHome" class="btn-toast-close-custom">×</button>
+        </div>
+      </div>
     </Transition>
   </div>
 </template>
@@ -1815,5 +1867,151 @@ onUnmounted(() => { window.removeEventListener('keydown', handleKey); if (priceT
   .review-content { flex-direction: column; align-items: center; }
   .review-board-wrap { width: 100%; max-width: 280px; }
   .hud-center { display: none; }
+}
+
+/* Custom Dark-Themed Toast Notification for Simulator */
+.cart-toast-custom {
+  position: fixed;
+  top: 90px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  background: rgba(16, 24, 18, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #ffffff;
+}
+
+.toast-body-custom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.toast-icon-check-custom {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  flex-shrink: 0;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.toast-img-wrap-custom {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.toast-img-custom {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.toast-details-custom {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.toast-title-custom {
+  font-size: 14px;
+  font-weight: 800;
+  color: #10b981;
+  margin: 0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.toast-name-custom {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 4px 0 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-meta-custom {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 2px 0 0 0;
+  font-weight: 500;
+}
+
+.toast-actions-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed rgba(16, 185, 129, 0.2);
+  padding-top: 12px;
+}
+
+.btn-toast-view-custom {
+  font-size: 11px;
+  font-weight: 700;
+  color: #000000;
+  text-decoration: none;
+  background: #10b981;
+  padding: 6px 14px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.btn-toast-view-custom:hover {
+  background: #34d399;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-toast-close-custom {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.btn-toast-close-custom:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* Toast Transition for Custom */
+.toast-cust-enter-active, .toast-cust-leave-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-cust-enter-from {
+  transform: translateX(120%) scale(0.9);
+  opacity: 0;
+}
+.toast-cust-leave-to {
+  transform: translateX(120%) scale(0.9);
+  opacity: 0;
 }
 </style>

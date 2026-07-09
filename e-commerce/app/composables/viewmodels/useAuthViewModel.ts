@@ -5,13 +5,19 @@ import { supabaseService } from '~/services/supabaseService'
 import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest } from '~/types/auth'
 import { triggerAuthAlert } from '~/composables/useSessionState'
 
-// Shared global state so all components see the same auth state
-const currentUser = ref<UserMe | null>(null)
-const challengeId = ref<string | null>(null)
-const registrationEmail = ref<string | null>(null)
-const isInitialized = ref(false)
-
 export const useAuthViewModel = () => {
+  const currentUser = useState<UserMe | null>('auth_currentUser', () => {
+    const isLoggedIn = useCookie('is_logged_in')
+    const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+    if (isLoggedIn.value === 'true' && userProfile.value) {
+      return userProfile.value as UserMe
+    }
+    return null
+  })
+  const challengeId = useState<string | null>('auth_challengeId', () => null)
+  const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
+  const isInitialized = useState<boolean>('auth_isInitialized', () => false)
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isAuthenticated = computed(() => currentUser.value !== null)
@@ -40,10 +46,8 @@ export const useAuthViewModel = () => {
           console.warn('Failed to fetch profile details from Golang backend:', profileErr)
         }
         
-        let avatarUrlVal: string | null = null
-        if (profileDetails && profileDetails.AvatarURL) {
-          avatarUrlVal = profileDetails.AvatarURL
-        } else if (import.meta.client) {
+        let avatarUrlVal: string | null = profileDetails?.AvatarURL || null
+        if (import.meta.client) {
           try {
             const urls = await supabaseService.getAvatarUrls(profileDetails?.user_id || response.account_id)
             if (urls) {
@@ -74,11 +78,15 @@ export const useAuthViewModel = () => {
             avatarUrl: avatarUrlVal
           }
         } else {
-          userProfile.value.id = response.account_id
-          userProfile.value.avatarUrl = avatarUrlVal
+          // Re-create object to guarantee Vue reactivity triggers across all components
+          userProfile.value = {
+            ...userProfile.value,
+            id: response.account_id,
+            avatarUrl: avatarUrlVal
+          }
         }
         
-        currentUser.value = userProfile.value as UserMe
+        currentUser.value = { ...(userProfile.value as UserMe) }
       } else {
         currentUser.value = null
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
@@ -303,7 +311,7 @@ export const useAuthViewModel = () => {
         }
         const isLoggedIn = useCookie('is_logged_in')
         isLoggedIn.value = 'true'
-        currentUser.value = userProfile.value as UserMe
+        currentUser.value = { ...(userProfile.value as UserMe) }
         triggerAuthAlert('success', `Verification successful! Welcome to Chia Florist, ${name}.`)
         return true
       }
@@ -374,7 +382,7 @@ export const useAuthViewModel = () => {
           avatarUrl: profile.AvatarURL || userProfile.value?.avatarUrl || null
         }
         
-        currentUser.value = userProfile.value as UserMe
+        currentUser.value = { ...(userProfile.value as UserMe) }
         return { success: true, profile: response.profile }
       }
       return { success: false, message: 'Update failed: Empty response' }
