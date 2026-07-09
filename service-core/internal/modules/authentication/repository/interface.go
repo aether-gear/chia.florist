@@ -183,3 +183,11 @@ type OAuthConnectionRepository interface {
 		userID uuid.UUID,
 	) error
 }
+
+type UserDeletionService interface {
+	DeleteUserRecord(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) error
+}

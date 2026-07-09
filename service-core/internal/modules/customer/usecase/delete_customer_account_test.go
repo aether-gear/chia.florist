@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	applogger "service-core/internal/common/logger"
 	addressDomain "service-core/internal/modules/address/domain"
@@ -12,8 +11,6 @@ import (
 	cartDomain "service-core/internal/modules/cart/domain"
 	customerDomain "service-core/internal/modules/customer/domain"
 	customerRepo "service-core/internal/modules/customer/repository"
-	userDomain "service-core/internal/modules/user/domain"
-	userRepo "service-core/internal/modules/user/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -123,98 +120,15 @@ func (m *mockCustomerRepo) Delete(_ context.Context, _ transaction.Executor, _ u
 	return m.deleteErr
 }
 
-// UserRepository Mock
-type mockUserRepo struct {
+// UserDeletionService Mock
+type mockUserDeletionSvc struct {
 	deleteCalls int
+	deleteErr   error
 }
 
-func (m *mockUserRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*userDomain.User, error) {
-	return nil, nil
-}
-func (m *mockUserRepo) GetByUsername(_ context.Context, _ transaction.Executor, _ string) (*userDomain.User, error) {
-	return nil, nil
-}
-func (m *mockUserRepo) CreateUser(_ context.Context, _ transaction.Executor, _ userRepo.CreateUserProps) error {
-	return nil
-}
-func (m *mockUserRepo) SaveProfile(_ context.Context, _ transaction.Executor, _ userRepo.SaveProfileProps) error {
-	return nil
-}
-func (m *mockUserRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+func (m *mockUserDeletionSvc) DeleteUserRecord(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	m.deleteCalls++
-	return nil
-}
-
-// AccountRepository Mock
-type mockAccountRepo struct {
-	deleteCalls int
-}
-
-func (m *mockAccountRepo) GetByEmail(_ context.Context, _ transaction.Executor, _ string) (*authenDomain.Account, error) {
-	return nil, nil
-}
-func (m *mockAccountRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*authenDomain.Account, error) {
-	return nil, nil
-}
-func (m *mockAccountRepo) GetByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*authenDomain.Account, error) {
-	return nil, nil
-}
-func (m *mockAccountRepo) ActivateByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *mockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ string) error {
-	return nil
-}
-func (m *mockAccountRepo) Create(_ context.Context, _ transaction.Executor, _ authenDomain.Account) error {
-	return nil
-}
-func (m *mockAccountRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	m.deleteCalls++
-	return nil
-}
-
-// OAuthConnectionRepository Mock
-type mockOAuthRepo struct {
-	deleteCalls int
-}
-
-func (m *mockOAuthRepo) GetByProviderAndSubject(_ context.Context, _ transaction.Executor, _ authenDomain.OAuthProvider, _ string) (*authenDomain.OAuthConnection, error) {
-	return nil, nil
-}
-func (m *mockOAuthRepo) GetByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*authenDomain.OAuthConnection, error) {
-	return nil, nil
-}
-func (m *mockOAuthRepo) Create(_ context.Context, _ transaction.Executor, _ authenDomain.OAuthConnection) error {
-	return nil
-}
-func (m *mockOAuthRepo) UpdateLastLogin(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time) error {
-	return nil
-}
-func (m *mockOAuthRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	m.deleteCalls++
-	return nil
-}
-
-// SessionRepository Mock
-type mockSessionRepo struct {
-	revokeCalls int
-}
-
-func (m *mockSessionRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*authenDomain.Session, error) {
-	return nil, nil
-}
-func (m *mockSessionRepo) RevokeByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *mockSessionRepo) RevokeAllByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	m.revokeCalls++
-	return nil
-}
-func (m *mockSessionRepo) UpdateLastActivityByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *mockSessionRepo) Save(_ context.Context, _ transaction.Executor, _ authenDomain.Session) error {
-	return nil
+	return m.deleteErr
 }
 
 // ===========================================================================
@@ -227,19 +141,13 @@ func TestDeleteCustomerAccount_Success(t *testing.T) {
 	userID := uuid.New()
 
 	customerRepoMock := &mockCustomerRepo{}
-	userRepoMock := &mockUserRepo{}
-	accountRepoMock := &mockAccountRepo{}
-	oauthRepoMock := &mockOAuthRepo{}
+	userDeletionSvcMock := &mockUserDeletionSvc{}
 	addressRepoMock := &mockAddressRepo{}
 	cartRepoMock := &mockCartRepo{}
-	sessionRepoMock := &mockSessionRepo{}
 
 	uc := NewDeleteCustomerAccountUsecase(
 		&delMockTransactor{},
-		accountRepoMock,
-		oauthRepoMock,
-		sessionRepoMock,
-		userRepoMock,
+		userDeletionSvcMock,
 		customerRepoMock,
 		addressRepoMock,
 		cartRepoMock,
@@ -260,23 +168,14 @@ func TestDeleteCustomerAccount_Success(t *testing.T) {
 	if customerRepoMock.deleteCalls != 1 {
 		t.Errorf("expected 1 customer delete call, got %d", customerRepoMock.deleteCalls)
 	}
-	if userRepoMock.deleteCalls != 1 {
-		t.Errorf("expected 1 user delete call, got %d", userRepoMock.deleteCalls)
-	}
-	if accountRepoMock.deleteCalls != 1 {
-		t.Errorf("expected 1 account delete call, got %d", accountRepoMock.deleteCalls)
-	}
-	if oauthRepoMock.deleteCalls != 1 {
-		t.Errorf("expected 1 oauth delete call, got %d", oauthRepoMock.deleteCalls)
+	if userDeletionSvcMock.deleteCalls != 1 {
+		t.Errorf("expected 1 user deletion service call, got %d", userDeletionSvcMock.deleteCalls)
 	}
 	if addressRepoMock.deleteCalls != 1 {
 		t.Errorf("expected 1 address delete call, got %d", addressRepoMock.deleteCalls)
 	}
 	if cartRepoMock.deleteCalls != 1 {
 		t.Errorf("expected 1 cart delete call, got %d", cartRepoMock.deleteCalls)
-	}
-	if sessionRepoMock.revokeCalls != 1 {
-		t.Errorf("expected 1 sessions revoke call, got %d", sessionRepoMock.revokeCalls)
 	}
 }
 
@@ -285,10 +184,7 @@ func TestDeleteCustomerAccount_ForbiddenForNonCustomers(t *testing.T) {
 
 	uc := NewDeleteCustomerAccountUsecase(
 		&delMockTransactor{},
-		&mockAccountRepo{},
-		&mockOAuthRepo{},
-		&mockSessionRepo{},
-		&mockUserRepo{},
+		&mockUserDeletionSvc{},
 		&mockCustomerRepo{},
 		&mockAddressRepo{},
 		&mockCartRepo{},
@@ -318,10 +214,7 @@ func TestDeleteCustomerAccount_TransactionFailure(t *testing.T) {
 
 	uc := NewDeleteCustomerAccountUsecase(
 		&delMockTransactor{},
-		&mockAccountRepo{},
-		&mockOAuthRepo{},
-		&mockSessionRepo{},
-		&mockUserRepo{},
+		&mockUserDeletionSvc{},
 		customerRepoMock,
 		&mockAddressRepo{},
 		&mockCartRepo{},

@@ -215,6 +215,12 @@ func NewContainer(cfg Config,
 			accountRepo,
 			membershipRepo,
 		)
+		userDeletionSvc = authenSvc.NewUserDeletionService(
+			accountRepo,
+			oauthRepo,
+			sessionRepo,
+			userRepo,
+		)
 		authorMdwr = authorSvc.NewAuthorizer(
 			actorSvc,
 		)
@@ -443,10 +449,7 @@ func NewContainer(cfg Config,
 		DeleteCustomerAccount: *customerUsecase.
 			NewDeleteCustomerAccountUsecase(
 				infra.TransactionProvider,
-				accountRepo,
-				oauthRepo,
-				sessionRepo,
-				userRepo,
+				userDeletionSvc,
 				customerRepo,
 				addressRepo,
 				cartRepo,

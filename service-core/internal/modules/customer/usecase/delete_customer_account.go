@@ -10,44 +10,34 @@ import (
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authenRepo "service-core/internal/modules/authentication/repository"
 	cartRepo "service-core/internal/modules/cart/repository"
-	"service-core/internal/modules/customer/repository"
-	userRepo "service-core/internal/modules/user/repository"
+	customerRepo "service-core/internal/modules/customer/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type DeleteCustomerAccountUsecase struct {
-	transactor   transaction.Transactor
-	accountRepo  authenRepo.AccountRepository
-	oauthRepo    authenRepo.OAuthConnectionRepository
-	sessionRepo  authenRepo.SessionRepository
-	userRepo     userRepo.UserRepository
-	customerRepo repository.CustomerRepository
-	addressRepo  addressRepo.CustomerAddressRepository
-	cartRepo     cartRepo.CartRepository
-	auditLogger  applogger.AuditLogger
+	transactor          transaction.Transactor
+	userDeletionService authenRepo.UserDeletionService
+	customerRepo        customerRepo.CustomerRepository
+	addressRepo         addressRepo.CustomerAddressRepository
+	cartRepo            cartRepo.CartRepository
+	auditLogger         applogger.AuditLogger
 }
 
 func NewDeleteCustomerAccountUsecase(
 	transactor transaction.Transactor,
-	accountRepo authenRepo.AccountRepository,
-	oauthRepo authenRepo.OAuthConnectionRepository,
-	sessionRepo authenRepo.SessionRepository,
-	userRepo userRepo.UserRepository,
-	customerRepo repository.CustomerRepository,
+	userDeletionService authenRepo.UserDeletionService,
+	customerRepo customerRepo.CustomerRepository,
 	addressRepo addressRepo.CustomerAddressRepository,
 	cartRepo cartRepo.CartRepository,
 	auditLogger applogger.AuditLogger,
 ) *DeleteCustomerAccountUsecase {
 	return &DeleteCustomerAccountUsecase{
-		transactor:   transactor,
-		accountRepo:  accountRepo,
-		oauthRepo:    oauthRepo,
-		sessionRepo:  sessionRepo,
-		userRepo:     userRepo,
-		customerRepo: customerRepo,
-		addressRepo:  addressRepo,
-		cartRepo:     cartRepo,
-		auditLogger:  auditLogger,
+		transactor:          transactor,
+		userDeletionService: userDeletionService,
+		customerRepo:        customerRepo,
+		addressRepo:         addressRepo,
+		cartRepo:            cartRepo,
+		auditLogger:         auditLogger,
 	}
 }
 
@@ -68,21 +58,6 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 			return fmt.Errorf("failed to soft delete customer: %w", err)
 		}
 
-		if err := u.userRepo.
-			Delete(ctx, exec, userID); err != nil {
-			return fmt.Errorf("failed to soft delete user profile: %w", err)
-		}
-
-		if err := u.accountRepo.
-			DeleteByUserID(ctx, exec, userID); err != nil {
-			return fmt.Errorf("failed to soft delete account: %w", err)
-		}
-
-		if err := u.oauthRepo.
-			DeleteByUserID(ctx, exec, userID); err != nil {
-			return fmt.Errorf("failed to soft delete oauth connections: %w", err)
-		}
-
 		if err := u.addressRepo.
 			DeleteByCustomerID(ctx, exec, customerID); err != nil {
 			return fmt.Errorf("failed to soft delete customer addresses: %w", err)
@@ -93,9 +68,9 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 			return fmt.Errorf("failed to soft delete cart items: %w", err)
 		}
 
-		if err := u.sessionRepo.
-			RevokeAllByUserID(ctx, exec, userID); err != nil {
-			return fmt.Errorf("failed to revoke sessions: %w", err)
+		if err := u.userDeletionService.
+			DeleteUserRecord(ctx, exec, userID); err != nil {
+			return fmt.Errorf("failed to delete user record: %w", err)
 		}
 
 		return nil
