@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useCart } from '~/composables/useCart'
 import { useProductViewModel } from '~/composables/viewmodels/useProductViewModel'
@@ -7,6 +7,19 @@ import { useProductViewModel } from '~/composables/viewmodels/useProductViewMode
 const route = useRoute()
 const productId = computed(() => route.params.id as string)
 const { addToCart, formatRupiah } = useCart()
+
+const showToast = ref(false)
+const toastInfo = ref({
+  name: '',
+  image: '',
+  quantity: 1,
+  size: ''
+})
+let toastTimeout: ReturnType<typeof setTimeout> | null = null
+
+onUnmounted(() => {
+  if (toastTimeout) clearTimeout(toastTimeout)
+})
 
 const { currentProduct, isLoading, error, fetchProductById } = useProductViewModel()
 
@@ -57,7 +70,18 @@ const handleAddToCart = () => {
     shopId: product.value.shopId || '99ef0062-1040-4574-a4be-0123abce5670',
     isCustom: false
   }, quantity.value)
-  navigateTo('/cart')
+  
+  toastInfo.value = {
+    name: product.value.name,
+    image: activeImage.value || '/images/birthday.jpeg',
+    quantity: quantity.value,
+    size: selectedSize.value
+  }
+  showToast.value = true
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => {
+    showToast.value = false
+  }, 4000)
 }
 
 const handleBuyNow = () => {
@@ -217,5 +241,168 @@ useHead({
         </div>
       </div>
     </div>
+    
+    <!-- Toast Notification -->
+    <Transition name="toast">
+      <div v-if="showToast" class="cart-toast" role="alert">
+        <div class="toast-body">
+          <div class="toast-icon-check">✓</div>
+          <div class="toast-img-wrap">
+            <img :src="toastInfo.image" class="toast-img" />
+          </div>
+          <div class="toast-details">
+            <h4 class="toast-title">Added to Cart!</h4>
+            <p class="toast-name">{{ toastInfo.name }}</p>
+            <p class="toast-meta">Qty: {{ toastInfo.quantity }} | Size: {{ toastInfo.size }}</p>
+          </div>
+        </div>
+        <div class="toast-actions">
+          <NuxtLink to="/cart" class="btn-toast-view">View Cart</NuxtLink>
+          <button @click="showToast = false" class="btn-toast-close">×</button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+/* Custom Toast Notification */
+.cart-toast {
+  position: fixed;
+  top: 90px;
+  right: 24px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(27, 67, 50, 0.15);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.toast-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.toast-icon-check {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(27, 67, 50, 0.1);
+  color: #1b4332;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.toast-img-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.toast-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.toast-details {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1b4332;
+  margin: 0;
+}
+
+.toast-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  margin: 2px 0 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-meta {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+  font-weight: 500;
+}
+
+.toast-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed rgba(27, 67, 50, 0.1);
+  padding-top: 12px;
+}
+
+.btn-toast-view {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1b4332;
+  text-decoration: none;
+  background: rgba(27, 67, 50, 0.05);
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-toast-view:hover {
+  background: #1b4332;
+  color: #ffffff;
+}
+
+.btn-toast-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.btn-toast-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #374151;
+}
+
+/* Toast Transition */
+.toast-enter-active, .toast-leave-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-enter-from {
+  transform: translateX(120%) scale(0.9);
+  opacity: 0;
+}
+.toast-leave-to {
+  transform: translateX(120%) scale(0.9);
+  opacity: 0;
+}
+</style>

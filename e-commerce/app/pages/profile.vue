@@ -52,10 +52,17 @@ const loadProfilePicture = async () => {
     publicAvatarUrl.value = urls.publicUrl
     signedAvatarUrl.value = urls.signedUrl
     avatarUrl.value = urls.signedUrl || urls.publicUrl
+    
+    if (authVm.currentUser.value) {
+      authVm.currentUser.value.avatarUrl = urls.signedUrl || urls.publicUrl
+    }
   } else {
     avatarUrl.value = null
     publicAvatarUrl.value = null
     signedAvatarUrl.value = null
+    if (authVm.currentUser.value) {
+      authVm.currentUser.value.avatarUrl = null
+    }
   }
 }
 
@@ -445,7 +452,7 @@ const triggerAlert = (message: string) => {
                 </div>
                 <div class="space-y-1.5">
                   <label class="text-xs font-bold text-gray-500">Username</label>
-                  <input type="text" v-model="user.username" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
+                  <input type="text" :value="user.username" disabled class="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-semibold outline-none text-gray-500 cursor-not-allowed" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="text-xs font-bold text-gray-500">Phone Number</label>
