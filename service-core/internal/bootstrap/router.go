@@ -141,6 +141,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.RequestPasswordReset,
 			&c.VerifyPasswordReset,
 			&c.ResetPassword,
+			&c.DeleteCustomerAccount,
 			c.GoogleOAuth,
 		)
 
@@ -287,6 +288,7 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/profile", func(r chi.Router) {
 			r.Get("/", chains.CoreAuth(userHandler.GetCurrentProfile))
 			r.Put("/", chains.CoreAuth(userHandler.UpdateCurrentProfile))
+			r.Delete("/", chains.CustomerOnly(authHandler.DeleteAccount))
 		})
 
 		r.Route("/carts", func(r chi.Router) {

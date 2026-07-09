@@ -83,7 +83,8 @@ type Container struct {
 	AuthenticateOAuth    authenUsecase.AuthenticateOAuthUsecase
 	RequestPasswordReset authenUsecase.RequestPasswordResetUsecase
 	VerifyPasswordReset  authenUsecase.VerifyPasswordResetUsecase
-	ResetPassword        authenUsecase.ResetPasswordUsecase
+	ResetPassword         authenUsecase.ResetPasswordUsecase
+	DeleteCustomerAccount customerUsecase.DeleteCustomerAccountUsecase
 
 	FindStaff       staffUsecase.FindStaffUsecase
 	CreateStaff     staffUsecase.CreateStaffUsecase
@@ -437,6 +438,18 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				challengeRepo,
 				pwHasher,
+				auditLogger,
+			),
+		DeleteCustomerAccount: *customerUsecase.
+			NewDeleteCustomerAccountUsecase(
+				infra.TransactionProvider,
+				accountRepo,
+				oauthRepo,
+				sessionRepo,
+				userRepo,
+				customerRepo,
+				addressRepo,
+				cartRepo,
 				auditLogger,
 			),
 
