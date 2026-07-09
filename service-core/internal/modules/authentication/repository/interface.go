@@ -47,6 +47,12 @@ type AccountRepository interface {
 		exec transaction.Executor,
 		account domain.Account,
 	) error
+
+	DeleteByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) error
 }
 
 type SessionRepository interface {
@@ -169,5 +175,19 @@ type OAuthConnectionRepository interface {
 		exec transaction.Executor,
 		id uuid.UUID,
 		lastLoginAt time.Time,
+	) error
+
+	DeleteByUserID(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
+	) error
+}
+
+type UserDeletionService interface {
+	DeleteUserRecord(
+		ctx context.Context,
+		exec transaction.Executor,
+		userID uuid.UUID,
 	) error
 }

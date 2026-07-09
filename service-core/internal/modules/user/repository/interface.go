@@ -33,4 +33,10 @@ type UserRepository interface {
 		exec transaction.Executor,
 		props SaveProfileProps,
 	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
 }

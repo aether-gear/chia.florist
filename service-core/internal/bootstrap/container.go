@@ -37,6 +37,7 @@ import (
 
 	authenSvc "service-core/internal/modules/authentication/infra/service"
 	authenRepo "service-core/internal/modules/authentication/repository"
+	customerSvc "service-core/internal/modules/customer/infra/service"
 	authorSvc "service-core/internal/modules/authorization/infra/service"
 	authorRepo "service-core/internal/modules/authorization/repository"
 	orderSvc "service-core/internal/modules/order/infra/service"
@@ -83,7 +84,8 @@ type Container struct {
 	AuthenticateOAuth    authenUsecase.AuthenticateOAuthUsecase
 	RequestPasswordReset authenUsecase.RequestPasswordResetUsecase
 	VerifyPasswordReset  authenUsecase.VerifyPasswordResetUsecase
-	ResetPassword        authenUsecase.ResetPasswordUsecase
+	ResetPassword         authenUsecase.ResetPasswordUsecase
+	DeleteCustomerAccount customerUsecase.DeleteCustomerAccountUsecase
 
 	FindStaff       staffUsecase.FindStaffUsecase
 	CreateStaff     staffUsecase.CreateStaffUsecase
@@ -214,6 +216,17 @@ func NewContainer(cfg Config,
 			accountRepo,
 			membershipRepo,
 		)
+		userDeletionSvc = authenSvc.NewUserDeletionService(
+			accountRepo,
+			oauthRepo,
+			sessionRepo,
+			userRepo,
+		)
+		customerDeletionSvc = customerSvc.NewCustomerDeletionService(
+			customerRepo,
+			addressRepo,
+			cartRepo,
+		)
 		authorMdwr = authorSvc.NewAuthorizer(
 			actorSvc,
 		)
@@ -301,7 +314,9 @@ func NewContainer(cfg Config,
 		Me: *authenUsecase.NewMeUsecase(
 			infra.TransactionExecutor,
 			accountRepo,
+			userRepo,
 			actorSvc,
+			oauthRepo,
 		),
 		Logout: *authenUsecase.NewLogoutUsecase(
 			infra.TransactionProvider,
@@ -436,6 +451,13 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				challengeRepo,
 				pwHasher,
+				auditLogger,
+			),
+		DeleteCustomerAccount: *customerUsecase.
+			NewDeleteCustomerAccountUsecase(
+				infra.TransactionProvider,
+				userDeletionSvc,
+				customerDeletionSvc,
 				auditLogger,
 			),
 

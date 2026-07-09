@@ -14,6 +14,7 @@ import (
 	appcookie "service-core/internal/common/http/cookie"
 	authdomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/usecase"
+	customerUsecase "service-core/internal/modules/customer/usecase"
 	appconfig "service-core/internal/shared/config"
 
 	"github.com/google/uuid"
@@ -22,18 +23,19 @@ import (
 )
 
 type authHandler struct {
-	me                   *usecase.MeUsecase
-	logout               *usecase.LogoutUsecase
-	loginCustomer        *usecase.LoginCustomerUsecase
-	loginStaff           *usecase.LoginStaffUsecase
-	registerCustomer     *usecase.RegisterCustomerUsecase
-	verifyAccount        *usecase.VerifyAccountUsecase
-	getAccount           *usecase.GetAccountUsecase
-	authenticateOAuth    *usecase.AuthenticateOAuthUsecase
-	requestPasswordReset *usecase.RequestPasswordResetUsecase
-	verifyPasswordReset  *usecase.VerifyPasswordResetUsecase
-	resetPassword        *usecase.ResetPasswordUsecase
-	googleCfg            appconfig.GoogleOAuthConfig
+	me                    *usecase.MeUsecase
+	logout                *usecase.LogoutUsecase
+	loginCustomer         *usecase.LoginCustomerUsecase
+	loginStaff            *usecase.LoginStaffUsecase
+	registerCustomer      *usecase.RegisterCustomerUsecase
+	verifyAccount         *usecase.VerifyAccountUsecase
+	getAccount            *usecase.GetAccountUsecase
+	authenticateOAuth     *usecase.AuthenticateOAuthUsecase
+	requestPasswordReset  *usecase.RequestPasswordResetUsecase
+	verifyPasswordReset   *usecase.VerifyPasswordResetUsecase
+	resetPassword         *usecase.ResetPasswordUsecase
+	deleteCustomerAccount *customerUsecase.DeleteCustomerAccountUsecase
+	googleCfg             appconfig.GoogleOAuthConfig
 }
 
 func NewAuthHandler(
@@ -48,21 +50,23 @@ func NewAuthHandler(
 	requestPasswordReset *usecase.RequestPasswordResetUsecase,
 	verifyPasswordReset *usecase.VerifyPasswordResetUsecase,
 	resetPassword *usecase.ResetPasswordUsecase,
+	deleteCustomerAccount *customerUsecase.DeleteCustomerAccountUsecase,
 	googleCfg appconfig.GoogleOAuthConfig,
 ) *authHandler {
 	return &authHandler{
-		me:                   me,
-		logout:               logout,
-		loginCustomer:        loginCustomer,
-		loginStaff:           loginStaff,
-		registerCustomer:     registerCustomer,
-		verifyAccount:        verifyAccount,
-		getAccount:           getAccount,
-		authenticateOAuth:    authenticateOAuth,
-		requestPasswordReset: requestPasswordReset,
-		verifyPasswordReset:  verifyPasswordReset,
-		resetPassword:        resetPassword,
-		googleCfg:            googleCfg,
+		me:                    me,
+		logout:                logout,
+		loginCustomer:         loginCustomer,
+		loginStaff:            loginStaff,
+		registerCustomer:      registerCustomer,
+		verifyAccount:         verifyAccount,
+		getAccount:            getAccount,
+		authenticateOAuth:     authenticateOAuth,
+		requestPasswordReset:  requestPasswordReset,
+		verifyPasswordReset:   verifyPasswordReset,
+		resetPassword:         resetPassword,
+		deleteCustomerAccount: deleteCustomerAccount,
+		googleCfg:             googleCfg,
 	}
 }
 
@@ -116,13 +120,26 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 		})
 	}
 
+	var avatarURL *string
+	if me.User != nil {
+		avatarURL = me.User.AvatarURL
+	}
+
+	var oauthProvider *string
+	if me.OAuth != nil {
+		providerStr := string(me.OAuth.Provider)
+		oauthProvider = &providerStr
+	}
+
 	response := meResponse{
 		AccountID:       me.Account.ID,
 		AccountType:     string(me.Account.Type),
 		IsAuthenticated: true,
+		AvatarURL:       avatarURL,
 		StaffID:         me.Actor.StaffID,
 		Roles:           roles,
 		Permissions:     permissions,
+		OAuthProvider:   oauthProvider,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -621,6 +638,28 @@ func (h *authHandler) ResetPassword(w http.ResponseWriter, r *http.Request) erro
 
 	response := map[string]string{
 		"message": "password reset successful",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	err := h.deleteCustomerAccount.Execute(r.Context(), *authCtx)
+	if err != nil {
+		return err
+	}
+
+	appcookie.Clear(w, appcookie.CookieAccess)
+	appcookie.Clear(w, appcookie.CookieCustomerRefresh)
+
+	response := map[string]string{
+		"message": "account deleted successfully",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

@@ -9,7 +9,7 @@ CREATE TABLE accounts (
 
     user_id UUID NOT NULL UNIQUE,
 
-    email TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL,
     password TEXT NOT NULL,
 
     status account_status DEFAULT 'pending',

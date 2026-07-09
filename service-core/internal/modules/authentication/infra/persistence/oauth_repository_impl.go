@@ -158,3 +158,22 @@ func (r *oauthConnectionRepositoryImpl) UpdateLastLogin(
 
 	return nil
 }
+
+func (r *oauthConnectionRepositoryImpl) DeleteByUserID(
+	ctx context.Context,
+	exec transaction.Executor,
+	userID uuid.UUID,
+) error {
+	query := `
+		UPDATE oauth_connections
+		SET deleted_at = NOW()
+		WHERE user_id = $1 AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("delete oauth connections failed: %w", err)
+	}
+
+	return nil
+}

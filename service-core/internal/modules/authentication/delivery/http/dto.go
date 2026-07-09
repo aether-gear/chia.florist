@@ -46,13 +46,14 @@ type permissionResponse struct {
 }
 
 type meResponse struct {
-	AccountID       uuid.UUID `json:"account_id"`
-	AccountType     string    `json:"account_type"`
-	IsAuthenticated bool      `json:"is_authenticated"`
-
-	StaffID     *uuid.UUID           `json:"staff_id,omitempty"`
-	Roles       []roleResponse       `json:"roles,omitempty"`
-	Permissions []permissionResponse `json:"permissions,omitempty"`
+	AccountID       uuid.UUID            `json:"account_id"`
+	AccountType     string               `json:"account_type"`
+	IsAuthenticated bool                 `json:"is_authenticated"`
+	AvatarURL       *string              `json:"avatar_url,omitempty"`
+	StaffID         *uuid.UUID           `json:"staff_id,omitempty"`
+	Roles           []roleResponse       `json:"roles,omitempty"`
+	Permissions     []permissionResponse `json:"permissions,omitempty"`
+	OAuthProvider   *string              `json:"oauth_provider,omitempty"`
 }
 
 type forgotPasswordCustomerRequest struct {

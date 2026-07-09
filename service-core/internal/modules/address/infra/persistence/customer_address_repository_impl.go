@@ -324,3 +324,27 @@ func (r *customerAddressRepositoryImpl) Delete(
 
 	return nil
 }
+
+func (r *customerAddressRepositoryImpl) DeleteByCustomerID(
+	ctx context.Context,
+	exec transaction.Executor,
+	customerID uuid.UUID,
+) error {
+	query := `
+		UPDATE
+			customer_addresses
+		SET
+			is_default = false,
+			deleted_at = now()
+		WHERE
+			customer_id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, customerID)
+	if err != nil {
+		return fmt.Errorf("delete customer addresses failed: %w", err)
+	}
+
+	return nil
+}

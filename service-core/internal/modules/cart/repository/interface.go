@@ -27,4 +27,10 @@ type CartRepository interface {
 		exec transaction.Executor,
 		cart *domain.Cart,
 	) error
+
+	DeleteByCustomerID(
+		ctx context.Context,
+		exec transaction.Executor,
+		customerID uuid.UUID,
+	) error
 }

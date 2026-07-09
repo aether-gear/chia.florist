@@ -32,7 +32,7 @@ func (r *customerRepositoryImpl) Create(
 			id,
 			user_id,
 			created_at
-		) VALUES ($1, $2, $3)
+		) VALUES ($1,$2,$3)
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -60,7 +60,9 @@ func (r *customerRepositoryImpl) GetByID(
 			updated_at,
 			deleted_at
 		FROM customers
-		WHERE id = $1
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -94,7 +96,9 @@ func (r *customerRepositoryImpl) GetByUserID(
 			updated_at,
 			deleted_at
 		FROM customers
-		WHERE user_id = $1
+		WHERE
+			user_id = $1
+			AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -133,7 +137,10 @@ func (r *customerRepositoryImpl) GetProfileByUserID(
 		FROM customers c
 		INNER JOIN users u
 			ON u.id = c.user_id
-		WHERE c.user_id = $1
+		WHERE
+			c.user_id = $1
+			AND c.deleted_at IS NULL
+			AND u.deleted_at IS NULL
 	`
 
 	var profile domain.CustomerProfile
@@ -170,15 +177,15 @@ func (r *customerRepositoryImpl) FindCustomers(
 	`
 
 	selectQuery := `
-		SELECT 
-			m.id, 
+		SELECT
+			m.id,
 			m.user_id,
-			u.name, 
-			u.username, 
+			u.name,
+			u.username,
 			u.phone,
 			u.avatar_url,
-			m.created_at, 
-			m.updated_at, 
+			m.created_at,
+			m.updated_at,
 			a.last_login_at
 	`
 
@@ -331,4 +338,29 @@ func (r *customerRepositoryImpl) FindCustomers(
 	}
 
 	return results, total, nil
+}
+
+func (r *customerRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
+	query := `
+		UPDATE customers
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	res, err := exec.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("query to delete customer: %w", err)
+	}
+
+	if res.RowsAffected() == 0 {
+		return apperrors.NewNotFound("customer not found or already deleted")
+	}
+
+	return nil
 }
