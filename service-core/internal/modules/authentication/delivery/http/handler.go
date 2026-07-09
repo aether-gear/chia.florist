@@ -116,10 +116,16 @@ func (h *authHandler) Me(w http.ResponseWriter, r *http.Request) error {
 		})
 	}
 
+	var avatarURL *string
+	if me.User != nil {
+		avatarURL = me.User.AvatarURL
+	}
+
 	response := meResponse{
 		AccountID:       me.Account.ID,
 		AccountType:     string(me.Account.Type),
 		IsAuthenticated: true,
+		AvatarURL:       avatarURL,
 		StaffID:         me.Actor.StaffID,
 		Roles:           roles,
 		Permissions:     permissions,

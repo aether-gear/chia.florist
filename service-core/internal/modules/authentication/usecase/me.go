@@ -9,23 +9,28 @@ import (
 	"service-core/internal/modules/authentication/repository"
 	authorDomain "service-core/internal/modules/authorization/domain"
 	authorRepo "service-core/internal/modules/authorization/repository"
+	userDomain "service-core/internal/modules/user/domain"
+	userRepo "service-core/internal/modules/user/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type MeUsecase struct {
 	exec        transaction.Executor
 	accountRepo repository.AccountRepository
+	userRepo    userRepo.UserRepository
 	actorSvc    authorRepo.ActorService
 }
 
 func NewMeUsecase(
 	exec transaction.Executor,
 	accountRepo repository.AccountRepository,
+	userRepo userRepo.UserRepository,
 	actorSvc authorRepo.ActorService,
 ) *MeUsecase {
 	return &MeUsecase{
 		exec:        exec,
 		accountRepo: accountRepo,
+		userRepo:    userRepo,
 		actorSvc:    actorSvc,
 	}
 }
@@ -33,6 +38,7 @@ func NewMeUsecase(
 type MeResult struct {
 	Account domain.Account
 	Actor   authorDomain.Actor
+	User    *userDomain.User
 }
 
 func (u *MeUsecase) Execute(
@@ -65,8 +71,15 @@ func (u *MeUsecase) Execute(
 		return nil, fmt.Errorf("failed to retrieve actor: %w", err)
 	}
 
+	user, err := u.userRepo.
+		GetByID(ctx, u.exec, authCtx.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	}
+
 	return &MeResult{
-		*account,
-		*actor,
+		Account: *account,
+		Actor:   *actor,
+		User:    user,
 	}, nil
 }

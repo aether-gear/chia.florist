@@ -301,6 +301,7 @@ func NewContainer(cfg Config,
 		Me: *authenUsecase.NewMeUsecase(
 			infra.TransactionExecutor,
 			accountRepo,
+			userRepo,
 			actorSvc,
 		),
 		Logout: *authenUsecase.NewLogoutUsecase(
