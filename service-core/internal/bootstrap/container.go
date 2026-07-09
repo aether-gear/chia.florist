@@ -37,6 +37,7 @@ import (
 
 	authenSvc "service-core/internal/modules/authentication/infra/service"
 	authenRepo "service-core/internal/modules/authentication/repository"
+	customerSvc "service-core/internal/modules/customer/infra/service"
 	authorSvc "service-core/internal/modules/authorization/infra/service"
 	authorRepo "service-core/internal/modules/authorization/repository"
 	orderSvc "service-core/internal/modules/order/infra/service"
@@ -220,6 +221,11 @@ func NewContainer(cfg Config,
 			oauthRepo,
 			sessionRepo,
 			userRepo,
+		)
+		customerDeletionSvc = customerSvc.NewCustomerDeletionService(
+			customerRepo,
+			addressRepo,
+			cartRepo,
 		)
 		authorMdwr = authorSvc.NewAuthorizer(
 			actorSvc,
@@ -450,9 +456,7 @@ func NewContainer(cfg Config,
 			NewDeleteCustomerAccountUsecase(
 				infra.TransactionProvider,
 				userDeletionSvc,
-				customerRepo,
-				addressRepo,
-				cartRepo,
+				customerDeletionSvc,
 				auditLogger,
 			),
 

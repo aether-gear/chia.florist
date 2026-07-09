@@ -46,3 +46,11 @@ type CustomerRepository interface {
 		id uuid.UUID,
 	) error
 }
+
+type CustomerDeletionService interface {
+	DeleteCustomerRecord(
+		ctx context.Context,
+		exec transaction.Executor,
+		customerID uuid.UUID,
+	) error
+}

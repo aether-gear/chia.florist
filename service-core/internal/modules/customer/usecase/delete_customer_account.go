@@ -6,38 +6,30 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
-	addressRepo "service-core/internal/modules/address/repository"
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authenRepo "service-core/internal/modules/authentication/repository"
-	cartRepo "service-core/internal/modules/cart/repository"
-	"service-core/internal/modules/customer/repository"
+	customerRepo "service-core/internal/modules/customer/repository"
 	transaction "service-core/internal/shared/transaction"
 )
 
 type DeleteCustomerAccountUsecase struct {
-	transactor          transaction.Transactor
-	userDeletionService authenRepo.UserDeletionService
-	customerRepo        repository.CustomerRepository
-	addressRepo         addressRepo.CustomerAddressRepository
-	cartRepo            cartRepo.CartRepository
-	auditLogger         applogger.AuditLogger
+	transactor              transaction.Transactor
+	userDeletionService     authenRepo.UserDeletionService
+	customerDeletionService customerRepo.CustomerDeletionService
+	auditLogger             applogger.AuditLogger
 }
 
 func NewDeleteCustomerAccountUsecase(
 	transactor transaction.Transactor,
 	userDeletionService authenRepo.UserDeletionService,
-	customerRepo repository.CustomerRepository,
-	addressRepo addressRepo.CustomerAddressRepository,
-	cartRepo cartRepo.CartRepository,
+	customerDeletionService customerRepo.CustomerDeletionService,
 	auditLogger applogger.AuditLogger,
 ) *DeleteCustomerAccountUsecase {
 	return &DeleteCustomerAccountUsecase{
-		transactor:          transactor,
-		userDeletionService: userDeletionService,
-		customerRepo:        customerRepo,
-		addressRepo:         addressRepo,
-		cartRepo:            cartRepo,
-		auditLogger:         auditLogger,
+		transactor:              transactor,
+		userDeletionService:     userDeletionService,
+		customerDeletionService: customerDeletionService,
+		auditLogger:             auditLogger,
 	}
 }
 
@@ -45,6 +37,7 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 	ctx context.Context,
 	authCtx authenDomain.AuthContext,
 ) error {
+	// Must be customer to perform customer account deletion
 	if authCtx.CustomerID == nil {
 		return apperrors.NewForbidden("only customer accounts can be deleted")
 	}
@@ -53,23 +46,13 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 	customerID := *authCtx.CustomerID
 
 	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		if err := u.customerRepo.
-			Delete(ctx, exec, customerID); err != nil {
-			return fmt.Errorf("failed to soft delete customer: %w", err)
+		// 1. Delegate customer record & cascading customer data deletion
+		if err := u.customerDeletionService.DeleteCustomerRecord(ctx, exec, customerID); err != nil {
+			return fmt.Errorf("failed to delete customer record: %w", err)
 		}
 
-		if err := u.addressRepo.
-			DeleteByCustomerID(ctx, exec, customerID); err != nil {
-			return fmt.Errorf("failed to soft delete customer addresses: %w", err)
-		}
-
-		if err := u.cartRepo.
-			DeleteByCustomerID(ctx, exec, customerID); err != nil {
-			return fmt.Errorf("failed to soft delete cart items: %w", err)
-		}
-
-		if err := u.userDeletionService.
-			DeleteUserRecord(ctx, exec, userID); err != nil {
+		// 2. Delegate core user identity record deletion
+		if err := u.userDeletionService.DeleteUserRecord(ctx, exec, userID); err != nil {
 			return fmt.Errorf("failed to delete user record: %w", err)
 		}
 
@@ -82,11 +65,7 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 			Action:   "delete_account",
 			Resource: "customer",
 			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"customer_id": customerID.String(),
-				"user_id":     userID.String(),
-				"error":       err.Error(),
-			},
+			Metadata: map[string]any{"customer_id": customerID.String(), "user_id": userID.String(), "error": err.Error()},
 		})
 		return err
 	}
@@ -96,10 +75,7 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 		Action:   "delete_account",
 		Resource: "customer",
 		Outcome:  applogger.OutcomeSuccess,
-		Metadata: map[string]any{
-			"customer_id": customerID.String(),
-			"user_id":     userID.String(),
-		},
+		Metadata: map[string]any{"customer_id": customerID.String(), "user_id": userID.String()},
 	})
 
 	return nil
