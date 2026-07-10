@@ -28,6 +28,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 		INSERT INTO payment_methods (
 			id,
 			name,
+			code,
 			type,
 			is_active,
 			description,
@@ -37,13 +38,14 @@ func (r *paymentMethodRepositoryImpl) Save(
 			created_at,
 			updated_at
 		) VALUES (
-		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
 		)
 	`
 
 	_, err := exec.Exec(ctx, query,
 		method.ID,
 		method.Name,
+		method.Code,
 		method.Type,
 		method.IsActive,
 		method.Description,
@@ -70,6 +72,7 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 		SELECT
 			id,
 			name,
+			code,
 			type,
 			is_active,
 			description,
@@ -84,6 +87,7 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 	err := exec.QueryRow(ctx, query, name).Scan(
 		&method.ID,
 		&method.Name,
+		&method.Code,
 		&method.Type,
 		&method.IsActive,
 		&method.Description,
@@ -109,6 +113,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 		SELECT 
 			id,
 			name,
+			code,
 			type,
 			is_active,
 			description,
@@ -123,6 +128,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 	err := exec.QueryRow(ctx, query, paymentID).Scan(
 		&method.ID,
 		&method.Name,
+		&method.Code,
 		&method.Type,
 		&method.IsActive,
 		&method.Description,
@@ -148,6 +154,7 @@ func (r *paymentMethodRepositoryImpl) ListAll(
 		SELECT 
 			id,
 			name,
+			code,
 			type,
 			is_active,
 			description,
@@ -170,6 +177,7 @@ func (r *paymentMethodRepositoryImpl) ListAll(
 		err := rows.Scan(
 			&row.ID,
 			&row.Name,
+			&row.Code,
 			&row.Type,
 			&row.IsActive,
 			&row.Description,

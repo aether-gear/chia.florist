@@ -16,10 +16,11 @@ import (
 )
 
 type midtransAPIProvider struct {
-	cfg       config.MidTransConfig
-	client    *http.Client
-	baseURL   string
-	authToken string
+	cfg        config.MidTransConfig
+	client     *http.Client
+	baseURL    string
+	authToken  string
+	strategies map[string]channelStrategy
 }
 
 func NewMidtransAPIProvider(
@@ -44,12 +45,40 @@ func NewMidtransAPIProvider(
 			[]byte(cfg.ServerKey+":"),
 		)
 
-	return &midtransAPIProvider{
+	p := &midtransAPIProvider{
 		cfg:       cfg,
 		client:    &http.Client{Timeout: 30 * time.Second},
 		baseURL:   baseURL,
 		authToken: authToken,
-	}, nil
+	}
+
+	p.strategies = map[string]channelStrategy{
+		"gopay":     &gopayStrategy{},
+		"shopeepay": &shopeepayStrategy{},
+		"qris":      &qrisStrategy{},
+		"qr_code":   &qrisStrategy{},
+		"mandiri":   &mandiriStrategy{},
+	}
+
+	return p, nil
+}
+
+func (p *midtransAPIProvider) getStrategy(code string) channelStrategy {
+	code = strings.ToLower(code)
+	if p.strategies == nil {
+		p.strategies = map[string]channelStrategy{
+			"gopay":     &gopayStrategy{},
+			"shopeepay": &shopeepayStrategy{},
+			"qris":      &qrisStrategy{},
+			"qr_code":   &qrisStrategy{},
+			"mandiri":   &mandiriStrategy{},
+		}
+	}
+	return p.strategies[code]
+}
+
+func (p *midtransAPIProvider) Supports(code string) bool {
+	return p.getStrategy(code) != nil
 }
 
 type vaNumber struct {
@@ -126,6 +155,11 @@ func (p *midtransAPIProvider) Charge(
 	ctx context.Context,
 	req paymentgateway.ChargeRequest,
 ) (*paymentgateway.ChargeResponse, error) {
+	strategy := p.getStrategy(req.PaymentType)
+	if strategy == nil {
+		return nil, fmt.Errorf("midtrans: unsupported payment method %q", req.PaymentType)
+	}
+
 	body, err := p.buildChargeBody(req)
 	if err != nil {
 		return nil, fmt.Errorf("midtrans: build charge request: %w", err)
@@ -152,98 +186,9 @@ func (p *midtransAPIProvider) Charge(
 			baseResp.StatusMessage, baseResp.StatusCode)
 	}
 
-	var instructions []paymentgateway.PaymentInstruction
-	paymentType := strings.ToLower(req.PaymentType)
-
-	switch paymentType {
-	case "mandiri":
-		var resp bankTransferChargeAPIResponse
-		if err := json.Unmarshal(respBody, &resp); err != nil {
-			return nil, fmt.Errorf("midtrans: unmarshal bank transfer response: %w", err)
-		}
-		if resp.PermataVANumber != "" {
-			instructions = append(instructions, paymentgateway.PaymentInstruction{
-				Type:  "bank_transfer",
-				Label: "PERMATA Virtual Account",
-				Value: resp.PermataVANumber,
-			})
-		}
-		for _, va := range resp.VaNumbers {
-			instructions = append(instructions, paymentgateway.PaymentInstruction{
-				Type:  "bank_transfer",
-				Label: strings.ToUpper(va.Bank) + " Virtual Account",
-				Value: va.VANumber,
-			})
-		}
-		if resp.BillKey != "" {
-			instructions = append(instructions, paymentgateway.PaymentInstruction{
-				Type:  "bank_transfer",
-				Label: "MANDIRI Bill Key",
-				Value: resp.BillKey,
-			})
-		}
-		if resp.BillerCode != "" {
-			instructions = append(instructions, paymentgateway.PaymentInstruction{
-				Type:  "bank_transfer",
-				Label: "MANDIRI Biller Code",
-				Value: resp.BillerCode,
-			})
-		}
-
-	case "qris", "qr_code":
-		var resp qrisChargeAPIResponse
-		if err := json.Unmarshal(respBody, &resp); err != nil {
-			return nil, fmt.Errorf("midtrans: unmarshal qris response: %w", err)
-		}
-		if resp.QRString != "" {
-			instructions = append(instructions, paymentgateway.PaymentInstruction{
-				Type:  "qris",
-				Label: "QRIS",
-				Value: resp.QRString,
-			})
-		}
-		for _, act := range resp.Actions {
-			if strings.EqualFold(act.Name, "deeplink-redirect") ||
-				strings.EqualFold(act.Name, "generate-qr-code") {
-				instructions = append(instructions, paymentgateway.PaymentInstruction{
-					Type:  "ewallet",
-					Label: act.Name,
-					Value: act.URL,
-				})
-			}
-		}
-
-	case "gopay":
-		var resp gopayChargeAPIResponse
-		if err := json.Unmarshal(respBody, &resp); err != nil {
-			return nil, fmt.Errorf("midtrans: unmarshal gopay response: %w", err)
-		}
-		for _, act := range resp.Actions {
-			if strings.EqualFold(act.Name, "deeplink-redirect") ||
-				strings.EqualFold(act.Name, "generate-qr-code") {
-				instructions = append(instructions, paymentgateway.PaymentInstruction{
-					Type:  "ewallet",
-					Label: act.Name,
-					Value: act.URL,
-				})
-			}
-		}
-
-	case "shopeepay":
-		var resp shopeepayChargeAPIResponse
-		if err := json.Unmarshal(respBody, &resp); err != nil {
-			return nil, fmt.Errorf("midtrans: unmarshal shopeepay response: %w", err)
-		}
-		for _, act := range resp.Actions {
-			if strings.EqualFold(act.Name, "deeplink-redirect") ||
-				strings.EqualFold(act.Name, "generate-qr-code") {
-				instructions = append(instructions, paymentgateway.PaymentInstruction{
-					Type:  "ewallet",
-					Label: act.Name,
-					Value: act.URL,
-				})
-			}
-		}
+	instructions, err := strategy.ParseInstructions(respBody)
+	if err != nil {
+		return nil, fmt.Errorf("midtrans: parse instructions: %w", err)
 	}
 
 	grossAmount, err := parseAmount(baseResp.GrossAmount)
@@ -432,30 +377,12 @@ func (p *midtransAPIProvider) buildChargeBody(
 		}
 	}
 
-	paymentType := strings.ToLower(req.PaymentType)
-
-	switch paymentType {
-	case "mandiri":
-		body["payment_type"] = "bank_transfer"
-		body["bank_transfer"] = map[string]any{
-			"bank": "mandiri",
-		}
-
-	case "qris", "qr_code":
-		body["payment_type"] = "qris"
-
-	case "gopay":
-		body["payment_type"] = "gopay"
-		body["gopay"] = map[string]any{
-			"enable_callback": true,
-		}
-
-	case "shopeepay":
-		body["payment_type"] = "shopeepay"
-
-	default:
+	strategy := p.getStrategy(req.PaymentType)
+	if strategy == nil {
 		return nil, fmt.Errorf("unsupported payment type %q", req.PaymentType)
 	}
+
+	strategy.BuildPayload(req, body)
 
 	return json.Marshal(body)
 }

@@ -364,6 +364,9 @@ func (m *coMockGateway) CancelTransaction(_ context.Context, gatewayOrderID stri
 	m.cancelOrderID = gatewayOrderID
 	return nil
 }
+func (m *coMockGateway) Supports(_ string) bool {
+	return true
+}
 
 // capturingGateway captures the ChargeRequest for inspection.
 type capturingGateway struct {
@@ -379,6 +382,9 @@ func (c *capturingGateway) ParseNotification(_ context.Context, _ paymentgateway
 	return nil, nil
 }
 func (c *capturingGateway) CancelTransaction(_ context.Context, _ string) error { return nil }
+func (c *capturingGateway) Supports(_ string) bool {
+	return true
+}
 
 // ===========================================================================
 // Test helpers
@@ -394,7 +400,7 @@ func coDefaultAccount(userID uuid.UUID) *authenDomain.Account {
 }
 
 func coDefaultMethod(methodID uuid.UUID, name string) *paymentDomain.PaymentMethod {
-	return &paymentDomain.PaymentMethod{ID: methodID, Name: name, Type: paymentDomain.TypeQRCode, IsActive: true}
+	return &paymentDomain.PaymentMethod{ID: methodID, Name: name, Code: paymentDomain.PaymentMethodCode(name), Type: paymentDomain.TypeQRCode, IsActive: true}
 }
 
 func coDefaultPricing(productID, shopID uuid.UUID) *orderRepo.PricingResult {
@@ -563,7 +569,7 @@ func TestCreateOrder_Manual_Success(t *testing.T) {
 
 	user := coDefaultUser()
 	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Type: paymentDomain.TypeBankTransfer, IsActive: true}
+	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Type: paymentDomain.TypeBankTransfer, IsActive: true}
 	pricing := coDefaultPricing(productID, shopID)
 
 	paRepo := &coMockPaymentAccountRepo{
@@ -618,7 +624,7 @@ func TestCreateOrder_ChargeResponse_BankTransfer_PopulatesAccountNumber(t *testi
 	methodID := uuid.New()
 	user := coDefaultUser()
 	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Type: paymentDomain.TypeBankTransfer, IsActive: true}
+	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Type: paymentDomain.TypeBankTransfer, IsActive: true}
 	pricing := coDefaultPricing(productID, shopID)
 
 	gateway := &coMockGateway{
@@ -667,7 +673,7 @@ func TestCreateOrder_ChargeResponse_EWallet_PopulatesQRString(t *testing.T) {
 	methodID := uuid.New()
 	user := coDefaultUser()
 	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "gopay", Type: paymentDomain.TypeEWallet, IsActive: true}
+	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "gopay", Code: "gopay", Type: paymentDomain.TypeEWallet, IsActive: true}
 	pricing := coDefaultPricing(productID, shopID)
 
 	gateway := &coMockGateway{

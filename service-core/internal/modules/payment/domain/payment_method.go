@@ -7,12 +7,19 @@ import (
 )
 
 type PaymentMethodType string
+type PaymentMethodCode string
 type PaymentFeeType string
 
 const (
 	TypeBankTransfer PaymentMethodType = "bank_transfer"
 	TypeEWallet      PaymentMethodType = "ewallet"
 	TypeQRCode       PaymentMethodType = "qr_code"
+
+	CodeGoPay          PaymentMethodCode = "gopay"
+	CodeShopeePay      PaymentMethodCode = "shopeepay"
+	CodeQRIS           PaymentMethodCode = "qris"
+	CodeBCAVirtualAcc  PaymentMethodCode = "bca_va"
+	CodeMandiriBill    PaymentMethodCode = "mandiri_bill"
 
 	FeeTypeFlat       PaymentFeeType = "flat"
 	FeeTypePercentage PaymentFeeType = "percentage"
@@ -23,6 +30,7 @@ type PaymentMethod struct {
 	ID uuid.UUID
 
 	Name        string
+	Code        PaymentMethodCode
 	Type        PaymentMethodType
 	IsActive    bool
 	Description string
@@ -39,6 +47,10 @@ type PaymentMethod struct {
 func (pM *PaymentMethod) Validate() error {
 	if pM.Name == "" {
 		return ErrInvalidName
+	}
+
+	if pM.Code == "" {
+		return ErrInvalidCode
 	}
 
 	if !pM.Type.IsValid() {

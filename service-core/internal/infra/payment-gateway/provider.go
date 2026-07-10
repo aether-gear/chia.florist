@@ -153,6 +153,10 @@ type NotificationResult struct {
 type NotificationPayload map[string]any
 
 type Provider interface {
+	// Supports returns true if the gateway provider is configured
+	// and capable of handling the given payment channel code.
+	Supports(code string) bool
+
 	// Charge creates a new payment transaction
 	// with the gateway and returns the instructions
 	// the customer needs to complete the payment

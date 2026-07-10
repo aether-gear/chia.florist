@@ -3,6 +3,7 @@ package domain
 import "errors"
 
 var ErrInvalidName = errors.New("name is required")
+var ErrInvalidCode = errors.New("code is required")
 var ErrInvalidType = errors.New("invalid type")
 var ErrInvalidFeeType = errors.New("invalid fee type")
 var ErrInvalidFeeFixed = errors.New("fixed fee must be greater than 0")
