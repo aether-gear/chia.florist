@@ -184,7 +184,7 @@ func NewRouter(c *Container) *chi.Mux {
 		paymentHandler = paymentH.NewPaymentHandler(
 			&c.CreatePaymentAccount,
 			&c.ListPaymentAccount,
-			&c.CreatePaymentMethod,
+			&c.SavePaymentMethod,
 			&c.ListPaymentMethod,
 			&c.ProcessPaymentWebhook,
 			&c.ProcessManualPayment,
@@ -379,7 +379,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 			r.Route("/methods", func(r chi.Router) {
 				r.Get("/", chains.StaffOnly(paymentHandler.ListPaymentMethod))
-				r.Post("/", chains.StaffAdminOnly(paymentHandler.CreatePaymentMethod))
+				r.Post("/", chains.StaffAdminOnly(paymentHandler.SavePaymentMethod))
 			})
 		})
 

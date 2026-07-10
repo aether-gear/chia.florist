@@ -40,6 +40,16 @@ func (r *paymentMethodRepositoryImpl) Save(
 		) VALUES (
 		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
 		)
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			code = EXCLUDED.code,
+			type = EXCLUDED.type,
+			is_active = EXCLUDED.is_active,
+			description = EXCLUDED.description,
+			fee_type = EXCLUDED.fee_type,
+			fee_amount = EXCLUDED.fee_amount,
+			fee_rate = EXCLUDED.fee_rate,
+			updated_at = NOW()
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -57,7 +67,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 	)
 
 	if err != nil {
-		return fmt.Errorf("insert payment method failed: %w", err)
+		return fmt.Errorf("save payment method failed: %w", err)
 	}
 
 	return nil
