@@ -125,6 +125,9 @@ func (h *PaymentHandler) SavePaymentMethod(w http.ResponseWriter, r *http.Reques
 	if req.Code == "" {
 		return apperrors.NewBadRequest("invalid code")
 	}
+	if req.Provider == "" {
+		return apperrors.NewBadRequest("invalid provider")
+	}
 	if req.Type == "" {
 		return apperrors.NewBadRequest("invalid type")
 	}
@@ -171,6 +174,7 @@ func (h *PaymentHandler) SavePaymentMethod(w http.ResponseWriter, r *http.Reques
 		ID:            methodID,
 		Name:          req.Name,
 		Code:          req.Code,
+		Provider:      req.Provider,
 		Type:          req.Type,
 		IsActive:      isActive,
 		Description:   req.Description,
@@ -209,6 +213,7 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 			ID:            p.ID,
 			Name:          p.Name,
 			Code:          string(p.Code),
+			Provider:      p.Provider,
 			Type:          string(p.Type),
 			IsActive:      p.IsActive,
 			Description:   p.Description,

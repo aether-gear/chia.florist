@@ -31,6 +31,7 @@ type PaymentMethod struct {
 
 	Name        string
 	Code        PaymentMethodCode
+	Provider    string
 	Type        PaymentMethodType
 	IsActive    bool
 	Description string
@@ -51,6 +52,10 @@ func (pM *PaymentMethod) Validate() error {
 
 	if pM.Code == "" {
 		return ErrInvalidCode
+	}
+
+	if pM.Provider == "" {
+		return ErrInvalidProvider
 	}
 
 	if !pM.Type.IsValid() {

@@ -29,6 +29,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 			id,
 			name,
 			code,
+			provider,
 			type,
 			is_active,
 			description,
@@ -38,11 +39,12 @@ func (r *paymentMethodRepositoryImpl) Save(
 			created_at,
 			updated_at
 		) VALUES (
-		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
 		)
 		ON CONFLICT (id) DO UPDATE SET
 			name = EXCLUDED.name,
 			code = EXCLUDED.code,
+			provider = EXCLUDED.provider,
 			type = EXCLUDED.type,
 			is_active = EXCLUDED.is_active,
 			description = EXCLUDED.description,
@@ -56,6 +58,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 		method.ID,
 		method.Name,
 		method.Code,
+		method.Provider,
 		method.Type,
 		method.IsActive,
 		method.Description,
@@ -83,6 +86,7 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 			id,
 			name,
 			code,
+			provider,
 			type,
 			is_active,
 			description,
@@ -98,6 +102,7 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 		&method.ID,
 		&method.Name,
 		&method.Code,
+		&method.Provider,
 		&method.Type,
 		&method.IsActive,
 		&method.Description,
@@ -124,6 +129,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 			id,
 			name,
 			code,
+			provider,
 			type,
 			is_active,
 			description,
@@ -139,6 +145,7 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 		&method.ID,
 		&method.Name,
 		&method.Code,
+		&method.Provider,
 		&method.Type,
 		&method.IsActive,
 		&method.Description,
@@ -165,6 +172,7 @@ func (r *paymentMethodRepositoryImpl) ListAll(
 			id,
 			name,
 			code,
+			provider,
 			type,
 			is_active,
 			description,
@@ -188,6 +196,7 @@ func (r *paymentMethodRepositoryImpl) ListAll(
 			&row.ID,
 			&row.Name,
 			&row.Code,
+			&row.Provider,
 			&row.Type,
 			&row.IsActive,
 			&row.Description,

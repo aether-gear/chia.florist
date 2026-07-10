@@ -400,7 +400,7 @@ func coDefaultAccount(userID uuid.UUID) *authenDomain.Account {
 }
 
 func coDefaultMethod(methodID uuid.UUID, name string) *paymentDomain.PaymentMethod {
-	return &paymentDomain.PaymentMethod{ID: methodID, Name: name, Code: paymentDomain.PaymentMethodCode(name), Type: paymentDomain.TypeQRCode, IsActive: true}
+	return &paymentDomain.PaymentMethod{ID: methodID, Name: name, Code: paymentDomain.PaymentMethodCode(name), Provider: "midtrans", Type: paymentDomain.TypeQRCode, IsActive: true}
 }
 
 func coDefaultPricing(productID, shopID uuid.UUID) *orderRepo.PricingResult {
@@ -569,7 +569,7 @@ func TestCreateOrder_Manual_Success(t *testing.T) {
 
 	user := coDefaultUser()
 	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Type: paymentDomain.TypeBankTransfer, IsActive: true}
+	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Provider: "manual", Type: paymentDomain.TypeBankTransfer, IsActive: true}
 	pricing := coDefaultPricing(productID, shopID)
 
 	paRepo := &coMockPaymentAccountRepo{
@@ -624,7 +624,7 @@ func TestCreateOrder_ChargeResponse_BankTransfer_PopulatesAccountNumber(t *testi
 	methodID := uuid.New()
 	user := coDefaultUser()
 	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Type: paymentDomain.TypeBankTransfer, IsActive: true}
+	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Provider: "midtrans", Type: paymentDomain.TypeBankTransfer, IsActive: true}
 	pricing := coDefaultPricing(productID, shopID)
 
 	gateway := &coMockGateway{
@@ -673,7 +673,7 @@ func TestCreateOrder_ChargeResponse_EWallet_PopulatesQRString(t *testing.T) {
 	methodID := uuid.New()
 	user := coDefaultUser()
 	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "gopay", Code: "gopay", Type: paymentDomain.TypeEWallet, IsActive: true}
+	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "gopay", Code: "gopay", Provider: "midtrans", Type: paymentDomain.TypeEWallet, IsActive: true}
 	pricing := coDefaultPricing(productID, shopID)
 
 	gateway := &coMockGateway{
