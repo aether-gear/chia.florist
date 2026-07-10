@@ -14,12 +14,13 @@ import (
 )
 
 type PaymentHandler struct {
-	createPaymentAccount  *usecase.CreatePaymentAccountUsecase
-	listPaymentAccount    *usecase.ListPaymentAccountUsecase
-	savePaymentMethod     *usecase.SavePaymentMethodUsecase
-	listPaymentMethod     *usecase.ListPaymentMethodUsecase
-	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase
-	processManualPayment  *usecase.ProcessManualPaymentUsecase
+	createPaymentAccount   *usecase.CreatePaymentAccountUsecase
+	listPaymentAccount     *usecase.ListPaymentAccountUsecase
+	savePaymentMethod      *usecase.SavePaymentMethodUsecase
+	listPaymentMethod      *usecase.ListPaymentMethodUsecase
+	processPaymentWebhook  *usecase.ProcessPaymentWebhookUsecase
+	processManualPayment   *usecase.ProcessManualPaymentUsecase
+	savePaymentInstruction *usecase.SavePaymentInstructionUsecase
 }
 
 func NewPaymentHandler(
@@ -29,14 +30,16 @@ func NewPaymentHandler(
 	listPaymentMethod *usecase.ListPaymentMethodUsecase,
 	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase,
 	processManualPayment *usecase.ProcessManualPaymentUsecase,
+	savePaymentInstruction *usecase.SavePaymentInstructionUsecase,
 ) *PaymentHandler {
 	return &PaymentHandler{
-		createPaymentAccount:  createPaymentAccount,
-		listPaymentAccount:    listPaymentAccount,
-		savePaymentMethod:     savePaymentMethod,
-		listPaymentMethod:     listPaymentMethod,
-		processPaymentWebhook: processPaymentWebhook,
-		processManualPayment:  processManualPayment,
+		createPaymentAccount:   createPaymentAccount,
+		listPaymentAccount:     listPaymentAccount,
+		savePaymentMethod:      savePaymentMethod,
+		listPaymentMethod:      listPaymentMethod,
+		processPaymentWebhook:  processPaymentWebhook,
+		processManualPayment:   processManualPayment,
+		savePaymentInstruction: savePaymentInstruction,
 	}
 }
 
@@ -280,6 +283,40 @@ func (h *PaymentHandler) ProcessManualPayment(w http.ResponseWriter, r *http.Req
 
 	response := map[string]string{
 		"message": fmt.Sprintf("manual payment successfully updated with action: %s", req.Action),
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *PaymentHandler) SavePaymentInstruction(w http.ResponseWriter, r *http.Request) error {
+	methodIDStr := chi.URLParam(r, "methodID")
+	methodID, err := uuid.Parse(methodIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid payment method ID")
+	}
+
+	var req savePaymentInstructionRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+
+	if req.Content == "" {
+		return apperrors.NewBadRequest("content cannot be empty")
+	}
+
+	input := usecase.SavePaymentInstructionInput{
+		PaymentMethodID: methodID,
+		Content:         req.Content,
+	}
+
+	err = h.savePaymentInstruction.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "payment instruction successfully saved",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

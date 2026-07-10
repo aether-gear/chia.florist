@@ -14,8 +14,8 @@ import (
 // to complete the payment — either composed from gateway
 // charge instructions or from a manual payment account
 type PaymentInstruction struct {
-	ID        uuid.UUID
-	PaymentID uuid.UUID
+	ID              uuid.UUID
+	PaymentMethodID uuid.UUID
 
 	Content string
 

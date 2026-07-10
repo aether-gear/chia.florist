@@ -51,3 +51,7 @@ type paymentAccountResponse struct {
 type manualPaymentActionRequest struct {
 	Action string `json:"action"`
 }
+
+type savePaymentInstructionRequest struct {
+	Content string `json:"content"`
+}
