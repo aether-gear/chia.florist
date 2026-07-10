@@ -271,8 +271,7 @@ func (u *CreateOrderUsecase) Execute(
 	)
 
 	if !input.IsManual {
-		provider := PAYMENT_PROVIDER
-		payment.Provider = provider
+		payment.Provider = method.Provider
 
 		if !u.paymentGateway.Supports(string(method.Code)) {
 			return nil, apperrors.NewBadRequest(fmt.Sprintf("payment method %q is not supported by the payment gateway", method.Code))
@@ -367,8 +366,7 @@ func (u *CreateOrderUsecase) Execute(
 			return nil, apperrors.NewConflict("no available payment account for the selected method")
 		}
 
-		provider := "manual"
-		payment.Provider = provider
+		payment.Provider = method.Provider
 		payment.PaymentAccountID = &paymentAccount.ID
 
 		paymentAccountResult = &PaymentAccountResult{

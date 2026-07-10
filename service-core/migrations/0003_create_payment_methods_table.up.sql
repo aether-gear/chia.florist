@@ -2,11 +2,14 @@ CREATE TYPE fee_type AS ENUM ('flat', 'percentage', 'mixed');
 
 CREATE TYPE method_type AS ENUM ('bank_transfer', 'ewallet', 'qr_code');
 
+CREATE TYPE method_code AS ENUM ('gopay', 'shopeepay', 'qris', 'bca_va', 'mandiri_bill');
+
 CREATE TABLE payment_methods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     name TEXT NOT NULL,
-    code TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL,
+    provider TEXT NOT NULL,
     type method_type NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     description TEXT,
@@ -18,6 +21,8 @@ CREATE TABLE payment_methods (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ,
+
+    CONSTRAINT payment_methods_code_provider_type_key UNIQUE (code, provider, type),
 
     CONSTRAINT payment_methods_fee_check
         CHECK (

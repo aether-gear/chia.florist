@@ -1,6 +1,8 @@
 package http
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -17,6 +19,7 @@ type savePaymentMethodRequest struct {
 	ID            *string `json:"id"`
 	Name          string  `json:"name"`
 	Code          string  `json:"code"`
+	Provider      string  `json:"provider"`
 	Type          string  `json:"type"`
 	IsActive      string  `json:"is_active"`
 	Description   string  `json:"description"`
@@ -25,16 +28,24 @@ type savePaymentMethodRequest struct {
 	FeePercentage *string `json:"fee_percentage"`
 }
 
+type paymentInstructionResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type paymentMethodResponse struct {
-	ID            uuid.UUID `json:"id"`
-	Name          string    `json:"name"`
-	Code          string    `json:"code"`
-	Type          string    `json:"type"`
-	IsActive      bool      `json:"is_active"`
-	Description   string    `json:"description"`
-	FeeType       string    `json:"fee_type"`
-	FeeFixed      int64     `json:"fee_fixed"`
-	FeePercentage float64   `json:"fee_percentage"`
+	ID            uuid.UUID                   `json:"id"`
+	Name          string                      `json:"name"`
+	Code          string                      `json:"code"`
+	Provider      string                      `json:"provider"`
+	Type          string                      `json:"type"`
+	IsActive      bool                        `json:"is_active"`
+	Description   string                      `json:"description"`
+	FeeType       string                      `json:"fee_type"`
+	FeeFixed      int64                       `json:"fee_fixed"`
+	FeePercentage float64                     `json:"fee_percentage"`
+	Instruction   *paymentInstructionResponse `json:"instruction,omitempty"`
 }
 
 type paymentAccountResponse struct {
@@ -48,4 +59,8 @@ type paymentAccountResponse struct {
 
 type manualPaymentActionRequest struct {
 	Action string `json:"action"`
+}
+
+type savePaymentInstructionRequest struct {
+	Content string `json:"content"`
 }

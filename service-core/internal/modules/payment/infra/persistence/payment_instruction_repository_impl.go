@@ -38,7 +38,7 @@ func (r *paymentInstructionRepositoryImpl) GetByPaymentMethodID(
 	var inst domain.PaymentInstruction
 	err := exec.QueryRow(ctx, query, methodID).Scan(
 		&inst.ID,
-		&inst.PaymentID,
+		&inst.PaymentMethodID,
 		&inst.Content,
 		&inst.CreatedAt,
 	)
@@ -64,11 +64,13 @@ func (r *paymentInstructionRepositoryImpl) Save(
 			content,
 			created_at
 		) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (payment_method_id) DO UPDATE SET
+			content = EXCLUDED.content
 	`
 
 	_, err := exec.Exec(ctx, query,
 		instruction.ID,
-		instruction.PaymentID,
+		instruction.PaymentMethodID,
 		instruction.Content,
 		instruction.CreatedAt,
 	)

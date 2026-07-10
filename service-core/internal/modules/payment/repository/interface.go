@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"service-core/internal/modules/payment/domain"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -42,6 +43,13 @@ type PaymentRepository interface {
 	) error
 }
 
+var (
+	PaymentMethodSortLatest query.SortKey = "latest"
+	PaymentMethodSortName   query.SortKey = "name"
+	PaymentMethodSortCode   query.SortKey = "code"
+	PaymentMethodSortType   query.SortKey = "type"
+)
+
 type PaymentMethodRepository interface {
 	Save(
 		ctx context.Context,
@@ -64,6 +72,7 @@ type PaymentMethodRepository interface {
 	ListAll(
 		ctx context.Context,
 		exec transaction.Executor,
+		sorts query.Sorts,
 	) ([]domain.PaymentMethod, error)
 }
 

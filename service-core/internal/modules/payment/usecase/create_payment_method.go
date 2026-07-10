@@ -31,6 +31,7 @@ type CreatePaymentMethodInput struct {
 	ID            *uuid.UUID
 	Name          string
 	Code          string
+	Provider      string
 	Type          string
 	IsActive      bool
 	Description   string
@@ -54,6 +55,7 @@ func (u *SavePaymentMethodUsecase) Execute(
 		ID:            id,
 		Name:          input.Name,
 		Code:          domain.PaymentMethodCode(input.Code),
+		Provider:      input.Provider,
 		Type:          domain.PaymentMethodType(input.Type),
 		IsActive:      input.IsActive,
 		FeeType:       domain.PaymentFeeType(input.FeeType),

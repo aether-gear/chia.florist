@@ -365,7 +365,7 @@ func (s *pricingServiceImpl) Calculate(
 		}
 	} else {
 		pms, err := s.paymentMethodRepo.
-			ListAll(ctx, exec)
+			ListAll(ctx, exec, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load payment methods: %w", err)
 		}

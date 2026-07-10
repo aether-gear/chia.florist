@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -29,6 +32,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 			id,
 			name,
 			code,
+			provider,
 			type,
 			is_active,
 			description,
@@ -38,11 +42,12 @@ func (r *paymentMethodRepositoryImpl) Save(
 			created_at,
 			updated_at
 		) VALUES (
-		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+		 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
 		)
 		ON CONFLICT (id) DO UPDATE SET
 			name = EXCLUDED.name,
 			code = EXCLUDED.code,
+			provider = EXCLUDED.provider,
 			type = EXCLUDED.type,
 			is_active = EXCLUDED.is_active,
 			description = EXCLUDED.description,
@@ -56,6 +61,7 @@ func (r *paymentMethodRepositoryImpl) Save(
 		method.ID,
 		method.Name,
 		method.Code,
+		method.Provider,
 		method.Type,
 		method.IsActive,
 		method.Description,
@@ -80,35 +86,68 @@ func (r *paymentMethodRepositoryImpl) FindByName(
 ) (*domain.PaymentMethod, error) {
 	query := `
 		SELECT
-			id,
-			name,
-			code,
-			type,
-			is_active,
-			description,
-			created_at,
-			updated_at
-		FROM payment_methods
-		WHERE name LIKE $1 || '%'
+			pm.id,
+			pm.name,
+			pm.code,
+			pm.provider,
+			pm.type,
+			pm.is_active,
+			pm.description,
+			pm.created_at,
+			pm.updated_at,
+			pi.id AS pi_id,
+			pi.content AS pi_content,
+			pi.created_at AS pi_created_at
+		FROM payment_methods pm
+		LEFT JOIN payment_instructions pi ON pm.id = pi.payment_method_id
+		WHERE
+			pm.name LIKE $1 || '%'
 		LIMIT 1
 	`
 
 	var method domain.PaymentMethod
+	var piID *uuid.UUID
+	var piContent *string
+	var piCreatedAt *time.Time
+
 	err := exec.QueryRow(ctx, query, name).Scan(
 		&method.ID,
 		&method.Name,
 		&method.Code,
+		&method.Provider,
 		&method.Type,
 		&method.IsActive,
 		&method.Description,
 		&method.CreatedAt,
 		&method.UpdatedAt,
+		&piID,
+		&piContent,
+		&piCreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("query payment method by name failed: %w", err)
+	}
+
+	if piID != nil {
+		var content string
+		if piContent != nil {
+			content = *piContent
+		}
+
+		var createdAt time.Time
+		if piCreatedAt != nil {
+			createdAt = *piCreatedAt
+		}
+
+		method.Instruction = &domain.PaymentInstruction{
+			ID:              *piID,
+			PaymentMethodID: method.ID,
+			Content:         content,
+			CreatedAt:       createdAt,
+		}
 	}
 
 	return &method, nil
@@ -120,30 +159,44 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 	paymentID uuid.UUID,
 ) (*domain.PaymentMethod, error) {
 	query := `
-		SELECT 
-			id,
-			name,
-			code,
-			type,
-			is_active,
-			description,
-			created_at,
-			updated_at
-		FROM payment_methods
-		WHERE id = $1
+		SELECT
+			pm.id,
+			pm.name,
+			pm.code,
+			pm.provider,
+			pm.type,
+			pm.is_active,
+			pm.description,
+			pm.created_at,
+			pm.updated_at,
+			pi.id AS pi_id,
+			pi.content AS pi_content,
+			pi.created_at AS pi_created_at
+		FROM payment_methods pm
+		LEFT JOIN payment_instructions pi ON pm.id = pi.payment_method_id
+		WHERE
+			pm.id = $1
 		LIMIT 1
 	`
 
 	var method domain.PaymentMethod
+	var piID *uuid.UUID
+	var piContent *string
+	var piCreatedAt *time.Time
+
 	err := exec.QueryRow(ctx, query, paymentID).Scan(
 		&method.ID,
 		&method.Name,
 		&method.Code,
+		&method.Provider,
 		&method.Type,
 		&method.IsActive,
 		&method.Description,
 		&method.CreatedAt,
 		&method.UpdatedAt,
+		&piID,
+		&piContent,
+		&piCreatedAt,
 	)
 
 	if err != nil {
@@ -153,28 +206,84 @@ func (r *paymentMethodRepositoryImpl) GetByID(
 		return nil, fmt.Errorf("query payment method by id failed: %w", err)
 	}
 
+	if piID != nil {
+		var content string
+		if piContent != nil {
+			content = *piContent
+		}
+
+		var createdAt time.Time
+		if piCreatedAt != nil {
+			createdAt = *piCreatedAt
+		}
+
+		method.Instruction = &domain.PaymentInstruction{
+			ID:              *piID,
+			PaymentMethodID: method.ID,
+			Content:         content,
+			CreatedAt:       createdAt,
+		}
+	}
+
 	return &method, nil
 }
 
 func (r *paymentMethodRepositoryImpl) ListAll(
 	ctx context.Context,
 	exec transaction.Executor,
+	sorts query.Sorts,
 ) ([]domain.PaymentMethod, error) {
-	query := `
-		SELECT 
-			id,
-			name,
-			code,
-			type,
-			is_active,
-			description,
-			created_at,
-			updated_at
-		FROM payment_methods
-		WHERE deleted_at IS NULL
-	`
+	var pmSortKeys = map[query.SortKey]string{
+		repository.PaymentMethodSortLatest: "pm.created_at",
+		repository.PaymentMethodSortName:   "pm.name",
+		repository.PaymentMethodSortCode:   "pm.code",
+		repository.PaymentMethodSortType:   "pm.type",
+	}
 
-	rows, err := exec.Query(ctx, query)
+	var sortClauses []string
+	for _, sort := range sorts {
+		colName, exists := pmSortKeys[sort.By]
+		if !exists {
+			continue
+		}
+
+		dir := "DESC"
+		if sort.Direction == query.SortAsc {
+			dir = "ASC"
+		}
+
+		sortClauses = append(
+			sortClauses,
+			fmt.Sprintf("%s %s", colName, dir),
+		)
+	}
+
+	orderBy := "ORDER BY pm.created_at DESC"
+	if len(sortClauses) > 0 {
+		orderBy = "ORDER BY " + strings.Join(sortClauses, ", ")
+	}
+
+	rawQuery := fmt.Sprintf(`
+		SELECT
+			pm.id,
+			pm.name,
+			pm.code,
+			pm.provider,
+			pm.type,
+			pm.is_active,
+			pm.description,
+			pm.created_at,
+			pm.updated_at,
+			pi.id AS pi_id,
+			pi.content AS pi_content,
+			pi.created_at AS pi_created_at
+		FROM payment_methods pm
+		LEFT JOIN payment_instructions pi ON pm.id = pi.payment_method_id
+		WHERE pm.deleted_at IS NULL
+		%s
+	`, orderBy)
+
+	rows, err := exec.Query(ctx, rawQuery)
 	if err != nil {
 		return nil, fmt.Errorf("query payment methods failed: %w", err)
 	}
@@ -183,19 +292,43 @@ func (r *paymentMethodRepositoryImpl) ListAll(
 	var result []domain.PaymentMethod
 	for rows.Next() {
 		var row domain.PaymentMethod
+		var piID *uuid.UUID
+		var piContent *string
+		var piCreatedAt *time.Time
 
 		err := rows.Scan(
 			&row.ID,
 			&row.Name,
 			&row.Code,
+			&row.Provider,
 			&row.Type,
 			&row.IsActive,
 			&row.Description,
 			&row.CreatedAt,
 			&row.UpdatedAt,
+			&piID,
+			&piContent,
+			&piCreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("mapping payment method model to domain failed: %w", err)
+		}
+
+		if piID != nil {
+			var content string
+			if piContent != nil {
+				content = *piContent
+			}
+			var createdAt time.Time
+			if piCreatedAt != nil {
+				createdAt = *piCreatedAt
+			}
+			row.Instruction = &domain.PaymentInstruction{
+				ID:              *piID,
+				PaymentMethodID: row.ID,
+				Content:         content,
+				CreatedAt:       createdAt,
+			}
 		}
 
 		result = append(result, row)
