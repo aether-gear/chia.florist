@@ -47,7 +47,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
-            Enter your credentials to access the WAF control panel
+            Enter your credentials to access the Control Panel
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -56,11 +56,11 @@ export default function LoginPage() {
               <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
                 Email
               </label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="admin@chia.florist" 
-                required 
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@chia.florist"
+                required
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
@@ -73,12 +73,12 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="••••••••" 
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
                 required
-                onChange={(e) => setPassword(e.target.value)} 
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
               {error && (
