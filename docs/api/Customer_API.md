@@ -37,6 +37,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [ ] Get Current User
     - [ ] Update User
     - [ ] List Orders
+    - [ ] Delete Account
   - [X] Addresses
     - [X] List My Addresses
     - [X] Save My Address
@@ -827,6 +828,29 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 |--------------------|-----------------------------|
 | `401 Unauthorized` | Missing or invalid session. |
 | `404 Not Found`    | User profile not found.     |
+
+### Delete Account
+
+- **Method**: `DELETE`
+- **Endpoint**: `/profile`
+- **Description**: Delete the account of the currently authenticated customer.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "account deleted successfully"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition                   |
+|--------------------|-----------------------------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Account must have type customer.     |
 
 ## Addresses
 

@@ -37,7 +37,8 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 	ctx context.Context,
 	authCtx authenDomain.AuthContext,
 ) error {
-	// Must be customer to perform customer account deletion
+	// Must be customer to perform
+	// customer account deletion
 	if authCtx.CustomerID == nil {
 		return apperrors.NewForbidden("only customer accounts can be deleted")
 	}
@@ -46,13 +47,17 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 	customerID := *authCtx.CustomerID
 
 	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		// 1. Delegate customer record & cascading customer data deletion
-		if err := u.customerDeletionService.DeleteCustomerRecord(ctx, exec, customerID); err != nil {
+		// Delete customer-domain data
+		// owned by the customer module.
+		if err := u.customerDeletionService.
+			DeleteCustomerRecord(ctx, exec, customerID); err != nil {
 			return fmt.Errorf("failed to delete customer record: %w", err)
 		}
 
-		// 2. Delegate core user identity record deletion
-		if err := u.userDeletionService.DeleteUserRecord(ctx, exec, userID); err != nil {
+		// Delete identity and authentication data
+		// owned by the authentication module.
+		if err := u.userDeletionService.
+			DeleteUserRecord(ctx, exec, userID); err != nil {
 			return fmt.Errorf("failed to delete user record: %w", err)
 		}
 
@@ -65,7 +70,11 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 			Action:   "delete_account",
 			Resource: "customer",
 			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"customer_id": customerID.String(), "user_id": userID.String(), "error": err.Error()},
+			Metadata: map[string]any{
+				"customer_id": customerID.String(),
+				"user_id":     userID.String(),
+				"error":       err.Error(),
+			},
 		})
 		return err
 	}
@@ -75,7 +84,10 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 		Action:   "delete_account",
 		Resource: "customer",
 		Outcome:  applogger.OutcomeSuccess,
-		Metadata: map[string]any{"customer_id": customerID.String(), "user_id": userID.String()},
+		Metadata: map[string]any{
+			"customer_id": customerID.String(),
+			"user_id":     userID.String(),
+		},
 	})
 
 	return nil

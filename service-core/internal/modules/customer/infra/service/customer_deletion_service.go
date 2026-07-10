@@ -20,8 +20,8 @@ type customerDeletionServiceImpl struct {
 
 func NewCustomerDeletionService(
 	customerRepo customerRepo.CustomerRepository,
-	addressRepo  addressRepo.CustomerAddressRepository,
-	cartRepo     cartRepo.CartRepository,
+	addressRepo addressRepo.CustomerAddressRepository,
+	cartRepo cartRepo.CartRepository,
 ) customerRepo.CustomerDeletionService {
 	return &customerDeletionServiceImpl{
 		customerRepo: customerRepo,
@@ -35,18 +35,18 @@ func (s *customerDeletionServiceImpl) DeleteCustomerRecord(
 	exec transaction.Executor,
 	customerID uuid.UUID,
 ) error {
-	// 1. Soft delete customer record
-	if err := s.customerRepo.Delete(ctx, exec, customerID); err != nil {
+	if err := s.customerRepo.
+		Delete(ctx, exec, customerID); err != nil {
 		return fmt.Errorf("failed to soft delete customer: %w", err)
 	}
 
-	// 2. Soft delete customer addresses
-	if err := s.addressRepo.DeleteByCustomerID(ctx, exec, customerID); err != nil {
+	if err := s.addressRepo.
+		DeleteByCustomerID(ctx, exec, customerID); err != nil {
 		return fmt.Errorf("failed to soft delete customer addresses: %w", err)
 	}
 
-	// 3. Soft delete customer cart items
-	if err := s.cartRepo.DeleteByCustomerID(ctx, exec, customerID); err != nil {
+	if err := s.cartRepo.
+		DeleteByCustomerID(ctx, exec, customerID); err != nil {
 		return fmt.Errorf("failed to soft delete cart items: %w", err)
 	}
 
