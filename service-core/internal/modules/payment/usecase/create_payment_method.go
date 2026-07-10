@@ -12,23 +12,25 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreatePaymentMethodUsecase struct {
+type SavePaymentMethodUsecase struct {
 	paymentMethodRepo repository.PaymentMethodRepository
 	executor          transaction.Executor
 }
 
-func NewCreatePaymentMethodUsecase(
+func NewSavePaymentMethodUsecase(
 	paymentMethodRepo repository.PaymentMethodRepository,
 	executor transaction.Executor,
-) *CreatePaymentMethodUsecase {
-	return &CreatePaymentMethodUsecase{
+) *SavePaymentMethodUsecase {
+	return &SavePaymentMethodUsecase{
 		paymentMethodRepo: paymentMethodRepo,
 		executor:          executor,
 	}
 }
 
 type CreatePaymentMethodInput struct {
+	ID            *uuid.UUID
 	Name          string
+	Code          string
 	Type          string
 	IsActive      bool
 	Description   string
@@ -37,13 +39,21 @@ type CreatePaymentMethodInput struct {
 	FeePercentage float64
 }
 
-func (u *CreatePaymentMethodUsecase) Execute(
+func (u *SavePaymentMethodUsecase) Execute(
 	ctx context.Context,
 	input CreatePaymentMethodInput,
 ) error {
+	var id uuid.UUID
+	if input.ID != nil && *input.ID != uuid.Nil {
+		id = *input.ID
+	} else {
+		id = uuid.New()
+	}
+
 	paymentMethod := domain.PaymentMethod{
-		ID:            uuid.New(),
+		ID:            id,
 		Name:          input.Name,
+		Code:          domain.PaymentMethodCode(input.Code),
 		Type:          domain.PaymentMethodType(input.Type),
 		IsActive:      input.IsActive,
 		FeeType:       domain.PaymentFeeType(input.FeeType),
@@ -56,7 +66,8 @@ func (u *CreatePaymentMethodUsecase) Execute(
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
-	err := u.paymentMethodRepo.Save(ctx, u.executor, paymentMethod)
+	err := u.paymentMethodRepo.
+		Save(ctx, u.executor, paymentMethod)
 	if err != nil {
 		return fmt.Errorf("failed to save payment method: %w", err)
 	}

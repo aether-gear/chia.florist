@@ -251,6 +251,9 @@ func (m *mockPaymentGateway) ParseNotification(_ context.Context, _ paymentgatew
 func (m *mockPaymentGateway) CancelTransaction(_ context.Context, _ string) error {
 	return nil
 }
+func (m *mockPaymentGateway) Supports(_ string) bool {
+	return true
+}
 
 // ---------------------------------------------------------------------------
 // Helper: assemble a webhook usecase with sensible defaults.

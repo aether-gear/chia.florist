@@ -5,7 +5,8 @@ CREATE TYPE method_type AS ENUM ('bank_transfer', 'ewallet', 'qr_code');
 CREATE TABLE payment_methods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    name TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
     type method_type NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     description TEXT,

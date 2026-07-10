@@ -13,8 +13,10 @@ type createPaymentAccountRequest struct {
 	IsActive      string  `json:"is_active"`
 }
 
-type createPaymentMethodRequest struct {
+type savePaymentMethodRequest struct {
+	ID            *string `json:"id"`
 	Name          string  `json:"name"`
+	Code          string  `json:"code"`
 	Type          string  `json:"type"`
 	IsActive      string  `json:"is_active"`
 	Description   string  `json:"description"`
@@ -26,6 +28,7 @@ type createPaymentMethodRequest struct {
 type paymentMethodResponse struct {
 	ID            uuid.UUID `json:"id"`
 	Name          string    `json:"name"`
+	Code          string    `json:"code"`
 	Type          string    `json:"type"`
 	IsActive      bool      `json:"is_active"`
 	Description   string    `json:"description"`

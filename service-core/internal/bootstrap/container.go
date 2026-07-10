@@ -37,9 +37,9 @@ import (
 
 	authenSvc "service-core/internal/modules/authentication/infra/service"
 	authenRepo "service-core/internal/modules/authentication/repository"
-	customerSvc "service-core/internal/modules/customer/infra/service"
 	authorSvc "service-core/internal/modules/authorization/infra/service"
 	authorRepo "service-core/internal/modules/authorization/repository"
+	customerSvc "service-core/internal/modules/customer/infra/service"
 	orderSvc "service-core/internal/modules/order/infra/service"
 
 	addressUsecase "service-core/internal/modules/address/usecase"
@@ -74,16 +74,16 @@ type Container struct {
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
-	Me                   authenUsecase.MeUsecase
-	LoginCustomer        authenUsecase.LoginCustomerUsecase
-	LoginStaff           authenUsecase.LoginStaffUsecase
-	RegisterCustomer     authenUsecase.RegisterCustomerUsecase
-	VerifyAccount        authenUsecase.VerifyAccountUsecase
-	GetAccount           authenUsecase.GetAccountUsecase
-	Logout               authenUsecase.LogoutUsecase
-	AuthenticateOAuth    authenUsecase.AuthenticateOAuthUsecase
-	RequestPasswordReset authenUsecase.RequestPasswordResetUsecase
-	VerifyPasswordReset  authenUsecase.VerifyPasswordResetUsecase
+	Me                    authenUsecase.MeUsecase
+	LoginCustomer         authenUsecase.LoginCustomerUsecase
+	LoginStaff            authenUsecase.LoginStaffUsecase
+	RegisterCustomer      authenUsecase.RegisterCustomerUsecase
+	VerifyAccount         authenUsecase.VerifyAccountUsecase
+	GetAccount            authenUsecase.GetAccountUsecase
+	Logout                authenUsecase.LogoutUsecase
+	AuthenticateOAuth     authenUsecase.AuthenticateOAuthUsecase
+	RequestPasswordReset  authenUsecase.RequestPasswordResetUsecase
+	VerifyPasswordReset   authenUsecase.VerifyPasswordResetUsecase
 	ResetPassword         authenUsecase.ResetPasswordUsecase
 	DeleteCustomerAccount customerUsecase.DeleteCustomerAccountUsecase
 
@@ -122,7 +122,7 @@ type Container struct {
 
 	CreatePaymentAccount  paymentUsecase.CreatePaymentAccountUsecase
 	ListPaymentAccount    paymentUsecase.ListPaymentAccountUsecase
-	CreatePaymentMethod   paymentUsecase.CreatePaymentMethodUsecase
+	SavePaymentMethod     paymentUsecase.SavePaymentMethodUsecase
 	ListPaymentMethod     paymentUsecase.ListPaymentMethodUsecase
 	ProcessPaymentWebhook paymentUsecase.ProcessPaymentWebhookUsecase
 	ProcessManualPayment  paymentUsecase.ProcessManualPaymentUsecase
@@ -137,8 +137,8 @@ type Container struct {
 	GetOrder          orderUsecase.GetOrderUsecase
 	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
 
-	FindAuditLogs auditUsecase.FindAuditLogsUsecase
-	GetAuditLog   auditUsecase.GetAuditLogUsecase
+	FindAuditLogs   auditUsecase.FindAuditLogsUsecase
+	GetAuditLog     auditUsecase.GetAuditLogUsecase
 	DeleteAuditLogs auditUsecase.DeleteAuditLogsUsecase
 
 	WAFAutoBanEnabled bool
@@ -604,8 +604,8 @@ func NewContainer(cfg Config,
 				paymentAccRepo,
 				infra.TransactionExecutor,
 			),
-		CreatePaymentMethod: *paymentUsecase.
-			NewCreatePaymentMethodUsecase(
+		SavePaymentMethod: *paymentUsecase.
+			NewSavePaymentMethodUsecase(
 				paymentMethodRepo,
 				infra.TransactionExecutor,
 			),

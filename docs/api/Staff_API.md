@@ -37,6 +37,7 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Find Customers
   - [x] Payment
     - [x] List Payment Method
+    - [ ] Save Payment Method
     - [x] List Payment Account
     - [x] Create Payment Account
   - [X] Orders
@@ -969,6 +970,47 @@ These endpoints require a valid staff session with the **staff admin** role.
 | `400 Bad Request`  | `id` is provided but is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+### Create Payment Method
+
+- **Method**: `POST`
+- **Endpoint**: `/payments/methods`
+- **Description**: Save payment method.
+- **Authentication**: Staff Admin
+
+- **Request Body**:
+
+  ```json
+  {
+    "id": "string (UUID)",
+    "name": "string (required)",
+    "code": "string (required)",
+    "type": "string (required)",
+    "is_active": "string (required)",
+    "description": "string (required)",
+    "fee_type": "string (required)",
+    "fee_amount": "string (optional)",
+    "fee_percentage": "string (optional)"
+  }
+  ```
+
+#### Important Notes
+
+> Account number is optional but required for creating account that based on `bank_transfer` payment method.
+
+#### Response `200 OK`
+
+```json
+{
+    "message": "payment method successfully created"
+}
+```
+
+```json
+{
+    "message": "payment method successfully updated"
+}
+```
 
 ### List Payment Accounts
 

@@ -274,6 +274,10 @@ func (u *CreateOrderUsecase) Execute(
 		provider := PAYMENT_PROVIDER
 		payment.Provider = provider
 
+		if !u.paymentGateway.Supports(string(method.Code)) {
+			return nil, apperrors.NewBadRequest(fmt.Sprintf("payment method %q is not supported by the payment gateway", method.Code))
+		}
+
 		var chargeItems []paymentgateway.ChargeItem
 		for _, item := range orderItems {
 			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
@@ -315,7 +319,7 @@ func (u *CreateOrderUsecase) Execute(
 					PaymentID:     payment.ID,
 					OrderID:       order.ID,
 					Amount:        order.Total,
-					PaymentType:   method.Name,
+					PaymentType:   string(method.Code),
 					ExpiresAt:     time.Now().Add(time.Hour * 24),
 					CustomerEmail: account.Email,
 					CustomerName:  user.Name,

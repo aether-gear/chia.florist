@@ -16,7 +16,7 @@ import (
 type PaymentHandler struct {
 	createPaymentAccount  *usecase.CreatePaymentAccountUsecase
 	listPaymentAccount    *usecase.ListPaymentAccountUsecase
-	createPaymentMethod   *usecase.CreatePaymentMethodUsecase
+	savePaymentMethod     *usecase.SavePaymentMethodUsecase
 	listPaymentMethod     *usecase.ListPaymentMethodUsecase
 	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase
 	processManualPayment  *usecase.ProcessManualPaymentUsecase
@@ -25,7 +25,7 @@ type PaymentHandler struct {
 func NewPaymentHandler(
 	createPaymentAccount *usecase.CreatePaymentAccountUsecase,
 	listPaymentAccount *usecase.ListPaymentAccountUsecase,
-	createPaymentMethod *usecase.CreatePaymentMethodUsecase,
+	savePaymentMethod *usecase.SavePaymentMethodUsecase,
 	listPaymentMethod *usecase.ListPaymentMethodUsecase,
 	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase,
 	processManualPayment *usecase.ProcessManualPaymentUsecase,
@@ -33,7 +33,7 @@ func NewPaymentHandler(
 	return &PaymentHandler{
 		createPaymentAccount:  createPaymentAccount,
 		listPaymentAccount:    listPaymentAccount,
-		createPaymentMethod:   createPaymentMethod,
+		savePaymentMethod:     savePaymentMethod,
 		listPaymentMethod:     listPaymentMethod,
 		processPaymentWebhook: processPaymentWebhook,
 		processManualPayment:  processManualPayment,
@@ -109,8 +109,8 @@ func (h *PaymentHandler) ListPaymentAccount(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
-func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) error {
-	var req createPaymentMethodRequest
+func (h *PaymentHandler) SavePaymentMethod(w http.ResponseWriter, r *http.Request) error {
+	var req savePaymentMethodRequest
 
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid body request")
@@ -122,6 +122,9 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 	if req.Name == "" {
 		return apperrors.NewBadRequest("invalid name")
 	}
+	if req.Code == "" {
+		return apperrors.NewBadRequest("invalid code")
+	}
 	if req.Type == "" {
 		return apperrors.NewBadRequest("invalid type")
 	}
@@ -130,6 +133,15 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 	}
 	if req.FeePercentage == nil || *req.FeePercentage == "" {
 		return apperrors.NewBadRequest("invalid fee percentage")
+	}
+
+	var methodID *uuid.UUID
+	if req.ID != nil && *req.ID != "" {
+		id, err := uuid.Parse(*req.ID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid id format")
+		}
+		methodID = &id
 	}
 
 	var feeFixed int64
@@ -156,7 +168,9 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 	}
 
 	input := usecase.CreatePaymentMethodInput{
+		ID:            methodID,
 		Name:          req.Name,
+		Code:          req.Code,
 		Type:          req.Type,
 		IsActive:      isActive,
 		Description:   req.Description,
@@ -165,13 +179,18 @@ func (h *PaymentHandler) CreatePaymentMethod(w http.ResponseWriter, r *http.Requ
 		FeePercentage: feePercentage,
 	}
 
-	err = h.createPaymentMethod.Execute(r.Context(), input)
+	err = h.savePaymentMethod.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
 
+	msg := "payment method successfully created"
+	if methodID != nil {
+		msg = "payment method successfully updated"
+	}
+
 	response := map[string]string{
-		"message": "payment method successfully created",
+		"message": msg,
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -189,6 +208,7 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 		pM := paymentMethodResponse{
 			ID:            p.ID,
 			Name:          p.Name,
+			Code:          string(p.Code),
 			Type:          string(p.Type),
 			IsActive:      p.IsActive,
 			Description:   p.Description,
@@ -200,7 +220,7 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 		paymentMthds = append(paymentMthds, pM)
 	}
 
-	response := map[string]interface{}{
+	response := map[string][]paymentMethodResponse{
 		"methods": paymentMthds,
 	}
 

@@ -882,3 +882,30 @@ func TestCancelTransaction_CorrectURLPath(t *testing.T) {
 		t.Errorf("path = %q, want %q", receivedPath, expected)
 	}
 }
+
+func TestSupports(t *testing.T) {
+	p := &midtransAPIProvider{}
+
+	cases := []struct {
+		code string
+		want bool
+	}{
+		{"gopay", true},
+		{"GOPAY", true},
+		{"shopeepay", true},
+		{"qris", true},
+		{"qr_code", true},
+		{"mandiri", true},
+		{"unsupported", false},
+		{"bca_va", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.code, func(t *testing.T) {
+			got := p.Supports(tc.code)
+			if got != tc.want {
+				t.Errorf("Supports(%q) = %v, want %v", tc.code, got, tc.want)
+			}
+		})
+	}
+}
