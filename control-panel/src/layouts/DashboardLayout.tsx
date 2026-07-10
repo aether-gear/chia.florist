@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Truck, LogOut, Menu, Store, Users, Wallet, Crown, History, User, ChevronDown, Check, Globe } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Truck, LogOut, Menu, Store, Users, Wallet, Crown, History, User, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
@@ -12,9 +12,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from '../components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
 
