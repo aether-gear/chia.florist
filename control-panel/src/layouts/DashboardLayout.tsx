@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Activity, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown, History } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, ShoppingBag, Package, FileText, Truck, LogOut, Menu, Settings, Store, Users, Wallet, Crown, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
@@ -31,7 +31,6 @@ const navigationGroups: NavigationGroup[] = [
       { name: 'Orders', href: '/orders', icon: FileText },
       { name: 'Products', href: '/products', icon: Package },
       { name: 'Shop', href: '/shop', icon: ShoppingBag },
-      { name: 'Transactions', href: '/transactions', icon: Activity },
       { name: 'Shipments', href: '/shipments', icon: Truck, adminOnly: true },
     ]
   },
