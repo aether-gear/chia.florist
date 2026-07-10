@@ -43,6 +43,169 @@ const isUploading = ref(false)
 const uploadError = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
+// ─── Cropper ────────────────────────────────────────────────────────────────
+const showCropper = ref(false)
+const cropSrc   = ref('')
+const cropFilename = ref('avatar.jpg')
+const cropMime     = ref('image/jpeg')
+const cropImgEl    = ref<HTMLImageElement | null>(null)
+
+// Container dimensions (fixed, matches template)
+const CONT_W = 440
+const CONT_H = 320
+const MIN_CROP = 40
+
+// Natural image size
+const naturalW = ref(0)
+const naturalH = ref(0)
+
+// Zoom & image-pan
+const cropZoom   = ref(1)
+const baseScale  = ref(1)
+const imgX = ref(0)  // pan offset from container centre
+const imgY = ref(0)
+
+const scale = computed(() => baseScale.value * cropZoom.value)
+const maxImgDX = computed(() => Math.max(0, (naturalW.value * scale.value - CONT_W) / 2))
+const maxImgDY = computed(() => Math.max(0, (naturalH.value * scale.value - CONT_H) / 2))
+
+const imgDisplayStyle = computed(() => ({
+  width: `${naturalW.value * scale.value}px`,
+  height: `${naturalH.value * scale.value}px`,
+  maxWidth: 'none',
+  maxHeight: 'none',
+  position: 'absolute' as const,
+  left: '50%',
+  top: '50%',
+  transform: `translate(-50%, -50%) translate(${imgX.value}px, ${imgY.value}px)`,
+  userSelect: 'none' as const,
+  pointerEvents: 'none' as const,
+  draggable: false
+}))
+
+function clampImg() {
+  imgX.value = Math.max(-maxImgDX.value, Math.min(maxImgDX.value, imgX.value))
+  imgY.value = Math.max(-maxImgDY.value, Math.min(maxImgDY.value, imgY.value))
+}
+
+// Crop box (in container pixel coords)
+const cbX = ref(60)
+const cbY = ref(40)
+const cbW = ref(CONT_W - 120)
+const cbH = ref(CONT_H - 80)
+
+// Computed: the four clipping rects that dim outside the crop box
+const dimTop    = computed(() => ({ top: 0, left: 0, width: '100%', height: `${cbY.value}px` }))
+const dimBottom = computed(() => ({ top: `${cbY.value + cbH.value}px`, left: 0, width: '100%', bottom: 0 }))
+const dimLeft   = computed(() => ({ top: `${cbY.value}px`, left: 0, width: `${cbX.value}px`, height: `${cbH.value}px` }))
+const dimRight  = computed(() => ({ top: `${cbY.value}px`, left: `${cbX.value + cbW.value}px`, right: 0, height: `${cbH.value}px` }))
+
+// Drag state
+type DragMode = 'img' | 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null
+const dragMode     = ref<DragMode>(null)
+const dragStartX   = ref(0)
+const dragStartY   = ref(0)
+const initCbX = ref(0); const initCbY = ref(0)
+const initCbW = ref(0); const initCbH = ref(0)
+const lastPanX = ref(0); const lastPanY = ref(0)
+
+function onImgLoad(e: Event) {
+  const img = e.target as HTMLImageElement
+  naturalW.value = img.naturalWidth
+  naturalH.value = img.naturalHeight
+  // Fill container: zoom=1 means image fills every pixel, overflow is clipped
+  baseScale.value = Math.max(CONT_W / img.naturalWidth, CONT_H / img.naturalHeight)
+  cropZoom.value = 1
+  imgX.value = 0; imgY.value = 0
+  // Square crop box, 75% of shorter container side, centred
+  const side = Math.round(Math.min(CONT_W, CONT_H) * 0.75)
+  cbW.value = side; cbH.value = side
+  cbX.value = Math.round((CONT_W - side) / 2)
+  cbY.value = Math.round((CONT_H - side) / 2)
+}
+
+function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
+  e.stopPropagation()
+  const cx = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX
+  const cy = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY
+  dragMode.value = mode
+  dragStartX.value = cx; dragStartY.value = cy
+  initCbX.value = cbX.value; initCbY.value = cbY.value
+  initCbW.value = cbW.value; initCbH.value = cbH.value
+}
+
+function startImgPan(e: MouseEvent | TouchEvent) {
+  const cx = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX
+  const cy = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY
+  dragMode.value = 'img'
+  lastPanX.value = cx; lastPanY.value = cy
+}
+
+function onGlobalMove(cx: number, cy: number) {
+  const m = dragMode.value
+  if (!m) return
+
+  if (m === 'img') {
+    imgX.value += cx - lastPanX.value
+    imgY.value += cy - lastPanY.value
+    lastPanX.value = cx; lastPanY.value = cy
+    clampImg()
+    return
+  }
+
+  const dx = cx - dragStartX.value
+  const dy = cy - dragStartY.value
+  let nx = initCbX.value, ny = initCbY.value, nw = initCbW.value, nh = initCbH.value
+
+  if (m === 'move') {
+    nx = Math.max(0, Math.min(CONT_W - nw, nx + dx))
+    ny = Math.max(0, Math.min(CONT_H - nh, ny + dy))
+  } else {
+    // Compute raw side length (always square: W === H)
+    let rawSide: number = nw
+    if (m === 'e')  rawSide = initCbW.value + dx
+    if (m === 'w')  rawSide = initCbW.value - dx
+    if (m === 's')  rawSide = initCbH.value + dy
+    if (m === 'n')  rawSide = initCbH.value - dy
+    if (m === 'se') rawSide = Math.max(initCbW.value + dx, initCbH.value + dy)
+    if (m === 'sw') rawSide = Math.max(initCbW.value - dx, initCbH.value + dy)
+    if (m === 'ne') rawSide = Math.max(initCbW.value + dx, initCbH.value - dy)
+    if (m === 'nw') rawSide = Math.max(initCbW.value - dx, initCbH.value - dy)
+    rawSide = Math.max(MIN_CROP, rawSide)
+
+    nw = rawSide; nh = rawSide
+
+    // Anchor the opposite edge for W/N handles
+    if (m.includes('w')) nx = initCbX.value + initCbW.value - rawSide
+    if (m.includes('n')) ny = initCbY.value + initCbH.value - rawSide
+
+    // Clamp position to container, re-enforce square after clamping
+    nx = Math.max(0, nx); ny = Math.max(0, ny)
+    if (nx + nw > CONT_W) { nw = CONT_W - nx; nh = nw }
+    if (ny + nh > CONT_H) { nh = CONT_H - ny; nw = nh }
+  }
+
+  cbX.value = nx; cbY.value = ny; cbW.value = nw; cbH.value = nh
+}
+
+function onMouseMove(e: MouseEvent)  { onGlobalMove(e.clientX, e.clientY) }
+function onMouseUp()                  { dragMode.value = null }
+function onTouchMoveCrop(e: TouchEvent) { if (e.touches.length === 1) { e.preventDefault(); onGlobalMove(e.touches[0].clientX, e.touches[0].clientY) } }
+function onTouchEndCrop()             { dragMode.value = null }
+
+function onCropZoomChange() {
+  clampImg()
+  // keep crop box inside container
+  if (cbX.value + cbW.value > CONT_W) cbW.value = CONT_W - cbX.value
+  if (cbY.value + cbH.value > CONT_H) cbH.value = CONT_H - cbY.value
+}
+
+function cancelCrop() {
+  showCropper.value = false
+  cropSrc.value = ''
+  if (fileInput.value) fileInput.value.value = ''
+}
+
 const loadProfilePicture = async () => {
   const userId = authVm.currentUser.value?.id
   if (!userId) return
@@ -70,7 +233,7 @@ const triggerFileSelect = () => {
   fileInput.value?.click()
 }
 
-const handleFileUpload = async (event: Event) => {
+const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
@@ -79,46 +242,79 @@ const handleFileUpload = async (event: Event) => {
     alert('Please select an image file.')
     return
   }
-
-  if (file.size > 5 * 1024 * 1024) {
-    alert('Image file size must be less than 5MB.')
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Image must be less than 10 MB.')
     return
   }
+
+  cropFilename.value = file.name || 'avatar.jpg'
+  cropMime.value = file.type || 'image/jpeg'
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    cropSrc.value = e.target?.result as string
+    showCropper.value = true
+  }
+  reader.readAsDataURL(file)
+}
+
+const performCropAndUpload = async () => {
+  const img = cropImgEl.value
+  if (!img) return
 
   const userId = authVm.currentUser.value?.id
-  if (!userId) {
-    alert('User not authenticated.')
-    return
-  }
+  if (!userId) { alert('Not authenticated.'); return }
 
-  isUploading.value = true
-  uploadError.value = null
-  try {
-    const urls = await supabaseService.uploadFile(userId, file)
-    if (urls) {
-      publicAvatarUrl.value = urls.publicUrl
-      signedAvatarUrl.value = urls.signedUrl
-      avatarUrl.value = urls.signedUrl || urls.publicUrl
-      
-      if (authVm.currentUser.value) {
-        authVm.currentUser.value.avatarUrl = urls.signedUrl || urls.publicUrl
+  // Draw to canvas while image element is still in DOM
+  const canvas = document.createElement('canvas')
+  canvas.width = 800
+  canvas.height = 800
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const s = scale.value
+  // Image top-left corner in container coords
+  const imgLeft = CONT_W / 2 - (naturalW.value * s) / 2 + imgX.value
+  const imgTop  = CONT_H / 2 - (naturalH.value * s) / 2 + imgY.value
+
+  // Crop box in source image coordinates
+  const srcX = (cbX.value - imgLeft) / s
+  const srcY = (cbY.value - imgTop) / s
+  const srcW = cbW.value / s
+  const srcH = cbH.value / s
+
+  ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, 800, 800)
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) { uploadError.value = 'Crop failed.'; return }
+
+    // Close modal after pixel data is captured
+    showCropper.value = false
+    cropSrc.value = ''
+    if (fileInput.value) fileInput.value.value = ''
+
+    isUploading.value = true
+    uploadError.value = null
+    try {
+      const croppedFile = new File([blob], cropFilename.value, { type: cropMime.value })
+      const urls = await supabaseService.uploadFile(userId, croppedFile)
+      if (urls) {
+        publicAvatarUrl.value = urls.publicUrl
+        signedAvatarUrl.value = urls.signedUrl
+        avatarUrl.value = urls.signedUrl || urls.publicUrl
+        if (authVm.currentUser.value) {
+          authVm.currentUser.value.avatarUrl = urls.signedUrl || urls.publicUrl
+        }
+        await authVm.updateUserProfile({ avatar_url: urls.signedUrl || urls.publicUrl })
+      } else {
+        uploadError.value = 'Upload failed. Please try again.'
       }
-
-      // Sync avatar URL with Go backend
-      await authVm.updateUserProfile({
-        avatar_url: urls.signedUrl || urls.publicUrl
-      })
-    } else {
-      uploadError.value = 'Failed to upload image. Please try again.'
+    } catch (err: any) {
+      uploadError.value = err.message || 'Upload error.'
+    } finally {
+      isUploading.value = false
     }
-  } catch (err: any) {
-    uploadError.value = err.message || 'An error occurred during file upload.'
-  } finally {
-    isUploading.value = false
-    if (fileInput.value) {
-      fileInput.value.value = ''
-    }
-  }
+  }, cropMime.value)
 }
 
 const handleRemovePicture = async () => {
@@ -1002,6 +1198,132 @@ const triggerAlert = (message: string) => {
       </div>
     </div>
 
+    <!-- ═══ Image Crop Modal ═══════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <Transition name="cropper-fade">
+        <div
+          v-if="showCropper"
+          class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.35); backdrop-filter: blur(4px)"
+          @mousemove="onMouseMove"
+          @mouseup="onMouseUp"
+          @touchmove.prevent="onTouchMoveCrop"
+          @touchend="onTouchEndCrop"
+        >
+          <div class="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-fade" style="width: 520px; max-width: 96vw">
+
+            <!-- Header -->
+            <div class="px-6 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 class="font-extrabold text-gray-900 text-sm">Crop Profile Picture</h3>
+                <p class="text-[11px] text-gray-400 mt-0.5">Drag corners or edges to resize · Drag inside crop box to move it · Drag outside to pan image</p>
+              </div>
+              <button @click="cancelCrop" class="text-gray-400 hover:text-gray-600 transition text-lg leading-none cursor-pointer">✕</button>
+            </div>
+
+            <!-- Canvas editing area -->
+            <div class="relative bg-gray-900 overflow-hidden select-none"
+              :style="{ width: `${CONT_W}px`, height: `${CONT_H}px`, margin: '0 auto' }"
+              @mousedown="startImgPan"
+              @touchstart.passive="startImgPan"
+            >
+              <!-- The image -->
+              <img
+                v-if="cropSrc"
+                :src="cropSrc"
+                :style="imgDisplayStyle"
+                @load="onImgLoad"
+                ref="cropImgEl"
+                alt=""
+              />
+
+              <!-- Dim overlays (4 rects outside crop box) -->
+              <div class="absolute pointer-events-none" :style="{ ...dimTop,    background: 'rgba(0,0,0,0.5)' }"></div>
+              <div class="absolute pointer-events-none" :style="{ ...dimBottom, background: 'rgba(0,0,0,0.5)' }"></div>
+              <div class="absolute pointer-events-none" :style="{ ...dimLeft,   background: 'rgba(0,0,0,0.5)' }"></div>
+              <div class="absolute pointer-events-none" :style="{ ...dimRight,  background: 'rgba(0,0,0,0.5)' }"></div>
+
+              <!-- Crop selection box -->
+              <div
+                class="absolute cursor-move"
+                :style="{
+                  left: `${cbX}px`, top: `${cbY}px`,
+                  width: `${cbW}px`, height: `${cbH}px`,
+                  border: '2px solid #fff',
+                  boxSizing: 'border-box'
+                }"
+                @mousedown.stop="startCropHandle($event, 'move')"
+                @touchstart.stop.passive="startCropHandle($event, 'move')"
+              >
+                <!-- Rule of thirds grid -->
+                <div class="absolute inset-0 pointer-events-none" style="
+                  background-image: linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px),
+                                    linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px);
+                  background-size: 33.33% 33.33%;
+                "></div>
+
+                <!-- 8 resize handles -->
+                <!-- Corners -->
+                <div class="crop-handle crop-handle-corner" style="top:-5px;left:-5px;cursor:nw-resize"
+                  @mousedown.stop="startCropHandle($event,'nw')" @touchstart.stop.passive="startCropHandle($event,'nw')"></div>
+                <div class="crop-handle crop-handle-corner" style="top:-5px;right:-5px;cursor:ne-resize"
+                  @mousedown.stop="startCropHandle($event,'ne')" @touchstart.stop.passive="startCropHandle($event,'ne')"></div>
+                <div class="crop-handle crop-handle-corner" style="bottom:-5px;left:-5px;cursor:sw-resize"
+                  @mousedown.stop="startCropHandle($event,'sw')" @touchstart.stop.passive="startCropHandle($event,'sw')"></div>
+                <div class="crop-handle crop-handle-corner" style="bottom:-5px;right:-5px;cursor:se-resize"
+                  @mousedown.stop="startCropHandle($event,'se')" @touchstart.stop.passive="startCropHandle($event,'se')"></div>
+                <!-- Edges -->
+                <div class="crop-handle crop-handle-edge" style="top:-4px;left:calc(50% - 12px);cursor:n-resize"
+                  @mousedown.stop="startCropHandle($event,'n')" @touchstart.stop.passive="startCropHandle($event,'n')"></div>
+                <div class="crop-handle crop-handle-edge" style="bottom:-4px;left:calc(50% - 12px);cursor:s-resize"
+                  @mousedown.stop="startCropHandle($event,'s')" @touchstart.stop.passive="startCropHandle($event,'s')"></div>
+                <div class="crop-handle crop-handle-edge" style="left:-4px;top:calc(50% - 12px);cursor:w-resize"
+                  @mousedown.stop="startCropHandle($event,'w')" @touchstart.stop.passive="startCropHandle($event,'w')"></div>
+                <div class="crop-handle crop-handle-edge" style="right:-4px;top:calc(50% - 12px);cursor:e-resize"
+                  @mousedown.stop="startCropHandle($event,'e')" @touchstart.stop.passive="startCropHandle($event,'e')"></div>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="px-6 py-4 space-y-3">
+              <!-- Zoom slider -->
+              <div class="flex items-center gap-3">
+                <span class="text-xs font-bold text-gray-400 w-10">Zoom</span>
+                <input
+                  type="range"
+                  v-model.number="cropZoom"
+                  min="1" max="4" step="0.01"
+                  class="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-[#1b4332] bg-gray-200"
+                  @input="onCropZoomChange"
+                />
+                <span class="text-xs font-bold text-gray-500 w-10 text-right">{{ Math.round(cropZoom * 100) }}%</span>
+              </div>
+
+              <!-- Size info + buttons -->
+              <div class="flex items-center gap-3">
+                <span class="text-[11px] text-gray-400 flex-1">
+                  ⬜ {{ cbW }} × {{ cbW }} px (square)
+                </span>
+                <button
+                  @click="cancelCrop"
+                  class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                >Cancel</button>
+                <button
+                  @click="performCropAndUpload"
+                  :disabled="isUploading"
+                  class="px-5 py-2 bg-[#1b4332] hover:bg-[#143326] disabled:opacity-60 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer"
+                >
+                  <span v-if="isUploading" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>{{ isUploading ? 'Uploading…' : 'Crop & Save' }}</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1016,5 +1338,32 @@ const triggerAlert = (message: string) => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #e5e7eb;
   border-radius: 10px;
+}
+
+/* Cropper modal transition */
+.cropper-fade-enter-active,
+.cropper-fade-leave-active { transition: opacity 0.2s ease; }
+.cropper-fade-enter-from,
+.cropper-fade-leave-to { opacity: 0; }
+
+/* Crop handles */
+.crop-handle {
+  position: absolute;
+  background: #fff;
+  border: 2px solid #1b4332;
+  border-radius: 2px;
+}
+.crop-handle-corner {
+  width: 10px;
+  height: 10px;
+}
+.crop-handle-edge {
+  width: 24px;
+  height: 8px;
+}
+.crop-handle-edge[style*="left:-4px"],
+.crop-handle-edge[style*="right:-4px"] {
+  width: 8px;
+  height: 24px;
 }
 </style>
