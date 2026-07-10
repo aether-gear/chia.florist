@@ -1,4 +1,5 @@
-import { CreditCard, Wallet, Loader2, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { CreditCard, Wallet, Loader2, Plus, Pencil, Eye } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import {
   Table,
@@ -13,9 +14,16 @@ import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
 import { Link } from 'react-router-dom';
+import type { PaymentMethod } from '../../../models/Payment';
+import PaymentMethodFormSheet from '../../../components/payments/PaymentMethodFormSheet';
+import PaymentMethodDetailOverlay from '../../../components/payments/PaymentMethodDetailOverlay';
 
 export default function PaymentSettingsPage() {
-  const { methods, accounts, loading, error } = usePaymentsViewModel();
+  const { methods, accounts, loading, error, savePaymentMethod } = usePaymentsViewModel();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailMethod, setDetailMethod] = useState<PaymentMethod | null>(null);
 
   if (loading) {
     return (
@@ -112,11 +120,16 @@ export default function PaymentSettingsPage() {
 
           <TabsContent value="methods" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Available Methods</CardTitle>
-                <CardDescription>
-                  These are the payment channels available for processing customer payments.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Available Methods</CardTitle>
+                  <CardDescription>
+                    These are the payment channels available for processing customer payments.
+                  </CardDescription>
+                </div>
+                <Button onClick={() => { setEditingMethod(null); setIsFormOpen(true); }} size="sm">
+                  <Plus className="mr-2 h-4 w-4" /> Add Method
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
@@ -125,25 +138,33 @@ export default function PaymentSettingsPage() {
                       <TableRow>
                         <TableHead className="w-[50px]"></TableHead>
                         <TableHead>Name</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Provider</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="text-right">Status</TableHead>
+                        <TableHead className="w-[100px] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {methods.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center h-24">
+                          <TableCell colSpan={8} className="text-center h-24">
                             No payment methods configured.
                           </TableCell>
                         </TableRow>
                       ) : (
                         methods.map((method) => (
-                          <TableRow key={method.id}>
+                          <TableRow key={method.id} className="cursor-pointer" onClick={() => {
+                            setDetailMethod(method);
+                            setIsDetailOpen(true);
+                          }}>
                             <TableCell>
                               <CreditCard className="h-5 w-5 text-muted-foreground" />
                             </TableCell>
                             <TableCell className="font-medium">{method.name}</TableCell>
+                            <TableCell className="font-mono text-xs">{method.code}</TableCell>
+                            <TableCell className="capitalize text-xs font-semibold text-indigo-600 dark:text-indigo-400">{method.provider}</TableCell>
                             <TableCell className="uppercase text-xs">{method.type.replace('_', ' ')}</TableCell>
                             <TableCell className="max-w-xs truncate text-muted-foreground">
                               {method.description}
@@ -152,6 +173,20 @@ export default function PaymentSettingsPage() {
                               <Badge variant={method.is_active ? "default" : "secondary"}>
                                 {method.is_active ? 'Active' : 'Inactive'}
                               </Badge>
+                            </TableCell>
+                            <TableCell className="text-right space-x-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setEditingMethod(method);
+                                  setIsFormOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                <span className="sr-only">Edit</span>
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -163,6 +198,19 @@ export default function PaymentSettingsPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <PaymentMethodFormSheet
+          isOpen={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          method={editingMethod}
+          onSave={savePaymentMethod}
+        />
+
+        <PaymentMethodDetailOverlay
+          isOpen={isDetailOpen}
+          onOpenChange={setIsDetailOpen}
+          method={detailMethod}
+        />
       </div>
     </div>
   );
