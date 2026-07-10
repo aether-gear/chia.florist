@@ -32,7 +32,6 @@ export default function AppRoutes() {
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/create" element={<CreateProductPage />} />
             <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/transactions" element={<PlaceholderPage title="Transactions" />} />
             <Route path="/shipments" element={<PlaceholderPage title="Shipments" />} />
             <Route path="/merchant/settings" element={<MerchantProfileSettings />} />
             

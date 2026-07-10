@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CreditCard, Wallet, Loader2, Plus, Pencil, Eye } from 'lucide-react';
+import { CreditCard, Wallet, Loader2, Plus, Pencil } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import {
   Table,
