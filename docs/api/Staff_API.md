@@ -37,7 +37,8 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Find Customers
   - [x] Payment
     - [x] List Payment Method
-    - [ ] Save Payment Method
+    - [x] Save Payment Method
+    - [x] Save Payment Instruction
     - [x] List Payment Account
     - [x] Create Payment Account
   - [X] Orders
@@ -910,9 +911,26 @@ These endpoints require a valid staff session with the **staff admin** role.
 
 - **Method**: `GET`
 - **Endpoint**: `/payments/methods`
-- **Description**: Retrieve a list of payment methods.
+- **Description**: Retrieve a list of payment methods with optional custom sorting. Includes the payment instruction configuration for each payment method if present.
 - **Authentication**: Staff
 - **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `sort`    | string | No       | Comma-separated sort expressions. Format: `<field>:<direction>`. |
+
+#### Sort Fields
+
+| Field      | Example            | Description                       |
+|------------|--------------------|-----------------------------------|
+| `latest`   | `sort=latest:desc` | Sort by creation date.            |
+| `name`     | `sort=name:asc`    | Sort alphabetically by name.      |
+| `code`     | `sort=code:desc`   | Sort by payment method code.      |
+| `type`     | `sort=type:asc`    | Sort by payment method type.      |
+
+> Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=name:asc,latest:desc`.
 
 #### Response `200 OK`
 
@@ -922,42 +940,32 @@ These endpoints require a valid staff session with the **staff admin** role.
         {
             "id": "0137d751-5188-447a-b630-1bf858f4f866",
             "name": "QRIS",
+            "code": "qris",
+            "provider": "midtrans",
             "type": "qr_code",
             "is_active": true,
             "description": "QRIS payment via Midtrans",
             "fee_type": "",
             "fee_fixed": 0,
-            "fee_percentage": 0
-        },
-        {
-            "id": "5de3fdf1-7cf2-4354-bf31-a288a6706c41",
-            "name": "GoPay",
-            "type": "ewallet",
-            "is_active": true,
-            "description": "GoPay via Midtrans",
-            "fee_type": "",
-            "fee_fixed": 0,
-            "fee_percentage": 0
-        },
-        {
-            "id": "074b02e4-e047-4f60-bdb0-cfeb5481d002",
-            "name": "DANA",
-            "type": "ewallet",
-            "is_active": true,
-            "description": "DANA via Midtrans",
-            "fee_type": "",
-            "fee_fixed": 0,
-            "fee_percentage": 0
+            "fee_percentage": 0,
+            "instruction": null
         },
         {
             "id": "24ce2aac-bd73-4c29-9ab9-2f53282b2679",
             "name": "Mandiri",
+            "code": "mandiri",
+            "provider": "manual",
             "type": "bank_transfer",
             "is_active": true,
-            "description": "Mandiri Bill Payment via Midtrans",
-            "fee_type": "",
-            "fee_fixed": 0,
-            "fee_percentage": 0
+            "description": "Manual Bank Transfer to Mandiri",
+            "fee_type": "flat",
+            "fee_fixed": 2500,
+            "fee_percentage": 0,
+            "instruction": {
+                "id": "21213fdf-7cf2-4354-bf31-a288a6706c41",
+                "content": "Please transfer exactly **Rp {{amount}}** to Mandiri Account **{{va_number}}**.",
+                "created_at": "2026-07-10T14:50:00Z"
+            }
         }
     ]
 }
@@ -967,24 +975,24 @@ These endpoints require a valid staff session with the **staff admin** role.
 
 | Status             | Condition |
 |--------------------|-----------|
-| `400 Bad Request`  | `id` is provided but is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
-| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `403 Forbidden`    | Authenticated user does not have a staff role. |
 
-### Create Payment Method
+### Save Payment Method
 
 - **Method**: `POST`
 - **Endpoint**: `/payments/methods`
-- **Description**: Save payment method.
+- **Description**: Save payment method (creates a new payment method or updates an existing one if the `id` is provided).
 - **Authentication**: Staff Admin
 
 - **Request Body**:
 
   ```json
   {
-    "id": "string (UUID)",
+    "id": "string (optional, UUID)",
     "name": "string (required)",
     "code": "string (required)",
+    "provider": "string (required)",
     "type": "string (required)",
     "is_active": "string (required)",
     "description": "string (required)",
@@ -1011,6 +1019,43 @@ These endpoints require a valid staff session with the **staff admin** role.
     "message": "payment method successfully updated"
 }
 ```
+
+### Save Payment Instruction
+
+- **Method**: `POST`
+- **Endpoint**: `/payments/methods/{methodID}/instruction`
+- **Description**: Create or update the payment instruction details for a specific payment method. If an instruction already exists for the given payment method, calling this endpoint will update its content.
+- **Authentication**: Staff Admin
+- **Path Parameters**:
+
+| Parameter  | Type | Required | Description |
+|------------|------|----------|-------------|
+| `methodID` | UUID | Yes      | The unique ID of the payment method. |
+
+- **Request Body**:
+
+  ```json
+  {
+    "content": "string (required, markdown content)"
+  }
+  ```
+
+#### Response `200 OK`
+
+```json
+{
+    "message": "payment instruction successfully saved"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `methodID` is not a valid UUID, request body is invalid, or `content` is empty. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | Payment method with the given ID does not exist. |
 
 ### List Payment Accounts
 
