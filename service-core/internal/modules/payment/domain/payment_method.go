@@ -43,6 +43,8 @@ type PaymentMethod struct {
 	CreatedAt time.Time
 	UpdatedAt *time.Time
 	DeletedAt *time.Time
+
+	Instruction *PaymentInstruction
 }
 
 func (pM *PaymentMethod) Validate() error {

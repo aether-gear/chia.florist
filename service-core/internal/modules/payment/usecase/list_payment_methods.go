@@ -3,9 +3,11 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 )
 
@@ -24,8 +26,64 @@ func NewListPaymentMethodUsecase(
 	}
 }
 
-func (u *ListPaymentMethodUsecase) ListAll(ctx context.Context) ([]domain.PaymentMethod, error) {
-	methods, err := u.paymentMethodRepo.ListAll(ctx, u.executor)
+type ListPaymentMethodInput struct {
+	Sort string
+}
+
+func (u *ListPaymentMethodUsecase) ListAll(
+	ctx context.Context,
+	input ListPaymentMethodInput,
+) ([]domain.PaymentMethod, error) {
+	var pmSortKeys = map[string]query.SortKey{
+		"latest": repository.PaymentMethodSortLatest,
+		"name":   repository.PaymentMethodSortName,
+		"code":   repository.PaymentMethodSortCode,
+		"type":   repository.PaymentMethodSortType,
+	}
+
+	var sorts query.Sorts
+	if input.Sort != "" {
+		parts := strings.SplitSeq(input.Sort, ",")
+		for part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+
+			subparts := strings.Split(part, ":")
+			key := strings.TrimSpace(subparts[0])
+
+			var dir query.SortDirection = query.SortDesc
+			if len(subparts) > 1 {
+				d := strings.ToLower(strings.TrimSpace(subparts[1]))
+				if d == "asc" {
+					dir = query.SortAsc
+				}
+			}
+
+			sortKey, exists := pmSortKeys[key]
+			if exists {
+				sorts = append(sorts, query.Sort{
+					By:        sortKey,
+					Direction: dir,
+				})
+			}
+		}
+	}
+
+	if len(sorts) == 0 {
+		sorts = query.Sorts{
+			{
+				By:        repository.PaymentMethodSortLatest,
+				Direction: query.SortDesc,
+			},
+		}
+	}
+
+	methods, err := u.paymentMethodRepo.
+		ListAll(ctx, u.executor,
+			sorts,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load payment methods: %w", err)
 	}

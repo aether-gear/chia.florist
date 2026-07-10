@@ -16,6 +16,7 @@ import (
 	paymentDomain "service-core/internal/modules/payment/domain"
 	userDomain "service-core/internal/modules/user/domain"
 	userRepo "service-core/internal/modules/user/repository"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -133,7 +134,7 @@ func (m *coMockPaymentMethodRepo) FindByName(_ context.Context, _ transaction.Ex
 func (m *coMockPaymentMethodRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentMethod, error) {
 	return m.method, m.err
 }
-func (m *coMockPaymentMethodRepo) ListAll(_ context.Context, _ transaction.Executor) ([]paymentDomain.PaymentMethod, error) {
+func (m *coMockPaymentMethodRepo) ListAll(_ context.Context, _ transaction.Executor, _ query.Sorts) ([]paymentDomain.PaymentMethod, error) {
 	return nil, nil
 }
 

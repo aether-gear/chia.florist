@@ -8,6 +8,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
+	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
 	"github.com/google/uuid"
 )
@@ -34,7 +35,7 @@ func (m *mockSavePaymentMethodRepo) GetByID(_ context.Context, _ transaction.Exe
 	}
 	return nil, nil
 }
-func (m *mockSavePaymentMethodRepo) ListAll(_ context.Context, _ transaction.Executor) ([]domain.PaymentMethod, error) {
+func (m *mockSavePaymentMethodRepo) ListAll(_ context.Context, _ transaction.Executor, _ query.Sorts) ([]domain.PaymentMethod, error) {
 	return nil, nil
 }
 

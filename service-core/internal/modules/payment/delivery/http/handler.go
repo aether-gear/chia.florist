@@ -205,7 +205,12 @@ func (h *PaymentHandler) SavePaymentMethod(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Request) error {
-	payMethods, err := h.listPaymentMethod.ListAll(r.Context())
+	sortParam := r.URL.Query().Get("sort")
+	input := usecase.ListPaymentMethodInput{
+		Sort: sortParam,
+	}
+
+	payMethods, err := h.listPaymentMethod.ListAll(r.Context(), input)
 	if err != nil {
 		return err
 	}
@@ -223,6 +228,14 @@ func (h *PaymentHandler) ListPaymentMethod(w http.ResponseWriter, r *http.Reques
 			FeeType:       string(p.FeeType),
 			FeeFixed:      p.FeeFixed,
 			FeePercentage: p.FeePercentage,
+		}
+
+		if p.Instruction != nil {
+			pM.Instruction = &paymentInstructionResponse{
+				ID:        p.Instruction.ID,
+				Content:   p.Instruction.Content,
+				CreatedAt: p.Instruction.CreatedAt,
+			}
 		}
 
 		paymentMthds = append(paymentMthds, pM)
