@@ -44,6 +44,7 @@ func (s *ActorService) Load(
 	actor := domain.Actor{
 		AccountID: account.ID,
 		Type:      account.Type,
+		StaffID:   staffID,
 	}
 
 	if actor.Type == authenDomain.AccountTypeStaff {

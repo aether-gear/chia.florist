@@ -282,9 +282,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/", chains.StaffAdminOnly(staffHandler.FindStaff))
 			r.Post("/", chains.StaffAdminOnly(staffHandler.CreateStaff))
 			r.Route("/{staffID}", func(r chi.Router) {
-				r.Route("/accounts", func(r chi.Router) {
-					r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
-				})
+				r.Post("/accounts", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
 			})
 		})
 
