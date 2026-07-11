@@ -16,7 +16,8 @@ type CornerStyle = 'none' | 'rounded' | 'cut' | 'ornate' | 'floral'
 type FrameStyle  = 'none' | 'square' | 'circle'
 type BrushType   = 'flower' | 'rose'
 type BorderStyle = 'none' | 'solid' | 'double' | 'dashed' | 'dotted' | 'groove' | 'ridge' | 'ornate'
-type ToolTab     = 'text' | 'image' | 'brush' | 'border' | 'corner'
+type FloralStyle = 'classic' | 'modern' | 'grand'
+type ToolTab     = 'text' | 'image' | 'brush' | 'border' | 'corner' | 'floral'
 type SectionKey  = 'upper' | 'lower'
 
 interface BoardSection {
@@ -37,7 +38,8 @@ interface BrushStroke {
   x: number; y: number; size: number; color: string; rotation: number
 }
 type CanvasElement = CanvasImage | BrushStroke
-interface BoardBorder { style: BorderStyle; color: string; width: number }
+interface BoardBorder { style: BorderStyle; color: string; width: number; center: boolean }
+interface FloralCrest { enabled: boolean; style: FloralStyle; primary: string; secondary: string; size: number }
 
 /* ─── CONSTANTS ───────────────────────────────────────────────────── */
 const boardW = computed(() => 800)
@@ -80,6 +82,7 @@ const BG_PRESETS    = ['#c0392b','#1a3a5c','#145a32','#6c3483','#a04000','#17202
 const TOOL_TABS: { id: ToolTab; label: string }[] = [
   { id: 'text', label: 'Text' }, { id: 'image', label: 'Image' },
   { id: 'brush', label: 'Brush' }, { id: 'border', label: 'Border' }, { id: 'corner', label: 'Corner' },
+  { id: 'floral', label: 'Floral' },
 ]
 
 /* ─── STATE ───────────────────────────────────────────────────────── */
@@ -97,7 +100,9 @@ const lower = ref<BoardSection>({
 })
 
 const heightRatio  = ref(0.58)
-const border       = ref<BoardBorder>({ style: 'solid', color: '#f5c842', width: 12 })
+const border       = ref<BoardBorder>({ style: 'solid', color: '#f5c842', width: 12, center: true })
+const topCrest     = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 })
+const bottomCrest  = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 })
 const elements     = ref<CanvasElement[]>([])
 
 const activeTab     = ref<ToolTab>('text')
@@ -131,6 +136,19 @@ const boardBorderStyle = computed((): Record<string, string> => {
   return { border: `${width}px ${style} ${color}` }
 })
 
+const centerBorderStyle = computed((): Record<string, string> => {
+  if (!border.value.center) return {}
+  const { style, color, width } = border.value
+  if (style === 'none' || width === 0) return {}
+  return {
+    width: '100%',
+    borderTop: `${width}px ${style === 'ornate' ? 'solid' : style} ${color}`,
+    ...(style === 'ornate' ? {
+      boxShadow: `0 -${Math.max(2, Math.round(width * 0.35))}px 0 ${color}, 0 ${Math.max(2, Math.round(width * 0.35))}px 0 ${color}`
+    } : {})
+  }
+})
+
 const upperCornerStyle = computed((): Record<string, string> => {
   const s = upper.value.cornerStyle
   if (s === 'rounded') return { borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }
@@ -146,6 +164,8 @@ const lowerCornerStyle = computed((): Record<string, string> => {
   if (s === 'ornate') return { borderBottomLeftRadius: '4px 18px', borderBottomRightRadius: '4px 18px' }
   return {}
 })
+
+const floralSec = computed(() => activeSection.value === 'upper' ? topCrest.value : bottomCrest.value)
 
 const selectedEl   = computed(() => elements.value.find(e => e.id === selectedId.value) ?? null)
 const selectedImg  = computed(() => (selectedEl.value?.type === 'image'  ? selectedEl.value : null) as CanvasImage | null)
@@ -165,8 +185,19 @@ const randomizeDesign = () => {
   border.value.style = rand(BORDER_STYLES).id
   border.value.color = rand(BORDER_COLORS)
   border.value.width = Math.floor(Math.random() * 16) + 4
+  border.value.center = Math.random() > 0.5
   upper.value.cornerStyle = rand(CORNERS).id
   lower.value.cornerStyle = rand(CORNERS).id
+  
+  topCrest.value.enabled = Math.random() > 0.5
+  topCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
+  topCrest.value.primary = rand(BG_PRESETS)
+  topCrest.value.secondary = rand(BG_PRESETS)
+  
+  bottomCrest.value.enabled = Math.random() > 0.5
+  bottomCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
+  bottomCrest.value.primary = rand(BG_PRESETS)
+  bottomCrest.value.secondary = rand(BG_PRESETS)
   
   // Interactive scale bounce feedback
   boardScale.value = boardScale.value * 0.95
@@ -367,6 +398,123 @@ onUnmounted(() => {
           <!-- Board scaler: sized to match scale -->
           <div class="board-scaler"
             :style="{ width: Math.round(boardW * boardScale) + 'px', height: Math.round(boardH * boardScale) + 'px' }">
+            <svg width="0" height="0" style="position:absolute">
+              <defs>
+                <g id="fw">
+                  <path d="M0 -12 C 4 -12 4 -4 12 -12 C 4 -4 12 -4 12 0 C 12 4 4 4 12 12 C 4 4 4 12 0 12 C -4 12 -4 4 -12 12 C -4 4 -12 4 -12 0 C -12 -4 -4 -4 -12 -12 C -4 -4 -4 -12 0 -12" fill="currentColor"/>
+                  <circle cx="0" cy="0" r="4" fill="#ffd700" opacity="0.9"/>
+                </g>
+                <g id="lf">
+                  <path d="M0 0 Q 15 -10 25 0 Q 15 10 0 0 Z" fill="#2d5a27"/>
+                </g>
+              </defs>
+            </svg>
+
+            <!-- 🌸 TOP FLORAL CREST 🌸 -->
+            <div v-if="topCrest.enabled" class="floral-crest fc-top"
+                 :style="{ '--p': topCrest.primary, '--s': topCrest.secondary, width: topCrest.size + '%' }">
+              <svg v-if="topCrest.style === 'classic'" viewBox="0 0 300 150" class="crest-svg">
+                <use href="#lf" x="60" y="145" transform="rotate(-30 60 145) scale(2)"/><use href="#lf" x="240" y="145" transform="rotate(210 240 145) scale(2)"/><use href="#lf" x="150" y="55" transform="rotate(-90 150 55) scale(2)"/>
+                <g fill="var(--p)">
+                  <use href="#fw" x="70" y="150"/><use href="#fw" x="74" y="125"/><use href="#fw" x="84" y="103"/><use href="#fw" x="103" y="84"/><use href="#fw" x="125" y="74"/><use href="#fw" x="150" y="70"/><use href="#fw" x="175" y="74"/><use href="#fw" x="197" y="84"/><use href="#fw" x="216" y="103"/><use href="#fw" x="226" y="125"/><use href="#fw" x="230" y="150"/>
+                </g>
+                <g fill="var(--s)">
+                  <use href="#fw" x="90" y="150"/><use href="#fw" x="96" y="124"/><use href="#fw" x="115" y="101"/><use href="#fw" x="140" y="91"/><use href="#fw" x="160" y="91"/><use href="#fw" x="185" y="101"/><use href="#fw" x="204" y="124"/><use href="#fw" x="210" y="150"/>
+                </g>
+                <g fill="#f1faee">
+                  <use href="#fw" x="110" y="150"/><use href="#fw" x="122" y="122"/><use href="#fw" x="150" y="110"/><use href="#fw" x="178" y="122"/><use href="#fw" x="190" y="150"/>
+                </g>
+                <g fill="#f5c842">
+                  <use href="#fw" x="130" y="150"/><use href="#fw" x="150" y="130"/><use href="#fw" x="170" y="150"/>
+                </g>
+              </svg>
+              <svg v-else-if="topCrest.style === 'modern'" viewBox="0 0 400 150" class="crest-svg">
+                <use href="#lf" x="40" y="145" transform="rotate(-30 40 145) scale(2)"/><use href="#lf" x="360" y="145" transform="rotate(210 360 145) scale(2)"/>
+                <g fill="var(--p)">
+                  <use href="#fw" x="60" y="150"/><use href="#fw" x="85" y="150"/><use href="#fw" x="110" y="150"/><use href="#fw" x="135" y="150"/><use href="#fw" x="160" y="150"/><use href="#fw" x="185" y="150"/><use href="#fw" x="215" y="150"/><use href="#fw" x="240" y="150"/><use href="#fw" x="265" y="150"/><use href="#fw" x="290" y="150"/><use href="#fw" x="315" y="150"/><use href="#fw" x="340" y="150"/>
+                  <use href="#fw" x="80" y="130"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="90"/><use href="#fw" x="140" y="70"/><use href="#fw" x="320" y="130"/><use href="#fw" x="300" y="110"/><use href="#fw" x="280" y="90"/><use href="#fw" x="260" y="70"/>
+                </g>
+                <g fill="var(--s)">
+                  <use href="#fw" x="110" y="130"/><use href="#fw" x="130" y="110"/><use href="#fw" x="150" y="90"/><use href="#fw" x="170" y="70"/><use href="#fw" x="190" y="55"/><use href="#fw" x="210" y="55"/><use href="#fw" x="230" y="70"/><use href="#fw" x="250" y="90"/><use href="#fw" x="270" y="110"/><use href="#fw" x="290" y="130"/>
+                </g>
+                <g fill="#f1faee">
+                  <use href="#fw" x="140" y="130"/><use href="#fw" x="160" y="110"/><use href="#fw" x="180" y="90"/><use href="#fw" x="200" y="75"/><use href="#fw" x="220" y="90"/><use href="#fw" x="240" y="110"/><use href="#fw" x="260" y="130"/>
+                </g>
+                <g fill="#f5c842">
+                  <use href="#fw" x="170" y="130"/><use href="#fw" x="190" y="110"/><use href="#fw" x="210" y="110"/><use href="#fw" x="230" y="130"/><use href="#fw" x="200" y="130"/>
+                </g>
+              </svg>
+              <svg v-else-if="topCrest.style === 'grand'" viewBox="0 0 500 150" class="crest-svg">
+                <g fill="var(--s)">
+                  <use href="#fw" x="40" y="150"/><use href="#fw" x="50" y="120"/><use href="#fw" x="70" y="95"/><use href="#fw" x="100" y="90"/><use href="#fw" x="130" y="95"/><use href="#fw" x="150" y="120"/><use href="#fw" x="160" y="150"/>
+                  <use href="#fw" x="340" y="150"/><use href="#fw" x="350" y="120"/><use href="#fw" x="370" y="95"/><use href="#fw" x="400" y="90"/><use href="#fw" x="430" y="95"/><use href="#fw" x="450" y="120"/><use href="#fw" x="460" y="150"/>
+                </g>
+                <g fill="var(--p)">
+                  <use href="#fw" x="60" y="150"/><use href="#fw" x="80" y="120"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="120"/><use href="#fw" x="140" y="150"/>
+                  <use href="#fw" x="360" y="150"/><use href="#fw" x="380" y="120"/><use href="#fw" x="400" y="110"/><use href="#fw" x="420" y="120"/><use href="#fw" x="440" y="150"/>
+                  <use href="#fw" x="170" y="150"/><use href="#fw" x="174" y="125"/><use href="#fw" x="184" y="103"/><use href="#fw" x="203" y="84"/><use href="#fw" x="225" y="74"/><use href="#fw" x="250" y="70"/><use href="#fw" x="275" y="74"/><use href="#fw" x="297" y="84"/><use href="#fw" x="316" y="103"/><use href="#fw" x="326" y="125"/><use href="#fw" x="330" y="150"/>
+                </g>
+                <g fill="#f1faee">
+                  <use href="#fw" x="190" y="150"/><use href="#fw" x="196" y="124"/><use href="#fw" x="215" y="101"/><use href="#fw" x="240" y="91"/><use href="#fw" x="260" y="91"/><use href="#fw" x="285" y="101"/><use href="#fw" x="304" y="124"/><use href="#fw" x="310" y="150"/>
+                </g>
+                <g fill="#f5c842">
+                  <use href="#fw" x="210" y="150"/><use href="#fw" x="222" y="122"/><use href="#fw" x="250" y="110"/><use href="#fw" x="278" y="122"/><use href="#fw" x="290" y="150"/>
+                </g>
+              </svg>
+            </div>
+
+            <!-- 🌸 BOTTOM FLORAL CREST 🌸 -->
+            <div v-if="bottomCrest.enabled" class="floral-crest fc-bottom"
+                 :style="{ '--p': bottomCrest.primary, '--s': bottomCrest.secondary, width: bottomCrest.size + '%' }">
+              <svg v-if="bottomCrest.style === 'classic'" viewBox="0 0 300 150" class="crest-svg">
+                <use href="#lf" x="60" y="145" transform="rotate(-30 60 145) scale(2)"/><use href="#lf" x="240" y="145" transform="rotate(210 240 145) scale(2)"/><use href="#lf" x="150" y="55" transform="rotate(-90 150 55) scale(2)"/>
+                <g fill="var(--p)">
+                  <use href="#fw" x="70" y="150"/><use href="#fw" x="74" y="125"/><use href="#fw" x="84" y="103"/><use href="#fw" x="103" y="84"/><use href="#fw" x="125" y="74"/><use href="#fw" x="150" y="70"/><use href="#fw" x="175" y="74"/><use href="#fw" x="197" y="84"/><use href="#fw" x="216" y="103"/><use href="#fw" x="226" y="125"/><use href="#fw" x="230" y="150"/>
+                </g>
+                <g fill="var(--s)">
+                  <use href="#fw" x="90" y="150"/><use href="#fw" x="96" y="124"/><use href="#fw" x="115" y="101"/><use href="#fw" x="140" y="91"/><use href="#fw" x="160" y="91"/><use href="#fw" x="185" y="101"/><use href="#fw" x="204" y="124"/><use href="#fw" x="210" y="150"/>
+                </g>
+                <g fill="#f1faee">
+                  <use href="#fw" x="110" y="150"/><use href="#fw" x="122" y="122"/><use href="#fw" x="150" y="110"/><use href="#fw" x="178" y="122"/><use href="#fw" x="190" y="150"/>
+                </g>
+                <g fill="#f5c842">
+                  <use href="#fw" x="130" y="150"/><use href="#fw" x="150" y="130"/><use href="#fw" x="170" y="150"/>
+                </g>
+              </svg>
+              <svg v-else-if="bottomCrest.style === 'modern'" viewBox="0 0 400 150" class="crest-svg">
+                <use href="#lf" x="40" y="145" transform="rotate(-30 40 145) scale(2)"/><use href="#lf" x="360" y="145" transform="rotate(210 360 145) scale(2)"/>
+                <g fill="var(--p)">
+                  <use href="#fw" x="60" y="150"/><use href="#fw" x="85" y="150"/><use href="#fw" x="110" y="150"/><use href="#fw" x="135" y="150"/><use href="#fw" x="160" y="150"/><use href="#fw" x="185" y="150"/><use href="#fw" x="215" y="150"/><use href="#fw" x="240" y="150"/><use href="#fw" x="265" y="150"/><use href="#fw" x="290" y="150"/><use href="#fw" x="315" y="150"/><use href="#fw" x="340" y="150"/>
+                  <use href="#fw" x="80" y="130"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="90"/><use href="#fw" x="140" y="70"/><use href="#fw" x="320" y="130"/><use href="#fw" x="300" y="110"/><use href="#fw" x="280" y="90"/><use href="#fw" x="260" y="70"/>
+                </g>
+                <g fill="var(--s)">
+                  <use href="#fw" x="110" y="130"/><use href="#fw" x="130" y="110"/><use href="#fw" x="150" y="90"/><use href="#fw" x="170" y="70"/><use href="#fw" x="190" y="55"/><use href="#fw" x="210" y="55"/><use href="#fw" x="230" y="70"/><use href="#fw" x="250" y="90"/><use href="#fw" x="270" y="110"/><use href="#fw" x="290" y="130"/>
+                </g>
+                <g fill="#f1faee">
+                  <use href="#fw" x="140" y="130"/><use href="#fw" x="160" y="110"/><use href="#fw" x="180" y="90"/><use href="#fw" x="200" y="75"/><use href="#fw" x="220" y="90"/><use href="#fw" x="240" y="110"/><use href="#fw" x="260" y="130"/>
+                </g>
+                <g fill="#f5c842">
+                  <use href="#fw" x="170" y="130"/><use href="#fw" x="190" y="110"/><use href="#fw" x="210" y="110"/><use href="#fw" x="230" y="130"/><use href="#fw" x="200" y="130"/>
+                </g>
+              </svg>
+              <svg v-else-if="bottomCrest.style === 'grand'" viewBox="0 0 500 150" class="crest-svg">
+                <g fill="var(--s)">
+                  <use href="#fw" x="40" y="150"/><use href="#fw" x="50" y="120"/><use href="#fw" x="70" y="95"/><use href="#fw" x="100" y="90"/><use href="#fw" x="130" y="95"/><use href="#fw" x="150" y="120"/><use href="#fw" x="160" y="150"/>
+                  <use href="#fw" x="340" y="150"/><use href="#fw" x="350" y="120"/><use href="#fw" x="370" y="95"/><use href="#fw" x="400" y="90"/><use href="#fw" x="430" y="95"/><use href="#fw" x="450" y="120"/><use href="#fw" x="460" y="150"/>
+                </g>
+                <g fill="var(--p)">
+                  <use href="#fw" x="60" y="150"/><use href="#fw" x="80" y="120"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="120"/><use href="#fw" x="140" y="150"/>
+                  <use href="#fw" x="360" y="150"/><use href="#fw" x="380" y="120"/><use href="#fw" x="400" y="110"/><use href="#fw" x="420" y="120"/><use href="#fw" x="440" y="150"/>
+                  <use href="#fw" x="170" y="150"/><use href="#fw" x="174" y="125"/><use href="#fw" x="184" y="103"/><use href="#fw" x="203" y="84"/><use href="#fw" x="225" y="74"/><use href="#fw" x="250" y="70"/><use href="#fw" x="275" y="74"/><use href="#fw" x="297" y="84"/><use href="#fw" x="316" y="103"/><use href="#fw" x="326" y="125"/><use href="#fw" x="330" y="150"/>
+                </g>
+                <g fill="#f1faee">
+                  <use href="#fw" x="190" y="150"/><use href="#fw" x="196" y="124"/><use href="#fw" x="215" y="101"/><use href="#fw" x="240" y="91"/><use href="#fw" x="260" y="91"/><use href="#fw" x="285" y="101"/><use href="#fw" x="304" y="124"/><use href="#fw" x="310" y="150"/>
+                </g>
+                <g fill="#f5c842">
+                  <use href="#fw" x="210" y="150"/><use href="#fw" x="222" y="122"/><use href="#fw" x="250" y="110"/><use href="#fw" x="278" y="122"/><use href="#fw" x="290" y="150"/>
+                </g>
+              </svg>
+            </div>
 
             <!-- ╔══ THE BOARD ══╗ -->
             <div
@@ -404,7 +552,10 @@ onUnmounted(() => {
               <!-- ── SECTION DIVIDER (drag to resize) ── -->
               <div class="section-divider" :style="{ top: upperH + 'px', '--dc': border.color || '#ccc' }"
                 @mousedown.stop="startDragDiv" @click.stop>
-                <div class="div-track"/>
+                <div class="div-track" :style="!border.center ? { opacity: 0.6 } : { display: 'none' }"/>
+                <div v-if="border.center" :style="{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }">
+                  <div :style="centerBorderStyle"></div>
+                </div>
                 <div class="div-knob">
                   <svg viewBox="0 0 20 6" width="20" height="6">
                     <circle cx="3" cy="3" r="2" fill="currentColor"/>
@@ -530,8 +681,11 @@ onUnmounted(() => {
             <svg v-else-if="tab.id === 'border'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="2" width="20" height="20" rx="2"/>
             </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <svg v-else-if="tab.id === 'corner'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
               <path d="M3 9V5a2 2 0 012-2h4"/><path d="M3 15v4a2 2 0 002 2h4"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22C12 22 20 18 20 12C20 6 12 2 12 2C12 2 4 6 4 12C4 18 12 22 12 22Z"/><circle cx="12" cy="12" r="3"/>
             </svg>
             <span>{{ tab.label }}</span>
           </button>
@@ -861,6 +1015,15 @@ onUnmounted(() => {
                 <span class="cval">{{ border.width }}px</span>
               </div>
             </div>
+            
+            <!-- Center Border Toggle -->
+            <div class="tg" style="margin-top: 1rem;">
+              <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing: 0.05em;">
+                <input type="checkbox" v-model="border.center" style="width:16px;height:16px;accent-color:#c4703e;"/>
+                SHOW CENTER BORDER
+              </label>
+            </div>
+            
             <!-- Preview -->
             <div class="tg">
               <div class="tg-label">PREVIEW</div>
@@ -896,6 +1059,56 @@ onUnmounted(() => {
                 </button>
               </div>
             </div>
+          </div>
+
+          <!-- ╔══ FLORAL TAB ══╗ -->
+          <div v-else-if="activeTab === 'floral'" class="tab-pane">
+            <div class="sec-toggle">
+              <button class="stg-btn" :class="{ active: activeSection === 'upper' }" @click="activeSection = 'upper'">Top Crest</button>
+              <button class="stg-btn" :class="{ active: activeSection === 'lower' }" @click="activeSection = 'lower'">Bottom Base</button>
+            </div>
+            
+            <div class="tg" style="margin-top: 1rem;">
+              <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing:0.05em;">
+                <input type="checkbox" v-model="floralSec.enabled" style="width:16px;height:16px;accent-color:#c4703e;"/>
+                ENABLE FLORAL DECOR
+              </label>
+            </div>
+
+            <template v-if="floralSec.enabled">
+              <div class="tg">
+                <div class="tg-label">STYLE</div>
+                <div class="frame-row">
+                  <button v-for="s in (['classic','modern','grand'] as FloralStyle[])" :key="s"
+                    class="frame-btn" :class="{ 'fb-active': floralSec.style === s }"
+                    @click="floralSec.style = s" style="text-transform: capitalize;">
+                    {{ s }}
+                  </button>
+                </div>
+              </div>
+              
+              <div class="tg">
+                <div class="tg-label">SIZE SCALING</div>
+                <div class="cr">
+                  <input type="range" min="20" max="100" class="dr-range" v-model.number="floralSec.size"/>
+                  <span class="cval">{{ floralSec.size }}%</span>
+                </div>
+              </div>
+
+              <div class="tg">
+                <div class="tg-label">COLORS</div>
+                <div class="color-row" style="margin-bottom:0.5rem">
+                  <label class="clabel" style="width:70px">Primary</label>
+                  <input type="color" v-model="floralSec.primary" class="csi"/>
+                  <span class="cval">{{ floralSec.primary }}</span>
+                </div>
+                <div class="color-row">
+                  <label class="clabel" style="width:70px">Secondary</label>
+                  <input type="color" v-model="floralSec.secondary" class="csi"/>
+                  <span class="cval">{{ floralSec.secondary }}</span>
+                </div>
+              </div>
+            </template>
           </div>
 
         </div><!-- /tab-body -->
@@ -1066,7 +1279,7 @@ button { font-family: inherit; }
 }
 
 /* ─── SECTIONS ───────────────────────────────────────────────────── */
-.board-section { position: absolute; left: 0; right: 0; overflow: visible; }
+.board-section { position: absolute; left: 0; right: 0; overflow: visible; transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s; }
 .sec-inner {
   width: 100%; height: 100%; position: relative; z-index: 1;
   display: flex; flex-direction: column;
@@ -1084,11 +1297,24 @@ button { font-family: inherit; }
 .fc-bl { bottom: 5px; left: 8px; }
 .fc-br { bottom: 5px; right: 8px; }
 
+/* ─── FLORAL CRESTS (Top & Bottom) ───────────────────────────────── */
+.floral-crest {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; justify-content: center; align-items: flex-end;
+  pointer-events: none; z-index: 20;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fc-top { bottom: 100%; transform-origin: bottom center; margin-bottom: -4px; }
+.fc-bottom { top: 100%; transform-origin: top center; margin-top: -4px; }
+.crest-svg { width: 100%; height: auto; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); transition: all 0.3s; }
+.fc-bottom .crest-svg { transform: scaleY(-1); }
+
 /* ─── SECTION DIVIDER ────────────────────────────────────────────── */
 .section-divider {
   position: absolute; left: 0; right: 0; height: 12px; margin-top: -6px;
   display: flex; align-items: center; justify-content: center;
   cursor: row-resize; z-index: 50;
+  transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .div-track {
   position: absolute; inset: 5px 0;
