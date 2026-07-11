@@ -1,11 +1,9 @@
 CREATE TABLE payment_channel_data (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    -- 1-to-1 with payments
     payment_id UUID UNIQUE NOT NULL,
 
-    -- "qris" | "ewallet" | "bank_transfer"
-    channel_type TEXT NOT NULL,
+    channel_type method_type NOT NULL,
 
     -- Human-readable label returned by the gateway
     -- e.g. "QRIS", "GoPay", "BCA Virtual Account"
