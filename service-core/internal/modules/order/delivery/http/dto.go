@@ -50,6 +50,7 @@ type createOrderResponse struct {
 	OrderID        string                             `json:"order_id"`
 	Instruction    *string                            `json:"instruction"`
 	PaymentAccount *createOrderPaymentAccountResponse `json:"payment_account,omitempty"`
+	ChannelData    *paymentChannelDataResponse        `json:"channel_data,omitempty"`
 }
 
 type orderItemResponse struct {
@@ -66,13 +67,21 @@ type orderItemResponse struct {
 	ShippingFeeTotal int64   `json:"shipping_fee"`
 }
 
+type paymentChannelDataResponse struct {
+	ChannelType string     `json:"channel_type"`
+	DisplayName string     `json:"display_name"`
+	ActionURL   *string    `json:"action_url,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+}
+
 type paymentDetailResponse struct {
-	ID        string     `json:"id"`
-	Status    string     `json:"status"`
-	Provider  string     `json:"provider"`
-	Amount    int64      `json:"amount"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID          string                      `json:"id"`
+	Status      string                      `json:"status"`
+	Provider    string                      `json:"provider"`
+	Amount      int64                       `json:"amount"`
+	ExpiresAt   *time.Time                  `json:"expires_at,omitempty"`
+	ChannelData *paymentChannelDataResponse `json:"channel_data,omitempty"`
+	CreatedAt   time.Time                   `json:"created_at"`
 }
 
 type shipmentDetailResponse struct {

@@ -18,11 +18,12 @@ import (
 )
 
 type FindOrdersUsecase struct {
-	executor      transaction.Executor
-	orderRepo     repository.OrderRepository
-	orderItemRepo repository.OrderItemRepository
-	paymentRepo   paymentRepo.PaymentRepository
-	shipmentRepo  shipmentRepo.ShipmentRepository
+	executor               transaction.Executor
+	orderRepo              repository.OrderRepository
+	orderItemRepo          repository.OrderItemRepository
+	paymentRepo            paymentRepo.PaymentRepository
+	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
+	shipmentRepo           shipmentRepo.ShipmentRepository
 }
 
 func NewFindOrdersUsecase(
@@ -30,14 +31,16 @@ func NewFindOrdersUsecase(
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
 	paymentRepo paymentRepo.PaymentRepository,
+	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
 ) *FindOrdersUsecase {
 	return &FindOrdersUsecase{
-		executor:      executor,
-		orderRepo:     orderRepo,
-		orderItemRepo: orderItemRepo,
-		paymentRepo:   paymentRepo,
-		shipmentRepo:  shipmentRepo,
+		executor:               executor,
+		orderRepo:              orderRepo,
+		orderItemRepo:          orderItemRepo,
+		paymentRepo:            paymentRepo,
+		paymentChannelDataRepo: paymentChannelDataRepo,
+		shipmentRepo:           shipmentRepo,
 	}
 }
 
@@ -52,10 +55,11 @@ type FindOrdersInput struct {
 }
 
 type OrderSearchResult struct {
-	Order    domain.Order
-	Items    []domain.OrderItem
-	Payment  *paymentDomain.Payment
-	Shipment *shipmentDomain.Shipment
+	Order       domain.Order
+	Items       []domain.OrderItem
+	Payment     *paymentDomain.Payment
+	ChannelData *paymentDomain.PaymentChannelData
+	Shipment    *shipmentDomain.Shipment
 }
 
 func (u *FindOrdersUsecase) Execute(
@@ -122,7 +126,10 @@ func (u *FindOrdersUsecase) Execute(
 		Sorts: sorts,
 	}
 
-	orders, total, err := u.orderRepo.FindOrders(ctx, u.executor, params)
+	orders, total, err := u.orderRepo.
+		FindOrders(ctx, u.executor,
+			params,
+		)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list orders: %w", err)
 	}
@@ -136,17 +143,26 @@ func (u *FindOrdersUsecase) Execute(
 		orderIDs[i] = o.ID
 	}
 
-	orderItems, err := u.orderItemRepo.ListByOrderIDs(ctx, u.executor, orderIDs)
+	orderItems, err := u.orderItemRepo.
+		ListByOrderIDs(ctx, u.executor,
+			orderIDs,
+		)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list order items: %w", err)
 	}
 
-	payments, err := u.paymentRepo.ListByOrderIDs(ctx, u.executor, orderIDs)
+	payments, err := u.paymentRepo.
+		ListByOrderIDs(ctx, u.executor,
+			orderIDs,
+		)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list payments: %w", err)
 	}
 
-	shipments, err := u.shipmentRepo.ListByOrderIDs(ctx, u.executor, orderIDs)
+	shipments, err := u.shipmentRepo.
+		ListByOrderIDs(ctx, u.executor,
+			orderIDs,
+		)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list shipments: %w", err)
 	}
@@ -162,6 +178,20 @@ func (u *FindOrdersUsecase) Execute(
 		paymentsMap[p.OrderID] = &p
 	}
 
+	// Collect payment IDs to bulk-fetch persisted channel data
+	paymentIDs := make([]uuid.UUID, 0, len(payments))
+	for i := range payments {
+		paymentIDs = append(paymentIDs, payments[i].ID)
+	}
+
+	channelDataMap, err := u.paymentChannelDataRepo.
+		ListByPaymentIDs(ctx, u.executor,
+			paymentIDs,
+		)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list payment channel data: %w", err)
+	}
+
 	shipmentsMap := make(map[uuid.UUID]*shipmentDomain.Shipment)
 	for i := range shipments {
 		s := shipments[i]
@@ -174,11 +204,20 @@ func (u *FindOrdersUsecase) Execute(
 		if items == nil {
 			items = []domain.OrderItem{}
 		}
+
+		payment := paymentsMap[o.ID]
+
+		var channelData *paymentDomain.PaymentChannelData
+		if payment != nil {
+			channelData = channelDataMap[payment.ID]
+		}
+
 		results[i] = OrderSearchResult{
-			Order:    o,
-			Items:    items,
-			Payment:  paymentsMap[o.ID],
-			Shipment: shipmentsMap[o.ID],
+			Order:       o,
+			Items:       items,
+			Payment:     payment,
+			ChannelData: channelData,
+			Shipment:    shipmentsMap[o.ID],
 		}
 	}
 

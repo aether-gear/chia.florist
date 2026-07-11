@@ -194,6 +194,7 @@ func NewContainer(cfg Config,
 		paymentMethodRepo      = paymentPersistence.NewPaymentMethodRepository()
 		paymentEventRepo       = paymentPersistence.NewPaymentEventRepositoryImpl()
 		paymentInstructionRepo = paymentPersistence.NewPaymentInstructionRepositoryImpl()
+		paymentChannelDataRepo = paymentPersistence.NewPaymentChannelDataRepositoryImpl()
 		shopRepo               = shopPersistence.NewShopRepositoryImpl()
 		courierRepo            = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo        = courierPersistence.NewShopCourierRepositoryImpl()
@@ -685,6 +686,7 @@ func NewContainer(cfg Config,
 				paymentAccRepo,
 				paymentEventRepo,
 				paymentInstructionRepo,
+				paymentChannelDataRepo,
 				inventoryRepo,
 				cartRepo,
 				userRepo,
@@ -697,6 +699,7 @@ func NewContainer(cfg Config,
 				orderRepo,
 				orderItemRepo,
 				paymentRepo,
+				paymentChannelDataRepo,
 				shipmentRepo,
 			),
 		GetOrder: *orderUsecase.
@@ -705,6 +708,7 @@ func NewContainer(cfg Config,
 				orderRepo,
 				orderItemRepo,
 				paymentRepo,
+				paymentChannelDataRepo,
 				shipmentRepo,
 			),
 		UpdateOrderStatus: *orderUsecase.

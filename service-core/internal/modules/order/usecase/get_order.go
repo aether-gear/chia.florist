@@ -16,11 +16,12 @@ import (
 )
 
 type GetOrderUsecase struct {
-	executor      transaction.Executor
-	orderRepo     repository.OrderRepository
-	orderItemRepo repository.OrderItemRepository
-	paymentRepo   paymentRepo.PaymentRepository
-	shipmentRepo  shipmentRepo.ShipmentRepository
+	executor               transaction.Executor
+	orderRepo              repository.OrderRepository
+	orderItemRepo          repository.OrderItemRepository
+	paymentRepo            paymentRepo.PaymentRepository
+	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
+	shipmentRepo           shipmentRepo.ShipmentRepository
 }
 
 func NewGetOrderUsecase(
@@ -28,37 +29,46 @@ func NewGetOrderUsecase(
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
 	paymentRepo paymentRepo.PaymentRepository,
+	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
 ) *GetOrderUsecase {
 	return &GetOrderUsecase{
-		executor:      executor,
-		orderRepo:     orderRepo,
-		orderItemRepo: orderItemRepo,
-		paymentRepo:   paymentRepo,
-		shipmentRepo:  shipmentRepo,
+		executor:               executor,
+		orderRepo:              orderRepo,
+		orderItemRepo:          orderItemRepo,
+		paymentRepo:            paymentRepo,
+		paymentChannelDataRepo: paymentChannelDataRepo,
+		shipmentRepo:           shipmentRepo,
 	}
 }
 
 type GetOrderInput struct {
 	OrderID uuid.UUID
 
-	// CustomerID, when set, enforces that the order must belong to this customer.
-	// Use for customer-facing endpoints. Leave nil for admin endpoints.
+	// CustomerID, when set, enforces that the order
+	// must belong to this customer.
+	//
+	// Use for customer-facing endpoints.
+	// Leave nil for admin endpoints.
 	CustomerID *uuid.UUID
 }
 
 type GetOrderResult struct {
-	Order    domain.Order
-	Items    []domain.OrderItem
-	Payment  *paymentDomain.Payment
-	Shipment *shipmentDomain.Shipment
+	Order       domain.Order
+	Items       []domain.OrderItem
+	Payment     *paymentDomain.Payment
+	ChannelData *paymentDomain.PaymentChannelData
+	Shipment    *shipmentDomain.Shipment
 }
 
 func (u *GetOrderUsecase) Execute(
 	ctx context.Context,
 	input GetOrderInput,
 ) (*GetOrderResult, error) {
-	order, err := u.orderRepo.GetByID(ctx, u.executor, input.OrderID)
+	order, err := u.orderRepo.
+		GetByID(ctx, u.executor,
+			input.OrderID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
@@ -67,11 +77,15 @@ func (u *GetOrderUsecase) Execute(
 	}
 
 	// Enforce ownership for customer path.
-	if input.CustomerID != nil && order.CustomerID != *input.CustomerID {
+	if input.CustomerID != nil &&
+		order.CustomerID != *input.CustomerID {
 		return nil, nil
 	}
 
-	items, err := u.orderItemRepo.ListByOrderID(ctx, u.executor, order.ID)
+	items, err := u.orderItemRepo.
+		ListByOrderID(ctx, u.executor,
+			order.ID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list order items: %w", err)
 	}
@@ -79,20 +93,39 @@ func (u *GetOrderUsecase) Execute(
 		items = []domain.OrderItem{}
 	}
 
-	payment, err := u.paymentRepo.GetByOrderID(ctx, u.executor, order.ID)
+	payment, err := u.paymentRepo.
+		GetByOrderID(ctx, u.executor,
+			order.ID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
-	shipment, err := u.shipmentRepo.GetByOrderID(ctx, u.executor, order.ID)
+	var channelData *paymentDomain.PaymentChannelData
+	if payment != nil {
+		cd, err := u.paymentChannelDataRepo.
+			GetByPaymentID(ctx, u.executor,
+				payment.ID,
+			)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get payment channel data: %w", err)
+		}
+		channelData = cd
+	}
+
+	shipment, err := u.shipmentRepo.
+		GetByOrderID(ctx, u.executor,
+			order.ID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shipment: %w", err)
 	}
 
 	return &GetOrderResult{
-		Order:    *order,
-		Items:    items,
-		Payment:  payment,
-		Shipment: shipment,
+		Order:       *order,
+		Items:       items,
+		Payment:     payment,
+		ChannelData: channelData,
+		Shipment:    shipment,
 	}, nil
 }
