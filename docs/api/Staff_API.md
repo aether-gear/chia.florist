@@ -18,9 +18,9 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Staff Sign In
     - [x] Me
     - [x] Log Out
-    - [ ] Forgot Password
-    - [ ] Verify Forgot Password
-    - [ ] Reset Password
+    - [x] Forgot Password
+    - [x] Verify Forgot Password
+    - [x] Reset Password
   - [x] Shops
     - [x] Save Shop
   - [x] Inventory

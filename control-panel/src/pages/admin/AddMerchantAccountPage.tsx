@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,6 +34,19 @@ export default function AddMerchantAccountPage() {
       merchantId: paramMerchantId || '',
     }
   });
+
+  useEffect(() => {
+    if (paramMerchantId) {
+      reset({
+        merchantId: paramMerchantId,
+        email: '',
+        name: '',
+        username: '',
+        password: '',
+        phone: ''
+      });
+    }
+  }, [paramMerchantId, reset]);
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
@@ -118,6 +131,17 @@ export default function AddMerchantAccountPage() {
               <Input type="password" {...register('password')} placeholder="••••••••" />
               {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
             </div>
+
+            {Object.keys(errors).length > 0 && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">
+                <strong>Validation Errors:</strong>
+                <ul className="list-disc pl-5 mt-1">
+                  {Object.entries(errors).map(([field, err]) => (
+                    <li key={field}>{field}: {err?.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {error && <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">{error}</div>}
             {success && <div className="p-3 text-sm text-green-700 bg-green-50 rounded-md border border-green-100">{success}</div>}
