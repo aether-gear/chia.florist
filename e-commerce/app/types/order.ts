@@ -94,3 +94,19 @@ export interface ListOrdersResponse {
   page: number
   total: number
 }
+
+export interface GetOrderPaymentDetailsResponse {
+  payment_id: string
+  status: string
+  amount: number
+  expires_at: string
+  channel_type?: string
+  display_name?: string
+  action_url?: string
+  account_name?: string
+  account_number?: string
+  phone_number?: string
+  qr_string?: string
+  instruction?: string
+}
+

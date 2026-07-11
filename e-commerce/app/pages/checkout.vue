@@ -724,7 +724,7 @@ const handlePlaceOrder = async () => {
     }
 
     alert('Order placed successfully! Redirecting to secure payment page...')
-    navigateTo('/payment')
+    navigateTo(`/payment?orderId=${result.order_id}`)
   } catch (err: any) {
     console.error('Checkout processing error:', err)
     alert(err.data?.message || err.message || 'Failed to process checkout. Please try again.')
