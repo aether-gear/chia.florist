@@ -20,6 +20,9 @@ import (
 	secPolicyPersistence "service-core/internal/modules/security_policy/infra/persistence"
 	secPolicyUsecase "service-core/internal/modules/security_policy/usecase"
 
+	threatIntelProvider "service-core/internal/modules/threat_intel/infra/provider"
+	threatIntelUsecase "service-core/internal/modules/threat_intel/usecase"
+
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
@@ -154,6 +157,9 @@ type Container struct {
 	GetFilters        secPolicyUsecase.GetFiltersUsecase
 	UpdateFilter      secPolicyUsecase.UpdateFilterUsecase
 	InspectPayload    secPolicyUsecase.InspectPayloadUsecase
+
+	AnalyzeIP         threatIntelUsecase.AnalyzeIPUsecase
+	GetGeoIP           threatIntelUsecase.GetGeoIPUsecase
 }
 
 func NewContainer(cfg Config,
@@ -200,6 +206,7 @@ func NewContainer(cfg Config,
 		invoiceRepo            = orderPersistence.NewInvoiceRepositoryImpl()
 		invoiceItemRepo        = orderPersistence.NewInvoiceItemRepositoryImpl()
 		shipmentRepo           = shipmentPersistence.NewShipmentRepositoryImpl()
+		threatIntelRepo        = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
 	)
 
 	var (
@@ -767,5 +774,7 @@ func NewContainer(cfg Config,
 			infra.TransactionExecutor,
 			secPolicyRepo,
 		),
+		AnalyzeIP: *threatIntelUsecase.NewAnalyzeIPUsecase(threatIntelRepo),
+		GetGeoIP:   *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
 	}
 }

@@ -25,6 +25,7 @@ import (
 	shipmentH "service-core/internal/modules/shipment/delivery/http"
 	shopH "service-core/internal/modules/shop/delivery/http"
 	staffH "service-core/internal/modules/staff/delivery/http"
+	threatIntelH "service-core/internal/modules/threat_intel/delivery/http"
 	userH "service-core/internal/modules/user/delivery/http"
 
 	"github.com/go-chi/chi/v5"
@@ -233,6 +234,11 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetFilters,
 			&c.UpdateFilter,
 		)
+
+		threatIntelHandler = threatIntelH.NewThreatIntelHandler(
+			&c.AnalyzeIP,
+			&c.GetGeoIP,
+		)
 	)
 
 	r := chi.NewRouter()
@@ -421,6 +427,14 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/api/filters", func(r chi.Router) {
 			r.Get("/", chains.StaffAdminOnly(secPolicyHandler.GetFilters))
 			r.Post("/", chains.StaffAdminOnly(secPolicyHandler.UpdateFilter))
+		})
+
+		r.Route("/api/analyze", func(r chi.Router) {
+			r.Get("/{ip}", chains.StaffAdminOnly(threatIntelHandler.AnalyzeIP))
+		})
+
+		r.Route("/api/geo", func(r chi.Router) {
+			r.Get("/{ip}", chains.StaffAdminOnly(threatIntelHandler.GetGeolocation))
 		})
 	})
 
