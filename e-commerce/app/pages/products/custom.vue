@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCart } from '~/composables/useCart'
 
 definePageMeta({ layout: false })
@@ -40,8 +40,12 @@ type CanvasElement = CanvasImage | BrushStroke
 interface BoardBorder { style: BorderStyle; color: string; width: number }
 
 /* ─── CONSTANTS ───────────────────────────────────────────────────── */
-const BOARD_W = 800
-const BOARD_H = 534
+const boardW = computed(() => 800)
+const boardH = computed(() => {
+  if (physicalSize.value === 'small') return 600
+  if (physicalSize.value === 'large') return 533
+  return 576
+})
 
 const FONTS: { id: FontId; label: string; family: string }[] = [
   { id: 'inter',        label: 'Inter',        family: "'Inter', sans-serif" },
@@ -117,8 +121,8 @@ const boardScale   = ref(0.75)
 /* ─── HELPERS ─────────────────────────────────────────────────────── */
 const getFont  = (id: FontId) => FONTS.find(f => f.id === id)?.family ?? "'Inter', sans-serif"
 const sec      = computed(() => activeSection.value === 'upper' ? upper.value : lower.value)
-const upperH   = computed(() => Math.round(heightRatio.value * BOARD_H))
-const lowerH   = computed(() => BOARD_H - upperH.value)
+const upperH   = computed(() => Math.round(heightRatio.value * boardH.value))
+const lowerH   = computed(() => boardH.value - upperH.value)
 
 const boardBorderStyle = computed((): Record<string, string> => {
   const { style, color, width } = border.value
@@ -149,13 +153,36 @@ const imgElements  = computed(() => elements.value.filter(e => e.type === 'image
 const brushElements = computed(() => elements.value.filter(e => e.type === 'brush') as BrushStroke[])
 const totalPrice   = computed(() => SIZES.find(s => s.id === physicalSize.value)?.price ?? 200_000)
 
-/* ─── SCALE ───────────────────────────────────────────────────────── */
+/* ─── SCALE & ANIMATION ───────────────────────────────────────────── */
+const randomizeDesign = () => {
+  const rand = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+  upper.value.bgColor = rand(BG_PRESETS)
+  lower.value.bgColor = rand(BG_PRESETS)
+  upper.value.headerFont = rand(FONTS).id
+  upper.value.bodyFont = rand(FONTS).id
+  lower.value.headerFont = rand(FONTS).id
+  lower.value.bodyFont = rand(FONTS).id
+  border.value.style = rand(BORDER_STYLES).id
+  border.value.color = rand(BORDER_COLORS)
+  border.value.width = Math.floor(Math.random() * 16) + 4
+  upper.value.cornerStyle = rand(CORNERS).id
+  lower.value.cornerStyle = rand(CORNERS).id
+  
+  // Interactive scale bounce feedback
+  boardScale.value = boardScale.value * 0.95
+  setTimeout(updateScale, 150)
+}
+
 const updateScale = () => {
   const el = containerRef.value
   if (!el) return
   const pad = 64
-  boardScale.value = Math.max(0.25, Math.min((el.offsetWidth - pad) / BOARD_W, (el.offsetHeight - pad) / BOARD_H, 1.1))
+  boardScale.value = Math.max(0.25, Math.min((el.offsetWidth - pad) / boardW.value, (el.offsetHeight - pad) / boardH.value, 1.1))
 }
+
+watch(physicalSize, () => {
+  updateScale()
+})
 
 /* ─── Z-ORDER (Instagram story: last in array = top layer) ────────── */
 const bringToFront = (id: string) => {
@@ -224,7 +251,7 @@ const handleBoardClick = (e: MouseEvent) => {
 
 /* ─── DRAG ────────────────────────────────────────────────────────── */
 let _draggingEl = false, _draggingDiv = false, _dragElId = ''
-let _rect = { left: 0, top: 0, width: BOARD_W * 0.75, height: BOARD_H * 0.75 }
+let _rect = { left: 0, top: 0, width: 0, height: 0 }
 let _dragBX = 0, _dragBY = 0, _dragElX0 = 0, _dragElY0 = 0
 let _divStartY = 0, _divStartR = 0
 
@@ -322,9 +349,11 @@ onUnmounted(() => {
       </div>
       <div class="dr-nav-right">
         <span class="dr-scale-chip">{{ Math.round(boardScale * 100) }}%</span>
-        <button id="btn-finalize-nav" class="dr-finalize-btn" @click="showReview = true">
-          Finalize &amp; Order
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <button class="dr-random-btn" @click="randomizeDesign" title="Randomize Design">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>
+          </svg>
+          Randomize
         </button>
       </div>
     </nav>
@@ -337,14 +366,14 @@ onUnmounted(() => {
         <div class="chess-bg" @dragover.prevent>
           <!-- Board scaler: sized to match scale -->
           <div class="board-scaler"
-            :style="{ width: Math.round(BOARD_W * boardScale) + 'px', height: Math.round(BOARD_H * boardScale) + 'px' }">
+            :style="{ width: Math.round(boardW * boardScale) + 'px', height: Math.round(boardH * boardScale) + 'px' }">
 
             <!-- ╔══ THE BOARD ══╗ -->
             <div
               ref="boardRef"
               class="board-frame"
               :style="{
-                width: BOARD_W + 'px', height: BOARD_H + 'px',
+                width: boardW + 'px', height: boardH + 'px',
                 transform: `scale(${boardScale})`, transformOrigin: 'top left',
                 cursor: isBrushMode ? 'crosshair' : 'default',
                 ...boardBorderStyle,
@@ -522,7 +551,7 @@ onUnmounted(() => {
             <div class="tg">
               <div class="tg-label">BACKGROUND</div>
               <div class="color-row">
-                <input id="bg-color-input" type="color" :value="sec.bgColor" @input="sec.bgColor = ($event.target as HTMLInputElement).value" class="csi"/>
+                <input id="bg-color-input" type="color" v-model="sec.bgColor" class="csi"/>
                 <span class="cval">{{ sec.bgColor }}</span>
               </div>
               <div class="dot-row">
@@ -535,10 +564,10 @@ onUnmounted(() => {
             <!-- Header -->
             <div class="tg">
               <div class="tg-label">HEADER</div>
-              <textarea class="dr-ta" :value="sec.headerText" @input="sec.headerText = ($event.target as HTMLTextAreaElement).value" placeholder="Header text…" rows="2"/>
+              <textarea class="dr-ta" v-model="sec.headerText" placeholder="Header text…" rows="2"/>
               <div class="cr">
                 <label class="clabel">Size</label>
-                <input type="range" min="10" max="96" class="dr-range" :value="sec.headerFontSize" @input="sec.headerFontSize = +($event.target as HTMLInputElement).value"/>
+                <input type="range" min="10" max="96" class="dr-range" v-model.number="sec.headerFontSize"/>
                 <span class="cval">{{ sec.headerFontSize }}px</span>
               </div>
               <div class="font-grid">
@@ -558,7 +587,7 @@ onUnmounted(() => {
               </div>
               <div class="color-row">
                 <label class="clabel">Color</label>
-                <input type="color" :value="sec.headerColor" @input="sec.headerColor = ($event.target as HTMLInputElement).value" class="csi"/>
+                <input type="color" v-model="sec.headerColor" class="csi"/>
                 <span class="cval">{{ sec.headerColor }}</span>
               </div>
             </div>
@@ -566,10 +595,10 @@ onUnmounted(() => {
             <!-- Body -->
             <div class="tg">
               <div class="tg-label">BODY</div>
-              <textarea class="dr-ta" :value="sec.bodyText" @input="sec.bodyText = ($event.target as HTMLTextAreaElement).value" placeholder="Body text… (new line = Enter)" rows="3"/>
+              <textarea class="dr-ta" v-model="sec.bodyText" placeholder="Body text… (new line = Enter)" rows="3"/>
               <div class="cr">
                 <label class="clabel">Size</label>
-                <input type="range" min="8" max="72" class="dr-range" :value="sec.bodyFontSize" @input="sec.bodyFontSize = +($event.target as HTMLInputElement).value"/>
+                <input type="range" min="8" max="72" class="dr-range" v-model.number="sec.bodyFontSize"/>
                 <span class="cval">{{ sec.bodyFontSize }}px</span>
               </div>
               <div class="font-grid">
@@ -588,7 +617,7 @@ onUnmounted(() => {
               </div>
               <div class="color-row">
                 <label class="clabel">Color</label>
-                <input type="color" :value="sec.bodyColor" @input="sec.bodyColor = ($event.target as HTMLInputElement).value" class="csi"/>
+                <input type="color" v-model="sec.bodyColor" class="csi"/>
                 <span class="cval">{{ sec.bodyColor }}</span>
               </div>
             </div>
@@ -596,8 +625,8 @@ onUnmounted(() => {
 
           <!-- ╔══ IMAGE TAB ══╗ -->
           <div v-else-if="activeTab === 'image'" class="tab-pane">
-            <!-- Drop zone (no image selected) -->
-            <template v-if="!selectedImg">
+            <!-- Drop zone (no images at all) -->
+            <template v-if="imgElements.length === 0">
               <div class="drop-zone" @dragover.prevent @drop="handleDrop">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="dz-icon">
                   <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
@@ -612,7 +641,16 @@ onUnmounted(() => {
 
             <!-- Image controls (image selected) -->
             <template v-else>
-              <div class="img-preview-wrap">
+              <div style="padding: 1rem 1rem 0;">
+                <label class="primary-btn" style="display:flex; justify-content:center; cursor:pointer; align-items:center; background:#4a4a4a; color:#fff; padding:0.6rem; border-radius:4px; font-weight:500; font-size:0.85rem">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px;margin-right:6px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload Another Image
+                  <input type="file" accept="image/*" @change="handleFileInput" style="display:none"/>
+                </label>
+              </div>
+
+              <template v-if="selectedImg">
+                <div class="img-preview-wrap">
                 <img :src="selectedImg.src" class="img-preview-thumb"
                   :style="{ borderRadius: selectedImg.frame === 'circle' ? '50%' : '4px' }"/>
               </div>
@@ -663,6 +701,7 @@ onUnmounted(() => {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                 Remove Image
               </button>
+              </template>
             </template>
 
             <!-- All images list -->
@@ -952,7 +991,7 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style>
+<style scoped>
 /* ─── GOOGLE FONTS ─────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:ital,wght@0,700;0,800;1,600&family=Dancing+Script:wght@600;700&family=Bebas+Neue&family=Merriweather:wght@700;900&family=Pacifico&display=swap');
 
@@ -993,14 +1032,14 @@ button { font-family: inherit; }
 .dr-page-title { font-size: 0.84rem; font-weight: 700; color: #1c1813; }
 .dr-nav-right { display: flex; align-items: center; gap: 0.7rem; }
 .dr-scale-chip { font-size: 0.63rem; font-weight: 700; color: #a8998d; background: #f4f0eb; border: 1px solid #e5ddd4; padding: 0.18rem 0.5rem; border-radius: 4px; letter-spacing: 0.05em; }
-.dr-finalize-btn {
+.dr-random-btn {
   display: flex; align-items: center; gap: 0.45rem;
-  background: #c4703e; color: #fff; font-size: 0.77rem; font-weight: 700;
-  padding: 0.45rem 0.95rem; border: none; border-radius: 6px; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(196,112,62,0.35); transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  background: #f4f0eb; color: #555; font-size: 0.77rem; font-weight: 600;
+  padding: 0.45rem 0.85rem; border: 1px solid #ddd; border-radius: 6px; cursor: pointer;
+  transition: all 0.15s;
 }
-.dr-finalize-btn:hover { background: #b5622f; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(196,112,62,0.4); }
-.dr-finalize-btn svg { width: 0.8rem; height: 0.8rem; }
+.dr-random-btn:hover { background: #e8e2da; color: #111; transform: translateY(-1px); }
+.dr-random-btn svg { width: 0.85rem; height: 0.85rem; }
 
 /* ─── BODY LAYOUT ────────────────────────────────────────────────── */
 .dr-body { flex: 1; display: flex; overflow: hidden; }
@@ -1015,14 +1054,15 @@ button { font-family: inherit; }
   background-size: 20px 20px;
 }
 
-.board-scaler { position: relative; flex-shrink: 0; }
+.board-scaler { position: relative; flex-shrink: 0; transform-origin: top left; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 
 /* ─── BOARD ──────────────────────────────────────────────────────── */
 .board-frame {
   position: absolute; top: 0; left: 0;
   box-shadow: 0 8px 40px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.08);
   overflow: hidden;
-  transition: border 0.2s, outline 0.2s;
+  background-color: #fff;
+  transition: border 0.2s, outline 0.2s, width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ─── SECTIONS ───────────────────────────────────────────────────── */
@@ -1033,7 +1073,7 @@ button { font-family: inherit; }
   align-items: center; justify-content: center;
   padding: 1.25rem 2rem; gap: 0.5rem;
 }
-.sec-text { line-height: 1.3; word-break: break-word; transition: all 0.25s; }
+.sec-text { line-height: 1.3; word-break: break-word; transition: all 0.25s; width: 100%; }
 .sec-header { font-weight: 800; }
 .sec-body   { white-space: pre-line; }
 
