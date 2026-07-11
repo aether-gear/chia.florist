@@ -807,12 +807,21 @@ const triggerAlert = (message: string) => {
                       <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Bill</p>
                       <p class="text-base font-extrabold text-[#1b4332] mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
                     </div>
-                    <button 
-                      @click="openOrderDetail(order)" 
-                      class="bg-[#1b4332] hover:bg-[#143326] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
-                    >
-                      View Details
-                    </button>
+                    <div class="flex gap-2">
+                      <button 
+                        v-if="order.status === 'pending'"
+                        @click.stop="navigateTo(`/payment?orderId=${order.id}`)"
+                        class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                      >
+                        Pay Now
+                      </button>
+                      <button 
+                        @click="openOrderDetail(order)" 
+                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                      >
+                        View Details
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1025,8 +1034,17 @@ const triggerAlert = (message: string) => {
           </button>
 
           <div>
-            <div v-if="selectedOrder.status === 'pending'">
-              <button @click="triggerAlert('Our team is reviewing your payment. Please wait up to 15 minutes.')" class="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer">
+            <div v-if="selectedOrder.status === 'pending'" class="flex gap-2">
+              <button 
+                @click="navigateTo(`/payment?orderId=${selectedOrder.id}`)" 
+                class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Pay Now
+              </button>
+              <button 
+                @click="triggerAlert('Our team is reviewing your payment. Please wait up to 15 minutes.')" 
+                class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
                 Check Payment Status
               </button>
             </div>
