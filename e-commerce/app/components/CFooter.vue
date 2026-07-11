@@ -6,7 +6,7 @@
   <footer class="bg-accent text-white-base py-8 px-4 md:px-12 w-full">
     <div class="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-8">
       
-      <div class="flex gap-12 justify-start">
+      <div class="flex gap-8 lg:gap-12 justify-start flex-wrap">
         <div>
           <h4 class="text-base font-bold mb-3 opacity-90">Site</h4>
           <ul class="space-y-2 font-medium text-sm md:text-base">
@@ -21,6 +21,13 @@
           <ul class="space-y-2 font-medium text-sm md:text-base">
             <li><NuxtLink to="/instagram" class="hover:opacity-70 transition">Instagram</NuxtLink></li>
             <li><NuxtLink to="/facebook" class="hover:opacity-70 transition">Facebook</NuxtLink></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-base font-bold mb-3 opacity-90">Legal</h4>
+          <ul class="space-y-2 font-medium text-sm md:text-base">
+            <li><NuxtLink to="/terms" class="hover:opacity-70 transition">Terms & Conditions</NuxtLink></li>
+            <li><NuxtLink to="/privacy" class="hover:opacity-70 transition">Privacy Policy</NuxtLink></li>
           </ul>
         </div>
       </div>
