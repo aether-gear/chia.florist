@@ -49,16 +49,19 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [X] Get Audit Log
   - [ ] WAF Security Policy
     - [ ] WAF Rules
-      - [ ] List Rules
-      - [ ] Create Rule
-      - [ ] Toggle Rule
-      - [ ] Delete Rule
+    - [ ] List Rules
+    - [ ] Create Rule
+    - [ ] Toggle Rule
+    - [ ] Delete Rule
     - [ ] IP Access Control
-      - [ ] List IP Config
-      - [ ] Update IP Action
+    - [ ] List IP Config
+    - [ ] Update IP Action
     - [ ] Filters
-      - [ ] Get Filters
-      - [ ] Update Filter
+    - [ ] Get Filters
+    - [ ] Update Filter
+    - [ ] Threat Intelligence
+    - [ ] Analyze IP
+    - [ ] Get Geolocation
 
 # Public API
 
@@ -1440,8 +1443,6 @@ They are intentionally bypassed by the WAF middleware itself — the WAF only in
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 
----
-
 #### Create Rule
 
 - **Method**: `POST`
@@ -1482,8 +1483,6 @@ They are intentionally bypassed by the WAF middleware itself — the WAF only in
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 
----
-
 #### Toggle Rule
 
 - **Method**: `PUT`
@@ -1517,8 +1516,6 @@ Empty body.
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 | `404 Not Found`    | No rule with the given `id` exists. |
 
----
-
 #### Delete Rule
 
 - **Method**: `DELETE`
@@ -1545,8 +1542,6 @@ Empty body.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 | `404 Not Found`    | No rule with the given `id` exists. |
-
----
 
 ### IP Access Control
 
@@ -1584,8 +1579,6 @@ Empty body.
 |--------------------|-----------|
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
-
----
 
 #### Update IP Action
 
@@ -1626,8 +1619,6 @@ Empty body.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 
----
-
 ### Filters
 
 #### Get Filters
@@ -1660,8 +1651,6 @@ Empty body.
 |--------------------|-----------|
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
-
----
 
 #### Update Filter
 
@@ -1708,3 +1697,82 @@ Empty body.
 | `400 Bad Request`  | `value` is empty, `type` is not `keyword` or `url`, or `action` is not `add` or `remove`. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+### Threat Intelligence
+
+#### Analyze IP
+
+- **Method**: `GET`
+- **Endpoint**: `/api/analyze/{ip}`
+- **Description**: Proxy query to VirusTotal v3 API to fetch the security reputation analysis of a given IP address.
+- **Authentication**: Staff Admin
+- **Headers**:
+  - `X-VT-Key`: `string (optional) — optional custom VirusTotal API key to overwrite the server-configured API key`
+- **Request Body**: None
+
+##### Response `200 OK`
+Returns the raw JSON response payload from VirusTotal's `/v3/ip_addresses/{ip}` endpoint. Example response snippet:
+
+```json
+{
+  "data": {
+    "id": "8.8.8.8",
+    "type": "ip_address",
+    "attributes": {
+      "as_owner": "Google LLC",
+      "asn": 15169,
+      "last_analysis_stats": {
+        "harmless": 76,
+        "malicious": 0,
+        "suspicious": 0,
+        "undetected": 11
+      }
+    }
+  }
+}
+```
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid IP address format, or VirusTotal API key is not configured/supplied. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `500 Internal Server Error` | Threat intelligence provider connection failed. |
+
+#### Get Geolocation
+
+- **Method**: `GET`
+- **Endpoint**: `/api/geo/{ip}`
+- **Description**: Proxy query to resolve the geolocation details of a given IP address. Uses `ip2location.io` if configured with a key, falling back automatically to a free `ip-api.com` lookup (mapping response fields for UI compatibility).
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+##### Response `200 OK`
+Returns geolocation parameters mapped to standard IP2Location fields.
+
+```json
+{
+  "ip": "8.8.8.8",
+  "country_code": "US",
+  "country_name": "United States of America",
+  "region_name": "California",
+  "city_name": "Mountain View",
+  "latitude": 37.405992,
+  "longitude": -122.078515,
+  "zip_code": "94043",
+  "time_zone": "-07:00",
+  "asn": "15169",
+  "as": "Google LLC"
+}
+```
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid IP address format. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `500 Internal Server Error` | Geolocation provider connection failed. |
