@@ -190,6 +190,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.ProcessPaymentWebhook,
 			&c.ProcessManualPayment,
 			&c.SavePaymentInstruction,
+			&c.GetPaymentDetail,
 		)
 
 		shopHandler = shopH.NewShopHandler(
@@ -344,6 +345,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Route("/orders", func(r chi.Router) {
 				r.Get("/", chains.CustomerOnly(orderHandler.ListMyOrders))
 				r.Get("/{orderID}", chains.CustomerOnly(orderHandler.GetMyOrder))
+				r.Get("/{orderID}/payment", chains.CustomerOnly(paymentHandler.GetMyOrderPayment))
 			})
 		})
 

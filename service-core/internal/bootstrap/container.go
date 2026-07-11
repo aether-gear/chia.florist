@@ -130,6 +130,7 @@ type Container struct {
 	ProcessPaymentWebhook  paymentUsecase.ProcessPaymentWebhookUsecase
 	ProcessManualPayment   paymentUsecase.ProcessManualPaymentUsecase
 	SavePaymentInstruction paymentUsecase.SavePaymentInstructionUsecase
+	GetPaymentDetail       paymentUsecase.GetPaymentDetailUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -651,6 +652,17 @@ func NewContainer(cfg Config,
 				paymentMethodRepo,
 				paymentInstructionRepo,
 				infra.TransactionExecutor,
+			),
+		GetPaymentDetail: *paymentUsecase.
+			NewGetPaymentDetailUsecase(
+				infra.TransactionExecutor,
+				orderRepo,
+				invoiceRepo,
+				paymentRepo,
+				paymentMethodRepo,
+				paymentAccRepo,
+				paymentInstructionRepo,
+				paymentChannelDataRepo,
 			),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
