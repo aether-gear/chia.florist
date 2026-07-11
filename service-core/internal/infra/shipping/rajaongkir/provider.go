@@ -31,10 +31,10 @@ func NewRajaOngkirProvider(
 ) (shipping.Provider, error) {
 	if strings.TrimSpace(cfg.URL) == "" ||
 		strings.TrimSpace(cfg.QRISLYKey) == "" ||
-		strings.TrimSpace(cfg.ShippingKey) == "" ||
+		strings.TrimSpace(cfg.ShippingCostKey) == "" ||
 		strings.TrimSpace(cfg.PaymentKey) == "" {
 
-		return nil, fmt.Errorf("midtrans: server key is required")
+		return nil, fmt.Errorf("raja ongkir: server key is required")
 	}
 
 	// Allow an explicit URL override
@@ -50,7 +50,7 @@ func NewRajaOngkirProvider(
 	return &rajaOngkirProvider{
 		client:      &http.Client{Timeout: 30 * time.Second},
 		baseURL:     baseURL,
-		shippingKey: cfg.ShippingKey,
+		shippingKey: cfg.ShippingCostKey,
 		paymentKey:  cfg.PaymentKey,
 		qrislyKey:   cfg.QRISLYKey,
 	}, nil

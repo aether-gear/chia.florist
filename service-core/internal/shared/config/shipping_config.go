@@ -14,8 +14,8 @@ func LoadShippingConfig() ShippingConfig {
 	return ShippingConfig{
 		DestinationURL: GetEnv("RAJAONGKIR_DESTINATION_URL"),
 		CalculateURL:   GetEnv("RAJAONGKIR_CALCULATE_URL"),
-		DestinationKey: GetEnv("RAJAONGKIR_SHIPPING"),
-		CalculateKEY:   GetEnv("RAJAONGKIR_SHIPPING"),
+		DestinationKey: GetEnv("RAJAONGKIR_SHIPPING_DELIVERY"),
+		CalculateKEY:   GetEnv("RAJAONGKIR_SHIPPING_COST"),
 		Timeout:        10 * time.Second,
 	}
 }

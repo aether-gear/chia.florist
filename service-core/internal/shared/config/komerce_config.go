@@ -17,6 +17,6 @@ func LoadKomerceConfig() KomerceConfig {
 		OrderBaseURL: GetEnv("KOMERCE_ORDER_URL"),
 		TrackBaseURL: GetEnv("RAJAONGKIR_URL"),
 		APIKey:       GetEnv("KOMERCE_API_KEY"),
-		ShippingKey:  GetEnv("RAJAONGKIR_SHIPPING"),
+		ShippingKey:  GetEnv("RAJAONGKIR_SHIPPING_DELIVERY"),
 	}
 }
