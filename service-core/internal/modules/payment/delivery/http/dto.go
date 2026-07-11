@@ -64,3 +64,21 @@ type manualPaymentActionRequest struct {
 type savePaymentInstructionRequest struct {
 	Content string `json:"content"`
 }
+
+type getPaymentDetailResponse struct {
+	PaymentID   string     `json:"payment_id"`
+	Status      string     `json:"status"`
+	Amount      int64      `json:"amount"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	ChannelType *string    `json:"channel_type,omitempty"`
+	DisplayName *string    `json:"display_name,omitempty"`
+	ActionURL   *string    `json:"action_url,omitempty"`
+	// For manual payments:
+	AccountName   *string `json:"account_name,omitempty"`
+	AccountNumber *string `json:"account_number,omitempty"`
+	PhoneNumber   *string `json:"phone_number,omitempty"`
+	QRString      *string `json:"qr_string,omitempty"`
+	// Rendered instruction markdown:
+	Instruction *string `json:"instruction,omitempty"`
+}
+

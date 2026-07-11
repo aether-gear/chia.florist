@@ -7,6 +7,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	authenDomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/payment/usecase"
 
 	"github.com/go-chi/chi/v5"
@@ -21,6 +22,7 @@ type PaymentHandler struct {
 	processPaymentWebhook  *usecase.ProcessPaymentWebhookUsecase
 	processManualPayment   *usecase.ProcessManualPaymentUsecase
 	savePaymentInstruction *usecase.SavePaymentInstructionUsecase
+	getPaymentDetail       *usecase.GetPaymentDetailUsecase
 }
 
 func NewPaymentHandler(
@@ -31,6 +33,7 @@ func NewPaymentHandler(
 	processPaymentWebhook *usecase.ProcessPaymentWebhookUsecase,
 	processManualPayment *usecase.ProcessManualPaymentUsecase,
 	savePaymentInstruction *usecase.SavePaymentInstructionUsecase,
+	getPaymentDetail *usecase.GetPaymentDetailUsecase,
 ) *PaymentHandler {
 	return &PaymentHandler{
 		createPaymentAccount:   createPaymentAccount,
@@ -40,6 +43,7 @@ func NewPaymentHandler(
 		processPaymentWebhook:  processPaymentWebhook,
 		processManualPayment:   processManualPayment,
 		savePaymentInstruction: savePaymentInstruction,
+		getPaymentDetail:       getPaymentDetail,
 	}
 }
 
@@ -333,5 +337,57 @@ func (h *PaymentHandler) SavePaymentInstruction(w http.ResponseWriter, r *http.R
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *PaymentHandler) GetMyOrderPayment(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authenDomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	customerID := *authCtx.CustomerID
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	result, err := h.getPaymentDetail.Execute(r.Context(), usecase.GetPaymentDetailInput{
+		OrderID:    orderID,
+		CustomerID: &customerID,
+	})
+	if err != nil {
+		return err
+	}
+
+	resp := getPaymentDetailResponse{
+		PaymentID: result.Payment.ID.String(),
+		Status:    string(result.Payment.Status),
+		Amount:    result.Payment.Amount,
+		ExpiresAt: result.Payment.ExpiresAt,
+	}
+
+	if result.ChannelData != nil {
+		channelTypeStr := string(result.ChannelData.ChannelType)
+		resp.ChannelType = &channelTypeStr
+		resp.DisplayName = &result.ChannelData.DisplayName
+		resp.ActionURL = result.ChannelData.ActionURL
+	}
+
+	if result.PaymentAccount != nil {
+		resp.AccountName = &result.PaymentAccount.AccountName
+		resp.AccountNumber = result.PaymentAccount.AccountNumber
+		resp.PhoneNumber = result.PaymentAccount.PhoneNumber
+		resp.QRString = result.PaymentAccount.QRString
+	}
+
+	resp.Instruction = result.Instruction
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
 }

@@ -157,3 +157,27 @@ type PaymentInstructionRepository interface {
 		instruction domain.PaymentInstruction,
 	) error
 }
+
+// PaymentChannelDataRepository persists gateway-returned payment channel
+// details (QR strings, VA numbers, deep links) so they can be retrieved
+// after the initial checkout response is discarded.
+type PaymentChannelDataRepository interface {
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		data domain.PaymentChannelData,
+	) error
+
+	GetByPaymentID(
+		ctx context.Context,
+		exec transaction.Executor,
+		paymentID uuid.UUID,
+	) (*domain.PaymentChannelData, error)
+
+	// ListByPaymentIDs returns channel data records indexed by payment ID.
+	ListByPaymentIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		paymentIDs []uuid.UUID,
+	) (map[uuid.UUID]*domain.PaymentChannelData, error)
+}

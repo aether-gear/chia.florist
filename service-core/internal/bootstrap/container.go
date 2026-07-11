@@ -130,6 +130,7 @@ type Container struct {
 	ProcessPaymentWebhook  paymentUsecase.ProcessPaymentWebhookUsecase
 	ProcessManualPayment   paymentUsecase.ProcessManualPaymentUsecase
 	SavePaymentInstruction paymentUsecase.SavePaymentInstructionUsecase
+	GetPaymentDetail       paymentUsecase.GetPaymentDetailUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -194,6 +195,7 @@ func NewContainer(cfg Config,
 		paymentMethodRepo      = paymentPersistence.NewPaymentMethodRepository()
 		paymentEventRepo       = paymentPersistence.NewPaymentEventRepositoryImpl()
 		paymentInstructionRepo = paymentPersistence.NewPaymentInstructionRepositoryImpl()
+		paymentChannelDataRepo = paymentPersistence.NewPaymentChannelDataRepositoryImpl()
 		shopRepo               = shopPersistence.NewShopRepositoryImpl()
 		courierRepo            = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo        = courierPersistence.NewShopCourierRepositoryImpl()
@@ -651,6 +653,17 @@ func NewContainer(cfg Config,
 				paymentInstructionRepo,
 				infra.TransactionExecutor,
 			),
+		GetPaymentDetail: *paymentUsecase.
+			NewGetPaymentDetailUsecase(
+				infra.TransactionExecutor,
+				orderRepo,
+				invoiceRepo,
+				paymentRepo,
+				paymentMethodRepo,
+				paymentAccRepo,
+				paymentInstructionRepo,
+				paymentChannelDataRepo,
+			),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
 			infra.TransactionExecutor,
@@ -685,6 +698,7 @@ func NewContainer(cfg Config,
 				paymentAccRepo,
 				paymentEventRepo,
 				paymentInstructionRepo,
+				paymentChannelDataRepo,
 				inventoryRepo,
 				cartRepo,
 				userRepo,
@@ -697,6 +711,7 @@ func NewContainer(cfg Config,
 				orderRepo,
 				orderItemRepo,
 				paymentRepo,
+				paymentChannelDataRepo,
 				shipmentRepo,
 			),
 		GetOrder: *orderUsecase.
@@ -705,6 +720,7 @@ func NewContainer(cfg Config,
 				orderRepo,
 				orderItemRepo,
 				paymentRepo,
+				paymentChannelDataRepo,
 				shipmentRepo,
 			),
 		UpdateOrderStatus: *orderUsecase.

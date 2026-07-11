@@ -226,6 +226,23 @@ func (m *coMockPaymentInstructionRepo) Save(_ context.Context, _ transaction.Exe
 	return nil
 }
 
+// --- payment channel data repo ---
+
+type coMockChannelDataRepo struct {
+	saved []paymentDomain.PaymentChannelData
+}
+
+func (m *coMockChannelDataRepo) Save(_ context.Context, _ transaction.Executor, data paymentDomain.PaymentChannelData) error {
+	m.saved = append(m.saved, data)
+	return nil
+}
+func (m *coMockChannelDataRepo) GetByPaymentID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentChannelData, error) {
+	return nil, nil
+}
+func (m *coMockChannelDataRepo) ListByPaymentIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) (map[uuid.UUID]*paymentDomain.PaymentChannelData, error) {
+	return map[uuid.UUID]*paymentDomain.PaymentChannelData{}, nil
+}
+
 // --- order repo ---
 
 type coMockOrderRepo struct {
@@ -447,11 +464,33 @@ func buildUC(
 	orderStore *coMockOrderRepo,
 	cartRepo *coMockCartRepo,
 ) *CreateOrderUsecase {
+	return buildUCWith(transactor, gateway, pricing, paymentMethodRepo, paymentAccRepo,
+		userRepo, accountRepo, inventoryRepo, paymentStore, orderStore, cartRepo, nil)
+}
+
+// buildUCWith is the full constructor; pass nil for channelDataRepo to use the default no-op mock.
+func buildUCWith(
+	transactor transaction.Transactor,
+	gateway paymentgateway.Provider,
+	pricing *coMockPricingService,
+	paymentMethodRepo *coMockPaymentMethodRepo,
+	paymentAccRepo *coMockPaymentAccountRepo,
+	userRepo *coMockUserRepo,
+	accountRepo *coMockAccountRepo,
+	inventoryRepo *coMockInventoryRepo,
+	paymentStore *coMockPaymentRepo,
+	orderStore *coMockOrderRepo,
+	cartRepo *coMockCartRepo,
+	channelDataRepo *coMockChannelDataRepo,
+) *CreateOrderUsecase {
 	if transactor == nil {
 		transactor = &coMockTransactor{}
 	}
 	if cartRepo == nil {
 		cartRepo = &coMockCartRepo{}
+	}
+	if channelDataRepo == nil {
+		channelDataRepo = &coMockChannelDataRepo{}
 	}
 	return NewCreateOrderUsecase(
 		&coMockExecutor{},
@@ -466,6 +505,7 @@ func buildUC(
 		paymentAccRepo,
 		&coMockPaymentEventRepo{},
 		&coMockPaymentInstructionRepo{},
+		channelDataRepo,
 		inventoryRepo,
 		cartRepo,
 		userRepo,
@@ -552,6 +592,140 @@ func TestCreateOrder_Gateway_Success(t *testing.T) {
 	}
 	if result.PaymentAccount.QRString == nil || *result.PaymentAccount.QRString != "qr-string-value" {
 		t.Errorf("QRString mismatch: %v", result.PaymentAccount.QRString)
+	}
+}
+
+func TestCreateOrder_Gateway_Success_NilPhone(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	productID := uuid.New()
+	shopID := uuid.New()
+	methodID := uuid.New()
+
+	user := &userDomain.User{ID: uuid.New(), Name: "Test User", Phone: nil}
+	acc := coDefaultAccount(user.ID)
+	method := coDefaultMethod(methodID, "qris")
+	pricing := coDefaultPricing(productID, shopID)
+	providerOrderID := uuid.New().String()
+
+	var capturedReq paymentgateway.ChargeRequest
+	gateway := &capturingGateway{
+		resp: &paymentgateway.ChargeResponse{
+			GatewayTransactionID: "midtrans-tx-001",
+			GatewayOrderID:       providerOrderID,
+			PaymentType:          "qris",
+			GrossAmount:          115000,
+			Status:               "pending",
+			Instructions: []paymentgateway.PaymentInstruction{
+				{Type: "qris", Label: "QRIS", Value: "qr-string-value"},
+			},
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+		},
+		captured: &capturedReq,
+	}
+
+	paymentStore := &coMockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{}}
+	orderStore := &coMockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}}
+
+	uc := buildUC(nil, gateway,
+		&coMockPricingService{result: pricing},
+		&coMockPaymentMethodRepo{method: method},
+		&coMockPaymentAccountRepo{},
+		&coMockUserRepo{user: user},
+		&coMockAccountRepo{account: acc},
+		&coMockInventoryRepo{},
+		paymentStore,
+		orderStore,
+		nil,
+	)
+
+	result, err := uc.Execute(ctx, coInput(customerID, methodID, false, productID, shopID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.OrderID == uuid.Nil {
+		t.Error("OrderID should not be nil")
+	}
+	if capturedReq.CustomerPhone != "" {
+		t.Errorf("expected empty CustomerPhone, got %q", capturedReq.CustomerPhone)
+	}
+}
+
+// ===========================================================================
+// Gateway channel data: persisted on checkout and returned in result
+// ===========================================================================
+
+func TestCreateOrder_Gateway_ChannelDataPersisted(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	productID := uuid.New()
+	shopID := uuid.New()
+	methodID := uuid.New()
+
+	user := coDefaultUser()
+	acc := coDefaultAccount(user.ID)
+	method := coDefaultMethod(methodID, "qris")
+	pricing := coDefaultPricing(productID, shopID)
+
+	gateway := &coMockGateway{
+		chargeResp: &paymentgateway.ChargeResponse{
+			GatewayTransactionID: "tx-ch-001",
+			GatewayOrderID:       uuid.New().String(),
+			PaymentType:          "qris",
+			GrossAmount:          115000,
+			Status:               "pending",
+			Instructions: []paymentgateway.PaymentInstruction{
+				{Type: "qris", Label: "QRIS Payment", Value: "data:image/png;base64,qrdata"},
+			},
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+		},
+	}
+
+	channelRepo := &coMockChannelDataRepo{}
+
+	uc := buildUCWith(nil, gateway,
+		&coMockPricingService{result: pricing},
+		&coMockPaymentMethodRepo{method: method},
+		&coMockPaymentAccountRepo{},
+		&coMockUserRepo{user: user},
+		&coMockAccountRepo{account: acc},
+		&coMockInventoryRepo{},
+		&coMockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{}},
+		&coMockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
+		nil,
+		channelRepo,
+	)
+
+	result, err := uc.Execute(ctx, coInput(customerID, methodID, false, productID, shopID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Result should surface channel data — ChannelType is sourced from method.Type,
+	// not the raw gateway instruction type.
+	if result.ChannelData == nil {
+		t.Fatal("expected ChannelData to be set in CreateOrderResult, got nil")
+	}
+	if result.ChannelData.ChannelType != paymentDomain.TypeQRCode {
+		t.Errorf("ChannelType = %q, want %q", result.ChannelData.ChannelType, paymentDomain.TypeQRCode)
+	}
+	if result.ChannelData.ActionURL == nil || *result.ChannelData.ActionURL != "data:image/png;base64,qrdata" {
+		t.Errorf("ActionURL = %v, want qrdata", result.ChannelData.ActionURL)
+	}
+
+	// Repo must have received exactly one Save call
+	if len(channelRepo.saved) != 1 {
+		t.Fatalf("expected 1 channel data record saved, got %d", len(channelRepo.saved))
+	}
+	cd := channelRepo.saved[0]
+	if cd.ChannelType != paymentDomain.TypeQRCode {
+		t.Errorf("saved ChannelType = %q, want %q", cd.ChannelType, paymentDomain.TypeQRCode)
+	}
+	if cd.DisplayName != "QRIS Payment" {
+		t.Errorf("saved DisplayName = %q, want \"QRIS Payment\"", cd.DisplayName)
+	}
+	if cd.ActionURL == nil || *cd.ActionURL != "data:image/png;base64,qrdata" {
+		t.Errorf("saved ActionURL mismatch: %v", cd.ActionURL)
 	}
 }
 

@@ -36,6 +36,7 @@ type CreateOrderUsecase struct {
 	paymentAccRepo         paymentRepo.PaymentAccountRepository
 	paymentEventRepo       paymentRepo.PaymentEventRepository
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository
+	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
 	inventoryRepo          inventoryRepo.InventoryRepository
 	cartRepo               cartRepo.CartRepository
 	userRepo               userRepo.UserRepository
@@ -56,6 +57,7 @@ func NewCreateOrderUsecase(
 	paymentAccRepo paymentRepo.PaymentAccountRepository,
 	paymentEventRepo paymentRepo.PaymentEventRepository,
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository,
+	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	cartRepo cartRepo.CartRepository,
 	userRepo userRepo.UserRepository,
@@ -75,6 +77,7 @@ func NewCreateOrderUsecase(
 		paymentAccRepo:         paymentAccRepo,
 		paymentEventRepo:       paymentEventRepo,
 		paymentInstructionRepo: paymentInstructionRepo,
+		paymentChannelDataRepo: paymentChannelDataRepo,
 		inventoryRepo:          inventoryRepo,
 		cartRepo:               cartRepo,
 		userRepo:               userRepo,
@@ -120,6 +123,7 @@ type PaymentAccountResult struct {
 type CreateOrderResult struct {
 	OrderID        uuid.UUID
 	PaymentAccount *PaymentAccountResult
+	ChannelData    *paymentDomain.PaymentChannelData
 	Instruction    *string
 	Total          int64
 }
@@ -310,6 +314,11 @@ func (u *CreateOrderUsecase) Execute(
 			})
 		}
 
+		var customerPhone string
+		if user.Phone != nil {
+			customerPhone = *user.Phone
+		}
+
 		var err error
 		chargeResp, err = u.paymentGateway.
 			Charge(
@@ -322,7 +331,7 @@ func (u *CreateOrderUsecase) Execute(
 					ExpiresAt:     time.Now().Add(time.Hour * 24),
 					CustomerEmail: account.Email,
 					CustomerName:  user.Name,
-					CustomerPhone: *user.Phone,
+					CustomerPhone: customerPhone,
 					Items:         chargeItems,
 				},
 			)
@@ -390,7 +399,11 @@ func (u *CreateOrderUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	var instruction *paymentDomain.PaymentInstruction
+	var (
+		instruction *paymentDomain.PaymentInstruction
+		channelData *paymentDomain.PaymentChannelData
+	)
+
 	err = u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
@@ -431,9 +444,44 @@ func (u *CreateOrderUsecase) Execute(
 				}
 			}
 
+			// Persist gateway channel data (QR string, VA number, deep link)
+			// so it survives the initial checkout response and can be
+			// retrieved on any subsequent request.
+			if chargeResp != nil && len(chargeResp.Instructions) > 0 {
+				inst := chargeResp.Instructions[0]
+				var actionURL *string
+				if inst.Value != "" {
+					v := inst.Value
+					actionURL = &v
+				}
+
+				cd := paymentDomain.PaymentChannelData{
+					ID:          uuid.New(),
+					PaymentID:   payment.ID,
+					ChannelType: method.Type,
+					DisplayName: inst.Label,
+					ActionURL:   actionURL,
+					ExpiresAt:   payment.ExpiresAt,
+					CreatedAt:   now,
+				}
+
+				if err := u.paymentChannelDataRepo.
+					Save(ctx, exec, cd); err != nil {
+					return fmt.Errorf("failed to save payment channel data: %w", err)
+				}
+
+				channelData = &cd
+			}
+
 			for _, item := range orderItems {
 				if err := u.inventoryRepo.
-					Reserve(ctx, exec, item.ProductID, item.ShopID, item.Quantity); err != nil {
+					Reserve(
+						ctx,
+						exec,
+						item.ProductID,
+						item.ShopID,
+						item.Quantity,
+					); err != nil {
 					return fmt.Errorf("failed to reserve inventory for product %s: %w", item.ProductID, err)
 				}
 			}
@@ -519,6 +567,7 @@ func (u *CreateOrderUsecase) Execute(
 	result := CreateOrderResult{
 		OrderID:        order.ID,
 		PaymentAccount: paymentAccountResult,
+		ChannelData:    channelData,
 		Instruction:    instructionContent,
 		Total:          order.Total,
 	}

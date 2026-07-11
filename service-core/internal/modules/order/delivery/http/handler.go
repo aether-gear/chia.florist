@@ -71,7 +71,7 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 	}
 
 	if o.Payment != nil {
-		resp.Payment = mapPaymentDetail(o.Payment)
+		resp.Payment = mapPaymentDetail(o.Payment, o.ChannelData)
 	}
 	if o.Shipment != nil {
 		resp.Shipment = mapShipmentDetail(o.Shipment)
@@ -80,8 +80,8 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 	return resp
 }
 
-func mapPaymentDetail(p *paymentDomain.Payment) *paymentDetailResponse {
-	return &paymentDetailResponse{
+func mapPaymentDetail(p *paymentDomain.Payment, cd *paymentDomain.PaymentChannelData) *paymentDetailResponse {
+	resp := &paymentDetailResponse{
 		ID:        p.ID.String(),
 		Status:    string(p.Status),
 		Provider:  p.Provider,
@@ -89,6 +89,16 @@ func mapPaymentDetail(p *paymentDomain.Payment) *paymentDetailResponse {
 		ExpiresAt: p.ExpiresAt,
 		CreatedAt: p.CreatedAt,
 	}
+	if cd != nil {
+		resp.ChannelData = &paymentChannelDataResponse{
+			ChannelType: string(cd.ChannelType),
+			DisplayName: cd.DisplayName,
+			ActionURL:   cd.ActionURL,
+			ExpiresAt:   cd.ExpiresAt,
+		}
+	}
+
+	return resp
 }
 
 func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
@@ -203,12 +213,15 @@ func (h *orderHandler) GetOrder(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewNotFound("order not found")
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, buildOrderResponse(usecase.OrderSearchResult{
-		Order:    result.Order,
-		Items:    result.Items,
-		Payment:  result.Payment,
-		Shipment: result.Shipment,
-	}))
+	resp := buildOrderResponse(usecase.OrderSearchResult{
+		Order:       result.Order,
+		Items:       result.Items,
+		Payment:     result.Payment,
+		ChannelData: result.ChannelData,
+		Shipment:    result.Shipment,
+	})
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
 }
 
@@ -295,12 +308,15 @@ func (h *orderHandler) GetMyOrder(w http.ResponseWriter, r *http.Request) error 
 		return apperrors.NewNotFound("order not found")
 	}
 
-	apphttp.WriteJSON(w, http.StatusOK, buildOrderResponse(usecase.OrderSearchResult{
-		Order:    result.Order,
-		Items:    result.Items,
-		Payment:  result.Payment,
-		Shipment: result.Shipment,
-	}))
+	resp := buildOrderResponse(usecase.OrderSearchResult{
+		Order:       result.Order,
+		Items:       result.Items,
+		Payment:     result.Payment,
+		ChannelData: result.ChannelData,
+		Shipment:    result.Shipment,
+	})
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
 }
 
@@ -410,6 +426,15 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 			AccountNumber: result.PaymentAccount.AccountNumber,
 			PhoneNumber:   result.PaymentAccount.PhoneNumber,
 			QRString:      result.PaymentAccount.QRString,
+		}
+	}
+
+	if result.ChannelData != nil {
+		resp.ChannelData = &paymentChannelDataResponse{
+			ChannelType: string(result.ChannelData.ChannelType),
+			DisplayName: result.ChannelData.DisplayName,
+			ActionURL:   result.ChannelData.ActionURL,
+			ExpiresAt:   result.ChannelData.ExpiresAt,
 		}
 	}
 

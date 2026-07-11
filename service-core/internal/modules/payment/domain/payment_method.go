@@ -15,11 +15,11 @@ const (
 	TypeEWallet      PaymentMethodType = "ewallet"
 	TypeQRCode       PaymentMethodType = "qr_code"
 
-	CodeGoPay          PaymentMethodCode = "gopay"
-	CodeShopeePay      PaymentMethodCode = "shopeepay"
-	CodeQRIS           PaymentMethodCode = "qris"
-	CodeBCAVirtualAcc  PaymentMethodCode = "bca_va"
-	CodeMandiriBill    PaymentMethodCode = "mandiri_bill"
+	CodeGoPay         PaymentMethodCode = "gopay"
+	CodeShopeePay     PaymentMethodCode = "shopeepay"
+	CodeQRIS          PaymentMethodCode = "qris"
+	CodeBCAVirtualAcc PaymentMethodCode = "bca_va"
+	CodeMandiriBill   PaymentMethodCode = "mandiri_bill"
 
 	FeeTypeFlat       PaymentFeeType = "flat"
 	FeeTypePercentage PaymentFeeType = "percentage"
