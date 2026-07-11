@@ -52,6 +52,9 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [ ] Calculate Checkout
   - [ ] Orders
     - [ ] Create Order
+    - [ ] Find My Orders
+    - [ ] Get Order
+    - [ ] Get Order Payment Details
 
 # Public API
 
@@ -1585,6 +1588,67 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 |--------------------|-----------------------------|
 | `401 Unauthorized` | Missing or invalid session. |
 | `404 Not Found`    | User profile not found.     |
+
+### Get Order Payment Details
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me/orders/{orderID}/payment`
+- **Description**: Retrieve detailed payment recovery information for the order. This includes the status, amount, expiration timestamp, active gateway channel data (such as QRIS string/deep links), manual account info, and the rendered step-by-step payment instructions.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Response `200 OK`
+
+##### Example (Gateway Payment - QRIS)
+```json
+{
+  "payment_id": "1d3a0355-ce51-4346-a07c-b8bc839e85f1",
+  "status": "pending",
+  "amount": 1220000,
+  "expires_at": "2026-06-28T10:09:09Z",
+  "channel_type": "qr_code",
+  "display_name": "QRIS",
+  "action_url": "data:image/png;base64,qrstring...",
+  "instruction": "# QRIS Payment Instructions\n\nPlease scan the QR code before **2026-06-28T10:09:09Z**."
+}
+```
+
+##### Example (Manual Payment - Bank Transfer)
+```json
+{
+  "payment_id": "2d3a0355-ce51-4346-a07c-b8bc839e85f2",
+  "status": "pending",
+  "amount": 250000,
+  "expires_at": "2026-06-28T10:09:09Z",
+  "account_name": "Chia Florist",
+  "account_number": "1234567890",
+  "instruction": "# Bank Transfer Instructions\n\nPlease transfer **IDR 250,000** to BCA account **1234567890**."
+}
+```
+
+#### Response Fields
+
+| Field            | Type   | Description |
+|------------------|--------|-------------|
+| `payment_id`     | string | The unique ID of the payment transaction. |
+| `status`         | string | Current payment status (`pending`, `paid`, `failed`, `expired`, `cancelled`, `refunded`). |
+| `amount`         | int    | Total payment amount. |
+| `expires_at`     | string | RFC3339 formatted expiration timestamp. |
+| `channel_type`   | string | (Optional) Gateway payment channel method type. |
+| `display_name`   | string | (Optional) Gateway payment channel display name. |
+| `action_url`     | string | (Optional) Gateway payment channel QR code, deep link, or VA number. |
+| `account_name`   | string | (Optional) Manual payment account holder name. |
+| `account_number` | string | (Optional) Manual payment account number. |
+| `phone_number`   | string | (Optional) Manual payment phone number. |
+| `qr_string`      | string | (Optional) Manual payment QR string. |
+| `instruction`    | string | (Optional) Rendered step-by-step markdown payment instructions. |
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Order or payment not found, or order does not belong to the authenticated customer. |
 
 ### Create Order
 
