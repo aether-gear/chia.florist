@@ -155,7 +155,7 @@ const totalPrice   = computed(() => SIZES.find(s => s.id === physicalSize.value)
 
 /* ─── SCALE & ANIMATION ───────────────────────────────────────────── */
 const randomizeDesign = () => {
-  const rand = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+  const rand = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!
   upper.value.bgColor = rand(BG_PRESETS)
   lower.value.bgColor = rand(BG_PRESETS)
   upper.value.headerFont = rand(FONTS).id
