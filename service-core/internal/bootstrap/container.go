@@ -73,7 +73,7 @@ type Container struct {
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
-	CreateProduct    productUsecase.CreateProductUsecase
+	SaveProduct      productUsecase.SaveProductUsecase
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 
@@ -159,8 +159,8 @@ type Container struct {
 	UpdateFilter      secPolicyUsecase.UpdateFilterUsecase
 	InspectPayload    secPolicyUsecase.InspectPayloadUsecase
 
-	AnalyzeIP         threatIntelUsecase.AnalyzeIPUsecase
-	GetGeoIP           threatIntelUsecase.GetGeoIPUsecase
+	AnalyzeIP threatIntelUsecase.AnalyzeIPUsecase
+	GetGeoIP  threatIntelUsecase.GetGeoIPUsecase
 }
 
 func NewContainer(cfg Config,
@@ -298,8 +298,8 @@ func NewContainer(cfg Config,
 				productImageRepo,
 				shopRepo,
 			),
-		CreateProduct: *productUsecase.
-			NewCreateProductUsecase(
+		SaveProduct: *productUsecase.
+			NewSaveProductUsecase(
 				productRepo,
 				slugGen,
 				infra.TransactionExecutor,
@@ -791,6 +791,6 @@ func NewContainer(cfg Config,
 			secPolicyRepo,
 		),
 		AnalyzeIP: *threatIntelUsecase.NewAnalyzeIPUsecase(threatIntelRepo),
-		GetGeoIP:   *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
+		GetGeoIP:  *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
 	}
 }

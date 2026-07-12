@@ -15,25 +15,26 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreateProductUsecase struct {
+type SaveProductUsecase struct {
 	productRepo repository.ProductRepository
 	slugGen     slug.Generator
 	executor    transaction.Executor
 }
 
-func NewCreateProductUsecase(
+func NewSaveProductUsecase(
 	productRepo repository.ProductRepository,
 	slugGen slug.Generator,
 	executor transaction.Executor,
-) *CreateProductUsecase {
-	return &CreateProductUsecase{
+) *SaveProductUsecase {
+	return &SaveProductUsecase{
 		productRepo: productRepo,
 		slugGen:     slugGen,
 		executor:    executor,
 	}
 }
 
-type CreateProductInput struct {
+type SaveProductInput struct {
+	ID          *uuid.UUID
 	SKU         string
 	Name        string
 	Description *string
@@ -42,14 +43,21 @@ type CreateProductInput struct {
 	Weight      *float64
 }
 
-func (u *CreateProductUsecase) Execute(
+func (u *SaveProductUsecase) Execute(
 	ctx context.Context,
-	input CreateProductInput,
+	input SaveProductInput,
 ) error {
 	now := time.Now()
 
+	var productID uuid.UUID
+	if input.ID == nil {
+		productID = uuid.New()
+	} else {
+		productID = *input.ID
+	}
+
 	product := &domain.Product{
-		ID:          uuid.New(),
+		ID:          productID,
 		SKU:         input.SKU,
 		Name:        input.Name,
 		Slug:        u.slugGen.Generate(input.Name),
@@ -68,7 +76,10 @@ func (u *CreateProductUsecase) Execute(
 		return err
 	}
 
-	if err := u.productRepo.CreateProduct(ctx, u.executor, product); err != nil {
+	if err := u.productRepo.
+		Save(ctx, u.executor,
+			product,
+		); err != nil {
 		return fmt.Errorf("failed to save product: %w", err)
 	}
 

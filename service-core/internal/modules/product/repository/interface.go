@@ -40,7 +40,7 @@ type ProductRepository interface {
 		IDs []uuid.UUID,
 	) ([]domain.Product, error)
 
-	CreateProduct(
+	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		product *domain.Product,

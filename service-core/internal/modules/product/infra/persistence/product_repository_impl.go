@@ -556,7 +556,7 @@ func (r *productRepositoryImpl) FindByIDs(
 	return results, nil
 }
 
-func (r *productRepositoryImpl) CreateProduct(
+func (r *productRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
 	product *domain.Product,
@@ -573,7 +573,17 @@ func (r *productRepositoryImpl) CreateProduct(
 			weight,
 			created_at
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (id)
+		DO UPDATE SET
+			sku = EXCLUDED.sku,
+			name = EXCLUDED.name,
+			slug = EXCLUDED.slug,
+			description = EXCLUDED.description,
+			status = EXCLUDED.status,
+			base_price = EXCLUDED.base_price,
+			weight = EXCLUDED.weight,
+			updated_at = NOW()
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -589,7 +599,7 @@ func (r *productRepositoryImpl) CreateProduct(
 	)
 
 	if err != nil {
-		return fmt.Errorf("insert product failed: %w", err)
+		return fmt.Errorf("save product failed: %w", err)
 	}
 
 	return nil

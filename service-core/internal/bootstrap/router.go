@@ -122,7 +122,7 @@ func NewRouter(c *Container) *chi.Mux {
 		productHandler = productH.NewProductHandler(
 			&c.FindProducts,
 			&c.GetProduct,
-			&c.CreateProduct,
+			&c.SaveProduct,
 			&c.AddProductImages,
 		)
 
@@ -253,7 +253,7 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
-			r.Post("/", chains.StaffOnly(productHandler.CreateProduct))
+			r.Post("/", chains.StaffOnly(productHandler.SaveProduct))
 
 			r.Route("/{slug}", func(r chi.Router) {
 				r.Get("/", chains.Core(productHandler.GetProduct))
