@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Search, Plus, Loader2, RefreshCw } from 'lucide-react';
+import { Package, Search, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
@@ -21,6 +21,14 @@ import {
   SheetTitle,
   SheetClose,
 } from '../../components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '../../components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../../lib/api';
@@ -37,6 +45,25 @@ export default function ProductsPage() {
   const [stock, setStock] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [productToDelete, setProductToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      await fetchApi(`/products/id/${productToDelete.id}`, {
+        method: 'DELETE',
+      });
+      setProductToDelete(null);
+      refresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete product');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Load shops on Sheet open
   useEffect(() => {
@@ -207,16 +234,40 @@ export default function ProductsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setIsAddInventoryOpen(true);
-                            }}
-                          >
-                            <Plus className="mr-1 h-3.5 w-3.5" /> Add Inventory
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-md p-1 min-w-[150px]">
+                              <DropdownMenuItem
+                                onClick={() => navigate(`/products/${product.slug}/edit`)}
+                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-slate-50 rounded"
+                              >
+                                <Edit className="h-4 w-4 text-slate-500" />
+                                <span>Edit Product</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedProduct(product);
+                                  setIsAddInventoryOpen(true);
+                                }}
+                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-slate-50 rounded"
+                              >
+                                <Plus className="h-4 w-4 text-slate-500" />
+                                <span>Add Inventory</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-slate-100 my-1" />
+                              <DropdownMenuItem
+                                onClick={() => setProductToDelete(product)}
+                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-red-50 text-red-600 rounded"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <span>Delete Product</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
@@ -290,6 +341,35 @@ export default function ProductsPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription className="py-2">
+              Are you sure you want to permanently delete <strong>{productToDelete?.name}</strong>? All association with inventory and shops will be removed. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => setProductToDelete(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteProduct}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Delete Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -20,6 +20,9 @@ export interface Product {
   price: number;
   stock: number;
   banner: ProductBanner;
+  gallery?: ProductBanner[];
+  description?: string | null;
+  weight?: number | null;
   availability: ProductAvailability[];
 }
 
