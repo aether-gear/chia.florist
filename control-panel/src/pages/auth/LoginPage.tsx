@@ -10,6 +10,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,11 +26,20 @@ export default function LoginPage() {
           email,
           password,
           user_agent: navigator.userAgent,
-          ip_address: '127.0.0.1' // In a real app, backend determines this or use a 3rd party service
+          ip_address: '127.0.0.1', // In a real app, backend determines this or use a 3rd party service
+          remember_me: rememberMe
         })
       });
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', email);
+
+      // Clear both first to avoid mixed states
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userEmail');
+      sessionStorage.removeItem('isAuthenticated');
+      sessionStorage.removeItem('userEmail');
+
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('isAuthenticated', 'true');
+      storage.setItem('userEmail', email);
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -80,6 +90,18 @@ export default function LoginPage() {
                 required
                 onChange={(e) => setPassword(e.target.value)}
               />
+            </div>
+            <div className="flex items-center space-x-2 py-1">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <label htmlFor="rememberMe" className="text-sm text-slate-600 font-medium cursor-pointer select-none">
+                Remember me
+              </label>
             </div>
               {error && (
                 <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
