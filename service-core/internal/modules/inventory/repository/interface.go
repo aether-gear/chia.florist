@@ -93,4 +93,17 @@ type InventoryRepository interface {
 		shopID uuid.UUID,
 		qty int,
 	) error
+
+	Update(
+		ctx context.Context,
+		exec transaction.Executor,
+		inventory *domain.Inventory,
+	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+		shopID uuid.UUID,
+	) error
 }

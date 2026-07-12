@@ -77,6 +77,8 @@ type Container struct {
 	DeleteProduct    productUsecase.DeleteProductUsecase
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
+	UpdateInventory  inventoryUsecase.UpdateInventoryUsecase
+	DeleteInventory  inventoryUsecase.DeleteInventoryUsecase
 
 	Me                    authenUsecase.MeUsecase
 	LoginCustomer         authenUsecase.LoginCustomerUsecase
@@ -324,6 +326,14 @@ func NewContainer(cfg Config,
 			NewCreateInventoryUsecase(inventoryRepo,
 				productRepo,
 				shopRepo,
+				infra.TransactionExecutor,
+			),
+		UpdateInventory: *inventoryUsecase.
+			NewUpdateInventoryUsecase(inventoryRepo,
+				infra.TransactionExecutor,
+			),
+		DeleteInventory: *inventoryUsecase.
+			NewDeleteInventoryUsecase(inventoryRepo,
 				infra.TransactionExecutor,
 			),
 

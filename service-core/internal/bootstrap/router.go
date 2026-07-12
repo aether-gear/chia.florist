@@ -129,6 +129,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 		inventoryHandler = inventoryH.NewInventoryHandler(
 			&c.CreateInventory,
+			&c.UpdateInventory,
+			&c.DeleteInventory,
 		)
 
 		authHandler = authH.NewAuthHandler(
@@ -371,6 +373,10 @@ func NewRouter(c *Container) *chi.Mux {
 					r.Get("/", chains.Core(shopHandler.GetShopProducts))
 					r.Post("/{productID}/inventories",
 						chains.StaffOnly(inventoryHandler.AddInventory))
+					r.Put("/{productID}/inventories",
+						chains.StaffOnly(inventoryHandler.UpdateInventory))
+					r.Delete("/{productID}/inventories",
+						chains.StaffOnly(inventoryHandler.RemoveInventory))
 				})
 			})
 		})
