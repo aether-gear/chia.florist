@@ -40,10 +40,16 @@ type ProductRepository interface {
 		IDs []uuid.UUID,
 	) ([]domain.Product, error)
 
-	CreateProduct(
+	Save(
 		ctx context.Context,
 		exec transaction.Executor,
 		product *domain.Product,
+	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
 	) error
 }
 

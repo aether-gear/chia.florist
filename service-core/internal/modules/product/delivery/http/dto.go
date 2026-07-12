@@ -14,7 +14,8 @@ const (
 	ProductStatusArchived productStatusDTO = "archived"
 )
 
-type createProductRequest struct {
+type saveProductRequest struct {
+	ID          *string          `json:"id"`
 	SKU         string           `json:"sku"`
 	Name        string           `json:"name"`
 	Description *string          `json:"description"`

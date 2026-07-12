@@ -363,3 +363,46 @@ func (r *inventoryRepositoryImpl) Commit(
 
 	return nil
 }
+
+func (r *inventoryRepositoryImpl) Update(
+	ctx context.Context,
+	exec transaction.Executor,
+	inventory *domain.Inventory,
+) error {
+	query := `
+		UPDATE inventory
+		SET
+			stock          = $1,
+			reserved_stock = $2,
+			updated_at     = NOW()
+		WHERE
+			id = $3
+	`
+	_, err := exec.Exec(ctx, query,
+		inventory.TotalStock,
+		inventory.ReservedStock,
+		inventory.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update inventory failed: %w", err)
+	}
+	return nil
+}
+
+func (r *inventoryRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+	shopID uuid.UUID,
+) error {
+	query := `
+		DELETE FROM inventory
+		WHERE product_id = $1 AND shop_id = $2
+	`
+	_, err := exec.Exec(ctx, query, productID, shopID)
+	if err != nil {
+		return fmt.Errorf("delete inventory failed: %w", err)
+	}
+	return nil
+}
+

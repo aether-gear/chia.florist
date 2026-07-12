@@ -235,6 +235,12 @@ func (m *mockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, pr
 	m.commits = append(m.commits, fmt.Sprintf("%s-%s-%d", productID, shopID, qty))
 	return nil
 }
+func (m *mockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
+	return nil
+}
+func (m *mockInventoryRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID) error {
+	return nil
+}
 
 // mockPaymentGateway for webhook tests (parse notification path).
 type mockPaymentGateway struct {

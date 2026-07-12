@@ -73,9 +73,12 @@ type Container struct {
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
-	CreateProduct    productUsecase.CreateProductUsecase
+	SaveProduct      productUsecase.SaveProductUsecase
+	DeleteProduct    productUsecase.DeleteProductUsecase
 	AddProductImages productUsecase.AddProductImagesUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
+	UpdateInventory  inventoryUsecase.UpdateInventoryUsecase
+	DeleteInventory  inventoryUsecase.DeleteInventoryUsecase
 
 	Me                    authenUsecase.MeUsecase
 	LoginCustomer         authenUsecase.LoginCustomerUsecase
@@ -159,8 +162,8 @@ type Container struct {
 	UpdateFilter      secPolicyUsecase.UpdateFilterUsecase
 	InspectPayload    secPolicyUsecase.InspectPayloadUsecase
 
-	AnalyzeIP         threatIntelUsecase.AnalyzeIPUsecase
-	GetGeoIP           threatIntelUsecase.GetGeoIPUsecase
+	AnalyzeIP threatIntelUsecase.AnalyzeIPUsecase
+	GetGeoIP  threatIntelUsecase.GetGeoIPUsecase
 }
 
 func NewContainer(cfg Config,
@@ -298,10 +301,15 @@ func NewContainer(cfg Config,
 				productImageRepo,
 				shopRepo,
 			),
-		CreateProduct: *productUsecase.
-			NewCreateProductUsecase(
+		SaveProduct: *productUsecase.
+			NewSaveProductUsecase(
 				productRepo,
 				slugGen,
+				infra.TransactionExecutor,
+			),
+		DeleteProduct: *productUsecase.
+			NewDeleteProductUsecase(
+				productRepo,
 				infra.TransactionExecutor,
 			),
 		AddProductImages: *productUsecase.
@@ -318,6 +326,14 @@ func NewContainer(cfg Config,
 			NewCreateInventoryUsecase(inventoryRepo,
 				productRepo,
 				shopRepo,
+				infra.TransactionExecutor,
+			),
+		UpdateInventory: *inventoryUsecase.
+			NewUpdateInventoryUsecase(inventoryRepo,
+				infra.TransactionExecutor,
+			),
+		DeleteInventory: *inventoryUsecase.
+			NewDeleteInventoryUsecase(inventoryRepo,
 				infra.TransactionExecutor,
 			),
 
@@ -791,6 +807,6 @@ func NewContainer(cfg Config,
 			secPolicyRepo,
 		),
 		AnalyzeIP: *threatIntelUsecase.NewAnalyzeIPUsecase(threatIntelRepo),
-		GetGeoIP:   *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
+		GetGeoIP:  *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
 	}
 }

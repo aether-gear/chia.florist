@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	apperrors "service-core/internal/common/errors"
 	storage "service-core/internal/infra/storage"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
@@ -62,8 +63,8 @@ type ProductImageInput struct {
 }
 
 type AddProductImageInput struct {
-	ProductSlug string
-	Images      []ProductImageInput
+	ProductID uuid.UUID
+	Images    []ProductImageInput
 }
 
 type productToVariants struct {
@@ -76,12 +77,13 @@ func (u *AddProductImagesUsecase) Execute(
 	input AddProductImageInput,
 ) error {
 	product, err := u.productRepo.
-		GetBySlug(ctx, u.executor, input.ProductSlug)
+		GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to get product: %w", err)
 	}
+
 	if product == nil {
-		return nil
+		return apperrors.NewNotFound("product not found")
 	}
 
 	var (

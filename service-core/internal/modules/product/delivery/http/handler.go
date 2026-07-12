@@ -9,25 +9,30 @@ import (
 	apphttp "service-core/internal/common/http"
 	appmultipart "service-core/internal/common/http/multipart"
 	"service-core/internal/modules/product/usecase"
+
+	"github.com/google/uuid"
 )
 
 type ProductHandler struct {
 	findProducts    *usecase.FindProductsUsecase
 	getProduct      *usecase.GetProductUsecase
-	createProduct   *usecase.CreateProductUsecase
+	saveProduct     *usecase.SaveProductUsecase
+	deleteProduct   *usecase.DeleteProductUsecase
 	addProductImage *usecase.AddProductImagesUsecase
 }
 
 func NewProductHandler(
 	findProducts *usecase.FindProductsUsecase,
 	getProduct *usecase.GetProductUsecase,
-	createProduct *usecase.CreateProductUsecase,
+	saveProduct *usecase.SaveProductUsecase,
+	deleteProduct *usecase.DeleteProductUsecase,
 	addProductImage *usecase.AddProductImagesUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
 		findProducts:    findProducts,
 		getProduct:      getProduct,
-		createProduct:   createProduct,
+		saveProduct:     saveProduct,
+		deleteProduct:   deleteProduct,
 		addProductImage: addProductImage,
 	}
 }
@@ -203,8 +208,8 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) error {
-	var req createProductRequest
+func (h *ProductHandler) SaveProduct(w http.ResponseWriter, r *http.Request) error {
+	var req saveProductRequest
 
 	if err := apphttp.DecodeJSON(r, &req); err != nil {
 		return apperrors.NewBadRequest("invalid request body")
@@ -223,7 +228,17 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		return apperrors.NewBadRequest("invalid status")
 	}
 
-	input := usecase.CreateProductInput{
+	var productID *uuid.UUID
+	if req.ID != nil && *req.ID != "" {
+		parsed, err := uuid.Parse(*req.ID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid product id")
+		}
+		productID = &parsed
+	}
+
+	input := usecase.SaveProductInput{
+		ID:          productID,
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
@@ -232,13 +247,13 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) e
 		Weight:      req.Weight,
 	}
 
-	err := h.createProduct.Execute(r.Context(), input)
+	err := h.saveProduct.Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
 
 	response := map[string]string{
-		"message": "product successfully created",
+		"message": "product successfully saved",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)
@@ -273,10 +288,14 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	productSlug := apphttp.Param(r, "slug")
+	productID, err := apphttp.ParamUUID(r, "id")
+	if err != nil {
+		return apperrors.NewBadRequest(err.Error())
+	}
+
 	input := usecase.AddProductImageInput{
-		ProductSlug: productSlug,
-		Images:      images,
+		ProductID: productID,
+		Images:    images,
 	}
 
 	err = h.addProductImage.Execute(r.Context(), input)
@@ -286,6 +305,25 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 
 	response := map[string]string{
 		"message": "product image successfully added",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) error {
+	productID, err := apphttp.ParamUUID(r, "id")
+	if err != nil {
+		return apperrors.NewBadRequest(err.Error())
+	}
+
+	err = h.deleteProduct.Execute(r.Context(), productID)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "product successfully deleted",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

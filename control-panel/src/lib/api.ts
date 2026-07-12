@@ -3,10 +3,11 @@ export const API_BASE_URL = '/api/core';
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
+  const headers: Record<string, string> = {};
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  Object.assign(headers, options.headers);
 
   const executeFetch = () => fetch(url, {
     ...options,

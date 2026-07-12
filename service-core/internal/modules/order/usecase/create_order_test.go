@@ -340,6 +340,12 @@ func (m *coMockInventoryRepo) Release(_ context.Context, _ transaction.Executor,
 func (m *coMockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
 	return nil
 }
+func (m *coMockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
+	return nil
+}
+func (m *coMockInventoryRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID) error {
+	return nil
+}
 
 // --- cart repo ---
 

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Package, Search, Plus, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Package, Search, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
-import { Label } from '../../components/ui/label';
+
 import {
   Table,
   TableBody,
@@ -14,65 +14,42 @@ import {
 } from '../../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetClose,
-} from '../../components/ui/sheet';
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '../../components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
-import { useNavigate } from 'react-router-dom';
+
 import { fetchApi } from '../../lib/api';
+import ProductFormSheet from '../../components/products/ProductFormSheet';
 
 export default function ProductsPage() {
   const { data, loading, error, refresh } = useProductsViewModel();
-  const navigate = useNavigate();
 
-  // Sheet form states
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [isAddInventoryOpen, setIsAddInventoryOpen] = useState(false);
-  const [shops, setShops] = useState<any[]>([]);
-  const [selectedShopId, setSelectedShopId] = useState('');
-  const [stock, setStock] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
-  // Load shops on Sheet open
-  useEffect(() => {
-    if (isAddInventoryOpen) {
-      const loadShops = async () => {
-        try {
-          const res = await fetchApi('/shops');
-          setShops(res.shops || []);
-        } catch (err: any) {
-          console.error('Failed to load shops', err);
-        }
-      };
-      loadShops();
-    }
-  }, [isAddInventoryOpen]);
+  // Product Form Sheet states
+  const [isProductSheetOpen, setIsProductSheetOpen] = useState(false);
+  const [activeProductSlug, setActiveProductSlug] = useState<string | undefined>(undefined);
 
-  const handleAddInventory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedProduct || !selectedShopId || !stock) return;
+  const [productToDelete, setProductToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    setIsSubmitting(true);
-    setFormError(null);
-
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
     try {
-      await fetchApi(`/shops/${selectedShopId}/products/${selectedProduct.id}/inventories`, {
-        method: 'POST',
-        body: JSON.stringify({ stock: Number(stock) }),
+      await fetchApi(`/products/id/${productToDelete.id}`, {
+        method: 'DELETE',
       });
-      setIsAddInventoryOpen(false);
-      setSelectedShopId('');
-      setStock('');
+      setProductToDelete(null);
       refresh();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to add inventory');
+      alert(err.message || 'Failed to delete product');
     } finally {
-      setIsSubmitting(false);
+      setIsDeleting(false);
     }
   };
 
@@ -111,7 +88,7 @@ export default function ProductsPage() {
               <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
-            <Button onClick={() => navigate('/products/create')}>
+            <Button onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" /> Add Product
             </Button>
           </div>
@@ -207,16 +184,33 @@ export default function ProductsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setIsAddInventoryOpen(true);
-                            }}
-                          >
-                            <Plus className="mr-1 h-3.5 w-3.5" /> Add Inventory
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-md p-1 min-w-[150px]">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setActiveProductSlug(product.slug);
+                                  setIsProductSheetOpen(true);
+                                }}
+                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-slate-50 rounded"
+                              >
+                                <Edit className="h-4 w-4 text-slate-500" />
+                                <span>Edit Product</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-slate-100 my-1" />
+                              <DropdownMenuItem
+                                onClick={() => setProductToDelete(product)}
+                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-red-50 text-red-600 rounded"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <span>Delete Product</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
@@ -228,68 +222,42 @@ export default function ProductsPage() {
         </Card>
       </div>
 
-      {/* Add Inventory Sheet */}
-      <Sheet open={isAddInventoryOpen} onOpenChange={setIsAddInventoryOpen}>
-        <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader className="mb-4">
-            <SheetTitle>Add Inventory</SheetTitle>
-            <SheetDescription>
-              Assign new inventory stock to a shop location for <strong>{selectedProduct?.name}</strong>.
-            </SheetDescription>
-          </SheetHeader>
+      {/* Product Form Sheet (Add / Edit) */}
+      <ProductFormSheet
+        open={isProductSheetOpen}
+        onOpenChange={setIsProductSheetOpen}
+        productSlug={activeProductSlug}
+        onSuccess={refresh}
+      />
 
-          {formError && (
-            <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100 mb-4">
-              {formError}
-            </div>
-          )}
-
-          <form onSubmit={handleAddInventory} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shop">Select Shop</Label>
-              <select
-                id="shop"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                value={selectedShopId}
-                onChange={(e) => setSelectedShopId(e.target.value)}
-                required
-              >
-                <option value="">Select Shop Branch</option>
-                {shops.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="stock">Initial Stock</Label>
-              <Input
-                id="stock"
-                type="number"
-                min="0"
-                placeholder="e.g. 50"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="pt-4 flex justify-end gap-2">
-              <SheetClose asChild>
-                <Button type="button" variant="outline">
-                  Cancel
-                </Button>
-              </SheetClose>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Stock
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription className="py-2">
+              Are you sure you want to permanently delete <strong>{productToDelete?.name}</strong>? All association with inventory and shops will be removed. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => setProductToDelete(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteProduct}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Delete Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
