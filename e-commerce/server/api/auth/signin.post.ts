@@ -4,11 +4,12 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const backendUrl = `${config.public.serviceCoreApiUrl}/auth/signin`
   const body = await readBody(event)
+  const { rememberMe, ...backendBody } = body || {}
 
   try {
     const response = await $fetch.raw(backendUrl, {
       method: 'POST',
-      body,
+      body: backendBody,
       headers: {
         'content-type': 'application/json'
       }
@@ -46,10 +47,18 @@ export default defineEventHandler(async (event) => {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite,
-          expires
+          expires: rememberMe ? expires : undefined
         })
       }
     }
+
+    // Set remember_me cookie for the client
+    setCookie(event, 'remember_me', rememberMe ? 'true' : 'false', {
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: rememberMe ? new Date(Date.now() + 30 * 24 * 3600 * 1000) : undefined
+    })
 
     return data
   } catch (err: any) {

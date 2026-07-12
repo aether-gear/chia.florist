@@ -14,6 +14,7 @@ const authVm = useAuthViewModel()
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const rememberMe = ref(false)
 
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -38,7 +39,7 @@ const handleLogin = async () => {
     const success = await authVm.login({
       email: email.value,
       password: password.value
-    })
+    }, rememberMe.value)
     
     if (success) {
       navigateTo('/')
@@ -60,6 +61,9 @@ const handleLogin = async () => {
 }
 
 const handleGoogleLogin = () => {
+  const rememberMeCookie = useCookie('remember_me')
+  rememberMeCookie.value = rememberMe.value ? 'true' : 'false'
+  
   sessionStorage.setItem('google_auth_pending', '1')
   window.location.href = '/api/auth/google'
 }
@@ -200,8 +204,17 @@ const switchToForgot = () => {
             </button>
           </div>
           
-          <div class="flex justify-end">
-            <button type="button" @click="switchToForgot" class="text-sm text-gray-500 hover:text-black transition-colors focus:outline-none">
+          <div class="flex items-center justify-between text-sm">
+            <label class="flex items-center gap-2 text-gray-500 hover:text-black cursor-pointer select-none transition-colors">
+              <input 
+                type="checkbox" 
+                v-model="rememberMe"
+                class="w-4 h-4 rounded border-gray-300 text-[#1b4332] focus:ring-[#1b4332] accent-[#1b4332]"
+                :disabled="authVm.isLoading.value"
+              />
+              Remember me
+            </label>
+            <button type="button" @click="switchToForgot" class="text-gray-500 hover:text-black transition-colors focus:outline-none">
               Forgot Password?
             </button>
           </div>
