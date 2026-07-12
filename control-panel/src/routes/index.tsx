@@ -10,8 +10,7 @@ import MerchantProfileSettings from '../pages/merchant-profile/MerchantProfileSe
 import CreateMerchantPage from '../pages/admin/CreateMerchantPage';
 import AddMerchantAccountPage from '../pages/admin/AddMerchantAccountPage';
 import ProductsPage from '../pages/dashboard/ProductsPage';
-import CreateProductPage from '../pages/products/CreateProductPage';
-import EditProductPage from '../pages/products/EditProductPage';
+
 import MerchantsListPage from '../pages/admin/MerchantsListPage';
 import CustomersListPage from '../pages/admin/CustomersListPage';
 import ShopManagementPage from '../pages/shop/ShopManagementPage';
@@ -33,8 +32,7 @@ export default function AppRoutes() {
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/shop" element={<ShopManagementPage />} />
             <Route path="/products" element={<ProductsPage />} />
-            <Route path="/products/create" element={<CreateProductPage />} />
-            <Route path="/products/:slug/edit" element={<EditProductPage />} />
+
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/shipments" element={<PlaceholderPage title="Shipments" />} />
             <Route path="/merchant/settings" element={<MerchantProfileSettings />} />
