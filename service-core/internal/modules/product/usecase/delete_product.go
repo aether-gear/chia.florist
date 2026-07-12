@@ -7,6 +7,8 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/product/repository"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
 )
 
 type DeleteProductUsecase struct {
@@ -26,11 +28,11 @@ func NewDeleteProductUsecase(
 
 func (u *DeleteProductUsecase) Execute(
 	ctx context.Context,
-	slug string,
+	id uuid.UUID,
 ) error {
 	product, err := u.productRepo.
-		GetBySlug(ctx, u.executor,
-			slug,
+		GetByID(ctx, u.executor,
+			id,
 		)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve product: %w", err)

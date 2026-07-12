@@ -288,10 +288,14 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	productSlug := apphttp.Param(r, "slug")
+	productID, err := apphttp.ParamUUID(r, "id")
+	if err != nil {
+		return apperrors.NewBadRequest(err.Error())
+	}
+
 	input := usecase.AddProductImageInput{
-		ProductSlug: productSlug,
-		Images:      images,
+		ProductID: productID,
+		Images:    images,
 	}
 
 	err = h.addProductImage.Execute(r.Context(), input)
@@ -308,9 +312,12 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 }
 
 func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) error {
-	productSlug := apphttp.Param(r, "slug")
+	productID, err := apphttp.ParamUUID(r, "id")
+	if err != nil {
+		return apperrors.NewBadRequest(err.Error())
+	}
 
-	err := h.deleteProduct.Execute(r.Context(), productSlug)
+	err = h.deleteProduct.Execute(r.Context(), productID)
 	if err != nil {
 		return err
 	}

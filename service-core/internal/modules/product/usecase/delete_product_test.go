@@ -25,10 +25,10 @@ type mockDeleteProductRepository struct {
 	deleteErr   error
 }
 
-func (m *mockDeleteProductRepository) GetBySlug(
+func (m *mockDeleteProductRepository) GetByID(
 	ctx context.Context,
 	exec transaction.Executor,
-	slug string,
+	id uuid.UUID,
 ) (*domain.Product, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
@@ -36,7 +36,7 @@ func (m *mockDeleteProductRepository) GetBySlug(
 	return m.product, nil
 }
 
-func (m *mockDeleteProductRepository) DeleteProduct(
+func (m *mockDeleteProductRepository) Delete(
 	ctx context.Context,
 	exec transaction.Executor,
 	id uuid.UUID,
@@ -67,13 +67,13 @@ func TestDeleteProduct_Success(t *testing.T) {
 
 	uc := NewDeleteProductUsecase(repo, exec)
 
-	err := uc.Execute(ctx, "test-product")
+	err := uc.Execute(ctx, productID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if repo.deleteCalls != 1 {
-		t.Errorf("expected DeleteProduct to be called 1 time, got %d", repo.deleteCalls)
+		t.Errorf("expected Delete to be called 1 time, got %d", repo.deleteCalls)
 	}
 }
 
@@ -86,7 +86,7 @@ func TestDeleteProduct_NotFound(t *testing.T) {
 
 	uc := NewDeleteProductUsecase(repo, exec)
 
-	err := uc.Execute(ctx, "non-existent-product")
+	err := uc.Execute(ctx, uuid.New())
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -111,13 +111,13 @@ func TestDeleteProduct_AlreadyDeleted(t *testing.T) {
 
 	uc := NewDeleteProductUsecase(repo, exec)
 
-	err := uc.Execute(ctx, "test-product")
+	err := uc.Execute(ctx, productID)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 
 	if repo.deleteCalls != 0 {
-		t.Errorf("expected DeleteProduct not to be called, but got %d calls", repo.deleteCalls)
+		t.Errorf("expected Delete not to be called, but got %d calls", repo.deleteCalls)
 	}
 }
 
@@ -131,7 +131,7 @@ func TestDeleteProduct_RepoErrorOnGet(t *testing.T) {
 
 	uc := NewDeleteProductUsecase(repo, exec)
 
-	err := uc.Execute(ctx, "test-product")
+	err := uc.Execute(ctx, uuid.New())
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error '%v', got '%v'", expectedErr, err)
 	}
@@ -157,7 +157,7 @@ func TestDeleteProduct_RepoErrorOnDelete(t *testing.T) {
 
 	uc := NewDeleteProductUsecase(repo, exec)
 
-	err := uc.Execute(ctx, "test-product")
+	err := uc.Execute(ctx, productID)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error '%v', got '%v'", expectedErr, err)
 	}

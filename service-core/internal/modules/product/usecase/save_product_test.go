@@ -22,7 +22,7 @@ type mockProductRepository struct {
 	saveErr      error
 }
 
-func (m *mockProductRepository) SaveProduct(
+func (m *mockProductRepository) Save(
 	ctx context.Context,
 	exec transaction.Executor,
 	product *domain.Product,
