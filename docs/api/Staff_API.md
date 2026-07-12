@@ -29,6 +29,9 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Get Current User
     - [x] Update User
 - [x] Staff Admin API
+  - [ ] Products Management
+      - [ ] Update Product
+      - [ ] Delete Product
   - [x] Staff Management
     - [x] Create Staff
     - [x] Add Staff Account
@@ -704,6 +707,100 @@ Authentication is handled via a session cookie set at sign-in.
 # Staff Admin API
 
 These endpoints require a valid staff session with the **staff admin** role.
+
+## Products Management
+
+### Save Product
+
+- **Method**: `POST`
+- **Endpoint**: `/products`
+- **Description**: Create a new product or update an existing product owned by the authenticated staff. Omit `id` to create; supply `id` to update.
+- **Authentication**: Staff (any role)
+- **Request Body**:
+
+  ```json
+  {
+    "id":           "string (UUID, optional — omit to create, supply to update)",
+    "sku":          "string (required)",
+    "name":         "string (required)",
+    "description":  "string (optional)",
+    "is_available": "bool (required)",
+    "status":       "string (optional): active, inactive or archived",
+    "price":        "int (required)",
+    "weight":       "float (optional)"
+  }
+  ```
+
+#### Response `200 OK`
+
+```json
+{ "message": "product successfully saved" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `name` or `sku` is empty, `id` is not a valid UUID, or `status` is invalid. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not hold a staff role. |
+
+### Add Product Image
+
+- **Method**: `POST`
+- **Endpoint**: `/products/id/{id}/images`
+- **Description**: Add an image to a product by product ID.
+- **Authentication**: Staff (any role)
+- **Request Multi-part**: Yes
+- **Request Body**:
+
+  ```json
+  {
+    "image": "file (required)"
+  }
+  ```
+
+#### Response `200 OK`
+
+```json
+{ "message": "product image successfully added" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `image` is not a valid file. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not hold a staff role. |
+| `404 Not Found`    | No product with the given `id` exists. |
+
+#### Delete Product
+
+- **Method**: `DELETE`
+- **Endpoint**: `/products/id/{id}`
+- **Description**: Permanently remove a product by ID.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+##### Path Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | string | Yes      | The product ID to delete. |
+
+##### Response `204 No Content`
+
+Empty body.
+
+##### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `id` path parameter is missing. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No product with the given `id` exists. |
 
 ## Staff Management
 
