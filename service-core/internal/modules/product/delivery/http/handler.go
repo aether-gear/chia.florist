@@ -17,6 +17,7 @@ type ProductHandler struct {
 	findProducts    *usecase.FindProductsUsecase
 	getProduct      *usecase.GetProductUsecase
 	saveProduct     *usecase.SaveProductUsecase
+	deleteProduct   *usecase.DeleteProductUsecase
 	addProductImage *usecase.AddProductImagesUsecase
 }
 
@@ -24,12 +25,14 @@ func NewProductHandler(
 	findProducts *usecase.FindProductsUsecase,
 	getProduct *usecase.GetProductUsecase,
 	saveProduct *usecase.SaveProductUsecase,
+	deleteProduct *usecase.DeleteProductUsecase,
 	addProductImage *usecase.AddProductImagesUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
 		findProducts:    findProducts,
 		getProduct:      getProduct,
 		saveProduct:     saveProduct,
+		deleteProduct:   deleteProduct,
 		addProductImage: addProductImage,
 	}
 }
@@ -298,6 +301,22 @@ func (h *ProductHandler) AddProductImages(w http.ResponseWriter, r *http.Request
 
 	response := map[string]string{
 		"message": "product image successfully added",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) error {
+	productSlug := apphttp.Param(r, "slug")
+
+	err := h.deleteProduct.Execute(r.Context(), productSlug)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "product successfully deleted",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

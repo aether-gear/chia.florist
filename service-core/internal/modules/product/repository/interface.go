@@ -45,6 +45,12 @@ type ProductRepository interface {
 		exec transaction.Executor,
 		product *domain.Product,
 	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
 }
 
 type ProductImageRepository interface {

@@ -604,3 +604,25 @@ func (r *productRepositoryImpl) Save(
 
 	return nil
 }
+
+func (r *productRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
+	query := `
+		UPDATE products
+		SET
+			deleted_at = NOW()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete product failed: %w", err)
+	}
+
+	return nil
+}
