@@ -32,7 +32,7 @@ func (h *InventoryHandler) AddInventory(w http.ResponseWriter, r *http.Request) 
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	shopID, err := apphttp.ParamUUID(r, "id")
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
@@ -68,7 +68,7 @@ func (h *InventoryHandler) UpdateInventory(w http.ResponseWriter, r *http.Reques
 		return apperrors.NewBadRequest("invalid request body")
 	}
 
-	shopID, err := apphttp.ParamUUID(r, "id")
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
@@ -99,7 +99,7 @@ func (h *InventoryHandler) UpdateInventory(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *InventoryHandler) RemoveInventory(w http.ResponseWriter, r *http.Request) error {
-	shopID, err := apphttp.ParamUUID(r, "id")
+	shopID, err := apphttp.ParamUUID(r, "shopID")
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
