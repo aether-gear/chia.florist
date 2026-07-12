@@ -18,6 +18,15 @@ export const useAuthViewModel = () => {
   const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
   const isInitialized = useState<boolean>('auth_isInitialized', () => false)
 
+  const getCookieOptions = () => {
+    const rememberMeCookie = useCookie('remember_me')
+    const isRemembered = rememberMeCookie.value === 'true'
+    return {
+      path: '/',
+      expires: isRemembered ? new Date(Date.now() + 30 * 24 * 3600 * 1000) : undefined
+    }
+  }
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isAuthenticated = computed(() => currentUser.value !== null)
@@ -31,8 +40,8 @@ export const useAuthViewModel = () => {
     try {
       const response = await authService.getMe(cookieHeader)
       if (response && response.is_authenticated) {
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
-        const isLoggedIn = useCookie('is_logged_in')
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         
         isLoggedIn.value = 'true'
 
@@ -89,8 +98,8 @@ export const useAuthViewModel = () => {
         currentUser.value = { ...(userProfile.value as UserMe) }
       } else {
         currentUser.value = null
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
-        const isLoggedIn = useCookie('is_logged_in')
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         userProfile.value = null
         isLoggedIn.value = null
         if (response && response.message) {
@@ -99,8 +108,8 @@ export const useAuthViewModel = () => {
       }
     } catch (err: any) {
       currentUser.value = null
-      const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
-      const isLoggedIn = useCookie('is_logged_in')
+      const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+      const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
       userProfile.value = null
       isLoggedIn.value = null
       error.value = err.data?.message || err.message || 'Failed to fetch user state'
@@ -114,12 +123,23 @@ export const useAuthViewModel = () => {
   /**
    * Authenticate user.
    */
-  const login = async (credentials: SignInRequest) => {
+  const login = async (credentials: SignInRequest, rememberMe: boolean = false) => {
     isLoading.value = true
     error.value = null
     
     try {
-      const response = await authService.signIn(credentials)
+      if (import.meta.client) {
+        const rememberMeCookie = useCookie('remember_me', {
+          path: '/',
+          expires: rememberMe ? new Date(Date.now() + 30 * 24 * 3600 * 1000) : undefined
+        })
+        rememberMeCookie.value = rememberMe ? 'true' : 'false'
+      }
+
+      const response = await authService.signIn({
+        ...credentials,
+        rememberMe
+      })
       if (response.message === 'login success') {
         if (import.meta.client) {
           localStorage.removeItem('chia-florist-cart-cache')
@@ -134,7 +154,7 @@ export const useAuthViewModel = () => {
           throw new Error(errMsg)
         }
 
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
         userProfile.value = {
           id: currentUser.value?.id || 'temp-id',
           name: credentials.email.split('@')[0],
@@ -144,7 +164,7 @@ export const useAuthViewModel = () => {
           last_login_at: new Date().toISOString()
         }
         
-        const isLoggedIn = useCookie('is_logged_in')
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
         
         currentUser.value = userProfile.value as UserMe
@@ -184,7 +204,7 @@ export const useAuthViewModel = () => {
           throw new Error(errMsg)
         }
 
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
         // In fetchCurrentUser it should have been updated by getProfile, 
         // but just in case we provide a default state:
         userProfile.value = {
@@ -196,7 +216,7 @@ export const useAuthViewModel = () => {
           last_login_at: new Date().toISOString()
         }
         
-        const isLoggedIn = useCookie('is_logged_in')
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
         
         currentUser.value = userProfile.value as UserMe
@@ -300,7 +320,7 @@ export const useAuthViewModel = () => {
           throw new Error(errMsg)
         }
 
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
         userProfile.value = {
           id: currentUser.value?.id || 'temp-id',
           name,
@@ -309,7 +329,7 @@ export const useAuthViewModel = () => {
           phone,
           last_login_at: new Date().toISOString()
         }
-        const isLoggedIn = useCookie('is_logged_in')
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
         currentUser.value = { ...(userProfile.value as UserMe) }
         triggerAuthAlert('success', `Verification successful! Welcome to Chia Florist, ${name}.`)
@@ -334,6 +354,8 @@ export const useAuthViewModel = () => {
     isLoggedIn.value = null
     const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
     userProfile.value = null
+    const rememberMeCookie = useCookie('remember_me')
+    rememberMeCookie.value = null
     if (import.meta.client) {
       localStorage.removeItem('auth_challenge_id')
       localStorage.removeItem('register_email')

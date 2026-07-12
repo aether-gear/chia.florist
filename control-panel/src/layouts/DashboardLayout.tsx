@@ -80,11 +80,13 @@ export default function DashboardLayout() {
     } finally {
       localStorage.removeItem('isAuthenticated');
       localStorage.removeItem('userEmail');
+      sessionStorage.removeItem('isAuthenticated');
+      sessionStorage.removeItem('userEmail');
       navigate('/login');
     }
   };
 
-  const userEmail = localStorage.getItem('userEmail') || '';
+  const userEmail = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
 
   const renderProfileDropdown = () => {
     const fallbackInitials = staffProfile?.Name

@@ -29,6 +29,7 @@ export interface SignInRequest {
   password: string
   user_agent?: string
   ip_address?: string
+  rememberMe?: boolean
 }
 
 export interface SignInResponse {

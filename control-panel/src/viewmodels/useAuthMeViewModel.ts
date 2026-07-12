@@ -26,7 +26,7 @@ export function useAuthMeViewModel() {
   const [error, setError] = useState<string | null>(null);
 
   // Determine admin status from stored email
-  const storedEmail = localStorage.getItem('userEmail') || '';
+  const storedEmail = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
   const isAdmin = ADMIN_EMAILS.includes(storedEmail.toLowerCase().trim());
 
   useEffect(() => {
