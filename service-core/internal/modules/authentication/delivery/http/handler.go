@@ -172,13 +172,20 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
+		var accessExpiry time.Time
+	var refreshExpiry time.Time
+	if req.RememberMe {
+		accessExpiry = tokens.AccessToken.ExpiresAt
+		refreshExpiry = tokens.RefreshToken.ExpiresAt
+	}
+
 	// Access token is bound to the response cookie
 	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
 		appcookie.CookieAccess,
 		tokens.AccessToken.Token,
-		tokens.AccessToken.ExpiresAt,
+		accessExpiry,
 	)
 
 	// Refresh token is bound to the response cookie
@@ -187,7 +194,7 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		w,
 		appcookie.CookieCustomerRefresh,
 		tokens.RefreshToken.Token,
-		tokens.RefreshToken.ExpiresAt,
+		refreshExpiry,
 	)
 
 	response := map[string]string{
@@ -319,13 +326,20 @@ func (h *authHandler) SignInStaffEmail(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
+		var accessExpiry time.Time
+	var refreshExpiry time.Time
+	if req.RememberMe {
+		accessExpiry = tokens.AccessToken.ExpiresAt
+		refreshExpiry = tokens.RefreshToken.ExpiresAt
+	}
+
 	// Access token is bound to the response cookie
 	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
 		appcookie.CookieStaff,
 		tokens.AccessToken.Token,
-		tokens.AccessToken.ExpiresAt,
+		accessExpiry,
 	)
 
 	// Refresh token is bound to the response cookie
@@ -334,7 +348,7 @@ func (h *authHandler) SignInStaffEmail(w http.ResponseWriter, r *http.Request) e
 		w,
 		appcookie.CookieStaffRefresh,
 		tokens.RefreshToken.Token,
-		tokens.RefreshToken.ExpiresAt,
+		refreshExpiry,
 	)
 
 	response := map[string]string{

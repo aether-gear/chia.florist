@@ -20,10 +20,11 @@ type verifyAccountRequest struct {
 }
 
 type signInEmailRequest struct {
-	UserAgent *string `json:"user_agent"`
-	IPAddress *string `json:"ip_address"`
-	Email     string  `json:"email"`
-	Password  string  `json:"password"`
+	UserAgent  *string `json:"user_agent"`
+	IPAddress  *string `json:"ip_address"`
+	Email      string  `json:"email"`
+	Password   string  `json:"password"`
+	RememberMe bool    `json:"remember_me"`
 }
 
 type signInUsernameRequest struct {
