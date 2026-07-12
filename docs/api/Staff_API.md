@@ -31,9 +31,9 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Get Current User
     - [x] Update User
 - [x] Staff Admin API
-  - [ ] Products Management
-      - [ ] Update Product
-      - [ ] Delete Product
+  - [x] Products Management
+      - [x] Update Product
+      - [x] Delete Product
   - [x] Staff Management
     - [x] Create Staff
     - [x] Add Staff Account

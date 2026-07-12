@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { History, Search, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, Eye, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
 import { Label } from '../../components/ui/label';
+import { Badge } from '../../components/ui/badge';
 import {
   Table,
   TableBody,
@@ -16,6 +16,11 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { useAuditLogsViewModel } from '../../viewmodels/useAuditLogsViewModel';
 import type { AuditLog } from '../../models/AuditLog';
+import LoadingState from '../../components/LoadingState';
+import EmptyState from '../../components/EmptyState';
+import SearchInput from '../../components/SearchInput';
+import StatusBadge from '../../components/StatusBadge';
+import Pagination from '../../components/Pagination';
 
 export default function AuditLogsPage() {
   const {
@@ -93,36 +98,30 @@ export default function AuditLogsPage() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
               <div className="space-y-1">
                 <Label htmlFor="action-filter" className="text-xs font-semibold text-slate-500">Action Name</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="action-filter"
-                    placeholder="e.g. signin, save_shop"
-                    className="pl-8 text-sm"
-                    value={actionFilter}
-                    onChange={(e) => {
-                      setActionFilter(e.target.value);
-                      setPage(1);
-                    }}
-                  />
-                </div>
+                <SearchInput
+                  id="action-filter"
+                  placeholder="e.g. signin, save_shop"
+                  className="relative w-full"
+                  value={actionFilter}
+                  onChange={(val) => {
+                    setActionFilter(val);
+                    setPage(1);
+                  }}
+                />
               </div>
 
               <div className="space-y-1">
                 <Label htmlFor="user-filter" className="text-xs font-semibold text-slate-500">User / Actor ID</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="user-filter"
-                    placeholder="UUID of the actor"
-                    className="pl-8 text-sm"
-                    value={userIdFilter}
-                    onChange={(e) => {
-                      setUserIdFilter(e.target.value);
-                      setPage(1);
-                    }}
-                  />
-                </div>
+                <SearchInput
+                  id="user-filter"
+                  placeholder="UUID of the actor"
+                  className="relative w-full"
+                  value={userIdFilter}
+                  onChange={(val) => {
+                    setUserIdFilter(val);
+                    setPage(1);
+                  }}
+                />
               </div>
 
               <div className="space-y-1">
@@ -160,15 +159,15 @@ export default function AuditLogsPage() {
         <Card className="shadow-md border-0 bg-white/70 backdrop-blur-md">
           <CardContent className="p-0">
             {error ? (
-              <div className="flex h-48 flex-col items-center justify-center p-4">
-                <p className="text-destructive font-medium mb-1">Failed to load audit logs</p>
-                <p className="text-xs text-slate-500">{error}</p>
-                <Button size="sm" onClick={() => refresh()} className="mt-4 bg-indigo-600">Retry</Button>
-              </div>
+              <EmptyState
+                title="Failed to load audit logs"
+                description={error}
+                actionLabel="Retry"
+                onAction={() => refresh()}
+                className="flex h-48 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent"
+              />
             ) : loading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-              </div>
+              <LoadingState message="Loading audit logs..." className="flex h-64 flex-col items-center justify-center gap-2" />
             ) : (
               <div className="rounded-md border border-slate-100 overflow-hidden">
                 <Table>
@@ -202,8 +201,13 @@ export default function AuditLogsPage() {
                   <TableBody>
                     {logs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center h-48 text-slate-400">
-                          No audit logs found matching your criteria.
+                        <TableCell colSpan={7} className="p-0">
+                          <EmptyState
+                            icon={<History className="h-8 w-8 mb-2 mx-auto text-slate-400" />}
+                            title="No audit logs found"
+                            description="No audit logs found matching your criteria."
+                            className="flex h-48 flex-col items-center justify-center text-center p-4 gap-1.5 border-0 bg-transparent"
+                          />
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -228,15 +232,7 @@ export default function AuditLogsPage() {
                             {log.actor_id}
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge
-                              className={
-                                log.outcome === 'success'
-                                  ? 'bg-emerald-100 text-emerald-800 border-0'
-                                  : 'bg-rose-100 text-rose-800 border-0'
-                              }
-                            >
-                              {log.outcome}
-                            </Badge>
+                            <StatusBadge status={log.outcome} />
                           </TableCell>
                           <TableCell className="text-slate-600 text-xs font-mono">
                             {log.client_ip}
@@ -259,37 +255,15 @@ export default function AuditLogsPage() {
               </div>
             )}
 
-            {/* Pagination Panel */}
-            {!loading && !error && totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-100 p-4">
-                <p className="text-sm text-slate-500">
-                  Showing page <span className="font-semibold text-slate-800">{page}</span> of{' '}
-                  <span className="font-semibold text-slate-800">{totalPages}</span> ({total} logs)
-                </p>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="border-slate-200"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="border-slate-200"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={total}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="logs"
+              className="flex items-center justify-between border-t border-slate-100 p-4"
+            />
           </CardContent>
         </Card>
       </div>
@@ -318,15 +292,7 @@ export default function AuditLogsPage() {
                   </div>
                   <div>
                     <span className="block text-xs font-semibold text-slate-400">OUTCOME</span>
-                    <Badge
-                      className={
-                        selectedLog.outcome === 'success'
-                          ? 'bg-emerald-100 text-emerald-800 border-0 font-bold uppercase mt-1'
-                          : 'bg-rose-100 text-rose-800 border-0 font-bold uppercase mt-1'
-                      }
-                    >
-                      {selectedLog.outcome}
-                    </Badge>
+                    <StatusBadge status={selectedLog.outcome} className="mt-1" />
                   </div>
                 </div>
 
@@ -375,3 +341,4 @@ export default function AuditLogsPage() {
     </div>
   );
 }
+

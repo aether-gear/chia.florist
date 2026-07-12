@@ -1,7 +1,9 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	apperrors "service-core/internal/common/errors"
@@ -162,6 +164,8 @@ func (h *auditHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) error
 }
 
 func (h *auditHandler) DeleteAuditLogs(w http.ResponseWriter, r *http.Request) error {
+	fmt.Printf("[DEBUG] DeleteAuditLogs hit: Method=%s URL=%s ContentLength=%d Query=%+v\n", r.Method, r.URL.String(), r.ContentLength, r.URL.Query())
+
 	var input usecase.DeleteAuditLogsInput
 	var msg string
 
@@ -175,29 +179,53 @@ func (h *auditHandler) DeleteAuditLogs(w http.ResponseWriter, r *http.Request) e
 		input.IDs = []uuid.UUID{id}
 		msg = "audit log deleted successfully"
 	} else {
-		var req deleteAuditLogsRequest
-		if err := apphttp.DecodeJSON(r, &req); err != nil {
-			return apperrors.NewBadRequest("invalid body request")
-		}
+		allQuery := r.URL.Query().Get("all") == "true"
+		idsQuery := r.URL.Query().Get("ids")
 
-		switch {
-		case req.All:
+		if allQuery {
 			input.DeleteAll = true
 			msg = "all audit logs deleted successfully"
-
-		case len(req.IDs) == 0:
-			return apperrors.NewBadRequest("no valid audit log IDs provided for deletion")
-
-		default:
-			input.IDs = req.IDs
+		} else if idsQuery != "" {
+			parts := strings.Split(idsQuery, ",")
+			var ids []uuid.UUID
+			for _, part := range parts {
+				parsed, err := uuid.Parse(strings.TrimSpace(part))
+				if err == nil {
+					ids = append(ids, parsed)
+				}
+			}
+			if len(ids) == 0 {
+				return apperrors.NewBadRequest("no valid audit log IDs provided in query")
+			}
+			input.IDs = ids
 			msg = "audit logs deleted successfully"
+		} else {
+			if r.ContentLength > 0 {
+				var req deleteAuditLogsRequest
+				if err := apphttp.DecodeJSON(r, &req); err == nil {
+					switch {
+					case req.All:
+						input.DeleteAll = true
+						msg = "all audit logs deleted successfully"
+					case len(req.IDs) > 0:
+						input.IDs = req.IDs
+						msg = "audit logs deleted successfully"
+					}
+				}
+			}
+
+			if !input.DeleteAll && len(input.IDs) == 0 {
+				return apperrors.NewBadRequest("no valid audit log IDs or query parameters provided for deletion")
+			}
 		}
 	}
 
 	if err := h.deleteAuditLogs.Execute(r.Context(), input); err != nil {
+		fmt.Printf("[DEBUG] DeleteAuditLogs EXECUTE ERROR: %v\n", err)
 		return err
 	}
 
+	fmt.Println("[DEBUG] DeleteAuditLogs completed successfully")
 	apphttp.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": msg,
 	})
