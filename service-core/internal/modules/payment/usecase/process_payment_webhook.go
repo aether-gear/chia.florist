@@ -7,6 +7,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	orderDomain "service-core/internal/modules/order/domain"
@@ -22,10 +23,12 @@ type ProcessPaymentWebhookUsecase struct {
 	paymentRepo      paymentRepo.PaymentRepository
 	paymentAccRepo   paymentRepo.PaymentAccountRepository
 	paymentEventRepo paymentRepo.PaymentEventRepository
+	webhookEventRepo paymentRepo.PaymentWebhookEventRepository
 	orderRepo        orderRepo.OrderRepository
 	orderItemRepo    orderRepo.OrderItemRepository
 	inventoryRepo    inventoryRepo.InventoryRepository
 	paymentGateway   paymentgateway.Provider
+	auditLogger      applogger.AuditLogger
 	transactor       transaction.Transactor
 	executor         transaction.Executor
 }
@@ -34,10 +37,12 @@ func NewProcessPaymentWebhookUsecase(
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentAccRepo paymentRepo.PaymentAccountRepository,
 	paymentEventRepo paymentRepo.PaymentEventRepository,
+	webhookEventRepo paymentRepo.PaymentWebhookEventRepository,
 	orderRepo orderRepo.OrderRepository,
 	orderItemRepo orderRepo.OrderItemRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	paymentGateway paymentgateway.Provider,
+	auditLogger applogger.AuditLogger,
 	transactor transaction.Transactor,
 	executor transaction.Executor,
 ) *ProcessPaymentWebhookUsecase {
@@ -45,10 +50,12 @@ func NewProcessPaymentWebhookUsecase(
 		paymentRepo:      paymentRepo,
 		paymentAccRepo:   paymentAccRepo,
 		paymentEventRepo: paymentEventRepo,
+		webhookEventRepo: webhookEventRepo,
 		orderRepo:        orderRepo,
 		orderItemRepo:    orderItemRepo,
 		inventoryRepo:    inventoryRepo,
 		paymentGateway:   paymentGateway,
+		auditLogger:      auditLogger,
 		transactor:       transactor,
 		executor:         executor,
 	}
@@ -62,8 +69,129 @@ func (u *ProcessPaymentWebhookUsecase) Execute(
 	ctx context.Context,
 	input ProcessPaymentWebhookInput,
 ) error {
+	// Extract idempotency fields from the raw payload
+	//
+	// The system reads order_id and transaction_status directly
+	// from the raw payload before calling ParseNotification
+	// (which hits the Midtrans status API).
+	//
+	// This lets the system persist the event first and
+	// avoid hitting the gateway on duplicate deliveries
+	// the system can detect locally.
+	orderIDStr, _ := input.Payload["order_id"].(string)
+	if orderIDStr == "" {
+		return apperrors.NewBadRequest("missing order_id in webhook payload")
+	}
+
+	txStatus, _ := input.Payload["transaction_status"].(string)
+	if txStatus == "" {
+		return apperrors.NewBadRequest("missing transaction_status in webhook payload")
+	}
+
+	payloadBytes, err := json.Marshal(input.Payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal webhook payload: %w", err)
+	}
+
+	// Persist the raw webhook event (idempotency gate)
+	//
+	// Upsert uses INSERT ... ON CONFLICT DO NOTHING then returns the
+	// canonical row.
+	//
+	// If the same (order_id, transaction_status) has already
+	// been successfully processed, system will short-circuit immediately.
+	webhookEvent := paymentDomain.PaymentWebhookEvent{
+		ID:                uuid.New(),
+		OrderID:           orderIDStr,
+		TransactionStatus: txStatus,
+		Payload:           payloadBytes,
+		Status:            paymentDomain.WebhookEventStatusReceived,
+		ReceivedAt:        time.Now().UTC(),
+	}
+
+	canonicalEvent, err := u.webhookEventRepo.
+		Upsert(ctx, u.executor,
+			webhookEvent,
+		)
+	if err != nil {
+		return fmt.Errorf("failed to persist webhook event: %w", err)
+	}
+
+	if canonicalEvent != nil &&
+		canonicalEvent.Status == paymentDomain.WebhookEventStatusProcessed {
+		return nil
+	}
+
+	// Use the canonical event ID for subsequent status updates
+	// (it may belong to an earlier delivery attempt, not the one just inserted).
+	eventID := canonicalEvent.ID
+
+	// Process the webhook
+	//
+	// Any error here is recorded on the persisted event and
+	// re-surfaced to the caller
+	// (non-2xx → Midtrans will retry delivery).
+	if err := u.process(ctx, input.Payload); err != nil {
+		// MarkFailed and the audit log are intentionally
+		// outside the main transaction so they persist
+		// even when the inner tx rolls back.
+		_ = u.webhookEventRepo.MarkFailed(ctx, u.executor,
+			eventID,
+			err.Error(),
+		)
+
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category:   "user_action",
+			Action:     "webhook_processing_failed",
+			Resource:   "payment",
+			ResourceID: orderIDStr,
+			Outcome:    applogger.OutcomeFailure,
+			Metadata: map[string]any{
+				"error":              err.Error(),
+				"transaction_status": txStatus,
+				"webhook_event_id":   eventID.String(),
+			},
+		})
+
+		return err
+	}
+
+	// Stamp the event as processed
+	if err := u.webhookEventRepo.MarkProcessed(ctx,
+		u.executor,
+		eventID,
+	); err != nil {
+		// Non-fatal: the payment itself was updated correctly.
+		//
+		// Log and continue — the event will show as 'received'
+		// but won't be re-processed because the payment status
+		// is no longer 'pending'.
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category:   "user_action",
+			Action:     "webhook_mark_processed_failed",
+			Resource:   "payment",
+			ResourceID: orderIDStr,
+			Outcome:    applogger.OutcomeFailure,
+			Metadata: map[string]any{
+				"error":            err.Error(),
+				"webhook_event_id": eventID.String(),
+			},
+		})
+	}
+
+	return nil
+}
+
+// process contains the core payment-state-machine logic,
+// unchanged from the original implementation.
+//
+// It is called only after the idempotency gate passes.
+func (u *ProcessPaymentWebhookUsecase) process(
+	ctx context.Context,
+	payload map[string]any,
+) error {
 	notifResult, err := u.paymentGateway.
-		ParseNotification(ctx, input.Payload)
+		ParseNotification(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to parse gateway notification: %w", err)
 	}

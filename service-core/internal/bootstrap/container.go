@@ -193,12 +193,13 @@ func NewContainer(cfg Config,
 		userRepo               = userPersistence.NewUserRepositoryImpl()
 		addressRepo            = addressPersistence.NewCustomerAddressRepositoryImpl()
 		addressShopRepo        = addressPersistence.NewShopAddressRepositoryImpl()
-		paymentRepo            = paymentPersistence.NewPaymentRepositoryImpl()
-		paymentAccRepo         = paymentPersistence.NewPaymentAccountRepository()
-		paymentMethodRepo      = paymentPersistence.NewPaymentMethodRepository()
-		paymentEventRepo       = paymentPersistence.NewPaymentEventRepositoryImpl()
-		paymentInstructionRepo = paymentPersistence.NewPaymentInstructionRepositoryImpl()
-		paymentChannelDataRepo = paymentPersistence.NewPaymentChannelDataRepositoryImpl()
+		paymentRepo             = paymentPersistence.NewPaymentRepositoryImpl()
+		paymentAccRepo          = paymentPersistence.NewPaymentAccountRepository()
+		paymentMethodRepo       = paymentPersistence.NewPaymentMethodRepository()
+		paymentEventRepo        = paymentPersistence.NewPaymentEventRepositoryImpl()
+		paymentInstructionRepo  = paymentPersistence.NewPaymentInstructionRepositoryImpl()
+		paymentChannelDataRepo  = paymentPersistence.NewPaymentChannelDataRepositoryImpl()
+		paymentWebhookEventRepo = paymentPersistence.NewPaymentWebhookEventRepositoryImpl()
 		shopRepo               = shopPersistence.NewShopRepositoryImpl()
 		courierRepo            = courierPersistence.NewCourierRepositoryImpl()
 		shopCourierRepo        = courierPersistence.NewShopCourierRepositoryImpl()
@@ -645,10 +646,12 @@ func NewContainer(cfg Config,
 				paymentRepo,
 				paymentAccRepo,
 				paymentEventRepo,
+				paymentWebhookEventRepo,
 				orderRepo,
 				orderItemRepo,
 				inventoryRepo,
 				infra.PaymentGateway,
+				auditLogger,
 				infra.TransactionProvider,
 				infra.TransactionExecutor,
 			),

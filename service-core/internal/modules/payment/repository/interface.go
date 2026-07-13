@@ -181,3 +181,34 @@ type PaymentChannelDataRepository interface {
 		paymentIDs []uuid.UUID,
 	) (map[uuid.UUID]*domain.PaymentChannelData, error)
 }
+
+// PaymentWebhookEventRepository persists inbound gateway webhook payloads
+// and tracks their processing lifecycle for idempotency and auditability.
+type PaymentWebhookEventRepository interface {
+	// Upsert inserts a new event row.
+	// On conflict (order_id, transaction_status) it leaves the existing row
+	// untouched and returns it, so the caller can inspect its current status
+	// before deciding whether to re-process.
+	Upsert(
+		ctx context.Context,
+		exec transaction.Executor,
+		event domain.PaymentWebhookEvent,
+	) (*domain.PaymentWebhookEvent, error)
+
+	// MarkProcessed sets status = 'processed' and stamps processed_at.
+	MarkProcessed(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
+
+	// MarkFailed sets status = 'failed' and records the error string.
+	// The event will be re-attempted on the next webhook delivery from
+	// the gateway for the same (order_id, transaction_status).
+	MarkFailed(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		errMsg string,
+	) error
+}
