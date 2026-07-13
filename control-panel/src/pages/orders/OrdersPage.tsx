@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { PackageOpen, Search, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
 import {
   Table,
   TableBody,
@@ -15,6 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { useOrdersViewModel } from '../../viewmodels/useOrdersViewModel';
 import type { Order } from '../../models/Order';
+import LoadingState from '../../components/LoadingState';
+import EmptyState from '../../components/EmptyState';
+import SearchInput from '../../components/SearchInput';
+import StatusBadge from '../../components/StatusBadge';
+import Pagination from '../../components/Pagination';
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 
 export default function OrdersPage() {
   const {
@@ -53,17 +58,6 @@ export default function OrdersPage() {
     }).format(amount);
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'delivered': return 'default';
-      case 'pending': return 'secondary';
-      case 'cancelled': return 'destructive';
-      case 'processing': return 'default';
-      case 'shipped': return 'default';
-      default: return 'outline';
-    }
-  };
-
   return (
     <div className="flex-col md:flex">
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -85,36 +79,35 @@ export default function OrdersPage() {
           </CardHeader>
           <CardContent>
             <div className="mb-4 flex flex-col sm:flex-row items-center gap-4">
-              <div className="relative flex-1 max-w-sm w-full">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search by Order Number..."
-                  className="pl-8"
-                  value={searchNumber}
-                  onChange={(e) => {
-                    setSearchNumber(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-              <div className="w-full sm:w-auto">
-                <select
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
+              <SearchInput
+                value={searchNumber}
+                onChange={(val) => {
+                  setSearchNumber(val);
+                  setPage(1);
+                }}
+                placeholder="Search by Order Number..."
+              />
+              <div className="w-full sm:w-[180px]">
+                <Select
+                  value={statusFilter || "all"}
+                  onValueChange={(val) => {
+                    setStatusFilter(val === "all" ? "" : val);
                     setPage(1);
                   }}
                 >
-                  <option value="">All Statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="processing">Processing</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button variant="outline" onClick={() => refresh()}>
                 Refresh
@@ -167,23 +160,29 @@ export default function OrdersPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-48 text-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto" />
+                      <TableCell colSpan={5} className="p-0">
+                        <LoadingState message="Loading orders..." className="flex h-48 flex-col items-center justify-center gap-2" />
                       </TableCell>
                     </TableRow>
                   ) : error ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-48 text-center text-destructive">
-                        {error}
+                      <TableCell colSpan={5} className="p-0">
+                        <EmptyState 
+                          title="Failed to load orders" 
+                          description={error} 
+                          className="flex h-48 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent text-destructive"
+                        />
                       </TableCell>
                     </TableRow>
                   ) : !data?.orders || data.orders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-48 text-center">
-                        <div className="flex flex-col items-center justify-center text-muted-foreground">
-                          <PackageOpen className="h-8 w-8 mb-2" />
-                          <p>No orders found matching your criteria.</p>
-                        </div>
+                      <TableCell colSpan={5} className="p-0">
+                        <EmptyState 
+                          icon={<PackageOpen className="h-8 w-8 mb-2 mx-auto text-slate-400" />} 
+                          title="No orders found" 
+                          description="No orders found matching your criteria."
+                          className="flex h-48 flex-col items-center justify-center text-center p-4 gap-1.5 border-0 bg-transparent"
+                        />
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -196,9 +195,7 @@ export default function OrdersPage() {
                           {new Date(order.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusBadgeVariant(order.status) as any}>
-                            {order.status}
-                          </Badge>
+                          <StatusBadge status={order.status} />
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(order.total)}
@@ -220,32 +217,14 @@ export default function OrdersPage() {
               </Table>
             </div>
 
-            {/* Pagination Controls */}
-            {data && data.total > 0 && (
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, data.total)} of {data.total} orders
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => p + 1)}
-                    disabled={page * limit >= data.total}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil((data?.total || 0) / limit)}
+              totalItems={data?.total || 0}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="orders"
+            />
           </CardContent>
         </Card>
       </div>
@@ -258,9 +237,7 @@ export default function OrdersPage() {
               <SheetHeader className="mb-6">
                 <SheetTitle className="flex items-center justify-between">
                   <span>Order {selectedOrder.number}</span>
-                  <Badge variant={getStatusBadgeVariant(selectedOrder.status) as any}>
-                    {selectedOrder.status}
-                  </Badge>
+                  <StatusBadge status={selectedOrder.status} />
                 </SheetTitle>
                 <SheetDescription>
                   Placed on {new Date(selectedOrder.created_at).toLocaleString()}

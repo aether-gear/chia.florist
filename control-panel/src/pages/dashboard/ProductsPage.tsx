@@ -1,9 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Package, Search, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
-
 import {
   Table,
   TableBody,
@@ -22,13 +19,17 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
-
 import { fetchApi } from '../../lib/api';
 import ProductFormSheet from '../../components/products/ProductFormSheet';
+import LoadingState from '../../components/LoadingState';
+import EmptyState from '../../components/EmptyState';
+import SearchInput from '../../components/SearchInput';
+import StatusBadge from '../../components/StatusBadge';
 
 export default function ProductsPage() {
   const { data, loading, error, refresh } = useProductsViewModel();
 
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Product Form Sheet states
   const [isProductSheetOpen, setIsProductSheetOpen] = useState(false);
@@ -36,6 +37,15 @@ export default function ProductsPage() {
 
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const filteredProducts = useMemo(() => {
+    if (!data?.products) return [];
+    return data.products.filter(product =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (product.slug && product.slug.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [data, searchQuery]);
 
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
@@ -54,18 +64,17 @@ export default function ProductsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState message="Loading products..." />;
   }
 
   if (error) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
+      <EmptyState
+        title="Failed to load products"
+        description={error}
+        actionLabel="Retry"
+        onAction={() => refresh()}
+      />
     );
   }
 
@@ -103,14 +112,11 @@ export default function ProductsPage() {
           </CardHeader>
           <CardContent>
             <div className="mb-4 flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search products..."
-                  className="pl-8"
-                />
-              </div>
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search products..."
+              />
             </div>
 
             <div className="rounded-md border">
@@ -127,14 +133,19 @@ export default function ProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {!data?.products || data.products.length === 0 ? (
+                  {filteredProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center">
-                        No products found.
+                      <TableCell colSpan={7} className="p-0">
+                        <EmptyState
+                          icon={<Package className="h-8 w-8 mb-2 mx-auto text-slate-400" />}
+                          title="No products found"
+                          description={searchQuery ? `No products match "${searchQuery}"` : "Try adding a new product to your catalog."}
+                          className="flex h-32 flex-col items-center justify-center text-center p-4 gap-1.5 border-0 bg-transparent"
+                        />
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.products.map((product) => (
+                    filteredProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           <div className="h-10 w-10 overflow-hidden rounded-md border">
@@ -159,17 +170,7 @@ export default function ProductsPage() {
                         </TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              product.status === 'active'
-                                ? 'default'
-                                : product.status === 'archived'
-                                ? 'secondary'
-                                : 'destructive'
-                            }
-                          >
-                            {product.status}
-                          </Badge>
+                          <StatusBadge status={product.status} />
                         </TableCell>
                         <TableCell>
                           {new Intl.NumberFormat('id-ID', {

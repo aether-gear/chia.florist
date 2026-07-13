@@ -9,6 +9,9 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { fetchApi } from '../../lib/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const isPublicIp = (ip: string): boolean => {
   if (!ip) return false;
@@ -222,6 +225,7 @@ export default function SecurityPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [wafSummary, setWafSummary] = useState({ total: 0, blocked: 0, allowed: 0, threatLevel: 'Low' });
   const [threatData, setThreatData] = useState<any[]>([]);
+  const [isConfirmClearLogsOpen, setIsConfirmClearLogsOpen] = useState(false);
 
   const [rules, setRules] = useState<any[]>([]);
   const [ipList, setIpList] = useState<any[]>([]);
@@ -475,9 +479,8 @@ export default function SecurityPage() {
 
     try {
       if (realIds.length > 0) {
-        await fetchApi('/api/stats', {
+        await fetchApi(`/api/stats?ids=${realIds.join(',')}`, {
           method: 'DELETE',
-          body: JSON.stringify({ ids: realIds }),
         });
       }
 
@@ -492,12 +495,14 @@ export default function SecurityPage() {
     }
   };
 
-  const handleClearAllLogs = async () => {
-    if (!window.confirm("Are you sure you want to permanently clear ALL security logs from the database?")) return;
+  const handleClearAllLogs = () => {
+    setIsConfirmClearLogsOpen(true);
+  };
+
+  const executeClearAllLogs = async () => {
     try {
-      await fetchApi('/api/stats', {
+      await fetchApi('/api/stats?all=true', {
         method: 'DELETE',
-        body: JSON.stringify({ all: true })
       });
       setLogs([]);
       setSelectedLogIds({});
@@ -976,11 +981,9 @@ export default function SecurityPage() {
             <CardDescription>Volume of allowed vs blocked requests over time.</CardDescription>
           </div>
           <div className="flex items-center gap-3 mt-4 sm:mt-0">
-            <select
-              className="bg-background text-foreground border border-input rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            <Select
               value={rangeType}
-              onChange={(e) => {
-                const val = e.target.value as any;
+              onValueChange={(val: any) => {
                 setRangeType(val);
                 if (val === 'Today') {
                   setCustomStart("");
@@ -998,9 +1001,14 @@ export default function SecurityPage() {
                 }
               }}
             >
-              <option value="Today">Today (00:00 - 24:00)</option>
-              <option value="Custom">Custom Range</option>
-            </select>
+              <SelectTrigger className="w-[180px] h-9 bg-background text-foreground border border-input">
+                <SelectValue placeholder="Select Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Today">Today (00:00 - 24:00)</SelectItem>
+                <SelectItem value="Custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
             {rangeType === 'Custom' && (
               <div className="flex items-center gap-2">
                 <Input type="datetime-local" className="h-8 text-xs w-[170px]" value={tempStart} onChange={e => setTempStart(e.target.value)} />
@@ -1224,12 +1232,9 @@ export default function SecurityPage() {
               <TableHeader>
                 <TableRow className="bg-slate-50 dark:bg-slate-900/50">
                   <TableHead className="w-[40px]">
-                    <input
-                      type="checkbox"
-                      className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                    <Checkbox
                       checked={ipList.length > 0 && ipList.every(entry => selectedIPs[entry.ip])}
-                      onChange={e => {
-                        const checked = e.target.checked;
+                      onCheckedChange={(checked) => {
                         const updated: Record<string, boolean> = {};
                         if (checked) {
                           ipList.forEach(entry => {
@@ -1255,14 +1260,12 @@ export default function SecurityPage() {
                 {displayedIps.map((entry: any) => (
                   <TableRow key={entry.ip}>
                     <TableCell>
-                      <input
-                        type="checkbox"
-                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                      <Checkbox
                         checked={!!selectedIPs[entry.ip]}
-                        onChange={e => {
+                        onCheckedChange={(checked) => {
                           setSelectedIPs(prev => ({
                             ...prev,
-                            [entry.ip]: e.target.checked
+                            [entry.ip]: !!checked
                           }));
                         }}
                       />
@@ -1316,19 +1319,23 @@ export default function SecurityPage() {
             <div className="flex items-center justify-between border-t pt-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500">Rows per page:</span>
-                <select
-                  className="bg-background text-foreground border border-input rounded-md px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
-                  value={ipRowsPerPage}
-                  onChange={(e) => {
-                    setIpRowsPerPage(Number(e.target.value));
+                <Select
+                  value={String(ipRowsPerPage)}
+                  onValueChange={(val) => {
+                    setIpRowsPerPage(Number(val));
                     setIpCurrentPage(1);
                   }}
                 >
-                  <option value={5}>5 rows</option>
-                  <option value={10}>10 rows</option>
-                  <option value={20}>20 rows</option>
-                  <option value={50}>50 rows</option>
-                </select>
+                  <SelectTrigger className="w-[85px] h-8 text-xs bg-background text-foreground border border-input">
+                    <SelectValue placeholder="5 rows" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 rows</SelectItem>
+                    <SelectItem value="10">10 rows</SelectItem>
+                    <SelectItem value="20">20 rows</SelectItem>
+                    <SelectItem value="50">50 rows</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500">
@@ -1401,14 +1408,12 @@ export default function SecurityPage() {
                         >
                           View
                         </Button>
-                        <Button
-                          size="sm"
-                          variant={rule.enabled ? "outline" : "default"}
-                          className={`h-8 text-xs font-medium ${!rule.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-850"}`}
-                          onClick={() => toggleRule(rule.id, rule.enabled)}
-                        >
-                          {rule.enabled ? "Disable" : "Enable"}
-                        </Button>
+                        <div className="flex items-center justify-center min-w-[56px]">
+                          <Switch
+                            checked={rule.enabled}
+                            onCheckedChange={() => toggleRule(rule.id, rule.enabled)}
+                          />
+                        </div>
                         <Button
                           size="sm"
                           variant="destructive"
@@ -1448,25 +1453,34 @@ export default function SecurityPage() {
               >
                 Clear All Logs
               </Button>
-              <select
-                className="bg-background text-foreground border border-input rounded-md px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+              <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onValueChange={(val) => setStatusFilter(val)}
               >
-                <option value="All">All Status</option>
-                <option value="Passed">Passed</option>
-                <option value="Blocked">Blocked</option>
-              </select>
-              <select
-                className="bg-background text-foreground border border-input rounded-md px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
-                value={rowsPerPage}
-                onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                <SelectTrigger className="w-[110px] h-8 text-xs bg-background text-foreground border border-input">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Status</SelectItem>
+                  <SelectItem value="Passed">Passed</SelectItem>
+                  <SelectItem value="Blocked">Blocked</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={String(rowsPerPage)}
+                onValueChange={(val) => setRowsPerPage(Number(val))}
               >
-                <option value={5}>5 rows</option>
-                <option value={10}>10 rows</option>
-                <option value={20}>20 rows</option>
-                <option value={50}>50 rows</option>
-              </select>
+                <SelectTrigger className="w-[85px] h-8 text-xs bg-background text-foreground border border-input">
+                  <SelectValue placeholder="5 rows" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 rows</SelectItem>
+                  <SelectItem value="10">10 rows</SelectItem>
+                  <SelectItem value="20">20 rows</SelectItem>
+                  <SelectItem value="50">50 rows</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardHeader>
           <CardContent>
@@ -1506,14 +1520,12 @@ export default function SecurityPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[40px]">
-                    <input
-                      type="checkbox"
-                      className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                    <Checkbox
                       checked={displayLogs.length > 0 && displayLogs.every(l => {
                         const logId = l.id || `${l.timestamp}-${l.ip}`;
                         return selectedLogIds[logId];
                       })}
-                      onChange={e => handleSelectAll(e.target.checked)}
+                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     />
                   </TableHead>
                   <TableHead>Time</TableHead>
@@ -1529,11 +1541,9 @@ export default function SecurityPage() {
                   return (
                     <TableRow key={logId}>
                       <TableCell>
-                        <input
-                          type="checkbox"
-                          className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 h-4 w-4 cursor-pointer"
+                        <Checkbox
                           checked={!!selectedLogIds[logId]}
-                          onChange={e => handleSelectLog(logId, e.target.checked)}
+                          onCheckedChange={(checked) => handleSelectLog(logId, !!checked)}
                         />
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
@@ -1860,41 +1870,46 @@ export default function SecurityPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    className="border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    onClick={() => {
-                      setEditRuleDesc(selectedRuleForDetail.description || "");
-                      setEditRulePattern(selectedRuleForDetail.pattern || "");
-                      setEditRuleTags((selectedRuleForDetail.tags || []).join(", "));
-                      setEditRuleImpact(selectedRuleForDetail.impact || "5");
-                      setIsEditingRule(true);
-                    }}
-                  >
-                    Edit Rule
-                  </Button>
-                  <Button
-                    variant={selectedRuleForDetail.enabled ? "outline" : "default"}
-                    className={!selectedRuleForDetail.enabled ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
-                    onClick={() => {
-                      toggleRule(selectedRuleForDetail.id, selectedRuleForDetail.enabled);
-                      setSelectedRuleForDetail((prev: any) => prev ? { ...prev, enabled: !prev.enabled } : null);
-                    }}
-                  >
-                    {selectedRuleForDetail.enabled ? "Disable" : "Enable"}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      handleDeleteRule(selectedRuleForDetail.id);
-                      setSelectedRuleForDetail(null);
-                    }}
-                  >
-                    Delete
-                  </Button>
-                  <Button variant="secondary" onClick={() => setSelectedRuleForDetail(null)}>Close</Button>
+                <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-850 pt-4 mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-750 dark:text-slate-300">Status:</span>
+                    <Switch
+                      checked={selectedRuleForDetail.enabled}
+                      onCheckedChange={() => {
+                        toggleRule(selectedRuleForDetail.id, selectedRuleForDetail.enabled);
+                        setSelectedRuleForDetail((prev: any) => prev ? { ...prev, enabled: !prev.enabled } : null);
+                      }}
+                    />
+                    <span className="text-xs text-slate-500">
+                      {selectedRuleForDetail.enabled ? "Active" : "Disabled"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        setEditRuleDesc(selectedRuleForDetail.description || "");
+                        setEditRulePattern(selectedRuleForDetail.pattern || "");
+                        setEditRuleTags((selectedRuleForDetail.tags || []).join(", "));
+                        setEditRuleImpact(selectedRuleForDetail.impact || "5");
+                        setIsEditingRule(true);
+                      }}
+                    >
+                      Edit Rule
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        handleDeleteRule(selectedRuleForDetail.id);
+                        setSelectedRuleForDetail(null);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
+                <Button variant="secondary" className="w-full mt-2" onClick={() => setSelectedRuleForDetail(null)}>Close</Button>
               </div>
             )
           )}
@@ -1924,17 +1939,21 @@ export default function SecurityPage() {
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-lg border border-slate-100 dark:border-slate-800">
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Access Status</div>
-                    <select
-                      className="bg-background text-foreground border border-input rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring w-full font-medium"
+                    <Select
                       value={editIPStatus}
-                      onChange={(e) => setEditIPStatus(e.target.value)}
+                      onValueChange={(val) => setEditIPStatus(val)}
                     >
-                      <option value="ban">Banned (Blocked)</option>
-                      <option value="whitelist">Whitelisted (Allowed)</option>
-                      <option value="ignore">Muted (No Log)</option>
-                      <option value="banned_muted">Banned & Muted (Block, No Log)</option>
-                      <option value="whitelisted_muted">Whitelisted & Muted (Allow, No Log)</option>
-                    </select>
+                      <SelectTrigger className="w-full h-9 bg-background text-foreground border border-input">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ban">Banned (Blocked)</SelectItem>
+                        <SelectItem value="whitelist">Whitelisted (Allowed)</SelectItem>
+                        <SelectItem value="ignore">Muted (No Log)</SelectItem>
+                        <SelectItem value="banned_muted">Banned & Muted (Block, No Log)</SelectItem>
+                        <SelectItem value="whitelisted_muted">Whitelisted & Muted (Allow, No Log)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Estimated Category</div>
@@ -2200,6 +2219,34 @@ export default function SecurityPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isConfirmClearLogsOpen} onOpenChange={setIsConfirmClearLogsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white">Clear All Security Logs</DialogTitle>
+            <DialogDescription className="mt-2 text-slate-500">
+              Are you sure you want to permanently clear ALL security logs from the database? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmClearLogsOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setIsConfirmClearLogsOpen(false);
+                executeClearAllLogs();
+              }}
+            >
+              Clear Logs
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
