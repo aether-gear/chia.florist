@@ -690,7 +690,8 @@ const handlePlaceOrder = async () => {
       orderId: result.order_id,
       instruction: result.instruction,
       paymentAccount: result.payment_account,
-      total: liveTotalPayment.value
+      total: liveTotalPayment.value,
+      status: 'pending'
     }
     paymentInfoState.value = paymentInfo
     if (import.meta.client) {

@@ -17,6 +17,13 @@ const addressVm = useAddress()
 const activeTab = ref('personal')
 const activeOrderStatus = ref<'pending' | 'processing' | 'shipping' | 'done'>('pending')
 
+const statusLabels = {
+  pending: 'Waiting Payment',
+  processing: 'To Ship',
+  shipping: 'Shipping',
+  done: 'Done'
+}
+
 // Edit address states
 const showAddressForm = ref(false)
 const editingAddress = ref<UserAddress | null>(null)
@@ -737,7 +744,7 @@ const triggerAlert = (message: string) => {
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
             <div class="bg-white border border-gray-100 p-2 rounded-2xl shadow-sm grid grid-cols-4 gap-1 text-center font-medium">
               <button 
-                v-for="status in [{id:'pending', label:'Pending'}, {id:'processing', label:'Processing'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
+                v-for="status in [{id:'pending', label:'Waiting Payment'}, {id:'processing', label:'To Ship'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
                 :key="status.id"
                 @click="activeOrderStatus = status.id as any"
                 :class="['py-3 text-xs sm:text-sm rounded-xl transition-all font-bold', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-400 hover:text-gray-900']"
@@ -829,7 +836,7 @@ const triggerAlert = (message: string) => {
               <div v-else class="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
                 <div class="text-5xl mb-4">📑</div>
                 <h4 class="font-bold text-gray-900 text-lg">No Orders Found</h4>
-                <p class="text-sm text-gray-400 mt-1">There are no orders with the "{{ activeOrderStatus }}" status yet.</p>
+                <p class="text-sm text-gray-400 mt-1">There are no orders with the "{{ statusLabels[activeOrderStatus] }}" status yet.</p>
               </div>
 
               <!-- Pagination -->
