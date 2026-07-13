@@ -155,9 +155,46 @@ const qrCodeUrl = computed(() => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`
 })
 
-const handleConfirmPayment = () => {
-  alert('Verifying your payment... Order successfully created!')
-  navigateTo('/profile')
+const isChecking = ref(false)
+const checkError = ref<string | null>(null)
+
+const handleCheckPayment = async () => {
+  const orderIdVal = orderId.value
+  if (!orderIdVal || orderIdVal === 'CHIA-LOCAL') return
+
+  isChecking.value = true
+  checkError.value = null
+  try {
+    const res = await orderService.checkOrderPaymentStatus(orderIdVal)
+    if (res.status === 'paid') {
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = 'paid'
+      }
+      
+      // Update session cache if exists
+      if (import.meta.client) {
+        const cached = sessionStorage.getItem('chia-last-payment-info')
+        if (cached) {
+          try {
+            const data = JSON.parse(cached)
+            data.status = 'paid'
+            sessionStorage.setItem('chia-last-payment-info', JSON.stringify(data))
+          } catch (e) {
+            console.error(e)
+          }
+        }
+      }
+      alert('Payment verified successfully! Thank you.')
+    } else {
+      alert(`Payment status is still pending (status: ${res.status}). If you just paid, please wait a minute and verify again.`)
+    }
+  } catch (err: any) {
+    console.error('Failed to check payment status:', err)
+    checkError.value = err.data?.message || err.message || 'Verification failed. Please try again.'
+    alert(checkError.value)
+  } finally {
+    isChecking.value = false
+  }
 }
 </script>
 
@@ -308,6 +345,24 @@ const handleConfirmPayment = () => {
                   </div>
                   <p class="text-[11px] text-gray-400 leading-relaxed">💡 Please write your client details in the reference note for faster verification.</p>
                 </div>
+              </div>
+
+              <!-- Action Buttons to check/verify payment -->
+              <div class="pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
+                <button
+                  @click="handleCheckPayment"
+                  :disabled="isChecking"
+                  class="flex-1 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3.5 px-6 rounded-xl transition text-xs cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span v-if="isChecking" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                  <span>{{ isChecking ? 'Verifying Payment...' : 'I Have Paid / Verify Status' }}</span>
+                </button>
+                <button
+                  @click="navigateTo('/profile')"
+                  class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-3.5 px-6 rounded-xl transition text-xs cursor-pointer"
+                >
+                  Pay Later / View Orders
+                </button>
               </div>
             </div>
 

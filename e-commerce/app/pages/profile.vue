@@ -539,6 +539,27 @@ const leaveReview = (orderId: string) => {
 const triggerAlert = (message: string) => {
   window.alert(message)
 }
+
+const isCheckingPayment = ref(false)
+
+const handleCheckPaymentStatus = async (orderId: string) => {
+  isCheckingPayment.value = true
+  try {
+    const res = await orderService.checkOrderPaymentStatus(orderId)
+    if (res.status === 'paid') {
+      alert('Payment verified! Your order is now being processed.')
+      closeOrderDetail()
+      loadOrders('pending') // Refresh pending orders list
+    } else {
+      alert(`Payment status is still pending (status: ${res.status}). If you have already transferred, please wait up to 15 minutes for automated reconciliation.`)
+    }
+  } catch (err: any) {
+    console.error('Failed to check payment status:', err)
+    alert(err.data?.message || err.message || 'Failed to check payment status. Please try again.')
+  } finally {
+    isCheckingPayment.value = false
+  }
+}
 </script>
 
 <template>
@@ -1049,10 +1070,12 @@ const triggerAlert = (message: string) => {
                 Pay Now
               </button>
               <button 
-                @click="triggerAlert('Our team is reviewing your payment. Please wait up to 15 minutes.')" 
-                class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                @click="handleCheckPaymentStatus(selectedOrder.id)" 
+                :disabled="isCheckingPayment"
+                class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                Check Payment Status
+                <span v-if="isCheckingPayment" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-500 border-t-transparent"></span>
+                <span>Check Payment Status</span>
               </button>
             </div>
             <div v-else-if="selectedOrder.status === 'confirmed' || selectedOrder.status === 'processing'">

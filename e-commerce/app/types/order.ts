@@ -110,3 +110,9 @@ export interface GetOrderPaymentDetailsResponse {
   instruction?: string
 }
 
+export interface CheckOrderPaymentStatusResponse {
+  status: string
+  synced: boolean
+}
+
+

@@ -1,6 +1,14 @@
 // app/services/orderService.ts
 import { bootstrapConfig } from '~/utils/bootstrap'
-import type { CreateOrderRequest, CreateOrderResponse, ListOrdersQuery, ListOrdersResponse, BackendOrder, GetOrderPaymentDetailsResponse } from '~/types/order'
+import type { 
+  CreateOrderRequest, 
+  CreateOrderResponse, 
+  ListOrdersQuery, 
+  ListOrdersResponse, 
+  BackendOrder, 
+  GetOrderPaymentDetailsResponse,
+  CheckOrderPaymentStatusResponse
+} from '~/types/order'
 
 export const orderService = {
   async createOrder(data: CreateOrderRequest): Promise<CreateOrderResponse> {
@@ -28,5 +36,12 @@ export const orderService = {
 
   async getOrderPaymentDetails(orderId: string): Promise<GetOrderPaymentDetailsResponse> {
     return bootstrapConfig.fetchApi<GetOrderPaymentDetailsResponse>(`/users/me/orders/${orderId}/payment`)
+  },
+
+  async checkOrderPaymentStatus(orderId: string): Promise<CheckOrderPaymentStatusResponse> {
+    return bootstrapConfig.fetchApi<CheckOrderPaymentStatusResponse>(`/users/me/orders/${orderId}/payment/check`, {
+      method: 'POST'
+    })
   }
 }
+
