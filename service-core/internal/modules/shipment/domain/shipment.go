@@ -21,13 +21,21 @@ const (
 	ShipmentStatusCancelled      ShipmentStatus = "cancelled"
 )
 
+type FulfillmentMethod string
+
+const (
+	FulfillmentMethodCourier      FulfillmentMethod = "courier"
+	FulfillmentMethodSelfDelivery FulfillmentMethod = "self_delivery"
+)
+
 type Shipment struct {
 	ID uuid.UUID
 
 	OrderID uuid.UUID
 
-	Status         ShipmentStatus
-	TrackingNumber *string
+	Status            ShipmentStatus
+	FulfillmentMethod FulfillmentMethod
+	TrackingNumber    *string
 
 	Courier string
 	Service string
@@ -41,7 +49,15 @@ type Shipment struct {
 }
 
 func (d *Shipment) Validate() error {
-	if d.Cost <= 0 {
+	if d.FulfillmentMethod == "" {
+		d.FulfillmentMethod = FulfillmentMethodCourier
+	}
+
+	if d.FulfillmentMethod != FulfillmentMethodCourier && d.FulfillmentMethod != FulfillmentMethodSelfDelivery {
+		return ErrInvalidFulfillmentMethod
+	}
+
+	if d.Cost < 0 {
 		return ErrInvalidCost
 	}
 
@@ -49,12 +65,14 @@ func (d *Shipment) Validate() error {
 		return ErrInvalidWeight
 	}
 
-	if d.Courier == "" {
-		return ErrInvalidCourier
-	}
+	if d.FulfillmentMethod == FulfillmentMethodCourier {
+		if d.Courier == "" {
+			return ErrInvalidCourier
+		}
 
-	if d.Service == "" {
-		return ErrInvalidService
+		if d.Service == "" {
+			return ErrInvalidService
+		}
 	}
 
 	if d.OriginID == "" {

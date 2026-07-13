@@ -23,6 +23,7 @@ const shipmentSelectCols = `
 	id,
 	order_id,
 	status,
+	fulfillment_method,
 	tracking_number,
 	courier_name,
 	service,
@@ -39,6 +40,7 @@ func (r *shipmentRepositoryImpl) scanShipment(row pgx.Row) (*domain.Shipment, er
 		&s.ID,
 		&s.OrderID,
 		&s.Status,
+		&s.FulfillmentMethod,
 		&s.TrackingNumber,
 		&s.Courier,
 		&s.Service,
@@ -63,6 +65,7 @@ func (r *shipmentRepositoryImpl) GetByID(
 		SELECT id,
 			order_id,
 			status,
+			fulfillment_method,
 			tracking_number,
 			courier_name,
 			service,
@@ -95,6 +98,7 @@ func (r *shipmentRepositoryImpl) GetByOrderID(
 			id,
 			order_id,
 			status,
+			fulfillment_method,
 			tracking_number,
 			courier_name,
 			service,
@@ -133,6 +137,7 @@ func (r *shipmentRepositoryImpl) ListByOrderIDs(
 			id,
 			order_id,
 			status,
+			fulfillment_method,
 			tracking_number,
 			courier_name,
 			service,
@@ -163,6 +168,7 @@ func (r *shipmentRepositoryImpl) ListByOrderIDs(
 			&s.ID,
 			&s.OrderID,
 			&s.Status,
+			&s.FulfillmentMethod,
 			&s.TrackingNumber,
 			&s.Courier,
 			&s.Service,
@@ -191,6 +197,7 @@ func (r *shipmentRepositoryImpl) Create(
 			id,
 			order_id,
 			status,
+			fulfillment_method,
 			tracking_number,
 			courier_name,
 			service,
@@ -199,13 +206,14 @@ func (r *shipmentRepositoryImpl) Create(
 			origin_id,
 			destination_id,
 			created_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 	`
 
 	_, err := exec.Exec(ctx, query,
 		shipment.ID,
 		shipment.OrderID,
 		shipment.Status,
+		shipment.FulfillmentMethod,
 		shipment.TrackingNumber,
 		shipment.Courier,
 		shipment.Service,
@@ -229,18 +237,20 @@ func (r *shipmentRepositoryImpl) Update(
 	query := `
 		UPDATE shipments
 		SET
-			status          = $2,
-			tracking_number = $3,
-			courier_name    = $4,
-			service         = $5,
-			shipping_cost   = $6,
-			weight          = $7
+			status             = $2,
+			fulfillment_method = $3,
+			tracking_number    = $4,
+			courier_name       = $5,
+			service            = $6,
+			shipping_cost      = $7,
+			weight             = $8
 		WHERE id = $1
 	`
 
 	_, err := exec.Exec(ctx, query,
 		shipment.ID,
 		shipment.Status,
+		shipment.FulfillmentMethod,
 		shipment.TrackingNumber,
 		shipment.Courier,
 		shipment.Service,

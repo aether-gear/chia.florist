@@ -103,13 +103,14 @@ func mapPaymentDetail(p *paymentDomain.Payment, cd *paymentDomain.PaymentChannel
 
 func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 	return &shipmentDetailResponse{
-		ID:             s.ID.String(),
-		Status:         string(s.Status),
-		Courier:        s.Courier,
-		Service:        s.Service,
-		TrackingNumber: s.TrackingNumber,
-		Cost:           s.Cost,
-		CreatedAt:      s.CreatedAt,
+		ID:                s.ID.String(),
+		Status:            string(s.Status),
+		FulfillmentMethod: string(s.FulfillmentMethod),
+		Courier:           s.Courier,
+		Service:           s.Service,
+		TrackingNumber:    s.TrackingNumber,
+		Cost:              s.Cost,
+		CreatedAt:         s.CreatedAt,
 	}
 }
 
@@ -472,9 +473,10 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := h.updateOrderStatus.Execute(r.Context(), usecase.UpdateOrderStatusInput{
-		OrderID:        orderID,
-		Status:         orderDomain.OrderStatus(req.Status),
-		TrackingNumber: req.TrackingNumber,
+		OrderID:           orderID,
+		Status:            orderDomain.OrderStatus(req.Status),
+		TrackingNumber:    req.TrackingNumber,
+		FulfillmentMethod: req.FulfillmentMethod,
 	})
 	if err != nil {
 		return err
