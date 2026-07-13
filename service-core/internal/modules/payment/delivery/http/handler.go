@@ -397,8 +397,6 @@ func (h *PaymentHandler) GetMyOrderPayment(w http.ResponseWriter, r *http.Reques
 
 // CheckMyOrderPaymentStatus is the customer-triggered payment sync endpoint.
 //
-// POST /users/me/orders/{orderID}/payment/check
-//
 // When a customer's payment appears stuck as 'pending' after they have paid,
 // calling this endpoint immediately queries Midtrans for the current status
 // and resolves the payment — without waiting for the background reconciler.
@@ -417,13 +415,13 @@ func (h *PaymentHandler) CheckMyOrderPaymentStatus(w http.ResponseWriter, r *htt
 		return apperrors.NewBadRequest("invalid order id")
 	}
 
-	result, err := h.checkPaymentStatus.Execute(
-		r.Context(),
-		usecase.CheckPaymentStatusInput{
-			OrderID:    orderID,
-			CustomerID: *authCtx.CustomerID,
-		},
-	)
+	input := usecase.CheckPaymentStatusInput{
+		OrderID:    orderID,
+		CustomerID: *authCtx.CustomerID,
+	}
+
+	result, err := h.checkPaymentStatus.
+		Execute(r.Context(), input)
 	if err != nil {
 		return err
 	}
