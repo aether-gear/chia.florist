@@ -86,6 +86,18 @@ func (m *mockPaymentRepo) Save(_ context.Context, _ transaction.Executor, paymen
 	m.payments[payment.ID] = &payment
 	return nil
 }
+func (m *mockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, since time.Time) ([]paymentDomain.Payment, error) {
+	var result []paymentDomain.Payment
+	for _, p := range m.payments {
+		if p.Status == paymentDomain.PaymentStatusPending &&
+			p.Provider == "gateway" &&
+			p.ProviderOrderID != nil &&
+			(p.CreatedAt.After(since) || p.CreatedAt.Equal(since)) {
+			result = append(result, *p)
+		}
+	}
+	return result, nil
+}
 
 // mockPaymentAccountRepo tracks increments, decrements and supports injecting errors.
 type mockPaymentAccountRepo struct {
@@ -255,6 +267,9 @@ func (m *mockPaymentGateway) Charge(_ context.Context, _ paymentgateway.ChargeRe
 func (m *mockPaymentGateway) ParseNotification(_ context.Context, _ paymentgateway.NotificationPayload) (*paymentgateway.NotificationResult, error) {
 	return m.result, m.err
 }
+func (m *mockPaymentGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
+	return m.result, m.err
+}
 func (m *mockPaymentGateway) CancelTransaction(_ context.Context, _ string) error {
 	return nil
 }
@@ -340,7 +355,7 @@ func newWebhookUsecase(
 	oRepo *mockOrderRepo,
 	oiRepo *mockOrderItemRepo,
 	iRepo *mockInventoryRepo,
-	gateway *mockPaymentGateway,
+	gateway paymentgateway.Provider,
 	transactor transaction.Transactor,
 ) *ProcessPaymentWebhookUsecase {
 	if transactor == nil {

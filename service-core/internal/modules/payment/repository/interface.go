@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"service-core/internal/modules/payment/domain"
 	query "service-core/internal/shared/query"
@@ -41,6 +42,18 @@ type PaymentRepository interface {
 		exec transaction.Executor,
 		payment domain.Payment,
 	) error
+
+	// ListPendingGateway returns gateway-provider payments
+	// still in 'pending' status whose provider_order_id is set
+	// and whose created_at is >= since.
+	//
+	// Used by the reconciliation job to find payments
+	// missed by webhooks.
+	ListPendingGateway(
+		ctx context.Context,
+		exec transaction.Executor,
+		since time.Time,
+	) ([]domain.Payment, error)
 }
 
 var (

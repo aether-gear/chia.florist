@@ -18,6 +18,7 @@ type Config struct {
 	Komerce     config.KomerceConfig
 	GoogleOAuth config.GoogleOAuthConfig
 	WAF         config.WAFConfig
+	PaymentSync config.PaymentSyncConfig
 }
 
 func LoadConfig() Config {
@@ -57,5 +58,6 @@ func LoadConfig() Config {
 		Komerce:     config.LoadKomerceConfig(),
 		GoogleOAuth: config.LoadGoogleOAuthConfig(),
 		WAF:         config.LoadWAFConfig(),
+		PaymentSync: config.LoadPaymentSyncConfig(),
 	}
 }

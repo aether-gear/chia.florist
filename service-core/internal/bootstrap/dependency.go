@@ -12,6 +12,7 @@ import (
 	"service-core/internal/infra/shipping/rajaongkir"
 	storage "service-core/internal/infra/storage"
 	supabaseStorage "service-core/internal/infra/storage/supabase"
+	paymentJob "service-core/internal/modules/payment/infra/job"
 	transaction "service-core/internal/shared/transaction"
 )
 
@@ -24,6 +25,10 @@ type Dependency struct {
 	LocationProvider    shipping.LocationProvider
 	ShippingProvider    shipping.ShippingProvider
 	LogisticsProvider   shipping.LogisticsProvider
+
+	// PaymentSyncJob is populated by NewContainer after all repos and logger
+	// are available, then started by App.Run.
+	PaymentSyncJob *paymentJob.PaymentSyncJob
 }
 
 func NewDependency(cfg Config) (*Dependency, error) {

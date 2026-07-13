@@ -173,6 +173,18 @@ type Provider interface {
 		payload NotificationPayload,
 	) (*NotificationResult, error)
 
+	// GetTransactionStatus fetches the current status
+	// of a transaction directly from the gateway using
+	// its gateway-side order ID.
+	//
+	// Used by the reconciliation job and the customer-triggered
+	// sync when no webhook was received (e.g. service was unreachable
+	// during Midtrans's delivery attempts).
+	GetTransactionStatus(
+		ctx context.Context,
+		gatewayOrderID string,
+	) (*NotificationResult, error)
+
 	// CancelTransaction requests the gateway to
 	// cancel / void a pending transaction
 	// identified by its gateway-side order ID.

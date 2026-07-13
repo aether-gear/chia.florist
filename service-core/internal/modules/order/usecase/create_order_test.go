@@ -165,6 +165,9 @@ func (m *coMockPaymentRepo) Save(_ context.Context, _ transaction.Executor, paym
 	m.payments[payment.ID] = &payment
 	return nil
 }
+func (m *coMockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, _ time.Time) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 // --- payment account repo ---
 
@@ -388,6 +391,9 @@ func (m *coMockGateway) CancelTransaction(_ context.Context, gatewayOrderID stri
 	m.cancelOrderID = gatewayOrderID
 	return nil
 }
+func (m *coMockGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
+	return nil, nil
+}
 func (m *coMockGateway) Supports(_ string) bool {
 	return true
 }
@@ -406,6 +412,9 @@ func (c *capturingGateway) ParseNotification(_ context.Context, _ paymentgateway
 	return nil, nil
 }
 func (c *capturingGateway) CancelTransaction(_ context.Context, _ string) error { return nil }
+func (c *capturingGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
+	return nil, nil
+}
 func (c *capturingGateway) Supports(_ string) bool {
 	return true
 }

@@ -227,6 +227,29 @@ func (p *midtransAPIProvider) ParseNotification(
 		return nil, fmt.Errorf("midtrans: parse notification: missing order_id in payload")
 	}
 
+	return p.fetchTransactionStatus(ctx, orderID)
+}
+
+func (p *midtransAPIProvider) GetTransactionStatus(
+	ctx context.Context,
+	gatewayOrderID string,
+) (*paymentgateway.NotificationResult, error) {
+	if gatewayOrderID == "" {
+		return nil, fmt.Errorf("midtrans: GetTransactionStatus: gatewayOrderID is required")
+	}
+	return p.fetchTransactionStatus(ctx, gatewayOrderID)
+}
+
+// fetchTransactionStatus calls the Midtrans
+// GET /v2/{orderID}/status endpoint
+// and returns a normalised NotificationResult.
+//
+// It is the shared implementation for both ParseNotification
+// and GetTransactionStatus.
+func (p *midtransAPIProvider) fetchTransactionStatus(
+	ctx context.Context,
+	orderID string,
+) (*paymentgateway.NotificationResult, error) {
 	url := p.baseURL + "/v2/" + orderID + "/status"
 	respBody, err := p.doRequest(
 		ctx,

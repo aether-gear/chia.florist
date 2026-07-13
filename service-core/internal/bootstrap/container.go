@@ -32,6 +32,7 @@ import (
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
 	orderPersistence "service-core/internal/modules/order/infra/persistence"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
+	paymentJob "service-core/internal/modules/payment/infra/job"
 	productPersistence "service-core/internal/modules/product/infra/persistence"
 	shipmentPersistence "service-core/internal/modules/shipment/infra/persistence"
 	shopPersistence "service-core/internal/modules/shop/infra/persistence"
@@ -134,6 +135,8 @@ type Container struct {
 	ProcessManualPayment   paymentUsecase.ProcessManualPaymentUsecase
 	SavePaymentInstruction paymentUsecase.SavePaymentInstructionUsecase
 	GetPaymentDetail       paymentUsecase.GetPaymentDetailUsecase
+	CheckPaymentStatus     paymentUsecase.CheckPaymentStatusUsecase
+	SyncPendingPayments    paymentUsecase.SyncPendingPaymentsUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -274,7 +277,22 @@ func NewContainer(cfg Config,
 		)
 	)
 
-	return &Container{
+	processPaymentWebhook := *paymentUsecase.
+		NewProcessPaymentWebhookUsecase(
+			paymentRepo,
+			paymentAccRepo,
+			paymentEventRepo,
+			paymentWebhookEventRepo,
+			orderRepo,
+			orderItemRepo,
+			inventoryRepo,
+			infra.PaymentGateway,
+			auditLogger,
+			infra.TransactionProvider,
+			infra.TransactionExecutor,
+		)
+
+	c := &Container{
 		Logger:             log,
 		AuditLogger:        auditLogger,
 		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
@@ -641,20 +659,7 @@ func NewContainer(cfg Config,
 				paymentMethodRepo,
 				infra.TransactionExecutor,
 			),
-		ProcessPaymentWebhook: *paymentUsecase.
-			NewProcessPaymentWebhookUsecase(
-				paymentRepo,
-				paymentAccRepo,
-				paymentEventRepo,
-				paymentWebhookEventRepo,
-				orderRepo,
-				orderItemRepo,
-				inventoryRepo,
-				infra.PaymentGateway,
-				auditLogger,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
-			),
+		ProcessPaymentWebhook: processPaymentWebhook,
 		ProcessManualPayment: *paymentUsecase.
 			NewProcessManualPaymentUsecase(
 				paymentRepo,
@@ -682,6 +687,23 @@ func NewContainer(cfg Config,
 				paymentAccRepo,
 				paymentInstructionRepo,
 				paymentChannelDataRepo,
+			),
+		CheckPaymentStatus: *paymentUsecase.
+			NewCheckPaymentStatusUsecase(
+				orderRepo,
+				paymentRepo,
+				infra.PaymentGateway,
+				&processPaymentWebhook,
+				infra.TransactionExecutor,
+			),
+		SyncPendingPayments: *paymentUsecase.
+			NewSyncPendingPaymentsUsecase(
+				paymentRepo,
+				infra.PaymentGateway,
+				&processPaymentWebhook,
+				infra.TransactionExecutor,
+				log,
+				time.Duration(cfg.PaymentSync.LookbackHours)*time.Hour,
 			),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
@@ -812,4 +834,14 @@ func NewContainer(cfg Config,
 		AnalyzeIP: *threatIntelUsecase.NewAnalyzeIPUsecase(threatIntelRepo),
 		GetGeoIP:  *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
 	}
+
+	// Populate the sync job on the infra struct so App.Run can start it.
+	interval := time.Duration(cfg.PaymentSync.IntervalMinutes) * time.Minute
+	infra.PaymentSyncJob = paymentJob.NewPaymentSyncJob(
+		&c.SyncPendingPayments,
+		interval,
+		log,
+	)
+
+	return c
 }
