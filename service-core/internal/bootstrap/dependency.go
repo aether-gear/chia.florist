@@ -21,7 +21,8 @@ type Dependency struct {
 	TransactionProvider transaction.Transactor
 	TransactionExecutor transaction.Executor
 	PaymentGateway      paymentgateway.Provider
-	ShippingProvider    shipping.Provider
+	LocationProvider    shipping.LocationProvider
+	ShippingProvider    shipping.ShippingProvider
 	LogisticsProvider   shipping.LogisticsProvider
 }
 
@@ -42,7 +43,7 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		return nil, err
 	}
 
-	shipping, err := rajaongkir.
+	rajaOngkir, err := rajaongkir.
 		NewRajaOngkirProvider(cfg.RajaOngkir)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,8 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		TransactionProvider: database.NewPostgresTransactor(db.Pool),
 		TransactionExecutor: db.Pool,
 		PaymentGateway:      gateway,
-		ShippingProvider:    shipping,
+		LocationProvider:    rajaOngkir,
+		ShippingProvider:    rajaOngkir,
 		LogisticsProvider:   logistics,
 	}, nil
 }

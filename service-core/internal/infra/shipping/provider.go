@@ -24,17 +24,14 @@ type RateOption struct {
 	Etd         string
 }
 
-type Provider interface {
+type ShippingProvider interface {
 	CalculateRates(
 		ctx context.Context,
 		input CalculateRatesInput,
 	) ([]RateOption, error)
+}
 
-	// TrackShipment(
-	// 	ctx context.Context,
-	// 	trackingNumber string,
-	// ) ([]shipmentDomain.ShipmentEvent, error)
-
+type LocationProvider interface {
 	ListProvinces(
 		ctx context.Context,
 	) ([]locationDomain.Province, error)

@@ -526,7 +526,7 @@ func NewContainer(cfg Config,
 
 		ListLocations: *locationUsecase.
 			NewListLocationUsecase(
-				infra.ShippingProvider,
+				infra.LocationProvider,
 				infra.TransactionExecutor,
 			),
 
