@@ -23,6 +23,7 @@ type PaymentHandler struct {
 	processManualPayment   *usecase.ProcessManualPaymentUsecase
 	savePaymentInstruction *usecase.SavePaymentInstructionUsecase
 	getPaymentDetail       *usecase.GetPaymentDetailUsecase
+	checkPaymentStatus     *usecase.CheckPaymentStatusUsecase
 }
 
 func NewPaymentHandler(
@@ -34,6 +35,7 @@ func NewPaymentHandler(
 	processManualPayment *usecase.ProcessManualPaymentUsecase,
 	savePaymentInstruction *usecase.SavePaymentInstructionUsecase,
 	getPaymentDetail *usecase.GetPaymentDetailUsecase,
+	checkPaymentStatus *usecase.CheckPaymentStatusUsecase,
 ) *PaymentHandler {
 	return &PaymentHandler{
 		createPaymentAccount:   createPaymentAccount,
@@ -44,6 +46,7 @@ func NewPaymentHandler(
 		processManualPayment:   processManualPayment,
 		savePaymentInstruction: savePaymentInstruction,
 		getPaymentDetail:       getPaymentDetail,
+		checkPaymentStatus:     checkPaymentStatus,
 	}
 }
 
@@ -389,5 +392,43 @@ func (h *PaymentHandler) GetMyOrderPayment(w http.ResponseWriter, r *http.Reques
 	resp.Instruction = result.Instruction
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+// CheckMyOrderPaymentStatus is the customer-triggered payment sync endpoint.
+//
+// When a customer's payment appears stuck as 'pending' after they have paid,
+// calling this endpoint immediately queries Midtrans for the current status
+// and resolves the payment — without waiting for the background reconciler.
+func (h *PaymentHandler) CheckMyOrderPaymentStatus(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authenDomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	input := usecase.CheckPaymentStatusInput{
+		OrderID:    orderID,
+		CustomerID: *authCtx.CustomerID,
+	}
+
+	result, err := h.checkPaymentStatus.
+		Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, checkPaymentStatusResponse{
+		Status: string(result.Status),
+		Synced: result.Synced,
+	})
 	return nil
 }

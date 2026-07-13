@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
@@ -258,3 +259,60 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 	return payments, nil
 }
 
+func (r *paymentRepositoryImpl) ListPendingGateway(
+	ctx context.Context,
+	exec transaction.Executor,
+	since time.Time,
+) ([]domain.Payment, error) {
+	query := `
+		SELECT
+			id,
+			order_id,
+			method_id,
+			payment_account_id,
+			provider,
+			provider_payment_id,
+			provider_order_id,
+			amount,
+			status,
+			expires_at,
+			created_at,
+			updated_at
+		FROM payments
+		WHERE status = 'pending'
+		  AND provider = 'gateway'
+		  AND provider_order_id IS NOT NULL
+		  AND created_at >= $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := exec.Query(ctx, query, since)
+	if err != nil {
+		return nil, fmt.Errorf("query pending gateway payments failed: %w", err)
+	}
+	defer rows.Close()
+
+	payments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Payment, error) {
+		var p domain.Payment
+		err := row.Scan(
+			&p.ID,
+			&p.OrderID,
+			&p.MethodID,
+			&p.PaymentAccountID,
+			&p.Provider,
+			&p.ProviderPaymentID,
+			&p.ProviderOrderID,
+			&p.Amount,
+			&p.Status,
+			&p.ExpiresAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		)
+		return p, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan pending gateway payments failed: %w", err)
+	}
+
+	return payments, nil
+}

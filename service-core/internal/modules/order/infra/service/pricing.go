@@ -29,7 +29,7 @@ type pricingServiceImpl struct {
 	inventoryRepo     inventoryRepo.InventoryRepository
 	paymentMethodRepo paymentRepo.PaymentMethodRepository
 	productRepo       productRepo.ProductRepository
-	shipping          shipping.Provider
+	shippingProvider  shipping.ShippingProvider
 	shopAddressRepo   addressRepo.ShopAddressRepository
 	shopRepo          shopRepo.ShopRepository
 }
@@ -40,7 +40,7 @@ func NewPricingService(
 	inventoryRepo inventoryRepo.InventoryRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
 	productRepo productRepo.ProductRepository,
-	shipping shipping.Provider,
+	shippingProvider shipping.ShippingProvider,
 	shopAddressRepo addressRepo.ShopAddressRepository,
 	shopRepo shopRepo.ShopRepository,
 ) orderRepo.PricingService {
@@ -50,7 +50,7 @@ func NewPricingService(
 		inventoryRepo:     inventoryRepo,
 		paymentMethodRepo: paymentMethodRepo,
 		productRepo:       productRepo,
-		shipping:          shipping,
+		shippingProvider:  shippingProvider,
 		shopAddressRepo:   shopAddressRepo,
 		shopRepo:          shopRepo,
 	}
@@ -240,7 +240,7 @@ func (s *pricingServiceImpl) Calculate(
 			return nil, fmt.Errorf("invalid origin district id: %w", err)
 		}
 
-		costOptions, err := s.shipping.CalculateRates(
+		costOptions, err := s.shippingProvider.CalculateRates(
 			ctx,
 			shipping.CalculateRatesInput{
 				OriginID:      originDistrictID,

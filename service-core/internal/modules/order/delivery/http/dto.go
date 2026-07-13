@@ -35,6 +35,15 @@ type createOrderRequest struct {
 
 type updateOrderStatusRequest struct {
 	Status string `json:"status"`
+
+	// TrackingNumber is optional. It is used in manual logistics mode to
+	// pre-set the shipment tracking number. Ignored when the server is
+	// configured with an automated provider (e.g. Komerce).
+	TrackingNumber *string `json:"tracking_number"`
+
+	// FulfillmentMethod is optional. Chooses who delivers the order: "courier"
+	// or "self_delivery". If not specified, it defaults to "courier".
+	FulfillmentMethod *string `json:"fulfillment_method"`
 }
 
 // ---- Response DTOs ----
@@ -85,13 +94,14 @@ type paymentDetailResponse struct {
 }
 
 type shipmentDetailResponse struct {
-	ID             string     `json:"id"`
-	Status         string     `json:"status"`
-	Courier        string     `json:"courier"`
-	Service        string     `json:"service"`
-	TrackingNumber *string    `json:"tracking_number,omitempty"`
-	Cost           int64      `json:"cost"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID                string     `json:"id"`
+	Status            string     `json:"status"`
+	FulfillmentMethod string     `json:"fulfillment_method"`
+	Courier           string     `json:"courier"`
+	Service           string     `json:"service"`
+	TrackingNumber    *string    `json:"tracking_number,omitempty"`
+	Cost              int64      `json:"cost"`
+	CreatedAt         time.Time  `json:"created_at"`
 }
 
 type orderResponse struct {

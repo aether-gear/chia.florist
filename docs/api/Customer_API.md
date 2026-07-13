@@ -55,6 +55,7 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [ ] Find My Orders
     - [ ] Get Order
     - [ ] Get Order Payment Details
+    - [X] Check Order Payment Status
 
 # Public API
 
@@ -1647,6 +1648,44 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 | Status             | Condition |
 |--------------------|-----------|
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Order or payment not found, or order does not belong to the authenticated customer. |
+
+### Check Order Payment Status
+
+- **Method**: `POST`
+- **Endpoint**: `/users/me/orders/{orderID}/payment/check`
+- **Description**: Query the external payment provider (e.g. Midtrans) directly to check and sync the payment status of the order. This is useful when the payment status is stuck as `pending` after successful payment, bypassing the background reconciler.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                   |
+|-----------|---------------|-------------------------------|
+| `orderID` | UUID (string) | The ID of the order to check. |
+
+#### Response `200 OK`
+
+```json
+{
+  "status": "paid",
+  "synced": true
+}
+```
+
+#### Response Fields
+
+| Field    | Type   | Description                                                                                             |
+|----------|--------|---------------------------------------------------------------------------------------------------------|
+| `status` | string | Current payment status (`pending`, `paid`, `failed`, `expired`, `cancelled`, `refunded`).               |
+| `synced` | bool   | Indicates if the payment status was resolved and updated/synchronized in the system during this call.  |
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `orderID` is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `404 Not Found`    | Order or payment not found, or order does not belong to the authenticated customer. |
 

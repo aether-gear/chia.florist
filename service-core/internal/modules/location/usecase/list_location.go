@@ -10,22 +10,22 @@ import (
 )
 
 type ListLocationUsecase struct {
-	shipping shipping.Provider
-	executor transaction.Executor
+	locationProvider shipping.LocationProvider
+	executor         transaction.Executor
 }
 
 func NewListLocationUsecase(
-	shipping shipping.Provider,
+	locationProvider shipping.LocationProvider,
 	executor transaction.Executor,
 ) *ListLocationUsecase {
 	return &ListLocationUsecase{
-		shipping: shipping,
-		executor: executor,
+		locationProvider: locationProvider,
+		executor:         executor,
 	}
 }
 
 func (u *ListLocationUsecase) Province(ctx context.Context) ([]domain.Province, error) {
-	res, err := u.shipping.ListProvinces(ctx)
+	res, err := u.locationProvider.ListProvinces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load provinces: %w", err)
 	}
@@ -34,7 +34,7 @@ func (u *ListLocationUsecase) Province(ctx context.Context) ([]domain.Province, 
 }
 
 func (u *ListLocationUsecase) City(ctx context.Context, provinceID string) ([]domain.City, error) {
-	res, err := u.shipping.ListCities(ctx, provinceID)
+	res, err := u.locationProvider.ListCities(ctx, provinceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cities: %w", err)
 	}
@@ -43,7 +43,7 @@ func (u *ListLocationUsecase) City(ctx context.Context, provinceID string) ([]do
 }
 
 func (u *ListLocationUsecase) District(ctx context.Context, cityID string) ([]domain.District, error) {
-	res, err := u.shipping.ListDistricts(ctx, cityID)
+	res, err := u.locationProvider.ListDistricts(ctx, cityID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load districts: %w", err)
 	}
@@ -52,7 +52,7 @@ func (u *ListLocationUsecase) District(ctx context.Context, cityID string) ([]do
 }
 
 func (u *ListLocationUsecase) Village(ctx context.Context, districtID string) ([]domain.Village, error) {
-	res, err := u.shipping.ListVillages(ctx, districtID)
+	res, err := u.locationProvider.ListVillages(ctx, districtID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load villages: %w", err)
 	}

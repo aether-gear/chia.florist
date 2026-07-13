@@ -12,17 +12,17 @@ import (
 )
 
 type EstimateShippingOptionsUsecase struct {
-	shipping shipping.Provider
-	executor transaction.Executor
+	shippingProvider shipping.ShippingProvider
+	executor         transaction.Executor
 }
 
 func NewEstimateShippingOptionsUsecase(
-	shipping shipping.Provider,
+	shippingProvider shipping.ShippingProvider,
 	executor transaction.Executor,
 ) *EstimateShippingOptionsUsecase {
 	return &EstimateShippingOptionsUsecase{
-		shipping: shipping,
-		executor: executor,
+		shippingProvider: shippingProvider,
+		executor:         executor,
 	}
 }
 
@@ -74,7 +74,7 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 		PriceFilter:   input.PriceFilter,
 	}
 
-	costOptions, err := u.shipping.CalculateRates(ctx, query)
+	costOptions, err := u.shippingProvider.CalculateRates(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate shipping cost: %w", err)
 	}

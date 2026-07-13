@@ -15,8 +15,8 @@ type KomerceConfig struct {
 func LoadKomerceConfig() KomerceConfig {
 	return KomerceConfig{
 		OrderBaseURL: GetEnv("KOMERCE_ORDER_URL"),
-		TrackBaseURL: GetEnv("RAJAONGKIR_URL"),
+		TrackBaseURL: GetEnv("KOMERCE_TRACK_URL"),
 		APIKey:       GetEnv("KOMERCE_API_KEY"),
-		ShippingKey:  GetEnv("RAJAONGKIR_SHIPPING_DELIVERY"),
+		ShippingKey:  GetEnv("KOMERCE_SHIPPING_DELIVERY"),
 	}
 }

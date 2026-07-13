@@ -53,8 +53,16 @@ export const useOrders = () => {
           sort: 'latest:desc',
           status: statuses[0]
         })
-        orders.value      = res.orders ?? []
-        totalOrders.value = res.total  ?? 0
+        console.log(`[useOrders] Tab: ${tab}, Status: ${statuses[0]}, Count: ${res.orders?.length || 0}`, res.orders?.map(o => ({ number: o.number, orderStatus: o.status, paymentStatus: o.payment?.status })))
+        
+        let fetchedOrders = res.orders ?? []
+        // Client-side guard: 'pending' (Waiting Payment) tab only shows pending payments
+        if (tab === 'pending') {
+          fetchedOrders = fetchedOrders.filter(o => o.payment?.status === 'pending')
+        }
+        
+        orders.value      = fetchedOrders
+        totalOrders.value = fetchedOrders.length
       } else {
         // Multiple statuses — fetch each and merge (no server-side multi-filter)
         const results = await Promise.all(
@@ -67,7 +75,22 @@ export const useOrders = () => {
             })
           )
         )
-        const merged = results.flatMap(r => r.orders ?? [])
+        let merged = results.flatMap(r => r.orders ?? [])
+        console.log(`[useOrders] Tab: ${tab}, Statuses: ${statuses.join(',')}, Count: ${merged.length}`, merged.map(o => ({ number: o.number, orderStatus: o.status, paymentStatus: o.payment?.status })))
+        
+        // Deduplicate orders by ID to prevent duplicates if the backend returns the same order in multiple queries
+        const seen = new Set<string>()
+        merged = merged.filter(o => {
+          if (seen.has(o.id)) return false
+          seen.add(o.id)
+          return true
+        })
+
+        // Client-side guard: 'processing' (To Ship) tab only shows non-pending payments
+        if (tab === 'processing') {
+          merged = merged.filter(o => o.payment?.status !== 'pending')
+        }
+        
         // Sort merged list newest first
         merged.sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

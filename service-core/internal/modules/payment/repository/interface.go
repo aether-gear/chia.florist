@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"service-core/internal/modules/payment/domain"
 	query "service-core/internal/shared/query"
@@ -41,6 +42,18 @@ type PaymentRepository interface {
 		exec transaction.Executor,
 		payment domain.Payment,
 	) error
+
+	// ListPendingGateway returns gateway-provider payments
+	// still in 'pending' status whose provider_order_id is set
+	// and whose created_at is >= since.
+	//
+	// Used by the reconciliation job to find payments
+	// missed by webhooks.
+	ListPendingGateway(
+		ctx context.Context,
+		exec transaction.Executor,
+		since time.Time,
+	) ([]domain.Payment, error)
 }
 
 var (
@@ -180,4 +193,35 @@ type PaymentChannelDataRepository interface {
 		exec transaction.Executor,
 		paymentIDs []uuid.UUID,
 	) (map[uuid.UUID]*domain.PaymentChannelData, error)
+}
+
+// PaymentWebhookEventRepository persists inbound gateway webhook payloads
+// and tracks their processing lifecycle for idempotency and auditability.
+type PaymentWebhookEventRepository interface {
+	// Upsert inserts a new event row.
+	// On conflict (order_id, transaction_status) it leaves the existing row
+	// untouched and returns it, so the caller can inspect its current status
+	// before deciding whether to re-process.
+	Upsert(
+		ctx context.Context,
+		exec transaction.Executor,
+		event domain.PaymentWebhookEvent,
+	) (*domain.PaymentWebhookEvent, error)
+
+	// MarkProcessed sets status = 'processed' and stamps processed_at.
+	MarkProcessed(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
+
+	// MarkFailed sets status = 'failed' and records the error string.
+	// The event will be re-attempted on the next webhook delivery from
+	// the gateway for the same (order_id, transaction_status).
+	MarkFailed(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		errMsg string,
+	) error
 }

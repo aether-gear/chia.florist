@@ -82,3 +82,7 @@ type getPaymentDetailResponse struct {
 	Instruction *string `json:"instruction,omitempty"`
 }
 
+type checkPaymentStatusResponse struct {
+	Status string `json:"status"`
+	Synced bool   `json:"synced"`
+}

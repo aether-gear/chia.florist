@@ -6,7 +6,7 @@ import (
 
 type Config struct {
 	App         config.AppConfig
-	Shipping    config.ShippingConfig
+	Logistics   config.LogisticsConfig
 	JWT         config.JWTConfig
 	Storage     config.StorageConfig
 	Supabase    config.SupabaseConfig
@@ -18,6 +18,7 @@ type Config struct {
 	Komerce     config.KomerceConfig
 	GoogleOAuth config.GoogleOAuthConfig
 	WAF         config.WAFConfig
+	PaymentSync config.PaymentSyncConfig
 }
 
 func LoadConfig() Config {
@@ -45,7 +46,7 @@ func LoadConfig() Config {
 
 	return Config{
 		App:         config.LoadAppConfig(),
-		Shipping:    config.LoadShippingConfig(),
+		Logistics:   config.LoadLogisticsConfig(),
 		JWT:         config.LoadJWTConfig(),
 		Storage:     config.LoadStorageConfig(),
 		Supabase:    supabaseCfg,
@@ -57,5 +58,6 @@ func LoadConfig() Config {
 		Komerce:     config.LoadKomerceConfig(),
 		GoogleOAuth: config.LoadGoogleOAuthConfig(),
 		WAF:         config.LoadWAFConfig(),
+		PaymentSync: config.LoadPaymentSyncConfig(),
 	}
 }

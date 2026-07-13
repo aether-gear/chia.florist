@@ -80,6 +80,12 @@ func (m *mockOrderDetailPaymentRepo) UpdateStatus(_ context.Context, _ transacti
 func (m *mockOrderDetailPaymentRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.Payment) error {
 	return nil
 }
+func (m *mockOrderDetailPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, _ time.Time) ([]paymentDomain.Payment, error) {
+	if m.payment != nil && m.payment.Status == paymentDomain.PaymentStatusPending && m.payment.Provider == "gateway" {
+		return []paymentDomain.Payment{*m.payment}, nil
+	}
+	return nil, nil
+}
 
 type mockOrderDetailPaymentMethodRepo struct {
 	method *paymentDomain.PaymentMethod

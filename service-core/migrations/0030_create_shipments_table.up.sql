@@ -11,6 +11,11 @@ CREATE TYPE shipment_status_enum AS ENUM (
     'cancelled'
 );
 
+CREATE TYPE fulfillment_method_enum AS ENUM (
+    'courier',
+    'self_delivery'
+);
+
 CREATE TABLE shipments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -18,6 +23,7 @@ CREATE TABLE shipments (
 
     status shipment_status_enum NOT NULL DEFAULT 'created',
     tracking_number TEXT UNIQUE,
+    fulfillment_method fulfillment_method_enum NOT NULL DEFAULT 'self_delivery',
 
     courier_name TEXT NOT NULL,
     service TEXT NOT NULL,

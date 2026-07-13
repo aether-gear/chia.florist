@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	orderDomain "service-core/internal/modules/order/domain"
@@ -84,6 +85,18 @@ func (m *mockPaymentRepo) UpdateStatus(_ context.Context, _ transaction.Executor
 func (m *mockPaymentRepo) Save(_ context.Context, _ transaction.Executor, payment paymentDomain.Payment) error {
 	m.payments[payment.ID] = &payment
 	return nil
+}
+func (m *mockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, since time.Time) ([]paymentDomain.Payment, error) {
+	var result []paymentDomain.Payment
+	for _, p := range m.payments {
+		if p.Status == paymentDomain.PaymentStatusPending &&
+			p.Provider == "gateway" &&
+			p.ProviderOrderID != nil &&
+			(p.CreatedAt.After(since) || p.CreatedAt.Equal(since)) {
+			result = append(result, *p)
+		}
+	}
+	return result, nil
 }
 
 // mockPaymentAccountRepo tracks increments, decrements and supports injecting errors.
@@ -254,11 +267,81 @@ func (m *mockPaymentGateway) Charge(_ context.Context, _ paymentgateway.ChargeRe
 func (m *mockPaymentGateway) ParseNotification(_ context.Context, _ paymentgateway.NotificationPayload) (*paymentgateway.NotificationResult, error) {
 	return m.result, m.err
 }
+func (m *mockPaymentGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
+	return m.result, m.err
+}
 func (m *mockPaymentGateway) CancelTransaction(_ context.Context, _ string) error {
 	return nil
 }
 func (m *mockPaymentGateway) Supports(_ string) bool {
 	return true
+}
+
+// mockPaymentWebhookEventRepo is a simple in-memory implementation of
+// PaymentWebhookEventRepository used in tests.
+type mockPaymentWebhookEventRepo struct {
+	events     map[string]*paymentDomain.PaymentWebhookEvent // key: order_id+":"+tx_status
+	upsertErr  error
+	markProcErr error
+	markFailErr error
+	processed  []uuid.UUID
+	failed     []uuid.UUID
+}
+
+func newMockWebhookEventRepo() *mockPaymentWebhookEventRepo {
+	return &mockPaymentWebhookEventRepo{
+		events: make(map[string]*paymentDomain.PaymentWebhookEvent),
+	}
+}
+
+func (m *mockPaymentWebhookEventRepo) Upsert(
+	_ context.Context,
+	_ transaction.Executor,
+	event paymentDomain.PaymentWebhookEvent,
+) (*paymentDomain.PaymentWebhookEvent, error) {
+	if m.upsertErr != nil {
+		return nil, m.upsertErr
+	}
+	key := event.OrderID + ":" + event.TransactionStatus
+	if existing, ok := m.events[key]; ok {
+		return existing, nil
+	}
+	m.events[key] = &event
+	return &event, nil
+}
+
+func (m *mockPaymentWebhookEventRepo) MarkProcessed(
+	_ context.Context,
+	_ transaction.Executor,
+	id uuid.UUID,
+) error {
+	if m.markProcErr != nil {
+		return m.markProcErr
+	}
+	m.processed = append(m.processed, id)
+	return nil
+}
+
+func (m *mockPaymentWebhookEventRepo) MarkFailed(
+	_ context.Context,
+	_ transaction.Executor,
+	id uuid.UUID,
+	_ string,
+) error {
+	if m.markFailErr != nil {
+		return m.markFailErr
+	}
+	m.failed = append(m.failed, id)
+	return nil
+}
+
+// mockAuditLogger captures audit events emitted during tests.
+type mockAuditLogger struct {
+	events []applogger.AuditEvent
+}
+
+func (m *mockAuditLogger) Log(_ context.Context, event applogger.AuditEvent) {
+	m.events = append(m.events, event)
 }
 
 // ---------------------------------------------------------------------------
@@ -272,14 +355,19 @@ func newWebhookUsecase(
 	oRepo *mockOrderRepo,
 	oiRepo *mockOrderItemRepo,
 	iRepo *mockInventoryRepo,
-	gateway *mockPaymentGateway,
+	gateway paymentgateway.Provider,
 	transactor transaction.Transactor,
 ) *ProcessPaymentWebhookUsecase {
 	if transactor == nil {
 		transactor = &mockTransactor{}
 	}
 	return NewProcessPaymentWebhookUsecase(
-		pRepo, paRepo, peRepo, oRepo, oiRepo, iRepo, gateway, transactor, &mockExecutor{},
+		pRepo, paRepo, peRepo,
+		newMockWebhookEventRepo(),
+		oRepo, oiRepo, iRepo,
+		gateway,
+		&mockAuditLogger{},
+		transactor, &mockExecutor{},
 	)
 }
 
@@ -323,7 +411,7 @@ func TestProcessPaymentWebhook_Settlement(t *testing.T) {
 	}
 
 	err := newWebhookUsecase(pRepo, paRepo, peRepo, oRepo, oiRepo, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -377,7 +465,7 @@ func TestProcessPaymentWebhook_Expire(t *testing.T) {
 	}
 
 	err := newWebhookUsecase(pRepo, paRepo, peRepo, oRepo, oiRepo, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "expire"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -420,7 +508,7 @@ func TestProcessPaymentWebhook_Cancel(t *testing.T) {
 	}
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo, oiRepo, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "cancel"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -459,7 +547,7 @@ func TestProcessPaymentWebhook_Deny(t *testing.T) {
 	}
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo, oiRepo, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "deny"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -498,7 +586,7 @@ func TestProcessPaymentWebhook_Pending_IsNoOp(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, peRepo, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "pending"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -533,7 +621,7 @@ func TestProcessPaymentWebhook_Challenge_IsNoOp(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, peRepo, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "challenge"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -569,7 +657,7 @@ func TestProcessPaymentWebhook_Idempotent_AlreadyPaid(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, peRepo, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -601,7 +689,7 @@ func TestProcessPaymentWebhook_Idempotent_AlreadyCancelled(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, peRepo, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "cancel"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -640,7 +728,7 @@ func TestProcessPaymentWebhook_PaymentAccountLoadDecremented_OnSettle(t *testing
 
 	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -672,7 +760,7 @@ func TestProcessPaymentWebhook_PaymentAccountLoadDecremented_OnExpire(t *testing
 
 	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "expire"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -701,7 +789,7 @@ func TestProcessPaymentWebhook_PaymentAccountLoadNotDecremented_WhenNotSet(t *te
 
 	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -730,7 +818,7 @@ func TestProcessPaymentWebhook_PaymentNotFound(t *testing.T) {
 		&mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}},
 		&mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 
 	if err == nil {
 		t.Fatal("expected error when payment not found, got nil")
@@ -751,7 +839,7 @@ func TestProcessPaymentWebhook_InvalidOrderIDInGatewayResponse(t *testing.T) {
 		&mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}},
 		&mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": "not-a-uuid"}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": "not-a-uuid", "transaction_status": "settlement"}})
 
 	if err == nil {
 		t.Fatal("expected error for invalid order ID in gateway response")
@@ -767,7 +855,7 @@ func TestProcessPaymentWebhook_GatewayParseError(t *testing.T) {
 		&mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}},
 		&mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": uuid.New().String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": uuid.New().String(), "transaction_status": "settlement"}})
 
 	if err == nil {
 		t.Fatal("expected error when gateway.ParseNotification fails")
@@ -795,7 +883,7 @@ func TestProcessPaymentWebhook_PaymentRepoUpdateFails(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 
 	if err == nil {
 		t.Fatal("expected error when payment repo update fails")
@@ -823,7 +911,7 @@ func TestProcessPaymentWebhook_OrderRepoUpdateFails(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 
 	if err == nil {
 		t.Fatal("expected error when order repo update fails")
@@ -853,7 +941,7 @@ func TestProcessPaymentWebhook_InventoryCommitFails(t *testing.T) {
 	}
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo, oiRepo, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err == nil {
 		t.Fatal("expected error when inventory commit fails")
 	}
@@ -882,7 +970,7 @@ func TestProcessPaymentWebhook_InventoryReleaseFails(t *testing.T) {
 	}
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo, oiRepo, iRepo, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "expire"}})
 	if err == nil {
 		t.Fatal("expected error when inventory release fails")
 	}
@@ -907,7 +995,7 @@ func TestProcessPaymentWebhook_PaymentEventCreateFails(t *testing.T) {
 
 	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, peRepo, oRepo,
 		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String()}})
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err == nil {
 		t.Fatal("expected error when payment event creation fails")
 	}

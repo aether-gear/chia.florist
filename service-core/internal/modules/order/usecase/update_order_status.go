@@ -63,6 +63,14 @@ func NewUpdateOrderStatusUsecase(
 type UpdateOrderStatusInput struct {
 	OrderID uuid.UUID
 	Status  domain.OrderStatus
+
+	// TrackingNumber is an optional override used when the server is running
+	// in manual logistics mode. Automated providers (e.g. Komerce) ignore it.
+	TrackingNumber *string
+
+	// FulfillmentMethod is an optional override. If not provided, it defaults
+	// to "courier".
+	FulfillmentMethod *string
 }
 
 type UpdateOrderStatusResult struct {
@@ -79,6 +87,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
+
 	if order == nil {
 		return nil, apperrors.NewNotFound("order not found")
 	}
@@ -100,37 +109,57 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return &result, nil
 	}
 
-	// processing → shipped: create Komerce logistics order
+	// processing → shipped
 	items, err := u.orderItemRepo.
 		ListByOrderID(ctx, u.executor, order.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list order items: %w", err)
 	}
+
 	if len(items) == 0 {
 		return nil, apperrors.NewInvalidInput("order has no items")
 	}
 
-	// All items within a single order share the same courier selection
-	// (captured at checkout per shop). Use the first item as the reference.
+	// All items within a single order share
+	// the same courier selection (captured at checkout per shop).
+	//
+	// Use the first item as the reference.
 	first := items[0]
 
-	var courierCode, courierService string
-	if first.CourierCode != nil {
-		courierCode = *first.CourierCode
-	}
-	if first.CourierService != nil {
-		courierService = *first.CourierService
-	}
-	if courierCode == "" || courierService == "" {
-		return nil, apperrors.NewInvalidInput("order items have no courier information")
+	method := shipmentDomain.FulfillmentMethodCourier
+	if input.FulfillmentMethod != nil &&
+		*input.FulfillmentMethod != "" {
+		method = shipmentDomain.FulfillmentMethod(*input.FulfillmentMethod)
 	}
 
-	// Resolve customer destination district ID from the order's address.
+	var courierCode, courierService string
+	if method == shipmentDomain.FulfillmentMethodCourier {
+		if first.CourierCode != nil {
+			courierCode = *first.CourierCode
+		}
+
+		if first.CourierService != nil {
+			courierService = *first.CourierService
+		}
+
+		if courierCode == "" || courierService == "" {
+			return nil, apperrors.NewInvalidInput("order items have no courier information")
+		}
+	} else {
+		courierCode = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+		courierService = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+	}
+
+	// Resolve customer destination district ID
+	// from the order's address.
 	customerAddr, err := u.addressRepo.
-		GetByID(ctx, u.executor, order.AddressID)
+		GetByID(ctx, u.executor,
+			order.AddressID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get customer address: %w", err)
 	}
+
 	if customerAddr == nil {
 		return nil, apperrors.NewNotFound("customer address not found")
 	}
@@ -140,12 +169,16 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, fmt.Errorf("invalid destination district ID %q: %w", customerAddr.Detail.DistrictID, err)
 	}
 
-	// Resolve shop origin district ID from the shop's default address.
+	// Resolve shop origin district ID
+	// from the shop's default address.
 	shopAddr, err := u.shopAddressRepo.
-		GetDefaultByShopID(ctx, u.executor, first.ShopID)
+		GetDefaultByShopID(ctx, u.executor,
+			first.ShopID,
+		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shop address: %w", err)
 	}
+
 	if shopAddr == nil {
 		return nil, apperrors.NewNotFound("shop address not found")
 	}
@@ -155,49 +188,62 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, fmt.Errorf("invalid origin district ID %q: %w", shopAddr.Detail.DistrictID, err)
 	}
 
-	// Build a human-readable item name for the Komerce order.
-	itemName := first.ProductName
-	if len(items) > 1 {
-		itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(items)-1)
-	}
+	var trackingNumber *string
+	if method == shipmentDomain.FulfillmentMethodCourier {
+		// Build a human-readable item name
+		// for the Komerce order.
+		itemName := first.ProductName
+		if len(items) > 1 {
+			itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(items)-1)
+		}
 
-	// Cost is pulled from the order's ShippingFee stored at checkout (OQ1).
-	// Weight uses the placeholder constant above until product weight is tracked.
-	komerceResult, err := u.logistics.CreateOrder(ctx, shipping.CreateOrderInput{
-		OriginAreaID:      originAreaID,
-		DestinationAreaID: destAreaID,
-		CourierCode:       courierCode,
-		CourierService:    courierService,
-		Weight:            DEFAULT_SHIPMENT_WEIGHT_GRAMS,
-		UniqueOrderID:     order.Number,
-		ItemName:          itemName,
-		ItemPrice:         order.Subtotal,
-		ItemQty:           DEFAULT_SHIPMENT_ITEM_QTY,
-		ShipperName:       shopAddr.Label,
-		ShipperPhone:      derefPhone(shopAddr.Phone),
-		ShipperAddress:    shopAddr.Detail.FullAddress,
-		ReceiverName:      customerAddr.ReceiverName,
-		ReceiverPhone:     derefPhone(customerAddr.Phone),
-		ReceiverAddress:   customerAddr.Detail.FullAddress,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
+		orderInput := shipping.CreateOrderInput{
+			OriginAreaID:         originAreaID,
+			DestinationAreaID:    destAreaID,
+			CourierCode:          courierCode,
+			CourierService:       courierService,
+			Weight:               DEFAULT_SHIPMENT_WEIGHT_GRAMS,
+			UniqueOrderID:        order.Number,
+			ItemName:             itemName,
+			ItemPrice:            order.Subtotal,
+			ItemQty:              DEFAULT_SHIPMENT_ITEM_QTY,
+			ShipperName:          shopAddr.Label,
+			ShipperPhone:         derefPhone(shopAddr.Phone),
+			ShipperAddress:       shopAddr.Detail.FullAddress,
+			ReceiverName:         customerAddr.ReceiverName,
+			ReceiverPhone:        derefPhone(customerAddr.Phone),
+			ReceiverAddress:      customerAddr.Detail.FullAddress,
+			ManualTrackingNumber: input.TrackingNumber,
+		}
+
+		// Cost is pulled from the order's ShippingFee
+		// stored at checkout (OQ1).
+		//
+		// Weight uses the placeholder constant above
+		// until product weight is tracked.
+		komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
+		}
+
+		tracking := komerceResult.TrackingNumber
+		trackingNumber = &tracking
 	}
 
 	now := time.Now()
-	trackingNumber := komerceResult.TrackingNumber
 	shipment := shipmentDomain.Shipment{
-		ID:             uuid.New(),
-		OrderID:        order.ID,
-		Status:         shipmentDomain.ShipmentStatusCreated,
-		TrackingNumber: &trackingNumber,
-		Courier:        courierCode,
-		Service:        courierService,
-		Cost:           order.ShippingFee,
-		Weight:         DEFAULT_SHIPMENT_WEIGHT_GRAMS,
-		OriginID:       shopAddr.Detail.DistrictID,
-		DestinationID:  customerAddr.Detail.DistrictID,
-		CreatedAt:      now,
+		ID:                uuid.New(),
+		OrderID:           order.ID,
+		Status:            shipmentDomain.ShipmentStatusCreated,
+		FulfillmentMethod: method,
+		TrackingNumber:    trackingNumber,
+		Courier:           courierCode,
+		Service:           courierService,
+		Cost:              order.ShippingFee,
+		Weight:            DEFAULT_SHIPMENT_WEIGHT_GRAMS,
+		OriginID:          shopAddr.Detail.DistrictID,
+		DestinationID:     customerAddr.Detail.DistrictID,
+		CreatedAt:         now,
 	}
 
 	if err := shipment.Validate(); err != nil {
@@ -207,18 +253,20 @@ func (u *UpdateOrderStatusUsecase) Execute(
 	var created *shipmentDomain.Shipment
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.shipmentRepo.
-			Create(ctx, exec, shipment); err != nil {
+			Create(ctx, exec,
+				shipment,
+			); err != nil {
 			return fmt.Errorf("failed to persist shipment: %w", err)
 		}
+
 		if err := u.orderRepo.
-			UpdateStatus(
-				ctx,
-				exec,
+			UpdateStatus(ctx, exec,
 				order.ID,
 				input.Status,
 			); err != nil {
 			return fmt.Errorf("failed to update order status: %w", err)
 		}
+
 		created = &shipment
 		return nil
 	})

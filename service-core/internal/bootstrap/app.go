@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -12,6 +13,7 @@ type App struct {
 	container    *Container
 	router       *chi.Mux
 	cfg          Config
+	cancelSync   context.CancelFunc
 }
 
 func New(cfg Config) (*App, error) {
@@ -32,6 +34,12 @@ func New(cfg Config) (*App, error) {
 }
 
 func (a *App) Close() {
+	// Stop the reconciliation job first so it doesn't race
+	// against the DB connection being closed.
+	if a.cancelSync != nil {
+		a.cancelSync()
+	}
+
 	if a == nil || a.dependencies == nil {
 		return
 	}
@@ -40,6 +48,15 @@ func (a *App) Close() {
 }
 
 func (a *App) Run() error {
+	// Start the payment reconciliation job in the background.
+	// It shuts down cleanly when the context is cancelled (in Close).
+	if a.dependencies.PaymentSyncJob != nil {
+		syncCtx, cancel := context.WithCancel(context.Background())
+		a.cancelSync = cancel
+
+		go a.dependencies.PaymentSyncJob.Start(syncCtx)
+	}
+
 	addr := a.cfg.App.Host + ":" + a.cfg.App.Port
 	log.Printf("service-core running on %s\n", addr)
 	return http.ListenAndServe(addr, a.router)

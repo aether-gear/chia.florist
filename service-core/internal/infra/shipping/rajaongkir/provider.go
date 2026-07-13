@@ -18,7 +18,7 @@ import (
 	config "service-core/internal/shared/config"
 )
 
-type rajaOngkirProvider struct {
+type RajaOngkirProvider struct {
 	client      *http.Client
 	baseURL     string
 	shippingKey string
@@ -28,7 +28,7 @@ type rajaOngkirProvider struct {
 
 func NewRajaOngkirProvider(
 	cfg config.RajaOngkirConfig,
-) (shipping.Provider, error) {
+) (*RajaOngkirProvider, error) {
 	if strings.TrimSpace(cfg.URL) == "" ||
 		strings.TrimSpace(cfg.QRISLYKey) == "" ||
 		strings.TrimSpace(cfg.ShippingCostKey) == "" ||
@@ -47,7 +47,7 @@ func NewRajaOngkirProvider(
 		baseURL = cleanedURL
 	}
 
-	return &rajaOngkirProvider{
+	return &RajaOngkirProvider{
 		client:      &http.Client{Timeout: 30 * time.Second},
 		baseURL:     baseURL,
 		shippingKey: cfg.ShippingCostKey,
@@ -72,7 +72,7 @@ type calculateRatesResponse struct {
 	} `json:"data"`
 }
 
-func (s *rajaOngkirProvider) CalculateRates(
+func (s *RajaOngkirProvider) CalculateRates(
 	ctx context.Context,
 	input shipping.CalculateRatesInput,
 ) ([]shipping.RateOption, error) {
@@ -130,7 +130,7 @@ type destinationResponse struct {
 	} `json:"data"`
 }
 
-func (s *rajaOngkirProvider) ListProvinces(
+func (s *RajaOngkirProvider) ListProvinces(
 	ctx context.Context,
 ) ([]locationDomain.Province, error) {
 	body, err := s.doLocationRequest(ctx, http.MethodGet, "/province", nil)
@@ -158,7 +158,7 @@ func (s *rajaOngkirProvider) ListProvinces(
 	return provinces, nil
 }
 
-func (s *rajaOngkirProvider) ListCities(
+func (s *RajaOngkirProvider) ListCities(
 	ctx context.Context,
 	provinceID string,
 ) ([]locationDomain.City, error) {
@@ -188,7 +188,7 @@ func (s *rajaOngkirProvider) ListCities(
 	return cities, nil
 }
 
-func (s *rajaOngkirProvider) ListDistricts(
+func (s *RajaOngkirProvider) ListDistricts(
 	ctx context.Context,
 	cityID string,
 ) ([]locationDomain.District, error) {
@@ -218,7 +218,7 @@ func (s *rajaOngkirProvider) ListDistricts(
 	return districts, nil
 }
 
-func (s *rajaOngkirProvider) ListVillages(
+func (s *RajaOngkirProvider) ListVillages(
 	ctx context.Context,
 	districtID string,
 ) ([]locationDomain.Village, error) {
@@ -248,7 +248,7 @@ func (s *rajaOngkirProvider) ListVillages(
 	return villages, nil
 }
 
-func (s *rajaOngkirProvider) doCalculateRatesRequest(
+func (s *RajaOngkirProvider) doCalculateRatesRequest(
 	ctx context.Context,
 	method string,
 	input shipping.CalculateRatesInput,
@@ -290,7 +290,7 @@ func (s *rajaOngkirProvider) doCalculateRatesRequest(
 	return body, nil
 }
 
-func (s *rajaOngkirProvider) doLocationRequest(
+func (s *RajaOngkirProvider) doLocationRequest(
 	ctx context.Context,
 	method string,
 	path string,

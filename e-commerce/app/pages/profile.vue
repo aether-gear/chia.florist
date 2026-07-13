@@ -17,6 +17,13 @@ const addressVm = useAddress()
 const activeTab = ref('personal')
 const activeOrderStatus = ref<'pending' | 'processing' | 'shipping' | 'done'>('pending')
 
+const statusLabels = {
+  pending: 'Waiting Payment',
+  processing: 'To Ship',
+  shipping: 'Shipping',
+  done: 'Done'
+}
+
 // Edit address states
 const showAddressForm = ref(false)
 const editingAddress = ref<UserAddress | null>(null)
@@ -532,6 +539,27 @@ const leaveReview = (orderId: string) => {
 const triggerAlert = (message: string) => {
   window.alert(message)
 }
+
+const isCheckingPayment = ref(false)
+
+const handleCheckPaymentStatus = async (orderId: string) => {
+  isCheckingPayment.value = true
+  try {
+    const res = await orderService.checkOrderPaymentStatus(orderId)
+    if (res.status === 'paid') {
+      alert('Payment verified! Your order is now being processed.')
+      closeOrderDetail()
+      loadOrders('pending') // Refresh pending orders list
+    } else {
+      alert(`Payment status is still pending (status: ${res.status}). If you have already transferred, please wait up to 15 minutes for automated reconciliation.`)
+    }
+  } catch (err: any) {
+    console.error('Failed to check payment status:', err)
+    alert(err.data?.message || err.message || 'Failed to check payment status. Please try again.')
+  } finally {
+    isCheckingPayment.value = false
+  }
+}
 </script>
 
 <template>
@@ -737,7 +765,7 @@ const triggerAlert = (message: string) => {
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
             <div class="bg-white border border-gray-100 p-2 rounded-2xl shadow-sm grid grid-cols-4 gap-1 text-center font-medium">
               <button 
-                v-for="status in [{id:'pending', label:'Pending'}, {id:'processing', label:'Processing'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
+                v-for="status in [{id:'pending', label:'Waiting Payment'}, {id:'processing', label:'To Ship'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
                 :key="status.id"
                 @click="activeOrderStatus = status.id as any"
                 :class="['py-3 text-xs sm:text-sm rounded-xl transition-all font-bold', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-400 hover:text-gray-900']"
@@ -829,7 +857,7 @@ const triggerAlert = (message: string) => {
               <div v-else class="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
                 <div class="text-5xl mb-4">📑</div>
                 <h4 class="font-bold text-gray-900 text-lg">No Orders Found</h4>
-                <p class="text-sm text-gray-400 mt-1">There are no orders with the "{{ activeOrderStatus }}" status yet.</p>
+                <p class="text-sm text-gray-400 mt-1">There are no orders with the "{{ statusLabels[activeOrderStatus] }}" status yet.</p>
               </div>
 
               <!-- Pagination -->
@@ -1042,10 +1070,12 @@ const triggerAlert = (message: string) => {
                 Pay Now
               </button>
               <button 
-                @click="triggerAlert('Our team is reviewing your payment. Please wait up to 15 minutes.')" 
-                class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                @click="handleCheckPaymentStatus(selectedOrder.id)" 
+                :disabled="isCheckingPayment"
+                class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                Check Payment Status
+                <span v-if="isCheckingPayment" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-500 border-t-transparent"></span>
+                <span>Check Payment Status</span>
               </button>
             </div>
             <div v-else-if="selectedOrder.status === 'confirmed' || selectedOrder.status === 'processing'">
