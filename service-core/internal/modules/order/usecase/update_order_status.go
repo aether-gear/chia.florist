@@ -63,6 +63,10 @@ func NewUpdateOrderStatusUsecase(
 type UpdateOrderStatusInput struct {
 	OrderID uuid.UUID
 	Status  domain.OrderStatus
+
+	// TrackingNumber is an optional override used when the server is running
+	// in manual logistics mode. Automated providers (e.g. Komerce) ignore it.
+	TrackingNumber *string
 }
 
 type UpdateOrderStatusResult struct {
@@ -179,6 +183,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		ReceiverName:      customerAddr.ReceiverName,
 		ReceiverPhone:     derefPhone(customerAddr.Phone),
 		ReceiverAddress:   customerAddr.Detail.FullAddress,
+		ManualTrackingNumber: input.TrackingNumber,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)

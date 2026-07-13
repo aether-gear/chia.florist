@@ -6,7 +6,7 @@ import (
 
 type Config struct {
 	App         config.AppConfig
-	Shipping    config.ShippingConfig
+	Logistics   config.LogisticsConfig
 	JWT         config.JWTConfig
 	Storage     config.StorageConfig
 	Supabase    config.SupabaseConfig
@@ -45,7 +45,7 @@ func LoadConfig() Config {
 
 	return Config{
 		App:         config.LoadAppConfig(),
-		Shipping:    config.LoadShippingConfig(),
+		Logistics:   config.LoadLogisticsConfig(),
 		JWT:         config.LoadJWTConfig(),
 		Storage:     config.LoadStorageConfig(),
 		Supabase:    supabaseCfg,

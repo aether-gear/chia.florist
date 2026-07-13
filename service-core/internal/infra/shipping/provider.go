@@ -73,6 +73,12 @@ type CreateOrderInput struct {
 	ReceiverName    string
 	ReceiverPhone   string
 	ReceiverAddress string
+
+	// ManualTrackingNumber is an optional pre-set
+	// tracking number supplied by staff when the server
+	// runs in manual logistics mode. Automated providers
+	// (e.g. Komerce) ignore this field entirely.
+	ManualTrackingNumber *string
 }
 
 type CreateOrderResult struct {

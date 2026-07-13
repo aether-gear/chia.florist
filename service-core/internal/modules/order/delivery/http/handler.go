@@ -444,8 +444,10 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 
 // UpdateOrderStatus handles PATCH /orders/{orderID}/status — staff-only.
 // Transitions the order to the requested status. When the target status is
-// "shipped", the system automatically creates a Komerce logistics order and
-// a Shipment record; no additional fields are required from the caller.
+// "shipped", the configured LogisticsProvider creates a shipment record.
+// In Komerce mode the provider calls the external API and returns a tracking
+// number automatically. In manual mode the optional "tracking_number" field
+// in the request body is used instead — no external call is made.
 func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) error {
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
@@ -470,8 +472,9 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := h.updateOrderStatus.Execute(r.Context(), usecase.UpdateOrderStatusInput{
-		OrderID: orderID,
-		Status:  orderDomain.OrderStatus(req.Status),
+		OrderID:        orderID,
+		Status:         orderDomain.OrderStatus(req.Status),
+		TrackingNumber: req.TrackingNumber,
 	})
 	if err != nil {
 		return err

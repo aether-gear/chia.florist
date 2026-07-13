@@ -35,6 +35,11 @@ type createOrderRequest struct {
 
 type updateOrderStatusRequest struct {
 	Status string `json:"status"`
+
+	// TrackingNumber is optional. It is used in manual logistics mode to
+	// pre-set the shipment tracking number. Ignored when the server is
+	// configured with an automated provider (e.g. Komerce).
+	TrackingNumber *string `json:"tracking_number"`
 }
 
 // ---- Response DTOs ----
