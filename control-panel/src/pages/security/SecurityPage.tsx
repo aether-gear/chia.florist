@@ -1014,7 +1014,7 @@ export default function SecurityPage() {
                 <Input type="datetime-local" className="h-8 text-xs w-[170px]" value={tempStart} onChange={e => setTempStart(e.target.value)} />
                 <span className="text-slate-400 text-sm">to</span>
                 <Input type="datetime-local" className="h-8 text-xs w-[170px]" value={tempEnd} onChange={e => setTempEnd(e.target.value)} />
-                <Button size="sm" className="h-8 bg-slate-900 hover:bg-slate-800 text-white font-medium px-3" onClick={handleApplyCustomRange}>
+                <Button size="sm" className="h-8 px-3" onClick={handleApplyCustomRange}>
                   Apply
                 </Button>
               </div>
@@ -1182,8 +1182,8 @@ export default function SecurityPage() {
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <Button variant="destructive" className="flex-1 md:flex-none" onClick={() => handleIPSubmit('ban')}>Ban</Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-none" onClick={() => handleIPSubmit('whitelist')}>Whitelist</Button>
-              <Button className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white flex-1 md:flex-none" onClick={() => handleIPSubmit('ignore')}>Mute</Button>
+              <Button className="flex-1 md:flex-none" onClick={() => handleIPSubmit('whitelist')}>Whitelist</Button>
+              <Button variant="secondary" className="flex-1 md:flex-none" onClick={() => handleIPSubmit('ignore')}>Mute</Button>
             </div>
           </div>
 
@@ -1203,14 +1203,15 @@ export default function SecurityPage() {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                  className="h-8 text-xs"
                   onClick={() => handleBulkIPActionFromManager('whitelist')}
                 >
                   Bulk Whitelist
                 </Button>
                 <Button
                   size="sm"
-                  className="h-8 text-xs bg-slate-700 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium"
+                  variant="secondary"
+                  className="h-8 text-xs"
                   onClick={() => handleBulkIPActionFromManager('ignore')}
                 >
                   Bulk Mute
@@ -1500,7 +1501,7 @@ export default function SecurityPage() {
                   </Button>
                   <Button
                     size="sm"
-                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                    className="h-8 text-xs"
                     onClick={() => handleBulkIPAction('whitelist')}
                   >
                     Bulk Whitelist IPs
@@ -1508,7 +1509,7 @@ export default function SecurityPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 text-xs border-slate-300 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-200 font-medium"
+                    className="h-8 text-xs"
                     onClick={handleBulkDeleteLogs}
                   >
                     Delete Logs
@@ -1760,7 +1761,7 @@ export default function SecurityPage() {
               <label className="text-sm font-medium mb-1 block text-slate-700 dark:text-slate-300">Impact Score (1-10)</label>
               <Input type="number" min="1" max="10" value={newRuleImpact} onChange={(e) => setNewRuleImpact(e.target.value)} />
             </div>
-            <Button className="w-full mt-4 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white" onClick={handleAddRule}>Save Rule</Button>
+            <Button className="w-full mt-4" onClick={handleAddRule}>Save Rule</Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -1817,7 +1818,7 @@ export default function SecurityPage() {
                   />
                 </div>
                 <div className="flex justify-end gap-2 mt-6">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleUpdateRule}>Save Changes</Button>
+                  <Button onClick={handleUpdateRule}>Save Changes</Button>
                   <Button variant="outline" onClick={() => setIsEditingRule(false)}>Cancel</Button>
                 </div>
               </div>
@@ -2044,14 +2045,14 @@ export default function SecurityPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="h-9"
                       onClick={() => setSelectedDetailIP(null)}
                     >
                       Close
                     </Button>
                     <Button
                       size="sm"
-                      className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                      className="h-9"
                       onClick={async () => {
                         await handleIPSubmit(editIPStatus, selectedDetailIP, editIPReason);
                         setSelectedDetailIP(null);
