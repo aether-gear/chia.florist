@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Checkbox } from '../../components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -333,7 +334,7 @@ export default function ShopManagementPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => refresh()}
-                className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
+                className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-primary transition-colors"
               >
                 <RefreshCw className="h-4 w-4" />
                 Refresh
@@ -341,7 +342,7 @@ export default function ShopManagementPage() {
               <Button
                 size="sm"
                 onClick={() => setIsAddShopOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
+                className="flex items-center gap-1.5"
               >
                 <Plus className="h-4 w-4" />
                 Add Shop
@@ -486,19 +487,17 @@ export default function ShopManagementPage() {
                         />
                       </div>
                       <div className="flex items-center space-x-2 pt-2">
-                        <input
+                        <Checkbox
                           id="shopIsActive"
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                           checked={shopIsActive}
-                          onChange={(e) => setShopIsActive(e.target.checked)}
+                          onCheckedChange={(checked) => setShopIsActive(checked === true)}
                         />
                         <Label htmlFor="shopIsActive" className="text-sm font-medium leading-none cursor-pointer">
                           Shop is Active
                         </Label>
                       </div>
                       <div className="pt-2">
-                        <Button type="submit" disabled={isSavingShop} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button type="submit" disabled={isSavingShop}>
                           {isSavingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Save Settings
                         </Button>
@@ -519,7 +518,7 @@ export default function ShopManagementPage() {
                     
                     <Sheet open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
                       <SheetTrigger asChild>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button size="sm">
                           <Plus className="mr-1.5 h-4 w-4" /> Add Inventory
                         </Button>
                       </SheetTrigger>
@@ -571,7 +570,7 @@ export default function ShopManagementPage() {
                             <SheetClose asChild>
                               <Button type="button" variant="outline">Cancel</Button>
                             </SheetClose>
-                            <Button type="submit" disabled={isInventorySubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+                            <Button type="submit" disabled={isInventorySubmitting}>
                               {isInventorySubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                               Add Stock
                             </Button>
@@ -642,7 +641,7 @@ export default function ShopManagementPage() {
                     
                     <Sheet open={isAddressOpen} onOpenChange={setIsAddressOpen}>
                       <SheetTrigger asChild>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button size="sm">
                           <Plus className="mr-1.5 h-4 w-4" /> Add Address
                         </Button>
                       </SheetTrigger>
@@ -771,12 +770,10 @@ export default function ShopManagementPage() {
                           </div>
 
                           <div className="flex items-center space-x-2 pt-2">
-                            <input
+                            <Checkbox
                               id="isActive"
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                               checked={isActive}
-                              onChange={(e) => setIsActive(e.target.checked)}
+                              onCheckedChange={(checked) => setIsActive(checked === true)}
                             />
                             <Label htmlFor="isActive" className="text-sm font-medium leading-none cursor-pointer">
                               Set as active address
@@ -787,7 +784,7 @@ export default function ShopManagementPage() {
                             <SheetClose asChild>
                               <Button type="button" variant="outline">Cancel</Button>
                             </SheetClose>
-                            <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+                            <Button type="submit" disabled={isSubmitting}>
                               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                               Save Address
                             </Button>
@@ -931,12 +928,10 @@ export default function ShopManagementPage() {
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
-              <input
+              <Checkbox
                 id="newShopIsActive"
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                 checked={newShopIsActive}
-                onChange={(e) => setNewShopIsActive(e.target.checked)}
+                onCheckedChange={(checked) => setNewShopIsActive(checked === true)}
               />
               <Label htmlFor="newShopIsActive" className="text-sm font-medium leading-none cursor-pointer">
                 Shop is Active (Staff Admin Only)
@@ -947,7 +942,7 @@ export default function ShopManagementPage() {
               <SheetClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </SheetClose>
-              <Button type="submit" disabled={isCreatingShop} className="bg-indigo-600 hover:bg-indigo-700">
+              <Button type="submit" disabled={isCreatingShop}>
                 {isCreatingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Shop
               </Button>

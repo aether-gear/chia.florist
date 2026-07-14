@@ -600,7 +600,7 @@ export default function ProductFormSheet({
             <Button
               type="submit"
               size="sm"
-              className="text-xs h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm flex items-center gap-1.5"
+              className="text-xs h-8 px-3 font-medium flex items-center gap-1.5"
               onClick={handleSave}
               disabled={saving || loading}
             >
