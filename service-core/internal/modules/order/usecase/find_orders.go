@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	addressDomain "service-core/internal/modules/address/domain"
+	addressRepo "service-core/internal/modules/address/repository"
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
 	paymentDomain "service-core/internal/modules/payment/domain"
@@ -24,6 +26,7 @@ type FindOrdersUsecase struct {
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
 	shipmentRepo           shipmentRepo.ShipmentRepository
+	addressRepo            addressRepo.CustomerAddressRepository
 }
 
 func NewFindOrdersUsecase(
@@ -33,6 +36,7 @@ func NewFindOrdersUsecase(
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
+	addressRepo addressRepo.CustomerAddressRepository,
 ) *FindOrdersUsecase {
 	return &FindOrdersUsecase{
 		executor:               executor,
@@ -41,6 +45,7 @@ func NewFindOrdersUsecase(
 		paymentRepo:            paymentRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
 		shipmentRepo:           shipmentRepo,
+		addressRepo:            addressRepo,
 	}
 }
 
@@ -60,6 +65,7 @@ type OrderSearchResult struct {
 	Payment     *paymentDomain.Payment
 	ChannelData *paymentDomain.PaymentChannelData
 	Shipment    *shipmentDomain.Shipment
+	Address     *addressDomain.CustomerAddress
 }
 
 func (u *FindOrdersUsecase) Execute(
@@ -133,7 +139,6 @@ func (u *FindOrdersUsecase) Execute(
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list orders: %w", err)
 	}
-
 	if len(orders) == 0 {
 		return []OrderSearchResult{}, total, nil
 	}
@@ -198,6 +203,29 @@ func (u *FindOrdersUsecase) Execute(
 		shipmentsMap[s.OrderID] = &s
 	}
 
+	addressIDs := make([]uuid.UUID, 0, len(orders))
+	addressSeen := make(map[uuid.UUID]bool)
+	for _, o := range orders {
+		if o.AddressID != uuid.Nil && !addressSeen[o.AddressID] {
+			addressSeen[o.AddressID] = true
+			addressIDs = append(addressIDs, o.AddressID)
+		}
+	}
+
+	addresses, err := u.addressRepo.
+		ListByIDs(ctx, u.executor,
+			addressIDs,
+		)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list customer addresses: %w", err)
+	}
+
+	addressesMap := make(map[uuid.UUID]*addressDomain.CustomerAddress)
+	for i := range addresses {
+		addr := addresses[i]
+		addressesMap[addr.ID] = &addr
+	}
+
 	results := make([]OrderSearchResult, len(orders))
 	for i, o := range orders {
 		items := itemsMap[o.ID]
@@ -218,6 +246,7 @@ func (u *FindOrdersUsecase) Execute(
 			Payment:     payment,
 			ChannelData: channelData,
 			Shipment:    shipmentsMap[o.ID],
+			Address:     addressesMap[o.AddressID],
 		}
 	}
 

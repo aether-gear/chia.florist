@@ -155,6 +155,13 @@ func (m *uosMockAddressRepo) DeleteByCustomerID(_ context.Context, _ transaction
 	return nil
 }
 
+func (m *uosMockAddressRepo) ListByIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]addressDomain.CustomerAddress, error) {
+	if m.addr != nil {
+		return []addressDomain.CustomerAddress{*m.addr}, m.err
+	}
+	return nil, m.err
+}
+
 type uosMockShopAddressRepo struct {
 	addr *addressDomain.ShopAddress
 	err  error

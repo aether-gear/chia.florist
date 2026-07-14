@@ -21,6 +21,14 @@ export interface OrderPayment {
   created_at: string;
 }
 
+export interface ShipmentEvent {
+  id: string;
+  status: string;
+  description: string;
+  location: string;
+  timestamp: string;
+}
+
 export interface OrderShipment {
   id: string;
   status: string;
@@ -30,6 +38,21 @@ export interface OrderShipment {
   tracking_number: string | null;
   cost: number;
   created_at: string;
+  events?: ShipmentEvent[];
+}
+
+export interface OrderAddress {
+  id: string;
+  customer_id: string;
+  receiver_name: string;
+  phone: string;
+  is_default: boolean;
+  province_id: string;
+  city_id: string;
+  district_id: string;
+  village_id: string;
+  full_address: string;
+  postal_code: string;
 }
 
 export interface Order {
@@ -46,6 +69,7 @@ export interface Order {
   items: OrderItem[];
   payment?: OrderPayment;
   shipment?: OrderShipment;
+  address?: OrderAddress;
 }
 
 export interface OrdersResponse {

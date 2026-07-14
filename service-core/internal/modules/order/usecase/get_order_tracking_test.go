@@ -132,6 +132,12 @@ func (m *gotMockAddressRepo) Delete(_ context.Context, _ transaction.Executor, _
 func (m *gotMockAddressRepo) DeleteByCustomerID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
+func (m *gotMockAddressRepo) ListByIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]addressDomain.CustomerAddress, error) {
+	if m.addr != nil {
+		return []addressDomain.CustomerAddress{*m.addr}, nil
+	}
+	return nil, nil
+}
 
 type gotMockLogisticsProvider struct {
 	events []shipping.TrackingEvent

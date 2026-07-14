@@ -1371,7 +1371,7 @@ Empty body.
     {
       "id": "e4a31771-4638-4e89-a292-624e723927d1",
       "number": "ORD-20260621-E4A317",
-      "user_id": "8ce91a56-deea-46ac-9330-de65d64daa32",
+      "customer_id": "8ce91a56-deea-46ac-9330-de65d64daa32",
       "address_id": "48956fd0-bcea-44a2-b598-af999d7abc7a",
       "status": "pending",
       "subtotal": 150000,
@@ -1379,6 +1379,19 @@ Empty body.
       "total": 165000,
       "created_at": "2026-06-21T08:45:00Z",
       "updated_at": null,
+      "address": {
+        "id": "48956fd0-bcea-44a2-b598-af999d7abc7a",
+        "customer_id": "8ce91a56-deea-46ac-9330-de65d64daa32",
+        "receiver_name": "Jane Doe",
+        "phone": "+628123456789",
+        "is_default": true,
+        "province_id": "31",
+        "city_id": "3173",
+        "district_id": "317305",
+        "village_id": "3173051003",
+        "full_address": "Jl. Mawar No. 12",
+        "postal_code": "11530"
+      },
       "items": [
         {
           "id": "2529f895-5b14-4aa1-a8a1-5bf890160441",

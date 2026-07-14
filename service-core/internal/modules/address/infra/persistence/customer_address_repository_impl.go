@@ -348,3 +348,76 @@ func (r *customerAddressRepositoryImpl) DeleteByCustomerID(
 
 	return nil
 }
+
+func (r *customerAddressRepositoryImpl) ListByIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressIDs []uuid.UUID,
+) ([]domain.CustomerAddress, error) {
+	if len(addressIDs) == 0 {
+		return []domain.CustomerAddress{}, nil
+	}
+
+	query := `
+		SELECT
+			id,
+			customer_id,
+			recipient_name,
+			phone,
+			province,
+			city,
+			district,
+			village,
+			full_address,
+			postal_code,
+			is_default,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM customer_addresses
+		WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
+	`
+
+	addressIDStrings := make([]string, len(addressIDs))
+	for i, id := range addressIDs {
+		addressIDStrings[i] = id.String()
+	}
+
+	rows, err := exec.Query(ctx, query, addressIDStrings)
+	if err != nil {
+		return nil, fmt.Errorf("query customer addresses by ids failed: %w", err)
+	}
+	defer rows.Close()
+
+	var addresses []domain.CustomerAddress
+	for rows.Next() {
+		var a domain.CustomerAddress
+		err := rows.Scan(
+			&a.ID,
+			&a.CustomerID,
+			&a.ReceiverName,
+			&a.Phone,
+			&a.Detail.ProvinceID,
+			&a.Detail.CityID,
+			&a.Detail.DistrictID,
+			&a.Detail.VillageID,
+			&a.Detail.FullAddress,
+			&a.Detail.PostalCode,
+			&a.IsDefault,
+			&a.CreatedAt,
+			&a.UpdatedAt,
+			&a.DeletedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("mapping address model to domain failed: %w", err)
+		}
+		addresses = append(addresses, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate addresses failed: %w", err)
+	}
+
+	return addresses, nil
+}
+
