@@ -266,7 +266,7 @@ export default function DashboardLayout() {
             {renderProfileDropdown()}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1">
           <div className="mx-auto max-w-7xl p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
             <Outlet />
           </div>

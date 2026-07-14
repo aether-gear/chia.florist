@@ -4,7 +4,6 @@ import LoginPage from '../pages/auth/LoginPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import SecurityPage from '../pages/security/SecurityPage';
-import PlaceholderPage from '../pages/PlaceholderPage';
 import OrdersPage from '../pages/orders/OrdersPage';
 import MerchantProfileSettings from '../pages/merchant-profile/MerchantProfileSettings';
 import CreateMerchantPage from '../pages/admin/CreateMerchantPage';
@@ -34,7 +33,7 @@ export default function AppRoutes() {
             <Route path="/products" element={<ProductsPage />} />
 
             <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/shipments" element={<PlaceholderPage title="Shipments" />} />
+            <Route path="/shipments" element={<Navigate to="/orders" replace />} />
             <Route path="/merchant/settings" element={<MerchantProfileSettings />} />
             
             {/* Admin Routes */}
