@@ -23,7 +23,6 @@ type FormData = z.infer<typeof schema>;
 export default function AddMerchantAccountPage() {
   const { merchantId: paramMerchantId } = useParams();
 
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -76,8 +75,8 @@ export default function AddMerchantAccountPage() {
   return (
     <div className="max-w-2xl mx-auto py-8">
       <div className="mb-8 flex items-center space-x-3">
-        <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center">
-          <Users className="h-5 w-5 text-indigo-600" />
+        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
+          <Users className="h-5 w-5 text-primary" />
         </div>
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Add Merchant (Staff) Account</h2>
@@ -85,7 +84,7 @@ export default function AddMerchantAccountPage() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-sm">
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Account Details</CardTitle>
           <CardDescription>Enter the credentials and contact info for the new user.</CardDescription>
@@ -146,7 +145,7 @@ export default function AddMerchantAccountPage() {
             {error && <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">{error}</div>}
             {success && <div className="p-3 text-sm text-green-700 bg-green-50 rounded-md border border-green-100">{success}</div>}
 
-            <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+            <Button type="submit" disabled={loading} className="w-full">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create Account
             </Button>

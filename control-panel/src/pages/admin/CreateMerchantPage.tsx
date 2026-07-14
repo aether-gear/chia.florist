@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, Store } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
@@ -48,8 +49,8 @@ export default function CreateMerchantPage() {
   return (
     <div className="max-w-2xl mx-auto py-8">
       <div className="mb-8 flex items-center space-x-3">
-        <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center">
-          <Store className="h-5 w-5 text-indigo-600" />
+        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
+          <Store className="h-5 w-5 text-primary" />
         </div>
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Create Merchant (Staff)</h2>
@@ -57,7 +58,7 @@ export default function CreateMerchantPage() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-sm">
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Merchant Details</CardTitle>
           <CardDescription>Enter the basic information for the new merchant.</CardDescription>
@@ -72,10 +73,10 @@ export default function CreateMerchantPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Description</label>
-              <textarea 
+              <Textarea 
                 {...register('description')}
-                className="flex min-h-[100px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 placeholder="Briefly describe the business..."
+                className="min-h-[100px]"
               />
               {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
             </div>
@@ -97,7 +98,7 @@ export default function CreateMerchantPage() {
             {error && <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">{error}</div>}
             {success && <div className="p-3 text-sm text-green-700 bg-green-50 rounded-md border border-green-100">{success}</div>}
 
-            <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+            <Button type="submit" disabled={loading} className="w-full">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Register Merchant
             </Button>
