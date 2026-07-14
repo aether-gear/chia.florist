@@ -1,4 +1,4 @@
-import { Store, Search, Loader2 } from 'lucide-react';
+import { Store, Search } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
@@ -13,25 +13,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useMerchantsViewModel } from '../../viewmodels/useMerchantsViewModel';
 import Pagination from '../../components/Pagination';
+import { Skeleton } from '../../components/ui/skeleton';
 
 export default function MerchantsListPage() {
   const { data, loading, error, page, limit, setPage } = useMerchantsViewModel();
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex-col md:flex">
@@ -83,7 +70,26 @@ export default function MerchantsListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.merchants.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell><Skeleton className="h-10 w-10 rounded-md bg-muted animate-pulse" /></TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-36 animate-pulse bg-muted mb-1.5" />
+                          <Skeleton className="h-3.5 w-24 animate-pulse bg-muted" />
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-48 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-28 animate-pulse bg-muted" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : !data?.merchants || data.merchants.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center">
                         No merchants found.

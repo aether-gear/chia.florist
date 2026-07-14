@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
 import { fetchApi } from '../../lib/api';
 import ProductFormSheet from '../../components/products/ProductFormSheet';
-import LoadingState from '../../components/LoadingState';
+import { Skeleton } from '../../components/ui/skeleton';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
@@ -64,20 +64,7 @@ export default function ProductsPage() {
     }
   };
 
-  if (loading) {
-    return <LoadingState message="Loading products..." />;
-  }
 
-  if (error) {
-    return (
-      <EmptyState
-        title="Failed to load products"
-        description={error}
-        actionLabel="Retry"
-        onAction={() => refresh()}
-      />
-    );
-  }
 
   return (
     <div className="flex-col md:flex">
@@ -134,7 +121,34 @@ export default function ProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell><Skeleton className="h-10 w-10 rounded-md bg-muted animate-pulse" /></TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-32 animate-pulse bg-muted mb-1.5" />
+                          <Skeleton className="h-3.5 w-24 animate-pulse bg-muted" />
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-20 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24 animate-pulse bg-muted" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-8 rounded-xl ml-auto animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="p-0">
+                        <EmptyState
+                          title="Failed to load products"
+                          description={error}
+                          actionLabel="Retry"
+                          onAction={() => refresh()}
+                          className="flex h-32 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent text-destructive"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredProducts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="p-0">
                         <EmptyState

@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '../../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import {
   Sheet,
@@ -299,21 +300,7 @@ export default function ShopManagementPage() {
     setIsDetailsOpen(true);
   };
 
-  if (loading && shops.length === 0) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex-col md:flex">
@@ -366,7 +353,22 @@ export default function ShopManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {shops.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell><Skeleton className="h-5 w-40 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-60 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 animate-pulse bg-muted" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center h-24 text-destructive">
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : shops.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
                         No shops found.

@@ -1,4 +1,4 @@
-import { Search, Loader2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import {
   Table,
@@ -12,25 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { useCustomersViewModel } from '../../viewmodels/useCustomersViewModel';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import Pagination from '../../components/Pagination';
+import { Skeleton } from '../../components/ui/skeleton';
 
 export default function CustomersListPage() {
   const { data, loading, error, page, limit, setPage } = useCustomersViewModel();
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
-    );
-  }
 
   // Generate initials for avatar fallback
   const getInitials = (name: string) => {
@@ -83,7 +70,29 @@ export default function CustomersListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.customers.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-10 w-10 rounded-full animate-pulse bg-muted" />
+                            <div className="space-y-1.5 flex-1">
+                              <Skeleton className="h-4 w-28 animate-pulse bg-muted" />
+                              <Skeleton className="h-3 w-20 animate-pulse bg-muted" />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-24 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32 animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="h-24 text-center text-destructive">
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : !data?.customers || data.customers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={3} className="h-24 text-center">
                         No customers found.

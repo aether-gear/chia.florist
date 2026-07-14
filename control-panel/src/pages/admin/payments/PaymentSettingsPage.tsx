@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CreditCard, Wallet, Loader2, Plus, Pencil } from 'lucide-react';
+import { CreditCard, Wallet, Plus, Pencil } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import {
   Table,
@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { Skeleton } from '../../../components/ui/skeleton';
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
 import { Link } from 'react-router-dom';
 import type { PaymentMethod } from '../../../models/Payment';
@@ -25,21 +26,7 @@ export default function PaymentSettingsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailMethod, setDetailMethod] = useState<PaymentMethod | null>(null);
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
-    );
-  }
 
   const getMethodName = (methodId: string) => {
     const method = methods.find(m => m.id === methodId);
@@ -91,7 +78,22 @@ export default function PaymentSettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {accounts.length === 0 ? (
+                      {loading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={`accounts-skeleton-${i}`}>
+                            <TableCell><Skeleton className="h-5 w-5 rounded bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-40 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-28 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-32 bg-muted animate-pulse" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : error ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center h-24 text-destructive">
+                            {error}
+                          </TableCell>
+                        </TableRow>
+                      ) : accounts.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={4} className="text-center h-24">
                             No payment accounts configured.
@@ -147,7 +149,26 @@ export default function PaymentSettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {methods.length === 0 ? (
+                      {loading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={`methods-skeleton-${i}`}>
+                            <TableCell><Skeleton className="h-5 w-5 rounded bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-32 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-16 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-20 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-24 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-40 bg-muted animate-pulse" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto bg-muted animate-pulse" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-8 rounded-xl ml-auto bg-muted animate-pulse" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : error ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center h-24 text-destructive">
+                            {error}
+                          </TableCell>
+                        </TableRow>
+                      ) : methods.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center h-24">
                             No payment methods configured.
