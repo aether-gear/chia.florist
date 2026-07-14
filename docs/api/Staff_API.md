@@ -30,6 +30,9 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
   - [x] Profile
     - [x] Get Current User
     - [x] Update User
+  - [x] Shipments
+    - [x] Update Shipment Status
+    - [x] Update Shipment
 - [x] Staff Admin API
   - [x] Products Management
       - [x] Update Product
@@ -1459,6 +1462,105 @@ Empty body.
 |--------------------|-----------------------------|
 | `401 Unauthorized` | Missing or invalid session. |
 | `404 Not Found`    | User profile not found.     |
+
+## Shipment Management
+
+### Update Shipment Status
+
+- **Method**: `PATCH`
+- **Endpoint**: `/shipments/{shipmentID}/status`
+- **Description**: Update the status of a shipment. Transitions the shipment status and logs a shipment event. If the shipment status transitions to `delivered`, the parent order's status is also automatically updated to `delivered`.
+- **Authentication**: Staff
+- **Path Parameters**:
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `shipmentID` | `string (UUID)` | Yes | The ID of the shipment to update. |
+
+- **Request Body**:
+
+```json
+{
+  "status": "string (required, enum: created, packed, labelled, picked_up, in_transit, out_for_delivery, delivered, failed, returned, cancelled)",
+  "description": "string (optional)",
+  "location": "string (optional)"
+}
+```
+
+#### Response `200 OK`
+
+```json
+{
+  "id": "7ca19532-6bb0-47b8-936a-2ee3d6790b9b",
+  "order_id": "e4a31771-4638-4e89-a292-624e723927d1",
+  "status": "packed",
+  "fulfillment_method": "courier",
+  "tracking_number": "JNE123456789",
+  "courier": "jne",
+  "service": "REG",
+  "cost": 15000,
+  "weight": 1000,
+  "created_at": "2026-07-13T18:34:00Z"
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+| :--- | :--- |
+| `400 Bad Request` | Missing `status` in body, invalid `shipmentID` format, or invalid request payload. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff role. |
+| `404 Not Found` | Shipment not found. |
+| `422 Unprocessable Entity` | Invalid status transition (e.g., trying to transition from a terminal state or moving backwards). |
+
+### Update Shipment
+
+- **Method**: `PATCH`
+- **Endpoint**: `/shipments/{shipmentID}`
+- **Description**: Update a shipment's metadata such as the tracking number, courier code, or service name. Typically used in manual logistics mode when tracking numbers or waybill information becomes available later.
+- **Authentication**: Staff
+- **Path Parameters**:
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `shipmentID` | `string (UUID)` | Yes | The ID of the shipment to update. |
+
+- **Request Body**:
+
+```json
+{
+  "tracking_number": "string (optional)",
+  "courier": "string (optional)",
+  "service": "string (optional)"
+}
+```
+
+#### Response `200 OK`
+
+```json
+{
+  "id": "7ca19532-6bb0-47b8-936a-2ee3d6790b9b",
+  "order_id": "e4a31771-4638-4e89-a292-624e723927d1",
+  "status": "created",
+  "fulfillment_method": "courier",
+  "tracking_number": "JNE999888777",
+  "courier": "jne",
+  "service": "YES",
+  "cost": 15000,
+  "weight": 1000,
+  "created_at": "2026-07-13T18:34:00Z"
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+| :--- | :--- |
+| `400 Bad Request` | Invalid `shipmentID` format, or invalid request payload (e.g. invalid fields). |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff role. |
+| `404 Not Found` | Shipment not found. |
 
 ## Audit Logs
 
