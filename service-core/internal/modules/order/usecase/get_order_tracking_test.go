@@ -167,8 +167,11 @@ func TestGetOrderTracking_OrderNotFound(t *testing.T) {
 		CustomerID: uuid.New(),
 	})
 
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if err.Error() != "order not found" {
+		t.Fatalf("expected 'order not found' error, got: %v", err)
 	}
 	if result != nil {
 		t.Fatalf("expected nil result, got %v", result)
@@ -199,8 +202,11 @@ func TestGetOrderTracking_CustomerIDMismatch(t *testing.T) {
 		CustomerID: mismatchCustomerID,
 	})
 
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if err.Error() != "not authorized" {
+		t.Fatalf("expected 'not authorized' error, got: %v", err)
 	}
 	if result != nil {
 		t.Fatalf("expected nil result, got %v", result)
@@ -230,8 +236,11 @@ func TestGetOrderTracking_ShipmentNotFound(t *testing.T) {
 		CustomerID: customerID,
 	})
 
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if err.Error() != "shipment not found" {
+		t.Fatalf("expected 'shipment not found' error, got: %v", err)
 	}
 	if result != nil {
 		t.Fatalf("expected nil result, got %v", result)
