@@ -128,3 +128,19 @@ type orderResponse struct {
 	Payment     *paymentDetailResponse  `json:"payment,omitempty"`
 	Shipment    *shipmentDetailResponse `json:"shipment,omitempty"`
 }
+
+type trackingTimelineEventResponse struct {
+	Status      string    `json:"status"`
+	Description string    `json:"description"`
+	Location    string    `json:"location"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
+type orderTrackingResponse struct {
+	OrderID        string                           `json:"order_id"`
+	ShipmentID     string                           `json:"shipment_id"`
+	Courier        string                           `json:"courier"`
+	TrackingNumber *string                          `json:"tracking_number,omitempty"`
+	Timeline       []trackingTimelineEventResponse `json:"timeline"`
+}
+

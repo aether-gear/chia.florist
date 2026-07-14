@@ -222,6 +222,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetOrder,
 			&c.CreateOrder,
 			&c.UpdateOrderStatus,
+			&c.GetOrderTracking,
 		)
 
 		auditHandler = auditH.NewAuditHandler(
@@ -351,6 +352,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Route("/orders", func(r chi.Router) {
 				r.Get("/", chains.CustomerOnly(orderHandler.ListMyOrders))
 				r.Get("/{orderID}", chains.CustomerOnly(orderHandler.GetMyOrder))
+				r.Get("/{orderID}/tracking", chains.CustomerOnly(orderHandler.GetMyOrderTracking))
 				r.Get("/{orderID}/payment", chains.CustomerOnly(paymentHandler.GetMyOrderPayment))
 				r.Post("/{orderID}/payment/check", chains.CustomerOnly(paymentHandler.CheckMyOrderPaymentStatus))
 			})

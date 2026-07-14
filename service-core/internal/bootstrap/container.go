@@ -149,6 +149,8 @@ type Container struct {
 	FindOrders        orderUsecase.FindOrdersUsecase
 	GetOrder          orderUsecase.GetOrderUsecase
 	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
+	GetOrderTracking  orderUsecase.GetOrderTrackingUsecase
+
 
 	FindAuditLogs   auditUsecase.FindAuditLogsUsecase
 	GetAuditLog     auditUsecase.GetAuditLogUsecase
@@ -793,6 +795,16 @@ func NewContainer(cfg Config,
 				addressShopRepo,
 				infra.LogisticsProvider,
 			),
+		GetOrderTracking: *orderUsecase.
+			NewGetOrderTrackingUsecase(
+				infra.TransactionExecutor,
+				orderRepo,
+				shipmentRepo,
+				shipmentEventRepo,
+				infra.LogisticsProvider,
+				addressRepo,
+			),
+
 
 		FindAuditLogs: *auditUsecase.NewFindAuditLogsUsecase(
 			infra.TransactionExecutor,
