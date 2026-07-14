@@ -34,16 +34,16 @@ export default function MerchantsListPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Merchants</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Merchants</h2>
+            <p className="text-muted-foreground text-sm">
               Manage merchants registered on the platform
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            <Button asChild>
+            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
               <Link to="/admin/merchants/create">
                 <Store className="mr-2 h-4 w-4" /> Create Merchant
               </Link>
@@ -51,10 +51,10 @@ export default function MerchantsListPage() {
           </div>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>All Merchants</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Merchants</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               Showing {data?.merchants.length || 0} of {data?.total || 0} merchants.
             </CardDescription>
           </CardHeader>
@@ -65,14 +65,14 @@ export default function MerchantsListPage() {
                 <Input
                   type="search"
                   placeholder="Search merchants..."
-                  className="pl-8"
+                  className="pl-8 rounded-xl border border-border bg-background text-foreground"
                 />
               </div>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-[80px]">Logo</TableHead>
                     <TableHead>Merchant Name</TableHead>

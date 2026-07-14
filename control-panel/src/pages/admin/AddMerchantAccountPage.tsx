@@ -73,66 +73,66 @@ export default function AddMerchantAccountPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
-      <div className="mb-8 flex items-center space-x-3">
-        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
-          <Users className="h-5 w-5 text-primary" />
+    <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-300">
+      <div className="mb-8 flex items-center space-x-4">
+        <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+          <Users className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Add Merchant (Staff) Account</h2>
-          <p className="text-muted-foreground">Register a new staff/admin account for a specific merchant staff entity.</p>
+          <h2 className="text-2xl font-bold font-display tracking-tight text-foreground">Add Merchant (Staff) Account</h2>
+          <p className="text-muted-foreground text-sm">Register a new staff/admin account for a specific merchant staff entity.</p>
         </div>
       </div>
 
-      <Card className="shadow-sm">
+      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
         <CardHeader>
-          <CardTitle>Account Details</CardTitle>
-          <CardDescription>Enter the credentials and contact info for the new user.</CardDescription>
+          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Account Details</CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">Enter the credentials and contact info for the new user.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Merchant ID</label>
-              <Input {...register('merchantId')} placeholder="Enter merchant ID" />
-              {errors.merchantId && <p className="text-sm text-red-500">{errors.merchantId.message}</p>}
+              <label className="text-sm font-semibold text-foreground">Merchant ID</label>
+              <Input {...register('merchantId')} placeholder="Enter merchant ID" className="rounded-xl border border-border bg-background" />
+              {errors.merchantId && <p className="text-sm text-rose-500">{errors.merchantId.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Full Name</label>
-                <Input {...register('name')} placeholder="John Doe" />
-                {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+                <label className="text-sm font-semibold text-foreground">Full Name</label>
+                <Input {...register('name')} placeholder="John Doe" className="rounded-xl border border-border bg-background" />
+                {errors.name && <p className="text-sm text-rose-500">{errors.name.message}</p>}
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Username</label>
-                <Input {...register('username')} placeholder="johndoe" />
-                {errors.username && <p className="text-sm text-red-500">{errors.username.message}</p>}
+                <label className="text-sm font-semibold text-foreground">Username</label>
+                <Input {...register('username')} placeholder="johndoe" className="rounded-xl border border-border bg-background" />
+                {errors.username && <p className="text-sm text-rose-500">{errors.username.message}</p>}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address</label>
-                <Input type="email" {...register('email')} placeholder="john@example.com" />
-                {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
+                <label className="text-sm font-semibold text-foreground">Email Address</label>
+                <Input type="email" {...register('email')} placeholder="john@example.com" className="rounded-xl border border-border bg-background" />
+                {errors.email && <p className="text-sm text-rose-500">{errors.email.message}</p>}
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Phone Number</label>
-                <Input {...register('phone')} placeholder="+62..." />
-                {errors.phone && <p className="text-sm text-red-500">{errors.phone.message}</p>}
+                <label className="text-sm font-semibold text-foreground">Phone Number</label>
+                <Input {...register('phone')} placeholder="+62..." className="rounded-xl border border-border bg-background" />
+                {errors.phone && <p className="text-sm text-rose-500">{errors.phone.message}</p>}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <Input type="password" {...register('password')} placeholder="••••••••" />
-              {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
+              <label className="text-sm font-semibold text-foreground">Password</label>
+              <Input type="password" {...register('password')} placeholder="••••••••" className="rounded-xl border border-border bg-background" />
+              {errors.password && <p className="text-sm text-rose-500">{errors.password.message}</p>}
             </div>
 
             {Object.keys(errors).length > 0 && (
-              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">
+              <div className="p-3.5 text-sm text-rose-600 bg-rose-50 rounded-xl border border-rose-100">
                 <strong>Validation Errors:</strong>
                 <ul className="list-disc pl-5 mt-1">
                   {Object.entries(errors).map(([field, err]) => (
@@ -142,10 +142,10 @@ export default function AddMerchantAccountPage() {
               </div>
             )}
 
-            {error && <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">{error}</div>}
-            {success && <div className="p-3 text-sm text-green-700 bg-green-50 rounded-md border border-green-100">{success}</div>}
+            {error && <div className="p-3.5 text-sm text-rose-600 bg-rose-50 rounded-xl border border-rose-100">{error}</div>}
+            {success && <div className="p-3.5 text-sm text-primary bg-primary/10 rounded-xl border border-primary/20">{success}</div>}
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create Account
             </Button>

@@ -257,7 +257,14 @@ export default function DashboardLayout() {
       <div className="flex-1 lg:pl-64 flex flex-col pt-16 lg:pt-0 min-w-0">
         <header className="hidden lg:flex h-16 flex-shrink-0 items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur-md px-8 text-foreground sticky top-0 z-10">
           <h1 className="text-xl font-bold font-display tracking-tight text-foreground">
-            {visibleNavigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
+            {(() => {
+              const matchedGroup = navigationGroups.find(g =>
+                g.items.some(item => location.pathname === item.href || location.pathname.startsWith(item.href + '/'))
+              );
+              return matchedGroup?.title
+                ? matchedGroup.title.charAt(0) + matchedGroup.title.slice(1).toLowerCase()
+                : 'Dashboard';
+            })()}
           </h1>
           <div className="flex items-center space-x-4">
             {renderProfileDropdown()}

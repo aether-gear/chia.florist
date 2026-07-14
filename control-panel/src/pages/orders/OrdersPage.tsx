@@ -60,20 +60,20 @@ export default function OrdersPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Orders</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
+            <p className="text-muted-foreground text-sm">
               Manage your orders and fulfillments
             </p>
           </div>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>All Orders</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Orders</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               {data?.total ? `Found ${data.total} orders matching your criteria.` : 'View and manage orders.'}
             </CardDescription>
           </CardHeader>
@@ -95,7 +95,7 @@ export default function OrdersPage() {
                     setPage(1);
                   }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full rounded-xl border border-border bg-background">
                     <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -109,17 +109,17 @@ export default function OrdersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" onClick={() => refresh()}>
+              <Button variant="outline" className="border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl" onClick={() => refresh()}>
                 Refresh
               </Button>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead 
-                      className="cursor-pointer hover:bg-slate-50" 
+                      className="cursor-pointer hover:bg-muted/50 text-foreground" 
                       onClick={() => handleSort('number')}
                     >
                       <div className="flex items-center">
@@ -128,7 +128,7 @@ export default function OrdersPage() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
+                      className="cursor-pointer hover:bg-muted/50 text-foreground"
                       onClick={() => handleSort('date')}
                     >
                       <div className="flex items-center">
@@ -137,7 +137,7 @@ export default function OrdersPage() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
+                      className="cursor-pointer hover:bg-muted/50 text-foreground"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center">
@@ -146,7 +146,7 @@ export default function OrdersPage() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-right cursor-pointer hover:bg-slate-50"
+                      className="text-right cursor-pointer hover:bg-muted/50 text-foreground"
                       onClick={() => handleSort('total')}
                     >
                       <div className="flex items-center justify-end">

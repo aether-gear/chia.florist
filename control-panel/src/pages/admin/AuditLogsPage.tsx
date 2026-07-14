@@ -72,11 +72,11 @@ export default function AuditLogsPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Audit Logs</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Audit Logs</h2>
+            <p className="text-muted-foreground text-sm">
               Monitor user actions, resource changes, and security outcomes.
             </p>
           </div>
@@ -84,7 +84,7 @@ export default function AuditLogsPage() {
             <Button
               variant="outline"
               onClick={() => refresh()}
-              className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
+              className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -93,11 +93,11 @@ export default function AuditLogsPage() {
         </div>
 
         {/* Filters Panel */}
-        <Card className="shadow-sm border-slate-100 bg-white">
-          <CardContent className="p-4 space-y-4">
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
+          <CardContent className="p-5 space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div className="space-y-1">
-                <Label htmlFor="action-filter" className="text-xs font-semibold text-slate-500">Action Name</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="action-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Action Name</Label>
                 <SearchInput
                   id="action-filter"
                   placeholder="e.g. signin, save_shop"
@@ -110,8 +110,8 @@ export default function AuditLogsPage() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="user-filter" className="text-xs font-semibold text-slate-500">User / Actor ID</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="user-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">User / Actor ID</Label>
                 <SearchInput
                   id="user-filter"
                   placeholder="UUID of the actor"
@@ -124,12 +124,12 @@ export default function AuditLogsPage() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="start-date" className="text-xs font-semibold text-slate-500">Start Date</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
                 <Input
                   id="start-date"
                   type="date"
-                  className="text-sm"
+                  className="text-sm rounded-xl border border-border bg-background"
                   value={startDate}
                   onChange={(e) => {
                     setStartDate(e.target.value);
@@ -138,12 +138,12 @@ export default function AuditLogsPage() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="end-date" className="text-xs font-semibold text-slate-500">End Date</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End Date</Label>
                 <Input
                   id="end-date"
                   type="date"
-                  className="text-sm"
+                  className="text-sm rounded-xl border border-border bg-background"
                   value={endDate}
                   onChange={(e) => {
                     setEndDate(e.target.value);
@@ -156,7 +156,7 @@ export default function AuditLogsPage() {
         </Card>
 
         {/* Main Content Table */}
-        <Card className="shadow-md border-0 bg-white/70 backdrop-blur-md">
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardContent className="p-0">
             {error ? (
               <EmptyState
@@ -169,33 +169,33 @@ export default function AuditLogsPage() {
             ) : loading ? (
               <LoadingState message="Loading audit logs..." className="flex h-64 flex-col items-center justify-center gap-2" />
             ) : (
-              <div className="rounded-md border border-slate-100 overflow-hidden">
+              <div className="rounded-2xl border border-border overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-slate-50/70">
+                  <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead 
-                        className="cursor-pointer hover:bg-slate-100/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/70 transition-colors text-foreground"
                         onClick={() => handleSort('date')}
                       >
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                        <div className="flex items-center gap-1.5 font-semibold">
                           Date & Time
                           <ArrowUpDown className="h-3.5 w-3.5" />
                         </div>
                       </TableHead>
                       <TableHead 
-                        className="cursor-pointer hover:bg-slate-100/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/70 transition-colors text-foreground"
                         onClick={() => handleSort('action')}
                       >
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                        <div className="flex items-center gap-1.5 font-semibold">
                           Action
                           <ArrowUpDown className="h-3.5 w-3.5" />
                         </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-700">Category / Resource</TableHead>
-                      <TableHead className="font-semibold text-slate-700">Actor ID</TableHead>
-                      <TableHead className="font-semibold text-slate-700 text-center">Outcome</TableHead>
-                      <TableHead className="font-semibold text-slate-700">Client IP</TableHead>
-                      <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
+                      <TableHead className="font-semibold text-foreground">Category / Resource</TableHead>
+                      <TableHead className="font-semibold text-foreground">Actor ID</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Outcome</TableHead>
+                      <TableHead className="font-semibold text-foreground">Client IP</TableHead>
+                      <TableHead className="text-right font-semibold text-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -203,7 +203,7 @@ export default function AuditLogsPage() {
                       <TableRow>
                         <TableCell colSpan={7} className="p-0">
                           <EmptyState
-                            icon={<History className="h-8 w-8 mb-2 mx-auto text-slate-400" />}
+                            icon={<History className="h-8 w-8 mb-2 mx-auto text-muted-foreground" />}
                             title="No audit logs found"
                             description="No audit logs found matching your criteria."
                             className="flex h-48 flex-col items-center justify-center text-center p-4 gap-1.5 border-0 bg-transparent"
@@ -214,34 +214,34 @@ export default function AuditLogsPage() {
                       logs.map((log) => (
                         <TableRow 
                           key={log.id} 
-                          className="hover:bg-slate-50/50 cursor-pointer transition-colors"
+                          className="hover:bg-muted/55 cursor-pointer transition-colors"
                           onClick={() => setSelectedLog(log)}
                         >
-                          <TableCell className="font-medium text-slate-800 text-sm">
+                          <TableCell className="font-medium text-foreground text-sm">
                             {formatDate(log.created_at)}
                           </TableCell>
                           <TableCell>
-                            <Badge className="bg-slate-100 text-slate-800 border-0 font-semibold uppercase text-xs">
+                            <Badge className="bg-muted text-muted-foreground border-0 font-semibold uppercase text-xs rounded-lg">
                               {log.action}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-slate-600 text-xs font-mono">
+                          <TableCell className="text-muted-foreground text-xs font-mono">
                             {log.category} / {log.resource}
                           </TableCell>
-                          <TableCell className="text-slate-500 font-mono text-xs max-w-[120px] truncate" title={log.actor_id}>
+                          <TableCell className="text-muted-foreground font-mono text-xs max-w-[120px] truncate" title={log.actor_id}>
                             {log.actor_id}
                           </TableCell>
                           <TableCell className="text-center">
                             <StatusBadge status={log.outcome} />
                           </TableCell>
-                          <TableCell className="text-slate-600 text-xs font-mono">
+                          <TableCell className="text-muted-foreground text-xs font-mono">
                             {log.client_ip}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-slate-400 hover:text-indigo-600"
+                              className="text-muted-foreground hover:text-primary hover:bg-primary/5"
                               onClick={() => setSelectedLog(log)}
                             >
                               <Eye className="h-4 w-4" />
@@ -262,7 +262,7 @@ export default function AuditLogsPage() {
               limit={limit}
               onPageChange={setPage}
               itemNamePlural="logs"
-              className="flex items-center justify-between border-t border-slate-100 p-4"
+              className="flex items-center justify-between border-t border-border p-4"
             />
           </CardContent>
         </Card>
@@ -274,8 +274,8 @@ export default function AuditLogsPage() {
           {selectedLog && (
             <>
               <SheetHeader className="mb-6">
-                <SheetTitle className="text-xl flex items-center gap-2">
-                  <History className="h-5 w-5 text-indigo-600" />
+                <SheetTitle className="text-xl flex items-center gap-2 font-display">
+                  <History className="h-5 w-5 text-primary" />
                   Audit Log Details
                 </SheetTitle>
                 <SheetDescription>
@@ -285,51 +285,51 @@ export default function AuditLogsPage() {
 
               <div className="space-y-6">
                 {/* Status and Action summary */}
-                <div className="grid grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4 border border-slate-100">
+                <div className="grid grid-cols-2 gap-4 rounded-2xl bg-muted/40 p-4 border border-border">
                   <div>
-                    <span className="block text-xs font-semibold text-slate-400">ACTION</span>
-                    <span className="font-bold text-slate-800 uppercase tracking-wide text-sm">{selectedLog.action}</span>
+                    <span className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">ACTION</span>
+                    <span className="font-bold font-display text-foreground uppercase tracking-wide text-sm mt-1 block">{selectedLog.action}</span>
                   </div>
                   <div>
-                    <span className="block text-xs font-semibold text-slate-400">OUTCOME</span>
+                    <span className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">OUTCOME</span>
                     <StatusBadge status={selectedLog.outcome} className="mt-1" />
                   </div>
                 </div>
 
                 {/* Properties table */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Properties</h4>
+                  <h4 className="text-sm font-bold font-display text-foreground border-b border-border pb-2">Properties</h4>
                   <div className="grid grid-cols-3 gap-2 text-sm">
-                    <span className="font-medium text-slate-400">Log ID</span>
-                    <span className="col-span-2 font-mono text-slate-700 text-xs break-all">{selectedLog.id}</span>
+                    <span className="font-medium text-muted-foreground">Log ID</span>
+                    <span className="col-span-2 font-mono text-foreground text-xs break-all">{selectedLog.id}</span>
 
-                    <span className="font-medium text-slate-400">Timestamp</span>
-                    <span className="col-span-2 text-slate-700">{formatDate(selectedLog.created_at)}</span>
+                    <span className="font-medium text-muted-foreground">Timestamp</span>
+                    <span className="col-span-2 text-foreground">{formatDate(selectedLog.created_at)}</span>
 
-                    <span className="font-medium text-slate-400">Category</span>
-                    <span className="col-span-2 text-slate-700">{selectedLog.category}</span>
+                    <span className="font-medium text-muted-foreground">Category</span>
+                    <span className="col-span-2 text-foreground">{selectedLog.category}</span>
 
-                    <span className="font-medium text-slate-400">Resource</span>
-                    <span className="col-span-2 text-slate-700">{selectedLog.resource} (ID: <span className="font-mono text-xs bg-slate-100 px-1 rounded">{selectedLog.resource_id}</span>)</span>
+                    <span className="font-medium text-muted-foreground">Resource</span>
+                    <span className="col-span-2 text-foreground">{selectedLog.resource} (ID: <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-lg">{selectedLog.resource_id}</span>)</span>
 
-                    <span className="font-medium text-slate-400">Actor ID</span>
-                    <span className="col-span-2 font-mono text-slate-700 text-xs break-all">{selectedLog.actor_id}</span>
+                    <span className="font-medium text-muted-foreground">Actor ID</span>
+                    <span className="col-span-2 font-mono text-foreground text-xs break-all">{selectedLog.actor_id}</span>
 
-                    <span className="font-medium text-slate-400">Request ID</span>
-                    <span className="col-span-2 font-mono text-slate-700 text-xs">{selectedLog.request_id}</span>
+                    <span className="font-medium text-muted-foreground">Request ID</span>
+                    <span className="col-span-2 font-mono text-foreground text-xs">{selectedLog.request_id}</span>
 
-                    <span className="font-medium text-slate-400">Client IP</span>
-                    <span className="col-span-2 font-mono text-slate-700 text-xs">{selectedLog.client_ip}</span>
+                    <span className="font-medium text-muted-foreground">Client IP</span>
+                    <span className="col-span-2 font-mono text-foreground text-xs">{selectedLog.client_ip}</span>
 
-                    <span className="font-medium text-slate-400">User Agent</span>
-                    <span className="col-span-2 text-slate-600 text-xs break-all">{selectedLog.metadata?.user_agent || 'N/A'}</span>
+                    <span className="font-medium text-muted-foreground">User Agent</span>
+                    <span className="col-span-2 text-muted-foreground text-xs break-all">{selectedLog.metadata?.user_agent || 'N/A'}</span>
                   </div>
                 </div>
 
                 {/* Metadata JSON tree */}
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-slate-800">Metadata Payload</h4>
-                  <div className="rounded-md bg-slate-900 p-4 text-xs font-mono text-indigo-200 overflow-x-auto max-h-[300px]">
+                  <h4 className="text-sm font-bold font-display text-foreground">Metadata Payload</h4>
+                  <div className="rounded-xl bg-slate-950 p-4 text-xs font-mono text-emerald-400 overflow-x-auto max-h-[300px]">
                     <pre>{JSON.stringify(selectedLog.metadata, null, 2)}</pre>
                   </div>
                 </div>

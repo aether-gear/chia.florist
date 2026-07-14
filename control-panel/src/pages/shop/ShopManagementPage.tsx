@@ -312,20 +312,20 @@ export default function ShopManagementPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Shop Management</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Shop Management</h2>
+            <p className="text-muted-foreground text-sm">
               View and manage all your store branches and their details.
             </p>
           </div>
         </div>
-        <Card className="shadow-md border-0 bg-white/70 backdrop-blur-md">
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <div>
-              <CardTitle className="text-xl font-semibold">Store Locations</CardTitle>
-              <CardDescription>
+              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Store Locations</CardTitle>
+              <CardDescription className="text-muted-foreground text-sm">
                 You have {shops.length} shop locations registered.
               </CardDescription>
             </div>
@@ -334,7 +334,7 @@ export default function ShopManagementPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => refresh()}
-                className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-primary transition-colors"
+                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
               >
                 <RefreshCw className="h-4 w-4" />
                 Refresh
@@ -342,7 +342,7 @@ export default function ShopManagementPage() {
               <Button
                 size="sm"
                 onClick={() => setIsAddShopOpen(true)}
-                className="flex items-center gap-1.5"
+                className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
               >
                 <Plus className="h-4 w-4" />
                 Add Shop
@@ -350,9 +350,9 @@ export default function ShopManagementPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border border-slate-100 overflow-hidden">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
-                <TableHeader className="bg-slate-50/70">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead>Shop Name</TableHead>
                     <TableHead>Description</TableHead>
@@ -363,7 +363,7 @@ export default function ShopManagementPage() {
                 <TableBody>
                   {shops.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center h-24 text-slate-500">
+                      <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
                         No shops found.
                       </TableCell>
                     </TableRow>
@@ -371,13 +371,13 @@ export default function ShopManagementPage() {
                     shops.map((shop) => (
                       <TableRow
                         key={shop.id}
-                        className="hover:bg-slate-50/50 cursor-pointer transition-colors"
+                        className="hover:bg-muted/55 cursor-pointer transition-colors"
                         onClick={() => handleOpenDetails(shop)}
                       >
-                        <TableCell className="font-semibold text-slate-800">
+                        <TableCell className="font-semibold text-foreground">
                           {shop.name}
                         </TableCell>
-                        <TableCell className="text-slate-600 max-w-sm truncate">
+                        <TableCell className="text-muted-foreground max-w-sm truncate">
                           {shop.description || '-'}
                         </TableCell>
                         <TableCell>
@@ -385,8 +385,8 @@ export default function ShopManagementPage() {
                             variant={shop.is_active ? 'default' : 'secondary'}
                             className={
                               shop.is_active
-                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100/80 border-0'
-                                : 'bg-slate-100 text-slate-800 hover:bg-slate-100/80 border-0'
+                                ? 'bg-primary/10 text-primary hover:bg-primary/10 border-0 rounded-lg'
+                                : 'bg-muted text-muted-foreground hover:bg-muted border-0 rounded-lg'
                             }
                           >
                             {shop.is_active ? 'Active' : 'Inactive'}
@@ -396,7 +396,7 @@ export default function ShopManagementPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                            className="text-primary hover:text-primary/90 hover:bg-primary/5 rounded-lg"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenDetails(shop);

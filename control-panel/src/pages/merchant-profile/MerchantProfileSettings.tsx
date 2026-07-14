@@ -45,16 +45,14 @@ export default function MerchantProfileSettings() {
   };
 
   if (loading && !profile) {
-    return (
-      <div className="flex h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
+    <div className="flex h-[400px] items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
   }
 
   if (error) {
     return (
-      <div className="flex h-[400px] flex-col items-center justify-center text-red-500">
+      <div className="flex h-[400px] flex-col items-center justify-center text-rose-500">
         <AlertCircle className="h-8 w-8 mb-2" />
         <p>{error}</p>
       </div>
@@ -62,17 +60,17 @@ export default function MerchantProfileSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 animate-in fade-in duration-300">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Profile Settings</h1>
-        <p className="text-muted-foreground">Manage your staff account information.</p>
+        <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Profile Settings</h1>
+        <p className="text-muted-foreground text-sm">Manage your staff account information.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>Account Details</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Account Details</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               Basic information about your staff account. Username cannot be changed.
             </CardDescription>
           </CardHeader>
@@ -80,46 +78,46 @@ export default function MerchantProfileSettings() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               
               <div className="flex items-center space-x-4 mb-6">
-                <div className="h-20 w-20 rounded-full bg-indigo-100 overflow-hidden border border-gray-200">
+                <div className="h-20 w-20 rounded-full bg-primary/10 overflow-hidden border border-border">
                   {profile?.AvatarURL ? (
                     <img src={profile.AvatarURL} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="h-full w-full flex items-center justify-center text-indigo-400 font-bold text-xl">
+                    <div className="h-full w-full flex items-center justify-center text-primary font-bold text-xl">
                       {profile?.Name?.charAt(0) || 'S'}
                     </div>
                   )}
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">{profile?.Name}</h3>
-                  <p className="text-sm text-gray-500">@{profile?.Username}</p>
+                  <h3 className="font-bold font-display text-foreground">{profile?.Name}</h3>
+                  <p className="text-sm text-muted-foreground">@{profile?.Username}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="username">Username (Read-Only)</Label>
-                <Input id="username" value={profile?.Username || ''} disabled className="bg-gray-50" />
+                <Input id="username" value={profile?.Username || ''} disabled className="bg-muted rounded-xl border-border" />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" {...register('name')} placeholder="e.g. Jane Doe" />
-                {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+                <Input id="name" {...register('name')} placeholder="e.g. Jane Doe" className="rounded-xl border-border bg-background" />
+                {errors.name && <p className="text-sm text-rose-500">{errors.name.message}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" {...register('phone')} placeholder="e.g. 08123456789" />
-                {errors.phone && <p className="text-sm text-red-500">{errors.phone.message}</p>}
+                <Input id="phone" {...register('phone')} placeholder="e.g. 08123456789" className="rounded-xl border-border bg-background" />
+                {errors.phone && <p className="text-sm text-rose-500">{errors.phone.message}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="avatar_url">Avatar URL</Label>
-                <Input id="avatar_url" {...register('avatar_url')} placeholder="https://example.com/avatar.jpg" />
-                {errors.avatar_url && <p className="text-sm text-red-500">{errors.avatar_url.message}</p>}
+                <Input id="avatar_url" {...register('avatar_url')} placeholder="https://example.com/avatar.jpg" className="rounded-xl border-border bg-background" />
+                {errors.avatar_url && <p className="text-sm text-rose-500">{errors.avatar_url.message}</p>}
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" disabled={!isDirty || isSubmitting}>
+                <Button type="submit" disabled={!isDirty || isSubmitting} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
@@ -135,31 +133,31 @@ export default function MerchantProfileSettings() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>Session Information</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Session Information</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               Details regarding your current session and account status.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-gray-500">Staff ID</p>
-              <p className="text-sm text-gray-900">{profile?.staff_id}</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Staff ID</p>
+              <p className="text-sm text-foreground font-semibold mt-1">{profile?.staff_id}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">User ID</p>
-              <p className="text-sm text-gray-900">{profile?.user_id}</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">User ID</p>
+              <p className="text-sm text-foreground font-semibold mt-1">{profile?.user_id}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Account Created</p>
-              <p className="text-sm text-gray-900">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Account Created</p>
+              <p className="text-sm text-foreground font-semibold mt-1">
                 {profile?.CreatedAt ? new Date(profile.CreatedAt).toLocaleString() : 'N/A'}
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Last Login</p>
-              <p className="text-sm text-gray-900">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Last Login</p>
+              <p className="text-sm text-foreground font-semibold mt-1">
                 {profile?.LastLoginAt ? new Date(profile.LastLoginAt).toLocaleString() : 'Current Session'}
               </p>
             </div>

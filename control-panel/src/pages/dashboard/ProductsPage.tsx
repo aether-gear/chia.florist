@@ -80,11 +80,11 @@ export default function ProductsPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Products</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Products</h2>
+            <p className="text-muted-foreground text-sm">
               Manage your product catalog and inventory
             </p>
           </div>
@@ -92,21 +92,21 @@ export default function ProductsPage() {
             <Button
               variant="outline"
               onClick={() => refresh()}
-              className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
+              className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
-            <Button onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" /> Add Product
             </Button>
           </div>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>All Products</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Products</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               You have {data?.total || 0} total products in your catalog.
             </CardDescription>
           </CardHeader>
@@ -119,7 +119,7 @@ export default function ProductsPage() {
               />
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -191,23 +191,23 @@ export default function ProductsPage() {
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-md p-1 min-w-[150px]">
+                            <DropdownMenuContent align="end" className="min-w-[150px] p-1">
                               <DropdownMenuItem
                                 onClick={() => {
                                   setActiveProductSlug(product.slug);
                                   setIsProductSheetOpen(true);
                                 }}
-                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-slate-50 rounded"
+                                className="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-lg hover:bg-muted"
                               >
-                                <Edit className="h-4 w-4 text-slate-500" />
+                                <Edit className="h-4 w-4 text-muted-foreground" />
                                 <span>Edit Product</span>
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-slate-100 my-1" />
+                              <DropdownMenuSeparator className="my-1" />
                               <DropdownMenuItem
                                 onClick={() => setProductToDelete(product)}
-                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-red-50 text-red-600 rounded"
+                                className="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-lg hover:bg-destructive/10 text-destructive focus:bg-destructive/10 focus:text-destructive"
                               >
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <Trash2 className="h-4 w-4 text-destructive" />
                                 <span>Delete Product</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>

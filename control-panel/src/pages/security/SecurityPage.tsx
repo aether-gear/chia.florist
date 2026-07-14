@@ -921,64 +921,64 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Security Monitoring</h2>
-          <p className="text-slate-500">Real-time threat analysis and WAF status.</p>
+          <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Security Monitoring</h2>
+          <p className="text-muted-foreground text-sm">Real-time threat analysis and WAF status.</p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-slate-900 text-white border-slate-800">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-300">Attack Attempts</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-red-400" />
+            <CardTitle className="text-sm font-bold font-display text-foreground">Attack Attempts</CardTitle>
+            <ShieldAlert className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-400">{wafSummary.blocked.toLocaleString()}</div>
-            <p className="text-xs text-slate-400">Total requests blocked by rules</p>
+            <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{wafSummary.blocked.toLocaleString()}</div>
+            <p className="text-xs text-rose-500 font-medium mt-1">Total requests blocked by rules</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Safe Traffic</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <CardTitle className="text-sm font-bold font-display text-foreground">Safe Traffic</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{wafSummary.allowed.toLocaleString()}</div>
-            <p className="text-xs text-slate-500">Allowed requests</p>
+            <div className="text-3xl font-bold tracking-tight text-primary">{wafSummary.allowed.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Allowed requests</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Anomaly Score</CardTitle>
+            <CardTitle className="text-sm font-bold font-display text-foreground">Anomaly Score</CardTitle>
             <Activity className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
               {((wafSummary.blocked / wafSummary.total) * 100).toFixed(1)}%
             </div>
-            <p className="text-xs text-slate-500">Traffic flagged as malicious</p>
+            <p className="text-xs text-muted-foreground mt-1">Traffic flagged as malicious</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Incidents</CardTitle>
+            <CardTitle className="text-sm font-bold font-display text-foreground">Active Incidents</CardTitle>
             <ShieldX className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-rose-600">{ipList.filter(ip => ip.status === 'Banned').length}</div>
-            <p className="text-xs text-slate-500">Currently banned IPs</p>
+            <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{ipList.filter(ip => ip.status === 'Banned').length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Currently banned IPs</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between">
           <div>
-            <CardTitle>Threat Landscape</CardTitle>
-            <CardDescription>Volume of allowed vs blocked requests over time.</CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Threat Landscape</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">Volume of allowed vs blocked requests over time.</CardDescription>
           </div>
           <div className="flex items-center gap-3 mt-4 sm:mt-0">
             <Select
@@ -1109,23 +1109,23 @@ export default function SecurityPage() {
       </Card>
 
       {/* Real-time Threat Geolocation Map */}
-      <Card className="mt-6">
+      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
         <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-slate-100">
+          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
             Real-time Threat Geolocation Map
           </CardTitle>
-          <CardDescription className="text-slate-500 dark:text-slate-400">
+          <CardDescription className="text-muted-foreground text-sm">
             Pinpoints the physical location of all audited public IP addresses in real-time. Hover over points for threat details.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="h-[400px] flex items-center justify-center bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden p-0 relative">
+          <div className="h-[400px] flex items-center justify-center bg-background border border-border rounded-2xl overflow-hidden p-0 relative">
             {mapIframe}
             {geoPoints.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/90 dark:bg-slate-950/90 text-center p-6 text-slate-500 dark:text-slate-400 space-y-2 z-20">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 text-center p-6 text-muted-foreground space-y-2 z-20">
                 <div className="text-3xl">🌐</div>
-                <div className="font-medium text-slate-700 dark:text-slate-300">No Geolocation Data Available</div>
-                <div className="text-xs max-w-sm mx-auto text-slate-500 dark:text-slate-400">
+                <div className="font-medium text-foreground">No Geolocation Data Available</div>
+                <div className="text-xs max-w-sm mx-auto text-muted-foreground">
                   No public IP addresses have been logged yet. Local or private traffic will not appear on the threat map.
                 </div>
               </div>
@@ -1135,17 +1135,17 @@ export default function SecurityPage() {
       </Card>
 
       {/* IP Blacklist Manager */}
-      <Card>
+      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="flex items-center gap-2"><ShieldCheck className="text-emerald-500" /> IP Blacklist Manager</CardTitle>
-            <CardDescription>Control access and logging behavior for specific IPs.</CardDescription>
+            <CardTitle className="flex items-center gap-2 font-bold font-display tracking-tight text-lg text-foreground"><ShieldCheck className="text-primary" /> IP Blacklist Manager</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">Control access and logging behavior for specific IPs.</CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
               size="sm"
               variant="outline"
-              className="h-9 gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-800"
+              className="h-9 gap-2 border-border text-foreground hover:bg-muted"
               onClick={handleClearAllIPs}
             >
               Reset / Forget All IPs
@@ -1153,7 +1153,7 @@ export default function SecurityPage() {
             <Button
               size="sm"
               variant="outline"
-              className="h-9 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+              className="h-9 gap-2 border-primary/20 text-primary hover:bg-primary/5"
               onClick={() => setIsCategoryModalOpen(true)}
             >
               <FolderOpen className="h-4 w-4" /> View Category Analysis
@@ -1161,49 +1161,49 @@ export default function SecurityPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col md:flex-row gap-4 items-end bg-background p-5 rounded-2xl border border-border/80">
             <div className="space-y-2 flex-1 w-full">
-              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Target IP Address</label>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Target IP Address</label>
               <Input
                 placeholder="e.g. 192.168.1.5 or ::1"
-                className="bg-background text-foreground border-slate-300 dark:border-slate-800 font-mono"
+                className="bg-background text-foreground border-border rounded-xl font-mono"
                 value={targetIP}
                 onChange={e => setTargetIP(e.target.value)}
               />
             </div>
             <div className="space-y-2 flex-1 w-full">
-              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Reason (Optional)</label>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Reason (Optional)</label>
               <Input
                 placeholder="e.g. Spamming API"
-                className="bg-background text-foreground border-slate-300 dark:border-slate-800"
+                className="bg-background text-foreground border-border rounded-xl"
                 value={targetReason}
                 onChange={e => setTargetReason(e.target.value)}
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
-              <Button variant="destructive" className="flex-1 md:flex-none" onClick={() => handleIPSubmit('ban')}>Ban</Button>
-              <Button className="flex-1 md:flex-none" onClick={() => handleIPSubmit('whitelist')}>Whitelist</Button>
-              <Button variant="secondary" className="flex-1 md:flex-none" onClick={() => handleIPSubmit('ignore')}>Mute</Button>
+              <Button variant="destructive" className="flex-1 md:flex-none rounded-xl" onClick={() => handleIPSubmit('ban')}>Ban</Button>
+              <Button className="flex-1 md:flex-none bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => handleIPSubmit('whitelist')}>Whitelist</Button>
+              <Button variant="secondary" className="flex-1 md:flex-none rounded-xl" onClick={() => handleIPSubmit('ignore')}>Mute</Button>
             </div>
           </div>
 
           {Object.keys(selectedIPs).filter(ip => selectedIPs[ip]).length > 0 && (
-            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <div className="flex items-center justify-between bg-muted/40 border border-border/80 rounded-2xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <span className="text-xs font-semibold text-muted-foreground">
                 {Object.keys(selectedIPs).filter(ip => selectedIPs[ip]).length} IP(s) selected
               </span>
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   variant="destructive"
-                  className="h-8 text-xs font-medium"
+                  className="h-8 text-xs font-semibold rounded-xl"
                   onClick={() => handleBulkIPActionFromManager('ban')}
                 >
                   Bulk Ban
                 </Button>
                 <Button
                   size="sm"
-                  className="h-8 text-xs"
+                  className="h-8 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
                   onClick={() => handleBulkIPActionFromManager('whitelist')}
                 >
                   Bulk Whitelist
@@ -1228,10 +1228,10 @@ export default function SecurityPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto border rounded-md">
+          <div className="overflow-x-auto border border-border rounded-2xl">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50 dark:bg-slate-900/50">
+                <TableRow className="bg-muted/50">
                   <TableHead className="w-[40px]">
                     <Checkbox
                       checked={ipList.length > 0 && ipList.every(entry => selectedIPs[entry.ip])}
@@ -1369,13 +1369,13 @@ export default function SecurityPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Active Rules Registry</CardTitle>
-              <CardDescription>Dynamically toggle security rules from waf-rules.json.</CardDescription>
+              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Active Rules Registry</CardTitle>
+              <CardDescription className="text-muted-foreground text-sm">Dynamically toggle security rules from waf-rules.json.</CardDescription>
             </div>
-            <Button size="sm" onClick={() => setIsAddRuleOpen(true)}>+ Add Rule</Button>
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => setIsAddRuleOpen(true)}>+ Add Rule</Button>
           </CardHeader>
           <CardContent>
             <Table>
@@ -1439,17 +1439,17 @@ export default function SecurityPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
             <div>
-              <CardTitle>Security Logs</CardTitle>
-              <CardDescription>Recent suspicious activities and blocks.</CardDescription>
+              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Security Logs</CardTitle>
+              <CardDescription className="text-muted-foreground text-sm">Recent suspicious activities and blocks.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
                 variant="destructive"
-                className="h-8 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white"
+                className="h-8 text-xs font-semibold rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                 onClick={handleClearAllLogs}
               >
                 Clear All Logs
@@ -1458,7 +1458,7 @@ export default function SecurityPage() {
                 value={statusFilter}
                 onValueChange={(val) => setStatusFilter(val)}
               >
-                <SelectTrigger className="w-[110px] h-8 text-xs bg-background text-foreground border border-input">
+                <SelectTrigger className="w-[110px] h-8 text-xs bg-background text-foreground border border-border rounded-xl">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1472,7 +1472,7 @@ export default function SecurityPage() {
                 value={String(rowsPerPage)}
                 onValueChange={(val) => setRowsPerPage(Number(val))}
               >
-                <SelectTrigger className="w-[85px] h-8 text-xs bg-background text-foreground border border-input">
+                <SelectTrigger className="w-[85px] h-8 text-xs bg-background text-foreground border border-border rounded-xl">
                   <SelectValue placeholder="5 rows" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1486,22 +1486,22 @@ export default function SecurityPage() {
           </CardHeader>
           <CardContent>
             {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length > 0 && (
-              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <div className="flex items-center justify-between bg-muted/40 border border-border/80 rounded-2xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <span className="text-xs font-semibold text-muted-foreground">
                   {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length} log(s) selected
                 </span>
                 <div className="flex gap-2">
                   <Button
                     size="sm"
                     variant="destructive"
-                    className="h-8 text-xs font-medium"
+                    className="h-8 text-xs font-semibold rounded-xl"
                     onClick={() => handleBulkIPAction('ban')}
                   >
                     Bulk Ban IPs
                   </Button>
                   <Button
                     size="sm"
-                    className="h-8 text-xs"
+                    className="h-8 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
                     onClick={() => handleBulkIPAction('whitelist')}
                   >
                     Bulk Whitelist IPs
@@ -1617,31 +1617,29 @@ export default function SecurityPage() {
 
                 <div className="font-semibold text-slate-500">Method</div>
                 <div className="font-bold">{selectedLog.method}</div>
-              </div>
-
-              <div>
-                <div className="font-semibold text-slate-800 dark:text-slate-250 mb-2 text-sm">Full Request URL / Payload:</div>
-                <div className="bg-slate-950 text-emerald-400 p-4 rounded-md text-xs font-mono break-all max-h-[220px] overflow-y-auto border border-slate-800 shadow-inner">
+              </div>              <div>
+                <div className="font-bold font-display text-foreground mb-2 text-sm">Full Request URL / Payload:</div>
+                <div className="bg-slate-950 text-emerald-400 p-4 rounded-xl text-xs font-mono break-all max-h-[220px] overflow-y-auto border border-border shadow-inner">
                   {selectedLog.url}
                 </div>
               </div>
 
               {selectedLog.details && (
                 <div>
-                  <div className="font-semibold text-slate-800 dark:text-slate-250 mb-2 text-sm">Evaluation Details:</div>
-                  <div className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-3 rounded-md text-xs font-mono border border-slate-200 dark:border-slate-800">
+                  <div className="font-bold font-display text-foreground mb-2 text-sm">Evaluation Details:</div>
+                  <div className="bg-muted/50 text-foreground p-3.5 rounded-xl text-xs font-mono border border-border">
                     {selectedLog.details}
                   </div>
                 </div>
               )}
 
-              <hr className="border-slate-200 dark:border-slate-800" />
+              <hr className="border-border/85" />
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">IP Threat Intel & Location</div>
+                  <div className="font-bold font-display text-foreground text-sm">IP Threat Intel & Location</div>
                   {vtResult && (
-                    <Badge variant={vtResult.stats.malicious > 0 ? "destructive" : "secondary"} className={vtResult.stats.malicious > 0 ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}>
+                    <Badge variant={vtResult.stats.malicious > 0 ? "destructive" : "secondary"} className={vtResult.stats.malicious > 0 ? "bg-red-100 text-red-800" : "bg-primary/10 text-primary border-0"}>
                       {vtResult.stats.malicious > 0 ? `${vtResult.stats.malicious} Malicious` : "Clean / Harmless"}
                     </Badge>
                   )}
@@ -1649,7 +1647,7 @@ export default function SecurityPage() {
 
                 {/* Status indicator: Key set or Demo fallback */}
                 {!VIRUSTOTAL_API_KEY && (
-                  <p className="text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <p className="text-[10px] text-muted-foreground bg-muted/30 p-3 rounded-xl border border-border">
                     ℹ️ Running in demo mode. Configure your API key in <code>SecurityPage.tsx</code> to use your own limits.
                   </p>
                 )}
@@ -1657,7 +1655,7 @@ export default function SecurityPage() {
                 {!vtResult && !vtLoading && (
                   <Button
                     size="sm"
-                    className="w-full h-9 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium flex items-center justify-center gap-1.5"
+                    className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-1.5"
                     onClick={() => handleCheckReputation(selectedLog.ip)}
                   >
                     <Activity className="h-4 w-4" /> Check Reputation & Location
@@ -1665,24 +1663,24 @@ export default function SecurityPage() {
                 )}
 
                 {vtLoading && (
-                  <div className="flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-                    <div className="flex flex-col items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-300 border-t-slate-800"></div>
+                  <div className="flex items-center justify-center p-6 bg-muted/20 border border-border rounded-xl">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground text-xs">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary/20 border-t-primary"></div>
                       Fetching IP intelligence & coordinates...
                     </div>
                   </div>
                 )}
 
                 {vtError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-750 dark:text-red-400 text-xs rounded-lg border border-red-200 dark:border-red-900/50 font-medium">
+                  <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-xs rounded-xl border border-red-200 dark:border-red-900/50 font-medium">
                     ⚠️ Error: {vtError}
                   </div>
                 )}
 
                 {vtResult && (
-                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3 text-xs animate-in fade-in duration-200">
-                    <div className="grid grid-cols-2 gap-y-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
-                      <div className="text-slate-500 font-medium">ISP / AS Owner</div>
+                  <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3 text-xs animate-in fade-in duration-200">
+                    <div className="grid grid-cols-2 gap-y-2 border-b border-border/80 pb-2.5">
+                      <div className="text-muted-foreground font-medium">ISP / AS Owner</div>
                       <div className="font-semibold text-slate-850 dark:text-slate-100 break-words">{vtResult.asOwner}</div>
 
                       <div className="text-slate-500 font-medium">Location</div>

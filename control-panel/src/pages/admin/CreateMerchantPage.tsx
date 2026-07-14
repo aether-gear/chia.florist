@@ -47,58 +47,58 @@ export default function CreateMerchantPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
-      <div className="mb-8 flex items-center space-x-3">
-        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
-          <Store className="h-5 w-5 text-primary" />
+    <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-300">
+      <div className="mb-8 flex items-center space-x-4">
+        <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+          <Store className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Create Merchant (Staff)</h2>
-          <p className="text-muted-foreground">Register a new merchant staff entity in the system.</p>
+          <h2 className="text-2xl font-bold font-display tracking-tight text-foreground">Create Merchant (Staff)</h2>
+          <p className="text-muted-foreground text-sm">Register a new merchant staff entity in the system.</p>
         </div>
       </div>
 
-      <Card className="shadow-sm">
+      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
         <CardHeader>
-          <CardTitle>Merchant Details</CardTitle>
-          <CardDescription>Enter the basic information for the new merchant.</CardDescription>
+          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Merchant Details</CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">Enter the basic information for the new merchant.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Merchant Name</label>
-              <Input {...register('name')} placeholder="e.g. Chia Florist" />
-              {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+              <label className="text-sm font-semibold text-foreground">Merchant Name</label>
+              <Input {...register('name')} placeholder="e.g. Chia Florist" className="rounded-xl border border-border bg-background" />
+              {errors.name && <p className="text-sm text-rose-500">{errors.name.message}</p>}
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
+              <label className="text-sm font-semibold text-foreground">Description</label>
               <Textarea 
                 {...register('description')}
                 placeholder="Briefly describe the business..."
-                className="min-h-[100px]"
+                className="min-h-[100px] rounded-xl border border-border bg-background"
               />
-              {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
+              {errors.description && <p className="text-sm text-rose-500">{errors.description.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Logo URL</label>
-                <Input {...register('logo_url')} placeholder="https://..." />
-                {errors.logo_url && <p className="text-sm text-red-500">{errors.logo_url.message}</p>}
+                <label className="text-sm font-semibold text-foreground">Logo URL</label>
+                <Input {...register('logo_url')} placeholder="https://..." className="rounded-xl border border-border bg-background" />
+                {errors.logo_url && <p className="text-sm text-rose-500">{errors.logo_url.message}</p>}
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Banner URL</label>
-                <Input {...register('banner_url')} placeholder="https://..." />
-                {errors.banner_url && <p className="text-sm text-red-500">{errors.banner_url.message}</p>}
+                <label className="text-sm font-semibold text-foreground">Banner URL</label>
+                <Input {...register('banner_url')} placeholder="https://..." className="rounded-xl border border-border bg-background" />
+                {errors.banner_url && <p className="text-sm text-rose-500">{errors.banner_url.message}</p>}
               </div>
             </div>
 
-            {error && <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">{error}</div>}
-            {success && <div className="p-3 text-sm text-green-700 bg-green-50 rounded-md border border-green-100">{success}</div>}
+            {error && <div className="p-3.5 text-sm text-rose-600 bg-rose-50 rounded-xl border border-rose-100">{error}</div>}
+            {success && <div className="p-3.5 text-sm text-primary bg-primary/10 rounded-xl border border-primary/20">{success}</div>}
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Register Merchant
             </Button>

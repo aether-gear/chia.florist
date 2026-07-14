@@ -43,20 +43,20 @@ export default function CustomersListPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Customers</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Customers</h2>
+            <p className="text-muted-foreground text-sm">
               Manage registered customer accounts
             </p>
           </div>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>All Customers</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Customers</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               Showing {data?.customers.length || 0} of {data?.total || 0} customers.
             </CardDescription>
           </CardHeader>
@@ -67,14 +67,14 @@ export default function CustomersListPage() {
                 <Input
                   type="search"
                   placeholder="Search customers by name, username, or email..."
-                  className="pl-8"
+                  className="pl-8 rounded-xl border border-border bg-background text-foreground"
                 />
               </div>
             </div>
  
-            <div className="rounded-md border">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-[250px]">Customer</TableHead>
                     <TableHead>Phone</TableHead>
@@ -94,10 +94,10 @@ export default function CustomersListPage() {
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-3">
                             <Avatar>
-                              <AvatarFallback>{getInitials(customer.name)}</AvatarFallback>
+                              <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(customer.name)}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="font-medium">{customer.name}</div>
+                              <div className="font-semibold text-foreground">{customer.name}</div>
                               <div className="text-xs text-muted-foreground">@{customer.username}</div>
                             </div>
                           </div>

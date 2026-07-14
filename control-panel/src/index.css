@@ -18,7 +18,14 @@
     --primary: 142.4 71.8% 29.2%; /* Elegant Deep Forest Green (#155e37) */
     --primary-foreground: 0 0% 100%; /* Contrast White Text */
     --ring: 142.4 71.8% 39.2%; /* Focus Ring Emerald (#047857) */
-    --radius: 0.625rem; /* Softer, modern border radius */
+    --radius: 1rem; /* Soft, rounded Maia style radius */
+
+    /* Chart colors */
+    --chart-1: 142.4 71.8% 29.2%;
+    --chart-2: 142.4 70.6% 45.3%;
+    --chart-3: 142.4 50% 65%;
+    --chart-4: 142.4 40% 75%;
+    --chart-5: 142.4 30% 85%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -50,6 +57,13 @@
     --primary: 142.4 70% 85%; /* Soft Sage/Mint Green */
     --primary-foreground: 142.4 71.8% 12%; /* Contrast Dark Green Text */
     --ring: 142.4 70.6% 45.3%; /* Focus Ring Mint */
+
+    /* Chart colors */
+    --chart-1: 142.4 70% 85%;
+    --chart-2: 142.4 70.6% 45.3%;
+    --chart-3: 142.4 50% 65%;
+    --chart-4: 142.4 40% 55%;
+    --chart-5: 142.4 30% 45%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;

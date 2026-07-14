@@ -19,98 +19,98 @@ export default function DashboardPage() {
   }).slice(0, logCount);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 animate-in fade-in duration-300">
       
       {/* WAF Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
-            <Activity className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-sm font-bold font-display text-foreground">Total Requests</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground/60" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{wafSummary.total.toLocaleString()}</div>
-            <p className="text-xs text-slate-500">Since last system restart</p>
+            <div className="text-3xl font-bold tracking-tight text-foreground">{wafSummary.total.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Since last system restart</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Blocked Threats</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-sm font-bold font-display text-foreground">Blocked Threats</CardTitle>
+            <ShieldAlert className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{wafSummary.blocked.toLocaleString()}</div>
-            <p className="text-xs text-red-500 font-medium">Action Required</p>
+            <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{wafSummary.blocked.toLocaleString()}</div>
+            <p className="text-xs text-rose-500 font-medium mt-1">Action Required</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Threat Level</CardTitle>
+            <CardTitle className="text-sm font-bold font-display text-foreground">Threat Level</CardTitle>
             <Shield className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{wafSummary.threatLevel}</div>
-            <p className="text-xs text-slate-500">Based on recent anomalies</p>
+            <div className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">{wafSummary.threatLevel}</div>
+            <p className="text-xs text-muted-foreground mt-1">Based on recent anomalies</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Rules</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+            <CardTitle className="text-sm font-bold font-display text-foreground">Active Rules</CardTitle>
+            <ShieldCheck className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{wafSummary.activeRules}</div>
-            <p className="text-xs text-slate-500">WAF policies enforced</p>
+            <div className="text-3xl font-bold tracking-tight text-primary">{wafSummary.activeRules}</div>
+            <p className="text-xs text-muted-foreground mt-1">WAF policies enforced</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-7 lg:grid-cols-7">
+      <div className="grid gap-6 md:grid-cols-7 lg:grid-cols-7">
         
         {/* Sales Graph */}
-        <Card className="md:col-span-4">
+        <Card className="md:col-span-4 border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>Sales Overview</CardTitle>
-            <CardDescription>Weekly revenue and orders performance.</CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg">Sales Overview</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">Weekly revenue and orders performance.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={salesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={(val) => `$${val}`} />
-                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                <Bar dataKey="revenue" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.04)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "currentColor" }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "currentColor" }} tickFormatter={(val) => `$${val}`} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }} />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* AI Insights */}
-        <Card className="md:col-span-3">
+        <Card className="md:col-span-3 border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center font-bold font-display tracking-tight text-lg text-foreground">
               <Zap className="w-5 h-5 mr-2 text-amber-500" fill="currentColor" />
               AI Insights
             </CardTitle>
-            <CardDescription>Smart business and security analysis.</CardDescription>
+            <CardDescription className="text-muted-foreground text-sm">Smart business and security analysis.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-amber-900 mb-1">Unusual Traffic Spike</h4>
-              <p className="text-xs text-amber-800">
+            <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+              <h4 className="text-sm font-bold font-display text-amber-800 dark:text-amber-300 mb-1">Unusual Traffic Spike</h4>
+              <p className="text-xs text-amber-700/80 dark:text-amber-300/70 leading-relaxed">
                 We detected a 400% increase in traffic originating from unknown IPs trying to access `/catalog`. WAF successfully blocked 98% of these malicious requests.
               </p>
             </div>
-            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-emerald-900 mb-1">Top Selling Product</h4>
-              <p className="text-xs text-emerald-800">
+            <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+              <h4 className="text-sm font-bold font-display text-primary mb-1">Top Selling Product</h4>
+              <p className="text-xs text-primary/80 dark:text-primary/70 leading-relaxed">
                 "{topSellingProducts[0].name}" is performing exceptionally well this week with {topSellingProducts[0].sales} sales, contributing to 65% of total revenue.
               </p>
             </div>
-            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-indigo-900 mb-1">Conversion Suggestion</h4>
-              <p className="text-xs text-indigo-800">
+            <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+              <h4 className="text-sm font-bold font-display text-primary mb-1">Conversion Suggestion</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Consider offering a discount on "Enterprise Setup". Abandoned cart rates are high for this tier.
               </p>
             </div>
@@ -119,15 +119,15 @@ export default function DashboardPage() {
       </div>
 
       {/* WAF Logs Table */}
-      <Card>
+      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Recent WAF Logs</CardTitle>
-            <CardDescription>Latest traffic evaluated by the Web Application Firewall.</CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg">Recent WAF Logs</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">Latest traffic evaluated by the Web Application Firewall.</CardDescription>
           </div>
           <div className="flex gap-2">
             <select
-              className="h-9 w-28 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+              className="h-9 w-28 rounded-xl border border-border bg-background px-3 py-1 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-foreground"
               value={logStatus}
               onChange={(e) => setLogStatus(e.target.value)}
             >
@@ -136,7 +136,7 @@ export default function DashboardPage() {
               <option value="Blocked">Blocked</option>
             </select>
             <select
-              className="h-9 w-20 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+              className="h-9 w-20 rounded-xl border border-border bg-background px-3 py-1 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-foreground"
               value={logCount}
               onChange={(e) => setLogCount(Number(e.target.value))}
             >
@@ -161,22 +161,22 @@ export default function DashboardPage() {
             <TableBody>
               {recentLogs.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-xs whitespace-nowrap">
+                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                     {new Date(log.timestamp).toLocaleTimeString()}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{log.ip}</TableCell>
+                  <TableCell className="font-mono text-xs text-foreground">{log.ip}</TableCell>
                   <TableCell>
-                    <span className="font-bold text-slate-700 mr-2">{log.method}</span>
-                    <span className="text-slate-500 text-sm truncate max-w-[200px] inline-block align-bottom">{log.url}</span>
+                    <span className="font-bold text-foreground mr-2">{log.method}</span>
+                    <span className="text-muted-foreground text-sm truncate max-w-[200px] inline-block align-bottom">{log.url}</span>
                   </TableCell>
                   <TableCell>
                     {log.status === 'Blocked' ? (
-                      <Badge variant="destructive">Blocked</Badge>
+                      <Badge variant="destructive" className="rounded-lg">Blocked</Badge>
                     ) : (
-                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Allowed</Badge>
+                      <Badge variant="secondary" className="bg-primary/15 text-primary hover:bg-primary/15 border-0 rounded-lg">Allowed</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-slate-600 truncate max-w-[250px]">{log.details}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground truncate max-w-[250px]">{log.details}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
