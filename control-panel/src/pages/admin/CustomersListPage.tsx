@@ -11,9 +11,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useCustomersViewModel } from '../../viewmodels/useCustomersViewModel';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
+import Pagination from '../../components/Pagination';
 
 export default function CustomersListPage() {
-  const { data, loading, error } = useCustomersViewModel();
+  const { data, loading, error, page, limit, setPage } = useCustomersViewModel();
 
   if (loading) {
     return (
@@ -122,6 +123,15 @@ export default function CustomersListPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil((data?.total || 0) / limit)}
+              totalItems={data?.total || 0}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="customers"
+            />
           </CardContent>
         </Card>
       </div>

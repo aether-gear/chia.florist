@@ -25,9 +25,10 @@ import LoadingState from '../../components/LoadingState';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
+import Pagination from '../../components/Pagination';
 
 export default function ProductsPage() {
-  const { data, loading, error, refresh } = useProductsViewModel();
+  const { data, loading, error, refresh, page, limit, setPage } = useProductsViewModel();
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -219,6 +220,15 @@ export default function ProductsPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil((data?.total || 0) / limit)}
+              totalItems={data?.total || 0}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="products"
+            />
           </CardContent>
         </Card>
       </div>

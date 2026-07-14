@@ -8,7 +8,7 @@ export function useAuditLogsViewModel() {
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(10);
+  const [limit, setLimit] = useState<number>(100);
   const [sort, setSort] = useState<string>('date:desc');
   
   // Filters

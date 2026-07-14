@@ -8,7 +8,7 @@ export function useOrdersViewModel() {
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(10);
+  const [limit, setLimit] = useState<number>(20);
   const [sort, setSort] = useState<string>('latest:desc');
   const [searchNumber, setSearchNumber] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -17,12 +17,12 @@ export function useOrdersViewModel() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const queryParams = new URLSearchParams();
       queryParams.append('page', page.toString());
       queryParams.append('limit', limit.toString());
       queryParams.append('sort', sort);
-      
+
       if (searchNumber) {
         queryParams.append('number', searchNumber);
       }

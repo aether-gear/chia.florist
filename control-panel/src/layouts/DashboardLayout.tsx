@@ -60,16 +60,12 @@ const navigationGroups: NavigationGroup[] = [
   }
 ];
 
-const allNavigation = navigationGroups.flatMap(g => g.items);
-
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const { data: authData, isAdmin } = useAuthMeViewModel();
   const { profile: staffProfile } = useMerchantProfileViewModel();
-
-  const visibleNavigation = allNavigation.filter(n => isAdmin || !n.adminOnly);
 
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();

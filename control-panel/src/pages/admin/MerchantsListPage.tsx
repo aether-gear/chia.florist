@@ -12,9 +12,10 @@ import {
 } from '../../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useMerchantsViewModel } from '../../viewmodels/useMerchantsViewModel';
+import Pagination from '../../components/Pagination';
 
 export default function MerchantsListPage() {
-  const { data, loading, error } = useMerchantsViewModel();
+  const { data, loading, error, page, limit, setPage } = useMerchantsViewModel();
 
   if (loading) {
     return (
@@ -135,6 +136,15 @@ export default function MerchantsListPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil((data?.total || 0) / limit)}
+              totalItems={data?.total || 0}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="merchants"
+            />
           </CardContent>
         </Card>
       </div>

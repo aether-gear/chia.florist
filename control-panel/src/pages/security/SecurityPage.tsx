@@ -232,7 +232,7 @@ export default function SecurityPage() {
   const [targetIP, setTargetIP] = useState("");
   const [targetReason, setTargetReason] = useState("");
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
-  const [ipRowsPerPage, setIpRowsPerPage] = useState<number>(5);
+  const [ipRowsPerPage, setIpRowsPerPage] = useState<number>(20);
   const [ipCurrentPage, setIpCurrentPage] = useState<number>(1);
   const [selectedDetailIP, setSelectedDetailIP] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -629,7 +629,7 @@ export default function SecurityPage() {
   };
 
   // Security Logs filter and pagination
-  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(20);
   const [statusFilter, setStatusFilter] = useState<string>("All");
 
   // New Rule Form State

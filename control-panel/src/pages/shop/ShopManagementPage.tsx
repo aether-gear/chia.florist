@@ -33,10 +33,14 @@ import {
 } from '../../components/ui/dialog';
 import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
+import Pagination from '../../components/Pagination';
 
 export default function ShopManagementPage() {
   const {
     shops,
+    total,
+    page,
+    limit,
     selectedShopId,
     selectedShopInfo,
     addresses,
@@ -46,6 +50,7 @@ export default function ShopManagementPage() {
     detailsLoading,
     error,
     detailsError,
+    setPage,
     createAddress,
     saveShop,
     createShop,
@@ -326,7 +331,7 @@ export default function ShopManagementPage() {
             <div>
               <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Store Locations</CardTitle>
               <CardDescription className="text-muted-foreground text-sm">
-                You have {shops.length} shop locations registered.
+                You have {total} shop locations registered.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -412,6 +417,15 @@ export default function ShopManagementPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil(total / limit)}
+              totalItems={total}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="shops"
+            />
           </CardContent>
         </Card>
       </div>
