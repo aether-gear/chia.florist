@@ -79,6 +79,21 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 	if o.Shipment != nil {
 		resp.Shipment = mapShipmentDetail(o.Shipment)
 	}
+	if o.Address != nil {
+		resp.Address = &orderAddressResponse{
+			ID:           o.Address.ID.String(),
+			CustomerID:   o.Address.CustomerID.String(),
+			ReceiverName: o.Address.ReceiverName,
+			Phone:        o.Address.Phone,
+			IsDefault:    o.Address.IsDefault,
+			ProvinceID:   o.Address.Detail.ProvinceID,
+			CityID:       o.Address.Detail.CityID,
+			DistrictID:   o.Address.Detail.DistrictID,
+			VillageID:    o.Address.Detail.VillageID,
+			FullAddress:  o.Address.Detail.FullAddress,
+			PostalCode:   o.Address.Detail.PostalCode,
+		}
+	}
 
 	return resp
 }

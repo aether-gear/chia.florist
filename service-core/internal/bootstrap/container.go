@@ -773,6 +773,7 @@ func NewContainer(cfg Config,
 				paymentRepo,
 				paymentChannelDataRepo,
 				shipmentRepo,
+				addressRepo,
 			),
 		GetOrder: *orderUsecase.
 			NewGetOrderUsecase(

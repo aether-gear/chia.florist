@@ -113,6 +113,20 @@ type shipmentDetailResponse struct {
 	Events            []shipmentEventResponse `json:"events,omitempty"`
 }
 
+type orderAddressResponse struct {
+	ID           string  `json:"id"`
+	CustomerID   string  `json:"customer_id"`
+	ReceiverName string  `json:"receiver_name"`
+	Phone        *string `json:"phone,omitempty"`
+	IsDefault    bool    `json:"is_default"`
+	ProvinceID   string  `json:"province_id"`
+	CityID       string  `json:"city_id"`
+	DistrictID   string  `json:"district_id"`
+	VillageID    string  `json:"village_id"`
+	FullAddress  string  `json:"full_address"`
+	PostalCode   string  `json:"postal_code"`
+}
+
 type orderResponse struct {
 	ID          string                  `json:"id"`
 	Number      string                  `json:"number"`
@@ -127,6 +141,7 @@ type orderResponse struct {
 	Items       []orderItemResponse     `json:"items"`
 	Payment     *paymentDetailResponse  `json:"payment,omitempty"`
 	Shipment    *shipmentDetailResponse `json:"shipment,omitempty"`
+	Address     *orderAddressResponse   `json:"address,omitempty"`
 }
 
 type trackingTimelineEventResponse struct {

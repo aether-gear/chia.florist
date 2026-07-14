@@ -16,6 +16,12 @@ type CustomerAddressRepository interface {
 		addressID uuid.UUID,
 	) (*domain.CustomerAddress, error)
 
+	ListByIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		addressIDs []uuid.UUID,
+	) ([]domain.CustomerAddress, error)
+
 	GetDefaultByCustomerID(
 		ctx context.Context,
 		exec transaction.Executor,
