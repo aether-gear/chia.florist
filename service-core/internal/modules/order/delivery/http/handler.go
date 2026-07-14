@@ -102,6 +102,17 @@ func mapPaymentDetail(p *paymentDomain.Payment, cd *paymentDomain.PaymentChannel
 }
 
 func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
+	events := make([]shipmentEventResponse, len(s.Events))
+	for i, e := range s.Events {
+		events[i] = shipmentEventResponse{
+			ID:          e.ID.String(),
+			Status:      e.Status,
+			Description: e.Description,
+			Location:    e.Location,
+			Timestamp:   e.Timestamp,
+		}
+	}
+
 	return &shipmentDetailResponse{
 		ID:                s.ID.String(),
 		Status:            string(s.Status),
@@ -111,6 +122,7 @@ func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 		TrackingNumber:    s.TrackingNumber,
 		Cost:              s.Cost,
 		CreatedAt:         s.CreatedAt,
+		Events:            events,
 	}
 }
 

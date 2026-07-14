@@ -93,15 +93,24 @@ type paymentDetailResponse struct {
 	CreatedAt   time.Time                   `json:"created_at"`
 }
 
+type shipmentEventResponse struct {
+	ID          string    `json:"id"`
+	Status      string    `json:"status"`
+	Description string    `json:"description"`
+	Location    string    `json:"location"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
 type shipmentDetailResponse struct {
-	ID                string     `json:"id"`
-	Status            string     `json:"status"`
-	FulfillmentMethod string     `json:"fulfillment_method"`
-	Courier           string     `json:"courier"`
-	Service           string     `json:"service"`
-	TrackingNumber    *string    `json:"tracking_number,omitempty"`
-	Cost              int64      `json:"cost"`
-	CreatedAt         time.Time  `json:"created_at"`
+	ID                string                  `json:"id"`
+	Status            string                  `json:"status"`
+	FulfillmentMethod string                  `json:"fulfillment_method"`
+	Courier           string                  `json:"courier"`
+	Service           string                  `json:"service"`
+	TrackingNumber    *string                 `json:"tracking_number,omitempty"`
+	Cost              int64                   `json:"cost"`
+	CreatedAt         time.Time               `json:"created_at"`
+	Events            []shipmentEventResponse `json:"events,omitempty"`
 }
 
 type orderResponse struct {

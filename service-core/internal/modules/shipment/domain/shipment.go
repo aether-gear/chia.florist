@@ -1,12 +1,21 @@
 package domain
 
 import (
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type ShipmentStatus string
+type (
+	// ShipmentStatus represents the operational status of a
+	// shipment throughout the delivery process.
+	ShipmentStatus string
+	// FulfillmentMethod identifies how an order is fulfilled
+	// and delivered to the customer.
+	FulfillmentMethod string
+)
 
 const (
 	ShipmentStatusCreated        ShipmentStatus = "created"
@@ -19,14 +28,68 @@ const (
 	ShipmentStatusFailed         ShipmentStatus = "failed"
 	ShipmentStatusReturned       ShipmentStatus = "returned"
 	ShipmentStatusCancelled      ShipmentStatus = "cancelled"
-)
 
-type FulfillmentMethod string
-
-const (
 	FulfillmentMethodCourier      FulfillmentMethod = "courier"
 	FulfillmentMethodSelfDelivery FulfillmentMethod = "self_delivery"
 )
+
+// allowedShipmentTransitions defines the valid state transitions for a
+// shipment. The key represents the current shipment status, while the
+// associated values represent the statuses that can be transitioned to
+// from that state.
+var allowedShipmentTransitions = map[ShipmentStatus][]ShipmentStatus{
+	ShipmentStatusCreated: {
+		ShipmentStatusPacked,
+		ShipmentStatusLabelled,
+		ShipmentStatusPickedUp,
+		ShipmentStatusInTransit,
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusDelivered,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusPacked: {
+		ShipmentStatusLabelled,
+		ShipmentStatusPickedUp,
+		ShipmentStatusInTransit,
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusDelivered,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusLabelled: {
+		ShipmentStatusPickedUp,
+		ShipmentStatusInTransit,
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusDelivered,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusPickedUp: {
+		ShipmentStatusInTransit,
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusDelivered,
+		ShipmentStatusFailed,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusInTransit: {
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusDelivered,
+		ShipmentStatusFailed,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusOutForDelivery: {
+		ShipmentStatusDelivered,
+		ShipmentStatusFailed,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusFailed: {
+		ShipmentStatusInTransit,
+		ShipmentStatusOutForDelivery,
+		ShipmentStatusReturned,
+		ShipmentStatusCancelled,
+	},
+	ShipmentStatusDelivered: {},
+	ShipmentStatusReturned:  {},
+	ShipmentStatusCancelled: {},
+}
 
 type Shipment struct {
 	ID uuid.UUID
@@ -46,6 +109,8 @@ type Shipment struct {
 	DestinationID string
 
 	CreatedAt time.Time
+
+	Events []ShipmentEvent
 }
 
 func (d *Shipment) Validate() error {
@@ -84,6 +149,28 @@ func (d *Shipment) Validate() error {
 	}
 
 	return nil
+}
+
+func (d *Shipment) UpdateStatus(status ShipmentStatus) error {
+	if d.Status == status {
+		return nil
+	}
+
+	if !d.canTransitionTo(status) {
+		return fmt.Errorf("invalid shipment status transition: %s → %s", d.Status, status)
+	}
+
+	d.Status = status
+	return nil
+}
+
+func (d *Shipment) canTransitionTo(next ShipmentStatus) bool {
+	allowed, exists := allowedShipmentTransitions[d.Status]
+	if !exists {
+		return false
+	}
+
+	return slices.Contains(allowed, next)
 }
 
 func (s ShipmentStatus) IsValid() bool {

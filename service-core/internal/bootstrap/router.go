@@ -213,6 +213,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 		shipmentHandler = shipmentH.NewShipmentHandler(
 			&c.EstimateShippingOptions,
+			&c.UpdateShipmentStatus,
+			&c.UpdateShipment,
 		)
 
 		orderHandler = orderH.NewOrderHandler(
@@ -414,6 +416,11 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
+		})
+
+		r.Route("/shipments", func(r chi.Router) {
+			r.Patch("/{shipmentID}/status", chains.StaffOnly(shipmentHandler.UpdateShipmentStatus))
+			r.Patch("/{shipmentID}", chains.StaffOnly(shipmentHandler.UpdateShipment))
 		})
 
 		r.Route("/api/stats", func(r chi.Router) {
