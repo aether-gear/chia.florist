@@ -213,6 +213,8 @@ func NewRouter(c *Container) *chi.Mux {
 
 		shipmentHandler = shipmentH.NewShipmentHandler(
 			&c.EstimateShippingOptions,
+			&c.UpdateShipmentStatus,
+			&c.UpdateShipment,
 		)
 
 		orderHandler = orderH.NewOrderHandler(
@@ -220,6 +222,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetOrder,
 			&c.CreateOrder,
 			&c.UpdateOrderStatus,
+			&c.GetOrderTracking,
 		)
 
 		auditHandler = auditH.NewAuditHandler(
@@ -349,6 +352,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Route("/orders", func(r chi.Router) {
 				r.Get("/", chains.CustomerOnly(orderHandler.ListMyOrders))
 				r.Get("/{orderID}", chains.CustomerOnly(orderHandler.GetMyOrder))
+				r.Get("/{orderID}/tracking", chains.CustomerOnly(orderHandler.GetMyOrderTracking))
 				r.Get("/{orderID}/payment", chains.CustomerOnly(paymentHandler.GetMyOrderPayment))
 				r.Post("/{orderID}/payment/check", chains.CustomerOnly(paymentHandler.CheckMyOrderPaymentStatus))
 			})
@@ -414,6 +418,11 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
+		})
+
+		r.Route("/shipments", func(r chi.Router) {
+			r.Patch("/{shipmentID}/status", chains.StaffOnly(shipmentHandler.UpdateShipmentStatus))
+			r.Patch("/{shipmentID}", chains.StaffOnly(shipmentHandler.UpdateShipment))
 		})
 
 		r.Route("/api/stats", func(r chi.Router) {

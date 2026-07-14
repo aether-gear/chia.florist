@@ -21,6 +21,7 @@ type orderHandler struct {
 	getOrder          *usecase.GetOrderUsecase
 	createOrder       *usecase.CreateOrderUsecase
 	updateOrderStatus *usecase.UpdateOrderStatusUsecase
+	getOrderTracking  *usecase.GetOrderTrackingUsecase
 }
 
 func NewOrderHandler(
@@ -28,12 +29,14 @@ func NewOrderHandler(
 	getOrder *usecase.GetOrderUsecase,
 	createOrder *usecase.CreateOrderUsecase,
 	updateOrderStatus *usecase.UpdateOrderStatusUsecase,
+	getOrderTracking *usecase.GetOrderTrackingUsecase,
 ) *orderHandler {
 	return &orderHandler{
 		findOrders:        findOrders,
 		getOrder:          getOrder,
 		createOrder:       createOrder,
 		updateOrderStatus: updateOrderStatus,
+		getOrderTracking:  getOrderTracking,
 	}
 }
 
@@ -102,6 +105,17 @@ func mapPaymentDetail(p *paymentDomain.Payment, cd *paymentDomain.PaymentChannel
 }
 
 func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
+	events := make([]shipmentEventResponse, len(s.Events))
+	for i, e := range s.Events {
+		events[i] = shipmentEventResponse{
+			ID:          e.ID.String(),
+			Status:      e.Status,
+			Description: e.Description,
+			Location:    e.Location,
+			Timestamp:   e.Timestamp,
+		}
+	}
+
 	return &shipmentDetailResponse{
 		ID:                s.ID.String(),
 		Status:            string(s.Status),
@@ -111,6 +125,7 @@ func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 		TrackingNumber:    s.TrackingNumber,
 		Cost:              s.Cost,
 		CreatedAt:         s.CreatedAt,
+		Events:            events,
 	}
 }
 
@@ -487,6 +502,57 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		Items:    []orderDomain.OrderItem{},
 		Shipment: result.Shipment,
 	})
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+func (h *orderHandler) GetMyOrderTracking(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authenDomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	customerID := *authCtx.CustomerID
+
+	orderID, err := apphttp.ParamUUID(r, "orderID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	input := usecase.GetOrderTrackingInput{
+		OrderID:    orderID,
+		CustomerID: customerID,
+	}
+
+	result, err := h.getOrderTracking.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		return apperrors.NewNotFound("tracking information not found")
+	}
+
+	timeline := make([]trackingTimelineEventResponse, len(result.Timeline))
+	for i, e := range result.Timeline {
+		timeline[i] = trackingTimelineEventResponse{
+			Status:      e.Status,
+			Description: e.Description,
+			Location:    e.Location,
+			Timestamp:   e.Timestamp,
+		}
+	}
+
+	resp := orderTrackingResponse{
+		OrderID:        result.OrderID.String(),
+		ShipmentID:     result.ShipmentID.String(),
+		Courier:        result.Courier,
+		TrackingNumber: result.TrackingNumber,
+		Timeline:       timeline,
+	}
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil

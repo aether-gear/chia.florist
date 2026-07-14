@@ -30,6 +30,9 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
   - [x] Profile
     - [x] Get Current User
     - [x] Update User
+  - [x] Shipments
+    - [x] Update Shipment Status
+    - [x] Update Shipment
 - [x] Staff Admin API
   - [x] Products Management
       - [x] Update Product
@@ -49,6 +52,8 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
   - [X] Orders
     - [X] List Orders
     - [X] Get Order
+    - [X] Get Order Tracking Timeline (Customer Endpoint)
+
   - [X] Audit Logs
     - [X] Find Audit Logs
     - [X] Get Audit Log
@@ -1409,10 +1414,16 @@ Empty body.
 ### Get Order
 
 - **Method**: `GET`
-- **Endpoint**: `/users/me/orders/{id}`
-- **Description**: Retrieve the order by its ID. This API meant for staff administrators to view order details.
-- **Authentication**: Customer
+- **Endpoint**: `/orders/{orderID}`
+- **Description**: Retrieve the order by its ID. This API is meant for staff administrators to view order details, including payment and shipment tracking history.
+- **Authentication**: Staff Admin
 - **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                   |
+|-----------|---------------|-------------------------------|
+| `orderID` | UUID (string) | The ID of the order to query. |
 
 #### Response `200 OK`
 
@@ -1449,16 +1460,196 @@ Empty body.
   "amount": 1220000,
   "expires_at": "2026-06-28T10:09:09Z",
   "created_at": "2026-06-27T10:09:05.904647Z"
+ },
+ "shipment": {
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "in_transit",
+  "fulfillment_method": "courier",
+  "courier": "jne",
+  "service": "REG",
+  "tracking_number": "JNE001928374",
+  "cost": 770000,
+  "created_at": "2026-06-27T10:09:05.904647Z",
+  "events": [
+   {
+    "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "status": "packed",
+    "description": "Order packed",
+    "location": "Jakarta Store",
+    "timestamp": "2026-06-27T11:00:00Z"
+   },
+   {
+    "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "status": "picked_up",
+    "description": "Picked up by courier",
+    "location": "Jakarta Store",
+    "timestamp": "2026-06-27T13:30:00Z"
+   }
+  ]
  }
 }
 ```
 
 #### Error Responses
 
-| Status             | Condition                   |
-|--------------------|-----------------------------|
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `orderID` is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
-| `404 Not Found`    | User profile not found.     |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | Order not found. |
+
+### Get Order Tracking Timeline (Customer Endpoint)
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me/orders/{orderID}/tracking`
+- **Description**: Retrieve the chronological tracking timeline of a shipment, merging internal shop events (e.g. `packed`, `picked_up`) with external courier updates (e.g. transit manifests from Komerce) when available. (Customer-facing endpoint documented here for completeness).
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                     |
+|-----------|---------------|---------------------------------|
+| `orderID` | UUID (string) | The ID of the order to track.   |
+
+#### Response `200 OK`
+
+```json
+{
+  "order_id": "f1e2d3c4-b5a6-7890-fedc-ba0987654321",
+  "shipment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "courier": "jne",
+  "tracking_number": "JNE001928374",
+  "timeline": [
+    {
+      "status": "packed",
+      "description": "Order packed and ready for courier pickup",
+      "location": "Jakarta Store",
+      "timestamp": "2026-07-14T02:00:00Z"
+    },
+    {
+      "status": "manifested",
+      "description": "Shipment booked",
+      "location": "Jakarta Hub",
+      "timestamp": "2026-07-14T03:00:00Z"
+    },
+    {
+      "status": "transit",
+      "description": "Departed JNE Hub",
+      "location": "Bekasi Office",
+      "timestamp": "2026-07-14T04:30:00Z"
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `orderID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Order or shipment not found, or order does not belong to the authenticated customer. |
+
+## Shipment Management
+
+### Update Shipment Status
+
+- **Method**: `PATCH`
+- **Endpoint**: `/shipments/{shipmentID}/status`
+- **Description**: Update the status of a shipment. Transitions the shipment status and logs a shipment event. If the shipment status transitions to `delivered`, the parent order's status is also automatically updated to `delivered`.
+- **Authentication**: Staff
+- **Path Parameters**:
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `shipmentID` | `string (UUID)` | Yes | The ID of the shipment to update. |
+
+- **Request Body**:
+
+```json
+{
+  "status": "string (required, enum: created, packed, labelled, picked_up, in_transit, out_for_delivery, delivered, failed, returned, cancelled)",
+  "description": "string (optional)",
+  "location": "string (optional)"
+}
+```
+
+#### Response `200 OK`
+
+```json
+{
+  "id": "7ca19532-6bb0-47b8-936a-2ee3d6790b9b",
+  "order_id": "e4a31771-4638-4e89-a292-624e723927d1",
+  "status": "packed",
+  "fulfillment_method": "courier",
+  "tracking_number": "JNE123456789",
+  "courier": "jne",
+  "service": "REG",
+  "cost": 15000,
+  "weight": 1000,
+  "created_at": "2026-07-13T18:34:00Z"
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+| :--- | :--- |
+| `400 Bad Request` | Missing `status` in body, invalid `shipmentID` format, or invalid request payload. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff role. |
+| `404 Not Found` | Shipment not found. |
+| `422 Unprocessable Entity` | Invalid status transition (e.g., trying to transition from a terminal state or moving backwards). |
+
+### Update Shipment
+
+- **Method**: `PATCH`
+- **Endpoint**: `/shipments/{shipmentID}`
+- **Description**: Update a shipment's metadata such as the tracking number, courier code, or service name. Typically used in manual logistics mode when tracking numbers or waybill information becomes available later.
+- **Authentication**: Staff
+- **Path Parameters**:
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `shipmentID` | `string (UUID)` | Yes | The ID of the shipment to update. |
+
+- **Request Body**:
+
+```json
+{
+  "tracking_number": "string (optional)",
+  "courier": "string (optional)",
+  "service": "string (optional)"
+}
+```
+
+#### Response `200 OK`
+
+```json
+{
+  "id": "7ca19532-6bb0-47b8-936a-2ee3d6790b9b",
+  "order_id": "e4a31771-4638-4e89-a292-624e723927d1",
+  "status": "created",
+  "fulfillment_method": "courier",
+  "tracking_number": "JNE999888777",
+  "courier": "jne",
+  "service": "YES",
+  "cost": 15000,
+  "weight": 1000,
+  "created_at": "2026-07-13T18:34:00Z"
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+| :--- | :--- |
+| `400 Bad Request` | Invalid `shipmentID` format, or invalid request payload (e.g. invalid fields). |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff role. |
+| `404 Not Found` | Shipment not found. |
 
 ## Audit Logs
 

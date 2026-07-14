@@ -49,3 +49,22 @@ type ShipmentMethodRepository interface {
 	) (*domain.ShipmentOption, error)
 }
 
+type ShipmentEventRepository interface {
+	GetByID(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) (*domain.ShipmentEvent, error)
+
+	ListByShipmentID(
+		ctx context.Context,
+		exec transaction.Executor,
+		shipmentID uuid.UUID,
+	) ([]domain.ShipmentEvent, error)
+
+	Create(
+		ctx context.Context,
+		exec transaction.Executor,
+		event domain.ShipmentEvent,
+	) error
+}

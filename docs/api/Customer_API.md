@@ -56,6 +56,8 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [ ] Get Order
     - [ ] Get Order Payment Details
     - [X] Check Order Payment Status
+    - [X] Get Order Tracking Timeline
+
 
 # Public API
 
@@ -1688,6 +1690,78 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `400 Bad Request`  | `orderID` is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `404 Not Found`    | Order or payment not found, or order does not belong to the authenticated customer. |
+
+### Get Order Tracking Timeline
+
+- **Method**: `GET`
+- **Endpoint**: `/users/me/orders/{orderID}/tracking`
+- **Description**: Retrieve the chronological tracking timeline of a shipment, merging internal shop events (e.g. `packed`, `picked_up`) with external courier updates (e.g. transit manifests from Komerce) when available.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Description                     |
+|-----------|---------------|---------------------------------|
+| `orderID` | UUID (string) | The ID of the order to track.   |
+
+#### Response `200 OK`
+
+```json
+{
+  "order_id": "f1e2d3c4-b5a6-7890-fedc-ba0987654321",
+  "shipment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "courier": "jne",
+  "tracking_number": "JNE001928374",
+  "timeline": [
+    {
+      "status": "packed",
+      "description": "Order packed and ready for courier pickup",
+      "location": "Jakarta Store",
+      "timestamp": "2026-07-14T02:00:00Z"
+    },
+    {
+      "status": "manifested",
+      "description": "Shipment booked",
+      "location": "Jakarta Hub",
+      "timestamp": "2026-07-14T03:00:00Z"
+    },
+    {
+      "status": "transit",
+      "description": "Departed JNE Hub",
+      "location": "Bekasi Office",
+      "timestamp": "2026-07-14T04:30:00Z"
+    }
+  ]
+}
+```
+
+#### Response Fields
+
+| Field             | Type   | Description |
+|-------------------|--------|-------------|
+| `order_id`        | string | The unique ID of the order. |
+| `shipment_id`     | string | The unique ID of the shipment. |
+| `courier`         | string | The courier code (e.g. `jne`, `self_delivery`). |
+| `tracking_number` | string | (Optional) The tracking number if shipped via courier. |
+| `timeline`        | array  | Chronological list of tracking timeline events. |
+
+#### Timeline Event Fields
+
+| Field         | Type   | Description |
+|---------------|--------|-------------|
+| `status`      | string | Status/manifest code of the event. |
+| `description` | string | Description of the tracking event. |
+| `location`    | string | Location where the event occurred. |
+| `timestamp`   | string | Date and time when the event occurred (ISO 8601). |
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `orderID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Order or shipment not found, or order does not belong to the authenticated customer. |
 
 ### Create Order
 

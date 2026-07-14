@@ -22,6 +22,7 @@ type GetOrderUsecase struct {
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
 	shipmentRepo           shipmentRepo.ShipmentRepository
+	shipmentEventRepo      shipmentRepo.ShipmentEventRepository
 }
 
 func NewGetOrderUsecase(
@@ -31,6 +32,7 @@ func NewGetOrderUsecase(
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
+	shipmentEventRepo shipmentRepo.ShipmentEventRepository,
 ) *GetOrderUsecase {
 	return &GetOrderUsecase{
 		executor:               executor,
@@ -39,6 +41,7 @@ func NewGetOrderUsecase(
 		paymentRepo:            paymentRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
 		shipmentRepo:           shipmentRepo,
+		shipmentEventRepo:      shipmentEventRepo,
 	}
 }
 
@@ -119,6 +122,22 @@ func (u *GetOrderUsecase) Execute(
 		)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shipment: %w", err)
+	}
+
+	if shipment != nil {
+		events, err := u.shipmentEventRepo.
+			ListByShipmentID(ctx, u.executor,
+				shipment.ID,
+			)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list shipment events: %w", err)
+		}
+
+		if events == nil {
+			events = []shipmentDomain.ShipmentEvent{}
+		}
+
+		shipment.Events = events
 	}
 
 	return &GetOrderResult{
