@@ -5,7 +5,7 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-const getBadgeConfig = (status: string) => {
+const getBadgeVariant = (status: string) => {
   const normalized = status.toLowerCase();
   switch (normalized) {
     case 'active':
@@ -14,39 +14,35 @@ const getBadgeConfig = (status: string) => {
     case 'confirmed':
     case 'completed':
     case 'whitelisted':
-      return {
-        variant: 'default' as const,
-        style: 'bg-emerald-100 text-emerald-800 border-0 hover:bg-emerald-200/80'
-      };
+    case 'paid':
+    case 'settled':
+      return 'success' as const;
     case 'pending':
     case 'processing':
     case 'shipped':
+    case 'in_transit':
+    case 'packed':
     case 'ignored':
     case 'archived':
-      return {
-        variant: 'secondary' as const,
-        style: 'bg-slate-100 text-slate-800 border-0 hover:bg-slate-200/80'
-      };
+      return 'secondary' as const;
     case 'cancelled':
     case 'failed':
     case 'banned':
     case 'inactive':
-      return {
-        variant: 'destructive' as const,
-        style: 'bg-rose-100 text-rose-800 border-0 hover:bg-rose-200/80'
-      };
+    case 'expired':
+      return 'danger' as const;
     default:
-      return {
-        variant: 'outline' as const,
-        style: 'bg-slate-50 text-slate-600 border-slate-200'
-      };
+      return 'outline' as const;
   }
 };
 
 export default function StatusBadge({ status, className = '' }: StatusBadgeProps) {
-  const config = getBadgeConfig(status);
+  const variant = getBadgeVariant(status);
   return (
-    <Badge variant={config.variant} className={`${config.style} ${className} font-semibold uppercase tracking-wide text-xs px-2.5 py-0.5 rounded-full transition-colors`}>
+    <Badge
+      variant={variant}
+      className={`font-semibold uppercase tracking-wide text-xs px-2.5 py-0.5 rounded-full transition-colors ${className}`}
+    >
       {status}
     </Badge>
   );

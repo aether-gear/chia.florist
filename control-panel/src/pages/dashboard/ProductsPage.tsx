@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Package, Search, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   Table,
@@ -21,13 +21,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
 import { fetchApi } from '../../lib/api';
 import ProductFormSheet from '../../components/products/ProductFormSheet';
-import LoadingState from '../../components/LoadingState';
+import { Skeleton } from '../../components/ui/skeleton';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
+import Pagination from '../../components/Pagination';
 
 export default function ProductsPage() {
-  const { data, loading, error, refresh } = useProductsViewModel();
+  const { data, loading, error, refresh, page, limit, setPage } = useProductsViewModel();
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -63,63 +64,55 @@ export default function ProductsPage() {
     }
   };
 
-  if (loading) {
-    return <LoadingState message="Loading products..." />;
-  }
 
-  if (error) {
-    return (
-      <EmptyState
-        title="Failed to load products"
-        description={error}
-        actionLabel="Retry"
-        onAction={() => refresh()}
-      />
-    );
-  }
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Products</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Products</h2>
+            <p className="text-muted-foreground text-sm">
               Manage your product catalog and inventory
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => refresh()}
-              className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-            <Button onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
-              <Plus className="mr-2 h-4 w-4" /> Add Product
-            </Button>
-          </div>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>All Products</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Products</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               You have {data?.total || 0} total products in your catalog.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex items-center gap-4">
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search products..."
-              />
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search products..."
+                />
+              </div>
+
+              {/* Right Side: Adding and Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Product
+                </Button>
+              </div>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -133,7 +126,34 @@ export default function ProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell><Skeleton className="h-10 w-10 rounded-md bg-muted animate-pulse" /></TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-32 animate-pulse bg-muted mb-1.5" />
+                          <Skeleton className="h-3.5 w-24 animate-pulse bg-muted" />
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-20 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24 animate-pulse bg-muted" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-8 rounded-xl ml-auto animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="p-0">
+                        <EmptyState
+                          title="Failed to load products"
+                          description={error}
+                          actionLabel="Retry"
+                          onAction={() => refresh()}
+                          className="flex h-32 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent text-destructive"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredProducts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="p-0">
                         <EmptyState
@@ -191,23 +211,23 @@ export default function ProductsPage() {
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-md p-1 min-w-[150px]">
+                            <DropdownMenuContent align="end" className="min-w-[150px] p-1">
                               <DropdownMenuItem
                                 onClick={() => {
                                   setActiveProductSlug(product.slug);
                                   setIsProductSheetOpen(true);
                                 }}
-                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-slate-50 rounded"
+                                className="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-lg hover:bg-muted"
                               >
-                                <Edit className="h-4 w-4 text-slate-500" />
+                                <Edit className="h-4 w-4 text-muted-foreground" />
                                 <span>Edit Product</span>
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-slate-100 my-1" />
+                              <DropdownMenuSeparator className="my-1" />
                               <DropdownMenuItem
                                 onClick={() => setProductToDelete(product)}
-                                className="cursor-pointer flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-red-50 text-red-600 rounded"
+                                className="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-lg hover:bg-destructive/10 text-destructive focus:bg-destructive/10 focus:text-destructive"
                               >
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <Trash2 className="h-4 w-4 text-destructive" />
                                 <span>Delete Product</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -219,6 +239,15 @@ export default function ProductsPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil((data?.total || 0) / limit)}
+              totalItems={data?.total || 0}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="products"
+            />
           </CardContent>
         </Card>
       </div>

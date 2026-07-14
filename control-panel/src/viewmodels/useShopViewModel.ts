@@ -3,6 +3,9 @@ import { fetchApi } from '../lib/api';
 
 export function useShopViewModel() {
   const [shops, setShops] = useState<any[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(15);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [selectedShopInfo, setSelectedShopInfo] = useState<any | null>(null);
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -19,15 +22,17 @@ export function useShopViewModel() {
       setLoading(true);
       setError(null);
       
-      const shopsData = await fetchApi('/shops');
+      const shopsData = await fetchApi(`/shops?page=${page}&limit=${limit}`);
       setShops(shopsData?.shops || []);
+      setTotal(shopsData?.total || 0);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch shops');
       setShops([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, limit]);
 
   const fetchShopDetails = useCallback(async (id: string) => {
     try {
@@ -102,9 +107,10 @@ export function useShopViewModel() {
         })
       });
       // Refresh the list of shops
-      const shopsData = await fetchApi('/shops');
+      const shopsData = await fetchApi(`/shops?page=${page}&limit=${limit}`);
       const updatedShops = shopsData?.shops || [];
       setShops(updatedShops);
+      setTotal(shopsData?.total || 0);
       
       // Update selected shop info
       const updated = updatedShops.find((s: any) => s.id === selectedShopId);
@@ -128,8 +134,9 @@ export function useShopViewModel() {
         body: JSON.stringify(data)
       });
       // Refresh the list of shops
-      const shopsData = await fetchApi('/shops');
+      const shopsData = await fetchApi(`/shops?page=${page}&limit=${limit}`);
       setShops(shopsData?.shops || []);
+      setTotal(shopsData?.total || 0);
       return true;
     } catch (err) {
       console.error(err);
@@ -141,6 +148,9 @@ export function useShopViewModel() {
 
   return {
     shops,
+    total,
+    page,
+    limit,
     selectedShopId,
     selectedShopInfo,
     addresses,
@@ -150,6 +160,8 @@ export function useShopViewModel() {
     detailsLoading,
     error,
     detailsError,
+    setPage,
+    setLimit,
     createAddress,
     saveShop,
     createShop,

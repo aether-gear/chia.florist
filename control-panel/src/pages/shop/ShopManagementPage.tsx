@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Truck, Package, Loader2, Plus, Info, RefreshCw, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Checkbox } from '../../components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import {
   TableRow,
 } from '../../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import {
   Sheet,
@@ -32,10 +34,15 @@ import {
 } from '../../components/ui/dialog';
 import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
+import Pagination from '../../components/Pagination';
+import SearchInput from '../../components/SearchInput';
 
 export default function ShopManagementPage() {
   const {
     shops,
+    total,
+    page,
+    limit,
     selectedShopId,
     selectedShopInfo,
     addresses,
@@ -45,12 +52,23 @@ export default function ShopManagementPage() {
     detailsLoading,
     error,
     detailsError,
+    setPage,
     createAddress,
     saveShop,
     createShop,
     selectShop,
-    refresh
+    refresh,
   } = useShopViewModel();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredShops = useMemo(() => {
+    if (!shops) return [];
+    return shops.filter(shop =>
+      shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (shop.description && shop.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [shops, searchQuery]);
   
   // Overlay details Dialog state
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -293,65 +311,64 @@ export default function ShopManagementPage() {
     setIsDetailsOpen(true);
   };
 
-  if (loading && shops.length === 0) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Shop Management</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Shop Management</h2>
+            <p className="text-muted-foreground text-sm">
               View and manage all your store branches and their details.
             </p>
           </div>
         </div>
-        <Card className="shadow-md border-0 bg-white/70 backdrop-blur-md">
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <div>
-              <CardTitle className="text-xl font-semibold">Store Locations</CardTitle>
-              <CardDescription>
-                You have {shops.length} shop locations registered.
+              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Store Locations</CardTitle>
+              <CardDescription className="text-muted-foreground text-sm">
+                You have {total} shop locations registered.
               </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refresh()}
-                className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-indigo-600 transition-colors"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setIsAddShopOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
-              >
-                <Plus className="h-4 w-4" />
-                Add Shop
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border border-slate-100 overflow-hidden">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search shops by name..."
+                />
+              </div>
+
+              {/* Right Side: Adding and Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddShopOpen(true)}
+                  className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Shop
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
-                <TableHeader className="bg-slate-50/70">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead>Shop Name</TableHead>
                     <TableHead>Description</TableHead>
@@ -360,23 +377,38 @@ export default function ShopManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {shops.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell><Skeleton className="h-5 w-40 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-60 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 animate-pulse bg-muted" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center h-24 text-slate-500">
-                        No shops found.
+                      <TableCell colSpan={4} className="text-center h-24 text-destructive">
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredShops.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                        {searchQuery ? `No shops match "${searchQuery}"` : "No shops found."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    shops.map((shop) => (
+                    filteredShops.map((shop) => (
                       <TableRow
                         key={shop.id}
-                        className="hover:bg-slate-50/50 cursor-pointer transition-colors"
+                        className="hover:bg-muted/55 cursor-pointer transition-colors"
                         onClick={() => handleOpenDetails(shop)}
                       >
-                        <TableCell className="font-semibold text-slate-800">
+                        <TableCell className="font-semibold text-foreground">
                           {shop.name}
                         </TableCell>
-                        <TableCell className="text-slate-600 max-w-sm truncate">
+                        <TableCell className="text-muted-foreground max-w-sm truncate">
                           {shop.description || '-'}
                         </TableCell>
                         <TableCell>
@@ -384,8 +416,8 @@ export default function ShopManagementPage() {
                             variant={shop.is_active ? 'default' : 'secondary'}
                             className={
                               shop.is_active
-                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100/80 border-0'
-                                : 'bg-slate-100 text-slate-800 hover:bg-slate-100/80 border-0'
+                                ? 'bg-primary/10 text-primary hover:bg-primary/10 border-0 rounded-lg'
+                                : 'bg-muted text-muted-foreground hover:bg-muted border-0 rounded-lg'
                             }
                           >
                             {shop.is_active ? 'Active' : 'Inactive'}
@@ -395,7 +427,7 @@ export default function ShopManagementPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                            className="text-primary hover:text-primary/90 hover:bg-primary/5 rounded-lg"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenDetails(shop);
@@ -411,6 +443,15 @@ export default function ShopManagementPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil(total / limit)}
+              totalItems={total}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="shops"
+            />
           </CardContent>
         </Card>
       </div>
@@ -486,19 +527,17 @@ export default function ShopManagementPage() {
                         />
                       </div>
                       <div className="flex items-center space-x-2 pt-2">
-                        <input
+                        <Checkbox
                           id="shopIsActive"
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                           checked={shopIsActive}
-                          onChange={(e) => setShopIsActive(e.target.checked)}
+                          onCheckedChange={(checked) => setShopIsActive(checked === true)}
                         />
                         <Label htmlFor="shopIsActive" className="text-sm font-medium leading-none cursor-pointer">
                           Shop is Active
                         </Label>
                       </div>
                       <div className="pt-2">
-                        <Button type="submit" disabled={isSavingShop} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button type="submit" disabled={isSavingShop}>
                           {isSavingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Save Settings
                         </Button>
@@ -519,7 +558,7 @@ export default function ShopManagementPage() {
                     
                     <Sheet open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
                       <SheetTrigger asChild>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button size="sm">
                           <Plus className="mr-1.5 h-4 w-4" /> Add Inventory
                         </Button>
                       </SheetTrigger>
@@ -571,7 +610,7 @@ export default function ShopManagementPage() {
                             <SheetClose asChild>
                               <Button type="button" variant="outline">Cancel</Button>
                             </SheetClose>
-                            <Button type="submit" disabled={isInventorySubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+                            <Button type="submit" disabled={isInventorySubmitting}>
                               {isInventorySubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                               Add Stock
                             </Button>
@@ -642,7 +681,7 @@ export default function ShopManagementPage() {
                     
                     <Sheet open={isAddressOpen} onOpenChange={setIsAddressOpen}>
                       <SheetTrigger asChild>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button size="sm">
                           <Plus className="mr-1.5 h-4 w-4" /> Add Address
                         </Button>
                       </SheetTrigger>
@@ -771,12 +810,10 @@ export default function ShopManagementPage() {
                           </div>
 
                           <div className="flex items-center space-x-2 pt-2">
-                            <input
+                            <Checkbox
                               id="isActive"
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                               checked={isActive}
-                              onChange={(e) => setIsActive(e.target.checked)}
+                              onCheckedChange={(checked) => setIsActive(checked === true)}
                             />
                             <Label htmlFor="isActive" className="text-sm font-medium leading-none cursor-pointer">
                               Set as active address
@@ -787,7 +824,7 @@ export default function ShopManagementPage() {
                             <SheetClose asChild>
                               <Button type="button" variant="outline">Cancel</Button>
                             </SheetClose>
-                            <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+                            <Button type="submit" disabled={isSubmitting}>
                               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                               Save Address
                             </Button>
@@ -931,12 +968,10 @@ export default function ShopManagementPage() {
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
-              <input
+              <Checkbox
                 id="newShopIsActive"
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-500"
                 checked={newShopIsActive}
-                onChange={(e) => setNewShopIsActive(e.target.checked)}
+                onCheckedChange={(checked) => setNewShopIsActive(checked === true)}
               />
               <Label htmlFor="newShopIsActive" className="text-sm font-medium leading-none cursor-pointer">
                 Shop is Active (Staff Admin Only)
@@ -947,7 +982,7 @@ export default function ShopManagementPage() {
               <SheetClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </SheetClose>
-              <Button type="submit" disabled={isCreatingShop} className="bg-indigo-600 hover:bg-indigo-700">
+              <Button type="submit" disabled={isCreatingShop}>
                 {isCreatingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Shop
               </Button>

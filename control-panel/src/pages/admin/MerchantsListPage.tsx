@@ -1,7 +1,8 @@
-import { Store, Search, Loader2 } from 'lucide-react';
-import { Input } from '../../components/ui/input';
+import { useState, useMemo } from 'react';
+import { Store, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
+import SearchInput from '../../components/SearchInput';
 import {
   Table,
   TableBody,
@@ -12,67 +13,77 @@ import {
 } from '../../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useMerchantsViewModel } from '../../viewmodels/useMerchantsViewModel';
+import Pagination from '../../components/Pagination';
+import { Skeleton } from '../../components/ui/skeleton';
 
 export default function MerchantsListPage() {
-  const { data, loading, error } = useMerchantsViewModel();
+  const { data, loading, error, page, limit, setPage, refresh } = useMerchantsViewModel();
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const [searchQuery, setSearchQuery] = useState('');
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
+  const filteredMerchants = useMemo(() => {
+    if (!data?.merchants) return [];
+    return data.merchants.filter(merchant =>
+      merchant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (merchant.description && merchant.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      merchant.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }
+  }, [data, searchQuery]);
+
+
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Merchants</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Merchants</h2>
+            <p className="text-muted-foreground text-sm">
               Manage merchants registered on the platform
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button asChild>
-              <Link to="/admin/merchants/create">
-                <Store className="mr-2 h-4 w-4" /> Create Merchant
-              </Link>
-            </Button>
-          </div>
         </div>
 
-        <Card>
+
+        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle>All Merchants</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Merchants</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
               Showing {data?.merchants.length || 0} of {data?.total || 0} merchants.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
                   placeholder="Search merchants..."
-                  className="pl-8"
                 />
+              </div>
+
+              {/* Right Side: Adding and Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors animate-in fade-in duration-200"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
+                  <Link to="/admin/merchants/create">
+                    <Store className="mr-2 h-4 w-4" /> Create Merchant
+                  </Link>
+                </Button>
               </div>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-[80px]">Logo</TableHead>
                     <TableHead>Merchant Name</TableHead>
@@ -82,14 +93,33 @@ export default function MerchantsListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.merchants.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`}>
+                        <TableCell><Skeleton className="h-10 w-10 rounded-md bg-muted animate-pulse" /></TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-36 animate-pulse bg-muted mb-1.5" />
+                          <Skeleton className="h-3.5 w-24 animate-pulse bg-muted" />
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-48 animate-pulse bg-muted" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-28 animate-pulse bg-muted" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto animate-pulse bg-muted" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No merchants found.
+                      <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredMerchants.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        {searchQuery ? `No merchants match "${searchQuery}"` : "No merchants found."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data?.merchants.map((merchant) => (
+                    filteredMerchants.map((merchant) => (
                       <TableRow key={merchant.id}>
                         <TableCell>
                           <div className="h-10 w-10 overflow-hidden rounded-md border">
@@ -135,6 +165,15 @@ export default function MerchantsListPage() {
                 </TableBody>
               </Table>
             </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil((data?.total || 0) / limit)}
+              totalItems={data?.total || 0}
+              limit={limit}
+              onPageChange={setPage}
+              itemNamePlural="merchants"
+            />
           </CardContent>
         </Card>
       </div>

@@ -1,5 +1,12 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from './ui/button';
+import {
+  Pagination as ShadcnPagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from './ui/pagination';
 
 interface PaginationProps {
   currentPage: number;
@@ -18,42 +25,93 @@ export default function Pagination({
   limit,
   onPageChange,
   itemNamePlural = 'items',
-  className = 'flex items-center justify-between mt-4'
+  className = 'flex flex-col sm:flex-row items-center justify-between gap-4 mt-4'
 }: PaginationProps) {
   if (totalItems === 0 || totalPages <= 1) return null;
 
   const startItem = ((currentPage - 1) * limit) + 1;
   const endItem = Math.min(currentPage * limit, totalItems);
 
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      if (start > 2) {
+        pages.push('ellipsis-start');
+      }
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      if (end < totalPages - 1) {
+        pages.push('ellipsis-end');
+      }
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
   return (
     <div className={className}>
       <div className="text-sm text-muted-foreground">
-        Showing <span className="font-semibold text-slate-800">{startItem}</span> to{' '}
-        <span className="font-semibold text-slate-800">{endItem}</span> of{' '}
-        <span className="font-semibold text-slate-800">{totalItems}</span> {itemNamePlural}
+        Showing <span className="font-semibold text-foreground">{startItem}</span> to{' '}
+        <span className="font-semibold text-foreground">{endItem}</span> of{' '}
+        <span className="font-semibold text-foreground">{totalItems}</span> {itemNamePlural}
       </div>
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-          className="border-slate-200"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          <span className="sr-only sm:not-sr-only sm:ml-1 text-xs">Previous</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage >= totalPages}
-          className="border-slate-200"
-        >
-          <span className="sr-only sm:not-sr-only sm:mr-1 text-xs">Next</span>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <ShadcnPagination className="mx-0 w-auto justify-end">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage > 1) onPageChange(currentPage - 1);
+              }}
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              tabIndex={currentPage === 1 ? -1 : 0}
+            />
+          </PaginationItem>
+          {getPageNumbers().map((p, idx) => {
+            if (p === 'ellipsis-start' || p === 'ellipsis-end') {
+              return (
+                <PaginationItem key={`ellipsis-${idx}`}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              );
+            }
+            const pageNum = p as number;
+            return (
+              <PaginationItem key={pageNum}>
+                <PaginationLink
+                  isActive={pageNum === currentPage}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onPageChange(pageNum);
+                  }}
+                  className="cursor-pointer"
+                >
+                  {pageNum}
+                </PaginationLink>
+              </PaginationItem>
+            );
+          })}
+          <PaginationItem>
+            <PaginationNext
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage < totalPages) onPageChange(currentPage + 1);
+              }}
+              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              tabIndex={currentPage === totalPages ? -1 : 0}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </ShadcnPagination>
     </div>
   );
 }

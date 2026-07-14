@@ -1,10 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
-import { ShieldAlert, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { fetchApi } from '@/lib/api';
+import AuthLayout from '@/layouts/AuthLayout';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -49,76 +50,102 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-0">
-        <CardHeader className="space-y-3 items-center text-center pb-8">
-          <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
-            <ShieldAlert className="h-7 w-7 text-indigo-600" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-          <CardDescription>
-            Enter your credentials to access the Control Panel
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@chia.florist"
-                required
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
-                  Password
-                </label>
-                <Link to="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-500 font-medium">
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                required
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center space-x-2 py-1">
-              <input
-                id="rememberMe"
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              <label htmlFor="rememberMe" className="text-sm text-slate-600 font-medium cursor-pointer select-none">
-                Remember me
-              </label>
-            </div>
-              {error && (
-                <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
-                  {error}
-                </div>
-              )}
-            <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center border-t p-4 mt-2">
-          <p className="text-sm text-slate-500">
-            Secure connection established
+    <AuthLayout>
+      <div className="space-y-6">
+        {/* Title and Subtitle */}
+        <div className="space-y-2">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-emerald-950">
+            Sign In
+          </h1>
+          <p className="text-sm text-zinc-500 font-sans font-light">
+            Enter your credentials to access the
+            <span className="text-emerald-950 italic"> Control Panel.</span>
           </p>
-        </CardFooter>
-      </Card>
-    </div>
+        </div>
+
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
+          {/* Email input field */}
+          <div className="space-y-2">
+            <label
+              htmlFor="email"
+              className="text-xs font-semibold tracking-wide text-zinc-500 uppercase font-sans"
+            >
+              Email address
+            </label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="admin@chia.florist"
+              required
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-11 border-zinc-200/80 rounded-lg text-sm bg-zinc-50/20 focus-visible:bg-white focus:outline-none focus:ring-2 transition-all duration-200 font-sans"
+            />
+          </div>
+
+          {/* Password input field */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="password"
+                className="text-xs font-semibold tracking-wide text-zinc-500 uppercase font-sans"
+              >
+                Password
+              </label>
+              <Link
+                to="/forgot-password"
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition-colors font-sans"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              required
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full h-11 border-zinc-200/80 rounded-lg text-sm bg-zinc-50/20 focus-visible:bg-white focus:outline-none focus:ring-2 transition-all duration-200 font-sans"
+            />
+          </div>
+
+          {/* Remember me option */}
+          <div className="flex items-center space-x-2.5 py-1">
+            <Checkbox
+              id="rememberMe"
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+              className="w-4 h-4 rounded border-zinc-300 focus-visible:ring-emerald-600"
+            />
+            <label
+              htmlFor="rememberMe"
+              className="text-xs font-medium text-zinc-500 cursor-pointer select-none font-sans"
+            >
+              Keep me signed in
+            </label>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="p-3 text-xs font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-lg font-sans animate-in fade-in zoom-in-95 duration-200">
+              {error}
+            </div>
+          )}
+
+          {/* Submit button */}
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full h-11 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-medium rounded-lg shadow-sm transition-all duration-200 flex items-center justify-center font-sans mt-6"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+            ) : (
+              'Sign In'
+            )}
+          </Button>
+        </form>
+      </div>
+    </AuthLayout>
   );
 }

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { CreditCard, Wallet, Loader2, Plus, Pencil } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { CreditCard, Wallet, Plus, Pencil, RefreshCw } from 'lucide-react';
+import SearchInput from '../../../components/SearchInput';
 import { Button } from '../../../components/ui/button';
 import {
   Table,
@@ -12,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { Skeleton } from '../../../components/ui/skeleton';
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
 import { Link } from 'react-router-dom';
 import type { PaymentMethod } from '../../../models/Payment';
@@ -19,27 +21,34 @@ import PaymentMethodFormSheet from '../../../components/payments/PaymentMethodFo
 import PaymentMethodDetailOverlay from '../../../components/payments/PaymentMethodDetailOverlay';
 
 export default function PaymentSettingsPage() {
-  const { methods, accounts, loading, error, savePaymentMethod } = usePaymentsViewModel();
+  const { methods, accounts, loading, error, savePaymentMethod, refetch } = usePaymentsViewModel();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailMethod, setDetailMethod] = useState<PaymentMethod | null>(null);
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const [accountSearch, setAccountSearch] = useState('');
+  const [methodSearch, setMethodSearch] = useState('');
 
-  if (error) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-destructive">{error}</p>
-      </div>
+  const filteredAccounts = useMemo(() => {
+    if (!accounts) return [];
+    return accounts.filter(account =>
+      account.account_name.toLowerCase().includes(accountSearch.toLowerCase()) ||
+      (account.account_number && account.account_number.toLowerCase().includes(accountSearch.toLowerCase())) ||
+      (account.phone_number && account.phone_number.toLowerCase().includes(accountSearch.toLowerCase()))
     );
-  }
+  }, [accounts, accountSearch]);
+
+  const filteredMethods = useMemo(() => {
+    if (!methods) return [];
+    return methods.filter(method =>
+      method.name.toLowerCase().includes(methodSearch.toLowerCase()) ||
+      method.code.toLowerCase().includes(methodSearch.toLowerCase()) ||
+      (method.description && method.description.toLowerCase().includes(methodSearch.toLowerCase()))
+    );
+  }, [methods, methodSearch]);
+
+
 
   const getMethodName = (methodId: string) => {
     const method = methods.find(m => m.id === methodId);
@@ -66,20 +75,42 @@ export default function PaymentSettingsPage() {
 
           <TabsContent value="accounts" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Configured Accounts</CardTitle>
-                  <CardDescription>
-                    These accounts are used to receive settlements from customers.
-                  </CardDescription>
-                </div>
-                <Button asChild size="sm">
-                  <Link to="/admin/payments/accounts/create">
-                    <Plus className="mr-2 h-4 w-4" /> Add Account
-                  </Link>
-                </Button>
+              <CardHeader>
+                <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Configured Accounts</CardTitle>
+                <CardDescription className="text-muted-foreground text-sm">
+                  These accounts are used to receive settlements from customers.
+                </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  {/* Left Side: Filter and Search */}
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                    <SearchInput
+                      value={accountSearch}
+                      onChange={setAccountSearch}
+                      placeholder="Search accounts..."
+                    />
+                  </div>
+
+                  {/* Right Side: Refresh & Add */}
+                  <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetch()}
+                      className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
+                    <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
+                      <Link to="/admin/payments/accounts/create">
+                        <Plus className="mr-2 h-4 w-4" /> Add Account
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -91,14 +122,29 @@ export default function PaymentSettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {accounts.length === 0 ? (
+                      {loading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={`accounts-skeleton-${i}`}>
+                            <TableCell><Skeleton className="h-5 w-5 rounded bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-40 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-28 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-32 bg-muted animate-pulse" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : error ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center h-24">
-                            No payment accounts configured.
+                          <TableCell colSpan={4} className="text-center h-24 text-destructive">
+                            {error}
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredAccounts.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                            {accountSearch ? `No accounts match "${accountSearch}"` : "No payment accounts configured."}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        accounts.map((account) => (
+                        filteredAccounts.map((account) => (
                           <TableRow key={account.id}>
                             <TableCell>
                               <Wallet className="h-5 w-5 text-muted-foreground" />
@@ -120,18 +166,43 @@ export default function PaymentSettingsPage() {
 
           <TabsContent value="methods" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Available Methods</CardTitle>
-                  <CardDescription>
-                    These are the payment channels available for processing customer payments.
-                  </CardDescription>
-                </div>
-                <Button onClick={() => { setEditingMethod(null); setIsFormOpen(true); }} size="sm">
-                  <Plus className="mr-2 h-4 w-4" /> Add Method
-                </Button>
+              <CardHeader>
+                <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Available Methods</CardTitle>
+                <CardDescription className="text-muted-foreground text-sm">
+                  These are the payment channels available for processing customer payments.
+                </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  {/* Left Side: Filter and Search */}
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                    <SearchInput
+                      value={methodSearch}
+                      onChange={setMethodSearch}
+                      placeholder="Search methods..."
+                    />
+                  </div>
+
+                  {/* Right Side: Refresh & Add */}
+                  <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetch()}
+                      className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
+                    <Button 
+                      onClick={() => { setEditingMethod(null); setIsFormOpen(true); }}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Add Method
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -147,14 +218,33 @@ export default function PaymentSettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {methods.length === 0 ? (
+                      {loading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={`methods-skeleton-${i}`}>
+                            <TableCell><Skeleton className="h-5 w-5 rounded bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-32 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-16 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-20 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-24 bg-muted animate-pulse" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-40 bg-muted animate-pulse" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto bg-muted animate-pulse" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-8 rounded-xl ml-auto bg-muted animate-pulse" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : error ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center h-24">
-                            No payment methods configured.
+                          <TableCell colSpan={8} className="text-center h-24 text-destructive">
+                            {error}
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredMethods.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
+                            {methodSearch ? `No methods match "${methodSearch}"` : "No payment methods configured."}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        methods.map((method) => (
+                        filteredMethods.map((method) => (
                           <TableRow key={method.id} className="cursor-pointer" onClick={() => {
                             setDetailMethod(method);
                             setIsDetailOpen(true);
