@@ -16,11 +16,11 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { useAuditLogsViewModel } from '../../viewmodels/useAuditLogsViewModel';
 import type { AuditLog } from '../../models/AuditLog';
-import LoadingState from '../../components/LoadingState';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
 import Pagination from '../../components/Pagination';
+import { Skeleton } from '../../components/ui/skeleton';
 
 export default function AuditLogsPage() {
   const {
@@ -166,8 +166,6 @@ export default function AuditLogsPage() {
                 onAction={() => refresh()}
                 className="flex h-48 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent"
               />
-            ) : loading ? (
-              <LoadingState message="Loading audit logs..." className="flex h-64 flex-col items-center justify-center gap-2" />
             ) : (
               <div className="rounded-2xl border border-border overflow-hidden">
                 <Table>
@@ -199,7 +197,19 @@ export default function AuditLogsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {logs.length === 0 ? (
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={`skeleton-${i}`}>
+                          <TableCell><Skeleton className="h-5 w-32 animate-pulse bg-muted" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-20 animate-pulse bg-muted" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-40 animate-pulse bg-muted" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-28 animate-pulse bg-muted" /></TableCell>
+                          <TableCell className="text-center"><Skeleton className="h-5 w-16 mx-auto animate-pulse bg-muted" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-24 animate-pulse bg-muted" /></TableCell>
+                          <TableCell className="text-right"><Skeleton className="h-5 w-8 ml-auto animate-pulse bg-muted" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : logs.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="p-0">
                           <EmptyState

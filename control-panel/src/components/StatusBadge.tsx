@@ -14,10 +14,14 @@ const getBadgeVariant = (status: string) => {
     case 'confirmed':
     case 'completed':
     case 'whitelisted':
+    case 'paid':
+    case 'settled':
       return 'success' as const;
     case 'pending':
     case 'processing':
     case 'shipped':
+    case 'in_transit':
+    case 'packed':
     case 'ignored':
     case 'archived':
       return 'secondary' as const;
@@ -25,6 +29,7 @@ const getBadgeVariant = (status: string) => {
     case 'failed':
     case 'banned':
     case 'inactive':
+    case 'expired':
       return 'danger' as const;
     default:
       return 'outline' as const;
