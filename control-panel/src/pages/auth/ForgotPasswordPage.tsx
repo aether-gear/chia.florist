@@ -98,14 +98,18 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-0">
+    <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-3 items-center text-center pb-8">
-          <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
+          <div className={`h-12 w-12 rounded-full flex items-center justify-center mb-2 ${
+            step === 'success' 
+              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400' 
+              : 'bg-primary/10 text-primary'
+          }`}>
             {step === 'success' ? (
-              <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+              <CheckCircle2 className="h-7 w-7" />
             ) : (
-              <KeyRound className="h-7 w-7 text-indigo-600" />
+              <KeyRound className="h-7 w-7" />
             )}
           </div>
           <CardTitle className="text-2xl font-bold">
@@ -147,7 +151,7 @@ export default function ForgotPasswordPage() {
                   <Mail className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                 </div>
               </div>
-              <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Send reset code'}
               </Button>
             </form>
@@ -170,7 +174,7 @@ export default function ForgotPasswordPage() {
                   className="text-center tracking-widest text-lg font-bold"
                 />
               </div>
-              <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Verify code'}
               </Button>
             </form>
@@ -204,7 +208,7 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
-              <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Reset password'}
               </Button>
             </form>
@@ -212,11 +216,11 @@ export default function ForgotPasswordPage() {
 
           {step === 'success' && (
             <div className="flex flex-col items-center justify-center py-4 space-y-4">
-              <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-3 w-full justify-center">
+              <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 rounded-lg p-3 w-full justify-center">
                 <ShieldCheck className="h-5 w-5" />
                 <span className="text-sm font-medium">Ready to sign in</span>
               </div>
-              <Button onClick={() => navigate('/login')} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              <Button onClick={() => navigate('/login')} className="w-full">
                 Back to Sign In
               </Button>
             </div>
@@ -224,7 +228,7 @@ export default function ForgotPasswordPage() {
         </CardContent>
         {step !== 'success' && (
           <CardFooter className="flex justify-center border-t p-4 mt-2">
-            <Link to="/login" className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-500 font-medium">
+            <Link to="/login" className="flex items-center gap-1 text-sm text-primary hover:underline font-medium">
               <ArrowLeft className="h-4 w-4" /> Back to Sign In
             </Link>
           </CardFooter>

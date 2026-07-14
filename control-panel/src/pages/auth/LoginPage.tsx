@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { fetchApi } from '@/lib/api';
@@ -49,11 +50,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-0">
+    <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-3 items-center text-center pb-8">
-          <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
-            <ShieldAlert className="h-7 w-7 text-indigo-600" />
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+            <ShieldAlert className="h-7 w-7 text-primary" />
           </div>
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
@@ -79,7 +80,7 @@ export default function LoginPage() {
                 <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
                   Password
                 </label>
-                <Link to="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-500 font-medium">
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline font-medium">
                   Forgot password?
                 </Link>
               </div>
@@ -92,23 +93,21 @@ export default function LoginPage() {
               />
             </div>
             <div className="flex items-center space-x-2 py-1">
-              <input
+              <Checkbox
                 id="rememberMe"
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
               />
               <label htmlFor="rememberMe" className="text-sm text-slate-600 font-medium cursor-pointer select-none">
                 Remember me
               </label>
             </div>
-              {error && (
-                <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
-                  {error}
-                </div>
-              )}
-            <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
+            {error && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+                {error}
+              </div>
+            )}
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
             </Button>
           </form>
