@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, Search, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, Eye, RefreshCw } from 'lucide-react';
+import { History, ArrowUpDown, Eye, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';

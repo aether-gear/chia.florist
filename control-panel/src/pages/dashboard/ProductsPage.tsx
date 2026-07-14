@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Package, Search, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   Table,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PackageOpen, Search, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, Eye } from 'lucide-react';
+import { PackageOpen, ArrowUpDown, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   Table,
