@@ -86,40 +86,47 @@ export default function OrdersPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex flex-col sm:flex-row items-center gap-4">
-              <SearchInput
-                value={searchNumber}
-                onChange={(val) => {
-                  setSearchNumber(val);
-                  setPage(1);
-                }}
-                placeholder="Search by Order Number..."
-              />
-              <div className="w-full sm:w-[180px]">
-                <Select
-                  value={statusFilter || "all"}
-                  onValueChange={(val) => {
-                    setStatusFilter(val === "all" ? "" : val);
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-1 flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchNumber}
+                  onChange={(val) => {
+                    setSearchNumber(val);
                     setPage(1);
                   }}
-                >
-                  <SelectTrigger className="w-full rounded-xl border border-border bg-background">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="shipped">Shipped</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+                  placeholder="Search by Order Number..."
+                />
+                <div className="w-full sm:w-[180px]">
+                  <Select
+                    value={statusFilter || "all"}
+                    onValueChange={(val) => {
+                      setStatusFilter(val === "all" ? "" : val);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-full rounded-xl border border-border bg-background">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="processing">Processing</SelectItem>
+                      <SelectItem value="shipped">Shipped</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <Button variant="outline" className="border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl" onClick={() => refresh()}>
-                Refresh
-              </Button>
+
+              {/* Right Side: Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button variant="outline" className="border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl" onClick={() => refresh()}>
+                  Refresh
+                </Button>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-border overflow-hidden">

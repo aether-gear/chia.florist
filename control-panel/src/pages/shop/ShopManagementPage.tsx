@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Truck, Package, Loader2, Plus, Info, RefreshCw, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -35,6 +35,7 @@ import {
 import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
 import Pagination from '../../components/Pagination';
+import SearchInput from '../../components/SearchInput';
 
 export default function ShopManagementPage() {
   const {
@@ -56,8 +57,18 @@ export default function ShopManagementPage() {
     saveShop,
     createShop,
     selectShop,
-    refresh
+    refresh,
   } = useShopViewModel();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredShops = useMemo(() => {
+    if (!shops) return [];
+    return shops.filter(shop =>
+      shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (shop.description && shop.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [shops, searchQuery]);
   
   // Overlay details Dialog state
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -321,27 +332,40 @@ export default function ShopManagementPage() {
                 You have {total} shop locations registered.
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refresh()}
-                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setIsAddShopOpen(true)}
-                className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
-              >
-                <Plus className="h-4 w-4" />
-                Add Shop
-              </Button>
-            </div>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search shops by name..."
+                />
+              </div>
+
+              {/* Right Side: Adding and Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddShopOpen(true)}
+                  className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Shop
+                </Button>
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
                 <TableHeader className="bg-muted/50">
@@ -368,14 +392,14 @@ export default function ShopManagementPage() {
                         {error}
                       </TableCell>
                     </TableRow>
-                  ) : shops.length === 0 ? (
+                  ) : filteredShops.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
-                        No shops found.
+                        {searchQuery ? `No shops match "${searchQuery}"` : "No shops found."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    shops.map((shop) => (
+                    filteredShops.map((shop) => (
                       <TableRow
                         key={shop.id}
                         className="hover:bg-muted/55 cursor-pointer transition-colors"

@@ -1,5 +1,5 @@
-import { Search } from 'lucide-react';
-import { Input } from '../../components/ui/input';
+import { useState, useMemo } from 'react';
+import { RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,9 +13,22 @@ import { useCustomersViewModel } from '../../viewmodels/useCustomersViewModel';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import Pagination from '../../components/Pagination';
 import { Skeleton } from '../../components/ui/skeleton';
+import SearchInput from '../../components/SearchInput';
+import { Button } from '../../components/ui/button';
 
 export default function CustomersListPage() {
-  const { data, loading, error, page, limit, setPage } = useCustomersViewModel();
+  const { data, loading, error, page, limit, setPage, refresh } = useCustomersViewModel();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredCustomers = useMemo(() => {
+    if (!data?.customers) return [];
+    return data.customers.filter(customer =>
+      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (customer.phone && customer.phone.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [data, searchQuery]);
 
 
 
@@ -49,14 +62,26 @@ export default function CustomersListPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search customers by name, username, or email..."
-                  className="pl-8 rounded-xl border border-border bg-background text-foreground"
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search customers..."
                 />
+              </div>
+
+              {/* Right Side: Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
               </div>
             </div>
  
@@ -92,14 +117,14 @@ export default function CustomersListPage() {
                         {error}
                       </TableCell>
                     </TableRow>
-                  ) : !data?.customers || data.customers.length === 0 ? (
+                  ) : filteredCustomers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="h-24 text-center">
-                        No customers found.
+                      <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                        {searchQuery ? `No customers match "${searchQuery}"` : "No customers found."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data?.customers.map((customer) => (
+                    filteredCustomers.map((customer) => (
                       <TableRow key={customer.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-3">

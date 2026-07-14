@@ -1,7 +1,8 @@
-import { Store, Search } from 'lucide-react';
-import { Input } from '../../components/ui/input';
+import { useState, useMemo } from 'react';
+import { Store, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
+import SearchInput from '../../components/SearchInput';
 import {
   Table,
   TableBody,
@@ -16,7 +17,18 @@ import Pagination from '../../components/Pagination';
 import { Skeleton } from '../../components/ui/skeleton';
 
 export default function MerchantsListPage() {
-  const { data, loading, error, page, limit, setPage } = useMerchantsViewModel();
+  const { data, loading, error, page, limit, setPage, refresh } = useMerchantsViewModel();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredMerchants = useMemo(() => {
+    if (!data?.merchants) return [];
+    return data.merchants.filter(merchant =>
+      merchant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (merchant.description && merchant.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      merchant.id.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [data, searchQuery]);
 
 
 
@@ -30,14 +42,8 @@ export default function MerchantsListPage() {
               Manage merchants registered on the platform
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
-              <Link to="/admin/merchants/create">
-                <Store className="mr-2 h-4 w-4" /> Create Merchant
-              </Link>
-            </Button>
-          </div>
         </div>
+
 
         <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
           <CardHeader>
@@ -47,14 +53,31 @@ export default function MerchantsListPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
                   placeholder="Search merchants..."
-                  className="pl-8 rounded-xl border border-border bg-background text-foreground"
                 />
+              </div>
+
+              {/* Right Side: Adding and Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors animate-in fade-in duration-200"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
+                  <Link to="/admin/merchants/create">
+                    <Store className="mr-2 h-4 w-4" /> Create Merchant
+                  </Link>
+                </Button>
               </div>
             </div>
 
@@ -89,14 +112,14 @@ export default function MerchantsListPage() {
                         {error}
                       </TableCell>
                     </TableRow>
-                  ) : !data?.merchants || data.merchants.length === 0 ? (
+                  ) : filteredMerchants.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No merchants found.
+                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        {searchQuery ? `No merchants match "${searchQuery}"` : "No merchants found."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data?.merchants.map((merchant) => (
+                    filteredMerchants.map((merchant) => (
                       <TableRow key={merchant.id}>
                         <TableCell>
                           <div className="h-10 w-10 overflow-hidden rounded-md border">

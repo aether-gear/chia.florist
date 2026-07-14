@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Card, CardContent } from '../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { useAuditLogsViewModel } from '../../viewmodels/useAuditLogsViewModel';
 import type { AuditLog } from '../../models/AuditLog';
@@ -80,91 +80,96 @@ export default function AuditLogsPage() {
               Monitor user actions, resource changes, and security outcomes.
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => refresh()}
-              className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-          </div>
         </div>
 
-        {/* Filters Panel */}
         <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardContent className="p-5 space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="action-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Action Name</Label>
-                <SearchInput
-                  id="action-filter"
-                  placeholder="e.g. signin, save_shop"
-                  className="relative w-full"
-                  value={actionFilter}
-                  onChange={(val) => {
-                    setActionFilter(val);
-                    setPage(1);
-                  }}
-                />
+          <CardHeader>
+            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Audit Logs</CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
+              View system audit trails and security activity logs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1 w-full md:w-auto">
+                <div className="space-y-1.5">
+                  <Label htmlFor="action-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Action Name</Label>
+                  <SearchInput
+                    id="action-filter"
+                    placeholder="e.g. signin, save_shop"
+                    className="relative w-full text-foreground"
+                    value={actionFilter}
+                    onChange={(val) => {
+                      setActionFilter(val);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="user-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">User / Actor ID</Label>
+                  <SearchInput
+                    id="user-filter"
+                    placeholder="UUID of the actor"
+                    className="relative w-full text-foreground"
+                    value={userIdFilter}
+                    onChange={(val) => {
+                      setUserIdFilter(val);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    className="text-sm rounded-xl border border-border bg-background text-foreground"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End Date</Label>
+                  <Input
+                    id="end-date"
+                    type="date"
+                    className="text-sm rounded-xl border border-border bg-background text-foreground"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="user-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">User / Actor ID</Label>
-                <SearchInput
-                  id="user-filter"
-                  placeholder="UUID of the actor"
-                  className="relative w-full"
-                  value={userIdFilter}
-                  onChange={(val) => {
-                    setUserIdFilter(val);
-                    setPage(1);
-                  }}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  className="text-sm rounded-xl border border-border bg-background"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End Date</Label>
-                <Input
-                  id="end-date"
-                  type="date"
-                  className="text-sm rounded-xl border border-border bg-background"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setPage(1);
-                  }}
-                />
+              {/* Right Side: Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full md:w-auto pb-0.5">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Main Content Table */}
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardContent className="p-0">
             {error ? (
               <EmptyState
                 title="Failed to load audit logs"
                 description={error}
                 actionLabel="Retry"
                 onAction={() => refresh()}
-                className="flex h-48 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent"
+                className="flex h-48 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent text-destructive"
               />
             ) : (
               <div className="rounded-2xl border border-border overflow-hidden">

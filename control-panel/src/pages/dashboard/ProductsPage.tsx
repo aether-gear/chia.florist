@@ -76,19 +76,6 @@ export default function ProductsPage() {
               Manage your product catalog and inventory
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => refresh()}
-              className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
-              <Plus className="mr-2 h-4 w-4" /> Add Product
-            </Button>
-          </div>
         </div>
 
         <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
@@ -99,12 +86,30 @@ export default function ProductsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex items-center gap-4">
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search products..."
-              />
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Left Side: Filter and Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search products..."
+                />
+              </div>
+
+              {/* Right Side: Adding and Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Product
+                </Button>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-border overflow-hidden">
