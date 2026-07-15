@@ -1,16 +1,67 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Shield, ShieldAlert, ShieldCheck, Zap, Activity } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { salesData, topSellingProducts } from '@/data/mockSales';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
+import { useProductStatsViewModel } from '../../viewmodels/useProductStatsViewModel';
+import { Skeleton } from '../../components/ui/skeleton';
 import { getWafSummary, getRecentLogs } from '@/data/wafData';
 
 export default function DashboardPage() {
   const wafSummary = getWafSummary();
   const [logCount, setLogCount] = useState(5);
   const [logStatus, setLogStatus] = useState('All');
+  const [timeWindow, setTimeWindow] = useState<'7d' | '30d' | '90d'>('30d');
+
+  const { data: statsData, loading: statsLoading, error: statsError } = useProductStatsViewModel();
+
+  const barChartData = useMemo(() => {
+    if (!statsData?.stats) return [];
+    const field =
+      timeWindow === '7d'
+        ? 'sales_velocity_7d'
+        : timeWindow === '30d'
+        ? 'sales_velocity_30d'
+        : 'sales_velocity_90d';
+
+    return [...statsData.stats]
+      .sort((a, b) => b[field] - a[field])
+      .slice(0, 6)
+      .map((item) => ({
+        name: item.name,
+        sales: item[field],
+      }));
+  }, [statsData, timeWindow]);
+
+  const topProduct = useMemo(() => {
+    if (!statsData?.stats || statsData.stats.length === 0) return null;
+    return [...statsData.stats].sort((a, b) => b.sales_velocity_7d - a.sales_velocity_7d)[0];
+  }, [statsData]);
+
+  const colors = [
+    'hsl(var(--chart-1))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+    '#9ca3af',
+  ];
+
+  const BarTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
+          <p className="font-semibold font-display mb-1">{data.name}</p>
+          <p className="text-muted-foreground">
+            Units Sold: <span className="font-semibold text-primary">{data.sales}</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const allRecentLogs = getRecentLogs(500);
   const recentLogs = allRecentLogs.filter(log => {
@@ -67,22 +118,79 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-7 lg:grid-cols-7">
         
-        {/* Sales Graph */}
-        <Card className="md:col-span-4 border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader>
-            <CardTitle className="font-bold font-display tracking-tight text-lg">Sales Overview</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">Weekly revenue and orders performance.</CardDescription>
+        {/* Sales Velocity Graph */}
+        <Card className="md:col-span-4 border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 flex flex-col justify-between">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
+                  Product Sales Velocity
+                </CardTitle>
+                <CardDescription className="text-muted-foreground text-xs font-sans">
+                  Top products sold by volume
+                </CardDescription>
+              </div>
+              {/* Pill Toggles */}
+              <div className="flex items-center gap-1 bg-muted p-0.5 rounded-lg text-xs">
+                {(['7d', '30d', '90d'] as const).map((window) => (
+                  <button
+                    key={window}
+                    onClick={() => setTimeWindow(window)}
+                    className={`px-2 py-1 rounded-md transition-colors font-medium font-sans ${
+                      timeWindow === window
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {window}
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.04)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "currentColor" }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "currentColor" }} tickFormatter={(val) => `$${val}`} />
-                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }} />
-                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent className="h-[300px] pt-4">
+            {statsLoading ? (
+              <div className="h-full w-full flex flex-col justify-between py-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-20 animate-pulse bg-muted shrink-0" />
+                    <Skeleton className="h-4 w-full rounded-md animate-pulse bg-muted" />
+                  </div>
+                ))}
+              </div>
+            ) : statsError ? (
+              <div className="h-full w-full flex items-center justify-center text-xs text-destructive bg-destructive/5 rounded-xl border border-destructive/10 p-4">
+                Failed to load sales velocity: {statsError}
+              </div>
+            ) : barChartData.length === 0 ? (
+              <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
+                No product sales statistics found.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barChartData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 10, left: -10, bottom: 5 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    width={85}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                  />
+                  <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(21, 94, 55, 0.05)' }} />
+                  <Bar dataKey="sales" radius={[0, 4, 4, 0]}>
+                    {barChartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={colors[index % 5]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -102,12 +210,26 @@ export default function DashboardPage() {
                 We detected a 400% increase in traffic originating from unknown IPs trying to access `/catalog`. WAF successfully blocked 98% of these malicious requests.
               </p>
             </div>
-            <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
-              <h4 className="text-sm font-bold font-display text-primary mb-1">Top Selling Product</h4>
-              <p className="text-xs text-primary/80 dark:text-primary/70 leading-relaxed">
-                "{topSellingProducts[0].name}" is performing exceptionally well this week with {topSellingProducts[0].sales} sales, contributing to 65% of total revenue.
-              </p>
-            </div>
+            {statsLoading ? (
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl space-y-2">
+                <Skeleton className="h-4 w-32 animate-pulse bg-muted" />
+                <Skeleton className="h-3 w-full animate-pulse bg-muted" />
+              </div>
+            ) : topProduct ? (
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                <h4 className="text-sm font-bold font-display text-primary mb-1">Top Selling Product</h4>
+                <p className="text-xs text-primary/80 dark:text-primary/70 leading-relaxed">
+                  "{topProduct.name}" is performing exceptionally well this week with {topProduct.sales_velocity_7d} sales, contributing to {topProduct.revenue_contribution_percentage}% of total revenue.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                <h4 className="text-sm font-bold font-display text-primary mb-1">Top Selling Product</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  No sales velocity records available for this week.
+                </p>
+              </div>
+            )}
             <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
               <h4 className="text-sm font-bold font-display text-primary mb-1">Conversion Suggestion</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
