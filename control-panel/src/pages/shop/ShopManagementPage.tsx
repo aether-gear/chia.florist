@@ -350,9 +350,10 @@ export default function ShopManagementPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => refresh()}
+                  disabled={loading}
                   className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
                 <Button

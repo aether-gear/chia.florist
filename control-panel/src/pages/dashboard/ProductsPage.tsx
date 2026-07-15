@@ -130,9 +130,10 @@ export default function ProductsPage() {
                 <Button
                   variant="outline"
                   onClick={() => { refresh(); refreshStats(); }}
+                  disabled={loading || statsLoading}
                   className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className={`h-4 w-4 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
                 <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>

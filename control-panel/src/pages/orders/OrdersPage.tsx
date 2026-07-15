@@ -193,22 +193,11 @@ export default function OrdersPage() {
       <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
-            <p className="text-muted-foreground text-sm">
-              Verify payments, fulfill shipments, and manage orders
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-xl border-border text-foreground hover:text-primary hover:bg-primary/5 h-10 w-10"
-            onClick={() => refresh()}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+        <div>
+          <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
+          <p className="text-muted-foreground text-sm">
+            Verify payments, fulfill shipments, and manage orders
+          </p>
         </div>
 
         {/* Order Workspace Section */}
@@ -219,19 +208,34 @@ export default function OrdersPage() {
           </div>
 
           {/* Full-width Search and Status Filter Tabs */}
-          <div className={`flex flex-col gap-4 items-start ${
+          <div className={`flex flex-col gap-4 items-start w-full ${
             selectedOrderId ? 'hidden lg:flex' : 'flex'
           }`}>
-          <div className="w-full md:max-w-xs lg:max-w-sm">
-            <SearchInput
-              value={searchNumber}
-              onChange={(val) => {
-                setSearchNumber(val);
-                setPage(1);
-              }}
-              placeholder="Search by Order Number..."
-            />
-          </div>
+            <div className="flex items-center justify-between w-full gap-4">
+              <div className="flex-1 md:max-w-xs lg:max-w-sm">
+                <SearchInput
+                  value={searchNumber}
+                  onChange={(val) => {
+                    setSearchNumber(val);
+                    setPage(1);
+                  }}
+                  placeholder="Search by Order Number..."
+                />
+              </div>
+
+              {/* Right Side: Refresh */}
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
           <div className="flex gap-1 overflow-x-auto pb-1 w-full md:w-auto scrollbar-none">
             {statusTabs.map((tab) => {
               const isActive = (statusFilter || 'all') === tab.value;
