@@ -77,6 +77,7 @@ type Container struct {
 	SaveProduct      productUsecase.SaveProductUsecase
 	DeleteProduct    productUsecase.DeleteProductUsecase
 	AddProductImages productUsecase.AddProductImagesUsecase
+	GetProductStats  productUsecase.GetProductStatsUsecase
 	CreateInventory  inventoryUsecase.CreateInventoryUsecase
 	UpdateInventory  inventoryUsecase.UpdateInventoryUsecase
 	DeleteInventory  inventoryUsecase.DeleteInventoryUsecase
@@ -189,6 +190,8 @@ func NewContainer(cfg Config,
 	var (
 		productRepo             = productPersistence.NewProductRepository()
 		productImageRepo        = productPersistence.NewProductImageRepository()
+		productPerformanceRepo  = productPersistence.NewProductPerformanceRepository()
+		productStockHistoryRepo = productPersistence.NewProductStockHistoryRepository()
 		inventoryRepo           = inventoryPersistence.NewInventoryRepository()
 		secPolicyRepo           = secPolicyPersistence.NewSecurityPolicyRepository()
 		accountRepo             = authenPersistence.NewAccountRepository()
@@ -324,11 +327,20 @@ func NewContainer(cfg Config,
 				inventoryRepo,
 				productImageRepo,
 				shopRepo,
+				productPerformanceRepo,
 			),
 		SaveProduct: *productUsecase.
 			NewSaveProductUsecase(
 				productRepo,
 				slugGen,
+				infra.TransactionExecutor,
+				productPerformanceRepo,
+			),
+		GetProductStats: *productUsecase.
+			NewGetProductStatsUsecase(
+				productPerformanceRepo,
+				productImageRepo,
+				infra.StorageProvider,
 				infra.TransactionExecutor,
 			),
 		DeleteProduct: *productUsecase.
@@ -351,14 +363,17 @@ func NewContainer(cfg Config,
 				productRepo,
 				shopRepo,
 				infra.TransactionExecutor,
+				productStockHistoryRepo,
 			),
 		UpdateInventory: *inventoryUsecase.
 			NewUpdateInventoryUsecase(inventoryRepo,
 				infra.TransactionExecutor,
+				productStockHistoryRepo,
 			),
 		DeleteInventory: *inventoryUsecase.
 			NewDeleteInventoryUsecase(inventoryRepo,
 				infra.TransactionExecutor,
+				productStockHistoryRepo,
 			),
 
 		Me: *authenUsecase.NewMeUsecase(

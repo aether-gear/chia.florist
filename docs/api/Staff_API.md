@@ -35,7 +35,8 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Update Shipment
 - [x] Staff Admin API
   - [x] Products Management
-      - [x] Update Product
+      - [x] Save Product
+      - [x] Get Product Stats
       - [x] Delete Product
   - [x] Staff Management
     - [x] Create Staff
@@ -799,14 +800,16 @@ These endpoints require a valid staff session with the **staff admin** role.
 
   ```json
   {
-    "id":           "string (UUID, optional — omit to create, supply to update)",
-    "sku":          "string (required)",
-    "name":         "string (required)",
-    "description":  "string (optional)",
-    "is_available": "bool (required)",
-    "status":       "string (optional): active, inactive or archived",
-    "price":        "int (required)",
-    "weight":       "float (optional)"
+    "id":                      "string (UUID, optional — omit to create, supply to update)",
+    "sku":                     "string (required)",
+    "name":                    "string (required)",
+    "description":             "string (optional)",
+    "is_available":            "bool (required)",
+    "status":                  "string (optional): active, inactive or archived",
+    "price":                   "int (required)",
+    "weight":                  "float (optional)",
+    "cost_price":              "int (optional, procurement cost per unit in cents)",
+    "supplier_lead_time_days": "int (optional, average replenishment duration in days)"
   }
   ```
 
@@ -853,6 +856,84 @@ These endpoints require a valid staff session with the **staff admin** role.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not hold a staff role. |
 | `404 Not Found`    | No product with the given `id` exists. |
+
+### Get Product Stats
+
+- **Method**: `GET`
+- **Endpoint**: `/products/stats`
+- **Description**: Retrieve a paginated list of products with performance statistics and metadata (views, gross margins, and multi-window sales velocity).
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | UUID   | No       | Filter stats by a specific product ID. |
+| `name`    | string | No       | Filter stats by product name (partial match). |
+| `page`    | int    | No       | Page number. Defaults to `1`. |
+| `limit`   | int    | No       | Number of results per page. Defaults to `10`. |
+| `sort`    | string | No       | Comma-separated sort expressions. Format: `<field>:<direction>`. |
+
+#### Sort Fields
+
+| Field | Example | Description |
+|---|---|---|
+| `latest` | `sort=latest:desc` | Sort by product creation date. |
+| `name` | `sort=name:asc` | Sort alphabetically by product name. |
+| `price` | `sort=price:desc` | Sort by product base price. |
+| `view_count` | `sort=view_count:desc` | Sort by detail page view count (most-seen). |
+| `sales_30d` | `sort=sales_30d:desc` | Sort by unit sales velocity in the last 30 days. |
+| `sales_7d` | `sort=sales_7d:desc` | Sort by unit sales velocity in the last 7 days. |
+| `revenue` | `sort=revenue:desc` | Sort by revenue contribution. |
+| `gross_margin` | `sort=gross_margin:desc` | Sort by gross margin percentage. |
+
+> Default sort: `latest:desc`.
+
+**Examples**:
+- `GET /products/stats?page=1&limit=10`
+- `GET /products/stats?sort=view_count:desc`
+
+#### Response `200 OK`
+
+```json
+{
+  "page": 1,
+  "limit": 10,
+  "total": 1,
+  "stats": [
+    {
+      "id": "e2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "sku": "PROD-001",
+      "name": "Red Roses Bouquet",
+      "slug": "red-roses-bouquet",
+      "status": "active",
+      "price": 10000,
+      "cost_price": 5000,
+      "supplier_lead_time_days": 3,
+      "gross_margin_pct": 50,
+      "view_count": 120,
+      "stock": 45,
+      "sales_velocity_7d": 12,
+      "sales_velocity_30d": 50,
+      "sales_velocity_90d": 150,
+      "conversion_rate": 41.67,
+      "revenue_contribution_percentage": 15.5,
+      "return_rate": null,
+      "average_rating": null,
+      "review_count": null,
+      "thumbnail": "https://example.com/images/red-roses-thumb.jpg"
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status | Condition |
+|---|---|
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden` | Authenticated user does not have the staff admin role. |
 
 #### Delete Product
 

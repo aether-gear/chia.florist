@@ -8,6 +8,8 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepository "service-core/internal/modules/product/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -19,6 +21,21 @@ type mockDeleteInventoryRepository struct {
 	getErr      error
 	deleteErr   error
 	deleteCalls int
+}
+
+type mockProductStockHistoryRepository struct {
+	productRepository.ProductStockHistoryRepository
+	recordedEvent *productDomain.ProductStockEvent
+	recordErr     error
+}
+
+func (m *mockProductStockHistoryRepository) RecordStockEvent(
+	ctx context.Context,
+	exec transaction.Executor,
+	event productDomain.ProductStockEvent,
+) error {
+	m.recordedEvent = &event
+	return m.recordErr
 }
 
 func (m *mockDeleteInventoryRepository) GetByProductIDAndShopID(
@@ -61,8 +78,9 @@ func TestDeleteInventory_Success(t *testing.T) {
 		inventory: existing,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewDeleteInventoryUsecase(repo, exec)
+	uc := NewDeleteInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, DeleteInventoryInput{
 		ProductID: productID,
@@ -87,8 +105,9 @@ func TestDeleteInventory_NotFound(t *testing.T) {
 		inventory: nil,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewDeleteInventoryUsecase(repo, exec)
+	uc := NewDeleteInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, DeleteInventoryInput{
 		ProductID: productID,
@@ -123,8 +142,9 @@ func TestDeleteInventory_ConflictWithReservations(t *testing.T) {
 		inventory: existing,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewDeleteInventoryUsecase(repo, exec)
+	uc := NewDeleteInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, DeleteInventoryInput{
 		ProductID: productID,
@@ -165,8 +185,9 @@ func TestDeleteInventory_RepoError(t *testing.T) {
 		deleteErr: expectedErr,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewDeleteInventoryUsecase(repo, exec)
+	uc := NewDeleteInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, DeleteInventoryInput{
 		ProductID: productID,

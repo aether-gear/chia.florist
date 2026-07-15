@@ -125,6 +125,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.SaveProduct,
 			&c.DeleteProduct,
 			&c.AddProductImages,
+			&c.GetProductStats,
 		)
 
 		inventoryHandler = inventoryH.NewInventoryHandler(
@@ -261,6 +262,7 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
 			r.Post("/", chains.StaffAdminOnly(productHandler.SaveProduct))
+			r.Get("/stats", chains.StaffAdminOnly(productHandler.GetProductStats))
 
 			r.Get("/{slug}", chains.Core(productHandler.GetProduct))
 

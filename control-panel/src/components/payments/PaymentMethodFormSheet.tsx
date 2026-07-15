@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Info } from 'lucide-react';
@@ -84,7 +84,10 @@ export default function PaymentMethodFormSheet({
     },
   });
 
-  const watchFeeType = form.watch('fee_type');
+  const watchFeeType = useWatch({
+    control: form.control,
+    name: 'fee_type',
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -137,7 +140,7 @@ export default function PaymentMethodFormSheet({
       },
       instructionContent
     );
-    
+
     setIsSubmitting(false);
     if (success) {
       onOpenChange(false);
@@ -158,7 +161,7 @@ export default function PaymentMethodFormSheet({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-8">
-            
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -283,7 +286,7 @@ export default function PaymentMethodFormSheet({
 
             <div className="border-t border-border/60 my-6 pt-6 space-y-6">
               <h3 className="text-md font-semibold tracking-tight text-slate-800 dark:text-slate-200">Fee Configuration</h3>
-              
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <FormField
                   control={form.control}
@@ -343,7 +346,7 @@ export default function PaymentMethodFormSheet({
                   />
                 )}
               </div>
-              
+
               {(watchFeeType === 'percentage' || watchFeeType === 'mixed') && (
                 <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400 p-3 rounded-lg border border-amber-200/50">
                   <Info className="h-4 w-4 shrink-0 mt-0.5" />
@@ -356,7 +359,7 @@ export default function PaymentMethodFormSheet({
 
             <div className="border-t border-border/60 my-6 pt-6 space-y-4">
               <h3 className="text-md font-semibold tracking-tight text-slate-800 dark:text-slate-200">Payment Instructions</h3>
-              
+
               <FormField
                 control={form.control}
                 name="instruction"

@@ -19,8 +19,10 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
+import { useProductStatsViewModel } from '../../viewmodels/useProductStatsViewModel';
 import { fetchApi } from '../../lib/api';
 import ProductFormSheet from '../../components/products/ProductFormSheet';
+import ProductPerformanceCharts from '../../components/products/ProductPerformanceCharts';
 import { Skeleton } from '../../components/ui/skeleton';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
@@ -29,6 +31,7 @@ import Pagination from '../../components/Pagination';
 
 export default function ProductsPage() {
   const { data, loading, error, refresh, page, limit, setPage } = useProductsViewModel();
+  const { data: statsData, loading: statsLoading, error: statsError, refresh: refreshStats } = useProductStatsViewModel();
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -57,6 +60,7 @@ export default function ProductsPage() {
       });
       setProductToDelete(null);
       refresh();
+      refreshStats();
     } catch (err: any) {
       alert(err.message || 'Failed to delete product');
     } finally {
@@ -76,6 +80,31 @@ export default function ProductsPage() {
               Manage your product catalog and inventory
             </p>
           </div>
+        </div>
+
+        {/* Performance Analytics Section */}
+        <div className="space-y-4">
+          <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Performance Analytics</h3>
+          
+          {statsLoading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={`stats-skeleton-${i}`} className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 h-[320px] p-6 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-32 animate-pulse bg-muted" />
+                    <Skeleton className="h-3.5 w-48 animate-pulse bg-muted" />
+                  </div>
+                  <Skeleton className="h-[180px] w-full rounded-xl animate-pulse bg-muted my-4" />
+                </Card>
+              ))}
+            </div>
+          ) : statsError ? (
+            <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-xl border border-destructive/20 font-sans">
+              Failed to load performance metrics: {statsError}
+            </div>
+          ) : (
+            statsData?.stats && <ProductPerformanceCharts stats={statsData.stats} />
+          )}
         </div>
 
         <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
@@ -100,7 +129,7 @@ export default function ProductsPage() {
               <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
                 <Button
                   variant="outline"
-                  onClick={() => refresh()}
+                  onClick={() => { refresh(); refreshStats(); }}
                   className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -257,7 +286,7 @@ export default function ProductsPage() {
         open={isProductSheetOpen}
         onOpenChange={setIsProductSheetOpen}
         productSlug={activeProductSlug}
-        onSuccess={refresh}
+        onSuccess={() => { refresh(); refreshStats(); }}
       />
 
       {/* Delete Confirmation Dialog */}

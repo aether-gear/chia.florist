@@ -64,8 +64,9 @@ func TestUpdateInventory_Success(t *testing.T) {
 		inventory: existing,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewUpdateInventoryUsecase(repo, exec)
+	uc := NewUpdateInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, UpdateInventoryInput{
 		ProductID: productID,
@@ -95,8 +96,9 @@ func TestUpdateInventory_NotFound(t *testing.T) {
 		inventory: nil,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewUpdateInventoryUsecase(repo, exec)
+	uc := NewUpdateInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, UpdateInventoryInput{
 		ProductID: productID,
@@ -132,8 +134,9 @@ func TestUpdateInventory_InvalidStock(t *testing.T) {
 		inventory: existing,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewUpdateInventoryUsecase(repo, exec)
+	uc := NewUpdateInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	// Attempting to set stock to less than reserved stock
 	err := uc.Execute(ctx, UpdateInventoryInput{
@@ -172,8 +175,9 @@ func TestUpdateInventory_RepoError(t *testing.T) {
 		updateErr: expectedErr,
 	}
 	exec := &mockExecutor{}
+	stockHistoryRepo := &mockProductStockHistoryRepository{}
 
-	uc := NewUpdateInventoryUsecase(repo, exec)
+	uc := NewUpdateInventoryUsecase(repo, exec, stockHistoryRepo)
 
 	err := uc.Execute(ctx, UpdateInventoryInput{
 		ProductID: productID,

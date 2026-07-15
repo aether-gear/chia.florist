@@ -19,28 +19,33 @@ type SaveProductUsecase struct {
 	productRepo repository.ProductRepository
 	slugGen     slug.Generator
 	executor    transaction.Executor
+	perfRepo    repository.ProductPerformanceRepository
 }
 
 func NewSaveProductUsecase(
 	productRepo repository.ProductRepository,
 	slugGen slug.Generator,
 	executor transaction.Executor,
+	perfRepo repository.ProductPerformanceRepository,
 ) *SaveProductUsecase {
 	return &SaveProductUsecase{
 		productRepo: productRepo,
 		slugGen:     slugGen,
 		executor:    executor,
+		perfRepo:    perfRepo,
 	}
 }
 
 type SaveProductInput struct {
-	ID          *uuid.UUID
-	SKU         string
-	Name        string
-	Description *string
-	Status      string
-	Price       int64
-	Weight      *float64
+	ID                   *uuid.UUID
+	SKU                  string
+	Name                 string
+	Description          *string
+	Status               string
+	Price                int64
+	Weight               *float64
+	CostPrice            *int64
+	SupplierLeadTimeDays *int
 }
 
 func (u *SaveProductUsecase) Execute(
@@ -81,6 +86,15 @@ func (u *SaveProductUsecase) Execute(
 			product,
 		); err != nil {
 		return fmt.Errorf("failed to save product: %w", err)
+	}
+
+	perf := domain.ProductPerformance{
+		ProductID:            productID,
+		CostPrice:            input.CostPrice,
+		SupplierLeadTimeDays: input.SupplierLeadTimeDays,
+	}
+	if err := u.perfRepo.UpsertPerformance(ctx, u.executor, perf, product.Price); err != nil {
+		return fmt.Errorf("failed to save product performance: %w", err)
 	}
 
 	return nil

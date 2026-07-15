@@ -4,27 +4,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepository "service-core/internal/modules/product/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type UpdateInventoryUsecase struct {
-	inventoryRepo repository.InventoryRepository
-	executor      transaction.Executor
+	inventoryRepo    repository.InventoryRepository
+	executor         transaction.Executor
+	stockHistoryRepo productRepository.ProductStockHistoryRepository
 }
 
 func NewUpdateInventoryUsecase(
 	inventoryRepo repository.InventoryRepository,
 	executor transaction.Executor,
+	stockHistoryRepo productRepository.ProductStockHistoryRepository,
 ) *UpdateInventoryUsecase {
 	return &UpdateInventoryUsecase{
-		inventoryRepo: inventoryRepo,
-		executor:      executor,
+		inventoryRepo:    inventoryRepo,
+		executor:         executor,
+		stockHistoryRepo: stockHistoryRepo,
 	}
 }
 
@@ -46,7 +52,6 @@ func (u *UpdateInventoryUsecase) Execute(
 	if err != nil {
 		return fmt.Errorf("failed to load inventory: %w", err)
 	}
-
 	if existing == nil {
 		return apperrors.NewNotFound("inventory not found")
 	}
@@ -63,11 +68,23 @@ func (u *UpdateInventoryUsecase) Execute(
 	}
 
 	if err := u.inventoryRepo.
-		Update(ctx, u.executor,
-			existing,
-		); err != nil {
+		Update(ctx, u.executor, existing); err != nil {
 		return fmt.Errorf("failed to update inventory: %w", err)
 	}
+
+	go func() {
+		event := productDomain.ProductStockEvent{
+			ProductID:  existing.ProductID,
+			ShopID:     existing.ShopID,
+			Available:  existing.TotalStock - existing.ReservedStock,
+			RecordedAt: time.Now(),
+		}
+
+		_ = u.stockHistoryRepo.
+			RecordStockEvent(context.Background(), u.executor,
+				event,
+			)
+	}()
 
 	return nil
 }
