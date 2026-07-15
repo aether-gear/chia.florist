@@ -190,12 +190,12 @@ export default function OrdersPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-6 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
 
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-border/60">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Order Workspace</h2>
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
             <p className="text-muted-foreground text-sm">
               Verify payments, fulfill shipments, and manage orders
             </p>
@@ -211,10 +211,17 @@ export default function OrdersPage() {
           </Button>
         </div>
 
-        {/* Full-width Search and Status Filter Tabs */}
-        <div className={`flex flex-col gap-4 justify-between bg-zinc-50/20 dark:bg-slate-900/10 p-4 rounded-2xl border border-border/60 ${
-          selectedOrderId ? 'hidden lg:flex' : 'flex'
-        }`}>
+        {/* Order Workspace Section */}
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60">
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Order Workspace</h3>
+            <p className="text-muted-foreground text-sm">Manage fulfillment, check payment updates, and inspect order status logs.</p>
+          </div>
+
+          {/* Full-width Search and Status Filter Tabs */}
+          <div className={`flex flex-col gap-4 items-start ${
+            selectedOrderId ? 'hidden lg:flex' : 'flex'
+          }`}>
           <div className="w-full md:max-w-xs lg:max-w-sm">
             <SearchInput
               value={searchNumber}
@@ -876,6 +883,7 @@ export default function OrdersPage() {
         </div>
 
       </div>
+    </div>
     </div>
   );
 }

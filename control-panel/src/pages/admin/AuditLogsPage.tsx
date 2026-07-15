@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { useAuditLogsViewModel } from '../../viewmodels/useAuditLogsViewModel';
 import type { AuditLog } from '../../models/AuditLog';
@@ -82,14 +82,14 @@ export default function AuditLogsPage() {
           </div>
         </div>
 
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader>
-            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Audit Logs</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60 mb-6">
+            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">All Audit Logs</h3>
+            <p className="text-muted-foreground text-sm">
               View system audit trails and security activity logs.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
               {/* Left Side: Filter and Search */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1 w-full md:w-auto">
@@ -176,7 +176,7 @@ export default function AuditLogsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead 
+                      <TableHead
                         className="cursor-pointer hover:bg-muted/70 transition-colors text-foreground"
                         onClick={() => handleSort('date')}
                       >
@@ -185,7 +185,7 @@ export default function AuditLogsPage() {
                           <ArrowUpDown className="h-3.5 w-3.5" />
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="cursor-pointer hover:bg-muted/70 transition-colors text-foreground"
                         onClick={() => handleSort('action')}
                       >
@@ -227,8 +227,8 @@ export default function AuditLogsPage() {
                       </TableRow>
                     ) : (
                       logs.map((log) => (
-                        <TableRow 
-                          key={log.id} 
+                        <TableRow
+                          key={log.id}
                           className="hover:bg-muted/55 cursor-pointer transition-colors"
                           onClick={() => setSelectedLog(log)}
                         >
@@ -279,8 +279,8 @@ export default function AuditLogsPage() {
               itemNamePlural="logs"
               className="flex items-center justify-between border-t border-border p-4"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Details Sheet Overlay */}
@@ -356,4 +356,3 @@ export default function AuditLogsPage() {
     </div>
   );
 }
-

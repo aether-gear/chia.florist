@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+// Removed Card imports since sections are now borderless and backgroundless
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -72,7 +72,7 @@ export default function ProductsPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Products</h2>
@@ -85,17 +85,17 @@ export default function ProductsPage() {
         {/* Performance Analytics Section */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Performance Analytics</h3>
-          
+
           {statsLoading ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={`stats-skeleton-${i}`} className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 h-[320px] p-6 flex flex-col justify-between">
-                  <div className="space-y-2">
+                <div key={`stats-skeleton-${i}`} className="h-[320px] flex flex-col justify-between space-y-4">
+                  <div className="space-y-2 pb-2 border-b border-border/60">
                     <Skeleton className="h-5 w-32 animate-pulse bg-muted" />
                     <Skeleton className="h-3.5 w-48 animate-pulse bg-muted" />
                   </div>
                   <Skeleton className="h-[180px] w-full rounded-xl animate-pulse bg-muted my-4" />
-                </Card>
+                </div>
               ))}
             </div>
           ) : statsError ? (
@@ -107,14 +107,14 @@ export default function ProductsPage() {
           )}
         </div>
 
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader>
-            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Products</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60">
+            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">All Products</h3>
+            <p className="text-muted-foreground text-sm">
               You have {data?.total || 0} total products in your catalog.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               {/* Left Side: Filter and Search */}
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -277,8 +277,8 @@ export default function ProductsPage() {
               onPageChange={setPage}
               itemNamePlural="products"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Product Form Sheet (Add / Edit) */}
@@ -320,4 +320,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-

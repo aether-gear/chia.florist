@@ -14,7 +14,7 @@ import {
   ZAxis,
 } from 'recharts';
 import type { ProductStat } from '../../models/Product';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+// Removed Card component imports
 
 interface ProductPerformanceChartsProps {
   stats: ProductStat[];
@@ -93,18 +93,18 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
-      {/* 1. Bar Chart Card */}
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 flex flex-col justify-between">
-        <CardHeader className="pb-2">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
+      {/* 1. Bar Chart Container */}
+      <div className="flex flex-col justify-between space-y-4">
+        <div className="pb-2 border-b border-border/60">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
+              <h4 className="font-bold font-display tracking-tight text-lg text-foreground">
                 Sales Velocity
-              </CardTitle>
-              <CardDescription className="text-muted-foreground text-xs font-sans">
+              </h4>
+              <p className="text-muted-foreground text-xs font-sans">
                 Top products sold by volume
-              </CardDescription>
+              </p>
             </div>
             {/* Pill Toggles */}
             <div className="flex items-center gap-1 bg-muted p-0.5 rounded-lg text-xs">
@@ -123,8 +123,8 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
               ))}
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="h-[240px] pt-4">
+        </div>
+        <div className="h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={barChartData}
@@ -148,20 +148,20 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* 2. Donut Chart Card */}
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 flex flex-col justify-between">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
+      {/* 2. Donut Chart Container */}
+      <div className="flex flex-col justify-between space-y-4">
+        <div className="pb-2 border-b border-border/60">
+          <h4 className="font-bold font-display tracking-tight text-lg text-foreground">
             Revenue Share
-          </CardTitle>
-          <CardDescription className="text-muted-foreground text-xs font-sans">
+          </h4>
+          <p className="text-muted-foreground text-xs font-sans">
             Revenue contribution percentage breakdown
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="h-[240px] pt-2">
+          </p>
+        </div>
+        <div className="h-[240px]">
           <div className="flex flex-col items-center justify-center h-full w-full">
             <div className="w-full h-[140px] relative flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
@@ -196,8 +196,8 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
             <div className="w-full flex flex-wrap justify-center items-center gap-x-3 gap-y-1.5 font-sans text-[11px] mt-2 px-1">
               {donutChartData.map((item, index) => (
                 <div key={item.name} className="flex items-center gap-1 text-foreground">
-                  <span 
-                    className="w-2.5 h-2.5 rounded-full shrink-0" 
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: colors[index % colors.length] }}
                   />
                   <span className="font-medium max-w-[100px] truncate" title={item.name}>
@@ -210,20 +210,20 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
               ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* 3. Scatter Chart Card */}
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 flex flex-col justify-between">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
+      {/* 3. Scatter Chart Container */}
+      <div className="flex flex-col justify-between space-y-4">
+        <div className="pb-2 border-b border-border/60">
+          <h4 className="font-bold font-display tracking-tight text-lg text-foreground">
             Conversion vs Views
-          </CardTitle>
-          <CardDescription className="text-muted-foreground text-xs font-sans">
+          </h4>
+          <p className="text-muted-foreground text-xs font-sans">
             Identify high-interest vs high-conversion items
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="h-[240px] pt-4">
+          </p>
+        </div>
+        <div className="h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
               <XAxis
@@ -249,8 +249,8 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
               <Scatter name="Products" data={scatterChartData} fill="hsl(var(--primary))" opacity={0.7} />
             </ScatterChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

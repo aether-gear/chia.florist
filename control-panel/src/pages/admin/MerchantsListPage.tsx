@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { useMerchantsViewModel } from '../../viewmodels/useMerchantsViewModel';
 import Pagination from '../../components/Pagination';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -45,14 +45,14 @@ export default function MerchantsListPage() {
         </div>
 
 
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader>
-            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Merchants</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60 mb-6">
+            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">All Merchants</h3>
+            <p className="text-muted-foreground text-sm">
               Showing {data?.merchants.length || 0} of {data?.total || 0} merchants.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               {/* Left Side: Filter and Search */}
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -174,8 +174,8 @@ export default function MerchantsListPage() {
               onPageChange={setPage}
               itemNamePlural="merchants"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

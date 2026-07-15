@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { useCustomersViewModel } from '../../viewmodels/useCustomersViewModel';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import Pagination from '../../components/Pagination';
@@ -54,14 +54,14 @@ export default function CustomersListPage() {
           </div>
         </div>
 
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader>
-            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">All Customers</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60 mb-6">
+            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">All Customers</h3>
+            <p className="text-muted-foreground text-sm">
               Showing {data?.customers.length || 0} of {data?.total || 0} customers.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               {/* Left Side: Filter and Search */}
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -84,7 +84,7 @@ export default function CustomersListPage() {
                 </Button>
               </div>
             </div>
- 
+
             <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
                 <TableHeader className="bg-muted/50">
@@ -166,8 +166,8 @@ export default function CustomersListPage() {
               onPageChange={setPage}
               itemNamePlural="customers"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
