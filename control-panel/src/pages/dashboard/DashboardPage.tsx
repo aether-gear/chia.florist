@@ -48,21 +48,6 @@ export default function DashboardPage() {
     '#9ca3af',
   ];
 
-  const BarTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
-          <p className="font-semibold font-display mb-1">{data.name}</p>
-          <p className="text-muted-foreground">
-            Units Sold: <span className="font-semibold text-primary">{data.sales}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   const allRecentLogs = getRecentLogs(500);
   const recentLogs = allRecentLogs.filter(log => {
     if (logStatus === 'All') return true;
@@ -308,3 +293,18 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+const BarTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
+        <p className="font-semibold font-display mb-1">{data.name}</p>
+        <p className="text-muted-foreground">
+          Units Sold: <span className="font-semibold text-primary">{data.sales}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};

@@ -87,57 +87,6 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
     }));
   }, [stats]);
 
-  // Custom tooltips for nice, borderless theme matching
-  const BarTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
-          <p className="font-semibold font-display mb-1">{data.name}</p>
-          <p className="text-muted-foreground">
-            Units Sold: <span className="font-semibold text-primary">{data.sales}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const DonutTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
-          <p className="font-semibold font-display mb-1">{data.name}</p>
-          <p className="text-muted-foreground">
-            Revenue Share: <span className="font-semibold text-primary">{data.value}%</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const ScatterTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
-          <p className="font-semibold font-display mb-1">{data.name}</p>
-          <p className="text-muted-foreground">
-            Views: <span className="font-medium text-foreground">{data.views}</span>
-          </p>
-          <p className="text-muted-foreground">
-            Conversion Rate: <span className="font-semibold text-primary">{data.conversion}%</span>
-          </p>
-          <p className="text-muted-foreground">
-            Stock: <span className="font-medium text-foreground">{data.stock} units</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   if (stats.length === 0) {
     return null;
@@ -305,3 +254,55 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
     </div>
   );
 }
+
+// Custom tooltips for nice, borderless theme matching
+const BarTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
+        <p className="font-semibold font-display mb-1">{data.name}</p>
+        <p className="text-muted-foreground">
+          Units Sold: <span className="font-semibold text-primary">{data.sales}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const DonutTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
+        <p className="font-semibold font-display mb-1">{data.name}</p>
+        <p className="text-muted-foreground">
+          Revenue Share: <span className="font-semibold text-primary">{data.value}%</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const ScatterTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover text-popover-foreground border border-border rounded-xl p-3 shadow-md text-xs font-sans">
+        <p className="font-semibold font-display mb-1">{data.name}</p>
+        <p className="text-muted-foreground">
+          Views: <span className="font-medium text-foreground">{data.views}</span>
+        </p>
+        <p className="text-muted-foreground">
+          Conversion Rate: <span className="font-semibold text-primary">{data.conversion}%</span>
+        </p>
+        <p className="text-muted-foreground">
+          Stock: <span className="font-medium text-foreground">{data.stock} units</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
