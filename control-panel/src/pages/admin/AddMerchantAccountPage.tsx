@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Loader2, Users } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
@@ -84,12 +84,12 @@ export default function AddMerchantAccountPage() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-        <CardHeader>
-          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Account Details</CardTitle>
-          <CardDescription className="text-muted-foreground text-sm">Enter the credentials and contact info for the new user.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="space-y-6">
+        <div className="pb-4 border-b border-border/60 mb-6">
+          <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Account Details</h3>
+          <p className="text-muted-foreground text-sm">Enter the credentials and contact info for the new user.</p>
+        </div>
+        <div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Merchant ID</label>
@@ -150,8 +150,8 @@ export default function AddMerchantAccountPage() {
               Create Account
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

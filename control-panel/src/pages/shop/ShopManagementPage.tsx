@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import {
@@ -69,20 +69,20 @@ export default function ShopManagementPage() {
       (shop.description && shop.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   }, [shops, searchQuery]);
-  
+
   // Overlay details Dialog state
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   // Sheet control (Add Address)
   const [isAddressOpen, setIsAddressOpen] = useState(false);
-  
+
   // Form states (Add Address)
   const [label, setLabel] = useState('');
   const [phone, setPhone] = useState('');
   const [fullAddress, setFullAddress] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [isActive, setIsActive] = useState(false);
-  
+
   // Shop Info Form states
   const [shopName, setShopName] = useState('');
   const [shopDesc, setShopDesc] = useState('');
@@ -148,12 +148,12 @@ export default function ShopManagementPage() {
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
   const [villages, setVillages] = useState<any[]>([]);
-  
+
   const [provinceId, setProvinceId] = useState('');
   const [cityId, setCityId] = useState('');
   const [districtId, setDistrictId] = useState('');
   const [villageId, setVillageId] = useState('');
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -315,7 +315,7 @@ export default function ShopManagementPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
             <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Shop Management</h2>
@@ -324,16 +324,16 @@ export default function ShopManagementPage() {
             </p>
           </div>
         </div>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <div className="space-y-6">
+          <div className="flex flex-row items-center justify-between pb-4 border-b border-border/60">
             <div>
-              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Store Locations</CardTitle>
-              <CardDescription className="text-muted-foreground text-sm">
+              <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Store Locations</h3>
+              <p className="text-muted-foreground text-sm">
                 You have {total} shop locations registered.
-              </CardDescription>
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               {/* Left Side: Filter and Search */}
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -350,9 +350,10 @@ export default function ShopManagementPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => refresh()}
+                  disabled={loading}
                   className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
                 <Button
@@ -452,8 +453,8 @@ export default function ShopManagementPage() {
               onPageChange={setPage}
               itemNamePlural="shops"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Shop Details Central Overlay Dialog */}
@@ -499,12 +500,12 @@ export default function ShopManagementPage() {
 
               {/* General Tab */}
               <TabsContent value="info" className="space-y-4">
-                <Card className="border-0 shadow-none bg-slate-50/50">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Edit Shop Profile</CardTitle>
-                    <CardDescription>Update general settings for this shop branch.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                <div className="space-y-6">
+                  <div className="pb-4 border-b border-border/60">
+                    <h3 className="text-lg font-bold text-foreground">Edit Shop Profile</h3>
+                    <p className="text-muted-foreground text-sm">Update general settings for this shop branch.</p>
+                  </div>
+                  <div>
                     <form onSubmit={handleSaveShop} className="space-y-4 max-w-md">
                       <div className="space-y-2">
                         <Label htmlFor="shopName">Shop Name</Label>
@@ -543,19 +544,19 @@ export default function ShopManagementPage() {
                         </Button>
                       </div>
                     </form>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               {/* Products Tab */}
               <TabsContent value="products" className="space-y-4">
-                <Card className="border-slate-100 shadow-none">
-                  <CardHeader className="flex flex-row items-center justify-between pb-4">
+                <div className="space-y-6">
+                  <div className="flex flex-row items-center justify-between pb-4 border-b border-border/60">
                     <div>
-                      <CardTitle className="text-lg">Product Inventory</CardTitle>
-                      <CardDescription>Listed products and current stock levels at this location.</CardDescription>
+                      <h3 className="text-lg font-bold text-foreground">Product Inventory</h3>
+                      <p className="text-muted-foreground text-sm">Listed products and current stock levels at this location.</p>
                     </div>
-                    
+
                     <Sheet open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
                       <SheetTrigger asChild>
                         <Button size="sm">
@@ -618,8 +619,8 @@ export default function ShopManagementPage() {
                         </form>
                       </SheetContent>
                     </Sheet>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <div>
                     <div className="rounded-md border border-slate-100 overflow-hidden">
                       <Table>
                         <TableHeader className="bg-slate-50/50">
@@ -666,19 +667,19 @@ export default function ShopManagementPage() {
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               {/* Addresses Tab */}
               <TabsContent value="addresses" className="space-y-4">
-                <Card className="border-slate-100 shadow-none">
-                  <CardHeader className="flex flex-row items-center justify-between pb-4">
+                <div className="space-y-6">
+                  <div className="flex flex-row items-center justify-between pb-4 border-b border-border/60">
                     <div>
-                      <CardTitle className="text-lg">Shop Addresses</CardTitle>
-                      <CardDescription>Physical locations where this branch operates.</CardDescription>
+                      <h3 className="text-lg font-bold text-foreground">Shop Addresses</h3>
+                      <p className="text-muted-foreground text-sm">Physical locations where this branch operates.</p>
                     </div>
-                    
+
                     <Sheet open={isAddressOpen} onOpenChange={setIsAddressOpen}>
                       <SheetTrigger asChild>
                         <Button size="sm">
@@ -690,13 +691,13 @@ export default function ShopManagementPage() {
                           <SheetTitle>Add Shop Address</SheetTitle>
                           <SheetDescription>Create a physical pickup location for this shop.</SheetDescription>
                         </SheetHeader>
-                        
+
                         {fetchError && (
                           <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100 mb-4">
                             {fetchError}
                           </div>
                         )}
-                        
+
                         <form onSubmit={handleSubmit} className="space-y-4">
                           <div className="space-y-2">
                             <Label htmlFor="label">Address Label / Branch Name</Label>
@@ -832,8 +833,8 @@ export default function ShopManagementPage() {
                         </form>
                       </SheetContent>
                     </Sheet>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <div>
                     <div className="rounded-md border border-slate-100 overflow-hidden">
                       <Table>
                         <TableHeader className="bg-slate-50/50">
@@ -873,18 +874,18 @@ export default function ShopManagementPage() {
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               {/* Couriers Tab */}
               <TabsContent value="couriers" className="space-y-4">
-                <Card className="border-slate-100 shadow-none">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configured Couriers</CardTitle>
-                    <CardDescription>Shipping providers configured for this branch.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                <div className="space-y-6">
+                  <div className="pb-4 border-b border-border/60">
+                    <h3 className="text-lg font-bold text-foreground">Configured Couriers</h3>
+                    <p className="text-muted-foreground text-sm">Shipping providers configured for this branch.</p>
+                  </div>
+                  <div>
                     <div className="rounded-md border border-slate-100 overflow-hidden">
                       <Table>
                         <TableHeader className="bg-slate-50/50">
@@ -920,8 +921,8 @@ export default function ShopManagementPage() {
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           )}

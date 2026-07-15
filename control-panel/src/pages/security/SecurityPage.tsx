@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -130,7 +130,7 @@ const LEAFLET_MAP_HTML = `
 
         points.forEach(pt => {
           if (!pt.lat || !pt.lng) return;
-          
+
           let marker = L.circleMarker([pt.lat, pt.lng], {
             radius: 6,
             fillColor: pt.isBlocked ? '#ef4444' : '#10b981',
@@ -921,64 +921,57 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Security Monitoring</h2>
-          <p className="text-muted-foreground text-sm">Real-time threat analysis and WAF status.</p>
+    <div className="flex-col md:flex">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Security Monitoring</h2>
+            <p className="text-muted-foreground text-sm">Real-time threat analysis and WAF status.</p>
+          </div>
+        </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 border-b border-border/60 pb-8">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Attack Attempts</span>
+            <ShieldAlert className="h-4 w-4 text-rose-500" />
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{wafSummary.blocked.toLocaleString()}</div>
+          <p className="text-xs text-rose-500 font-medium">Total requests blocked by rules</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Safe Traffic</span>
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-primary">{wafSummary.allowed.toLocaleString()}</div>
+          <p className="text-xs text-muted-foreground">Allowed requests</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Anomaly Score</span>
+            <Activity className="h-4 w-4 text-orange-500" />
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
+            {((wafSummary.blocked / wafSummary.total) * 100).toFixed(1)}%
+          </div>
+          <p className="text-xs text-muted-foreground">Traffic flagged as malicious</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Active Incidents</span>
+            <ShieldX className="h-4 w-4 text-rose-500" />
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{ipList.filter(ip => ip.status === 'Banned').length}</div>
+          <p className="text-xs text-muted-foreground">Currently banned IPs</p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Attack Attempts</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{wafSummary.blocked.toLocaleString()}</div>
-            <p className="text-xs text-rose-500 font-medium mt-1">Total requests blocked by rules</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Safe Traffic</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-primary">{wafSummary.allowed.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Allowed requests</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Anomaly Score</CardTitle>
-            <Activity className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
-              {((wafSummary.blocked / wafSummary.total) * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Traffic flagged as malicious</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Active Incidents</CardTitle>
-            <ShieldX className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{ipList.filter(ip => ip.status === 'Banned').length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Currently banned IPs</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between">
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border/60">
           <div>
-            <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Threat Landscape</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">Volume of allowed vs blocked requests over time.</CardDescription>
+            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Threat Landscape</h3>
+            <p className="text-muted-foreground text-sm">Volume of allowed vs blocked requests over time.</p>
           </div>
           <div className="flex items-center gap-3 mt-4 sm:mt-0">
             <Select
@@ -1025,8 +1018,8 @@ export default function SecurityPage() {
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="h-[350px]">
+        </div>
+        <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={threatData}
@@ -1105,20 +1098,21 @@ export default function SecurityPage() {
               ) : null}
             </AreaChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Real-time Threat Geolocation Map */}
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-        <CardHeader>
-          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
+      {/* Real-time Threat Geolocation Map */}
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-border/60">
+          <h3 className="font-bold font-display tracking-tight text-lg text-foreground">
             Real-time Threat Geolocation Map
-          </CardTitle>
-          <CardDescription className="text-muted-foreground text-sm">
+          </h3>
+          <p className="text-muted-foreground text-sm">
             Pinpoints the physical location of all audited public IP addresses in real-time. Hover over points for threat details.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
+          </p>
+        </div>
+        <div>
           <div className="h-[400px] flex items-center justify-center bg-background border border-border rounded-2xl overflow-hidden p-0 relative">
             {mapIframe}
             {geoPoints.length === 0 && (
@@ -1131,15 +1125,15 @@ export default function SecurityPage() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* IP Blacklist Manager */}
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <div className="space-y-6">
+        <div className="flex flex-row items-center justify-between pb-2 border-b border-border/60">
           <div>
-            <CardTitle className="flex items-center gap-2 font-bold font-display tracking-tight text-lg text-foreground"><ShieldCheck className="text-primary" /> IP Blacklist Manager</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">Control access and logging behavior for specific IPs.</CardDescription>
+            <h3 className="flex items-center gap-2 font-bold font-display tracking-tight text-lg text-foreground"><ShieldCheck className="text-primary" /> IP Blacklist Manager</h3>
+            <p className="text-muted-foreground text-sm">Control access and logging behavior for specific IPs.</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -1159,8 +1153,8 @@ export default function SecurityPage() {
               <FolderOpen className="h-4 w-4" /> View Category Analysis
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        </div>
+        <div className="space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-end bg-background p-5 rounded-2xl border border-border/80">
             <div className="space-y-2 flex-1 w-full">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Target IP Address</label>
@@ -1365,19 +1359,19 @@ export default function SecurityPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <div className="space-y-6">
+          <div className="flex flex-row items-center justify-between pb-2 border-b border-border/60">
             <div>
-              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Active Rules Registry</CardTitle>
-              <CardDescription className="text-muted-foreground text-sm">Dynamically toggle security rules from waf-rules.json.</CardDescription>
+              <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Active Rules Registry</h3>
+              <p className="text-muted-foreground text-sm">Dynamically toggle security rules from waf-rules.json.</p>
             </div>
             <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => setIsAddRuleOpen(true)}>+ Add Rule</Button>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1436,14 +1430,14 @@ export default function SecurityPage() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border/60 space-y-2 sm:space-y-0">
             <div>
-              <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Security Logs</CardTitle>
-              <CardDescription className="text-muted-foreground text-sm">Recent suspicious activities and blocks.</CardDescription>
+              <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Security Logs</h3>
+              <p className="text-muted-foreground text-sm">Recent suspicious activities and blocks.</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -1483,8 +1477,8 @@ export default function SecurityPage() {
                 </SelectContent>
               </Select>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             {Object.keys(selectedLogIds).filter(id => selectedLogIds[id]).length > 0 && (
               <div className="flex items-center justify-between bg-muted/40 border border-border/80 rounded-2xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
                 <span className="text-xs font-semibold text-muted-foreground">
@@ -1581,8 +1575,8 @@ export default function SecurityPage() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Payload Details Sheet */}
@@ -1617,7 +1611,8 @@ export default function SecurityPage() {
 
                 <div className="font-semibold text-slate-500">Method</div>
                 <div className="font-bold">{selectedLog.method}</div>
-              </div>              <div>
+              </div>
+              <div>
                 <div className="font-bold font-display text-foreground mb-2 text-sm">Full Request URL / Payload:</div>
                 <div className="bg-slate-950 text-emerald-400 p-4 rounded-xl text-xs font-mono break-all max-h-[220px] overflow-y-auto border border-border shadow-inner">
                   {selectedLog.url}
@@ -2249,6 +2244,7 @@ export default function SecurityPage() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

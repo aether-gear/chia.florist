@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Badge } from '../../../components/ui/badge';
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
 
@@ -42,14 +42,14 @@ export default function PaymentMethodsPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Methods</CardTitle>
-            <CardDescription>
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60 mb-6">
+            <h3 className="font-bold text-lg">Available Methods</h3>
+            <p className="text-muted-foreground text-sm">
               These are the payment channels available for processing customer payments.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -90,8 +90,8 @@ export default function PaymentMethodsPage() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

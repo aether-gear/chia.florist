@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Skeleton } from '../../../components/ui/skeleton';
@@ -57,11 +57,11 @@ export default function PaymentSettingsPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Payment Settings</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Payment Settings</h2>
+            <p className="text-muted-foreground text-sm">
               Manage supported payment methods and configured settlement accounts.
             </p>
           </div>
@@ -74,14 +74,14 @@ export default function PaymentSettingsPage() {
           </TabsList>
 
           <TabsContent value="accounts" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Configured Accounts</CardTitle>
-                <CardDescription className="text-muted-foreground text-sm">
+            <div className="space-y-6">
+              <div className="pb-4 border-b border-border/60 mb-6">
+                <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Configured Accounts</h3>
+                <p className="text-muted-foreground text-sm">
                   These accounts are used to receive settlements from customers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </p>
+              </div>
+              <div>
                 <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   {/* Left Side: Filter and Search */}
                   <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -98,9 +98,10 @@ export default function PaymentSettingsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => refetch()}
+                      disabled={loading}
                       className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                       Refresh
                     </Button>
                     <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
@@ -160,19 +161,19 @@ export default function PaymentSettingsPage() {
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="methods" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Available Methods</CardTitle>
-                <CardDescription className="text-muted-foreground text-sm">
+            <div className="space-y-6">
+              <div className="pb-4 border-b border-border/60 mb-6">
+                <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Available Methods</h3>
+                <p className="text-muted-foreground text-sm">
                   These are the payment channels available for processing customer payments.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </p>
+              </div>
+              <div>
                 <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   {/* Left Side: Filter and Search */}
                   <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -189,9 +190,10 @@ export default function PaymentSettingsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => refetch()}
+                      disabled={loading}
                       className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                       Refresh
                     </Button>
                     <Button 
@@ -284,8 +286,8 @@ export default function PaymentSettingsPage() {
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 

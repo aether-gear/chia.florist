@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
 import { Link } from 'react-router-dom';
 
@@ -55,14 +55,14 @@ export default function PaymentAccountsPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Configured Accounts</CardTitle>
-            <CardDescription>
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60 mb-6">
+            <h3 className="font-bold text-lg">Configured Accounts</h3>
+            <p className="text-muted-foreground text-sm">
               These accounts are used to receive settlements from customers.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -97,8 +97,8 @@ export default function PaymentAccountsPage() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

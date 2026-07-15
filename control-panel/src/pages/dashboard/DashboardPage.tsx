@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Removed Card imports since sections are now borderless and backgroundless
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Shield, ShieldAlert, ShieldCheck, Zap, Activity } from 'lucide-react';
@@ -56,84 +56,74 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-300">
-      
+
       {/* WAF Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Total Requests</CardTitle>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 border-b border-border/60 pb-8">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Total Requests</span>
             <Activity className="h-4 w-4 text-muted-foreground/60" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-foreground">{wafSummary.total.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Since last system restart</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Blocked Threats</CardTitle>
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-foreground">{wafSummary.total.toLocaleString()}</div>
+          <p className="text-xs text-muted-foreground">Since last system restart</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Blocked Threats</span>
             <ShieldAlert className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{wafSummary.blocked.toLocaleString()}</div>
-            <p className="text-xs text-rose-500 font-medium mt-1">Action Required</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Threat Level</CardTitle>
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{wafSummary.blocked.toLocaleString()}</div>
+          <p className="text-xs text-rose-500 font-medium">Action Required</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Threat Level</span>
             <Shield className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">{wafSummary.threatLevel}</div>
-            <p className="text-xs text-muted-foreground mt-1">Based on recent anomalies</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold font-display text-foreground">Active Rules</CardTitle>
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">{wafSummary.threatLevel}</div>
+          <p className="text-xs text-muted-foreground">Based on recent anomalies</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold font-display text-foreground">Active Rules</span>
             <ShieldCheck className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-primary">{wafSummary.activeRules}</div>
-            <p className="text-xs text-muted-foreground mt-1">WAF policies enforced</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-primary">{wafSummary.activeRules}</div>
+          <p className="text-xs text-muted-foreground">WAF policies enforced</p>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-7 lg:grid-cols-7">
-        
+      <div className="grid gap-10 md:grid-cols-7 lg:grid-cols-7 border-b border-border/60 pb-8">
+
         {/* Sales Velocity Graph */}
-        <Card className="md:col-span-4 border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40 flex flex-col justify-between">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div>
-                <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">
-                  Product Sales Velocity
-                </CardTitle>
-                <CardDescription className="text-muted-foreground text-xs font-sans">
-                  Top products sold by volume
-                </CardDescription>
-              </div>
-              {/* Pill Toggles */}
-              <div className="flex items-center gap-1 bg-muted p-0.5 rounded-lg text-xs">
-                {(['7d', '30d', '90d'] as const).map((window) => (
-                  <button
-                    key={window}
-                    onClick={() => setTimeWindow(window)}
-                    className={`px-2 py-1 rounded-md transition-colors font-medium font-sans ${
-                      timeWindow === window
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {window}
-                  </button>
-                ))}
-              </div>
+        <div className="md:col-span-4 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-border/60">
+            <div>
+              <h3 className="font-bold font-display tracking-tight text-lg text-foreground">
+                Product Sales Velocity
+              </h3>
+              <p className="text-muted-foreground text-xs font-sans">
+                Top products sold by volume
+              </p>
             </div>
-          </CardHeader>
-          <CardContent className="h-[300px] pt-4">
+            {/* Pill Toggles */}
+            <div className="flex items-center gap-1 bg-muted p-0.5 rounded-lg text-xs">
+              {(['7d', '30d', '90d'] as const).map((window) => (
+                <button
+                  key={window}
+                  onClick={() => setTimeWindow(window)}
+                  className={`px-2 py-1 rounded-md transition-colors font-medium font-sans ${
+                    timeWindow === window
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {window}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="h-[300px]">
             {statsLoading ? (
               <div className="h-full w-full flex flex-col justify-between py-4">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -176,19 +166,19 @@ export default function DashboardPage() {
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* AI Insights */}
-        <Card className="md:col-span-3 border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-          <CardHeader>
-            <CardTitle className="flex items-center font-bold font-display tracking-tight text-lg text-foreground">
+        <div className="md:col-span-3 flex flex-col space-y-4">
+          <div className="pb-2 border-b border-border/60">
+            <h3 className="flex items-center font-bold font-display tracking-tight text-lg text-foreground">
               <Zap className="w-5 h-5 mr-2 text-amber-500" fill="currentColor" />
               AI Insights
-            </CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">Smart business and security analysis.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </h3>
+            <p className="text-muted-foreground text-sm">Smart business and security analysis.</p>
+          </div>
+          <div className="space-y-4">
             <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
               <h4 className="text-sm font-bold font-display text-amber-800 dark:text-amber-300 mb-1">Unusual Traffic Spike</h4>
               <p className="text-xs text-amber-700/80 dark:text-amber-300/70 leading-relaxed">
@@ -221,16 +211,16 @@ export default function DashboardPage() {
                 Consider offering a discount on "Enterprise Setup". Abandoned cart rates are high for this tier.
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* WAF Logs Table */}
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <div className="space-y-6">
+        <div className="flex flex-row items-center justify-between pb-2 border-b border-border/60">
           <div>
-            <CardTitle className="font-bold font-display tracking-tight text-lg">Recent WAF Logs</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">Latest traffic evaluated by the Web Application Firewall.</CardDescription>
+            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Recent WAF Logs</h3>
+            <p className="text-muted-foreground text-sm">Latest traffic evaluated by the Web Application Firewall.</p>
           </div>
           <div className="flex gap-2">
             <select
@@ -253,8 +243,8 @@ export default function DashboardPage() {
               <option value={50}>50 Rows</option>
             </select>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -288,8 +278,8 @@ export default function DashboardPage() {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

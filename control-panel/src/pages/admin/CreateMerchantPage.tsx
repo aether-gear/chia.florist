@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { Loader2, Store } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
@@ -58,12 +58,12 @@ export default function CreateMerchantPage() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-none bg-zinc-50/40 dark:bg-slate-900/40">
-        <CardHeader>
-          <CardTitle className="font-bold font-display tracking-tight text-lg text-foreground">Merchant Details</CardTitle>
-          <CardDescription className="text-muted-foreground text-sm">Enter the basic information for the new merchant.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="space-y-6">
+        <div className="pb-4 border-b border-border/60 mb-6">
+          <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Merchant Details</h3>
+          <p className="text-muted-foreground text-sm">Enter the basic information for the new merchant.</p>
+        </div>
+        <div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Merchant Name</label>
@@ -73,7 +73,7 @@ export default function CreateMerchantPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Description</label>
-              <Textarea 
+              <Textarea
                 {...register('description')}
                 placeholder="Briefly describe the business..."
                 className="min-h-[100px] rounded-xl border border-border bg-background"
@@ -103,8 +103,8 @@ export default function CreateMerchantPage() {
               Register Merchant
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

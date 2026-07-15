@@ -15,7 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from '../../../components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
+// Removed Card component imports since sections are now borderless and backgroundless
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
 
 const formSchema = z.object({
@@ -75,14 +75,14 @@ export default function CreatePaymentAccountPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Details</CardTitle>
-            <CardDescription>
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-border/60 mb-6">
+            <h3 className="font-bold text-lg">Account Details</h3>
+            <p className="text-muted-foreground text-sm">
               Please enter the payment gateway integration or bank account details.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 
@@ -169,8 +169,8 @@ export default function CreatePaymentAccountPage() {
                 </Button>
               </form>
             </Form>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
