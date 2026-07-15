@@ -5,13 +5,12 @@ import * as z from 'zod';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Save, AlertCircle, Loader2 } from 'lucide-react';
+import { Save, AlertCircle, Loader2, Camera } from 'lucide-react';
 import { useMerchantProfileViewModel } from '../../viewmodels/useMerchantProfileViewModel';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name is required (min 2 chars)'),
   phone: z.string().min(5, 'Phone is required').optional().or(z.literal('')),
-  avatar_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -24,7 +23,6 @@ export default function MerchantProfileSettings() {
     defaultValues: {
       name: '',
       phone: '',
-      avatar_url: ''
     }
   });
 
@@ -33,7 +31,6 @@ export default function MerchantProfileSettings() {
       reset({
         name: profile.Name || '',
         phone: profile.Phone || '',
-        avatar_url: profile.AvatarURL || ''
       });
     }
   }, [profile, reset]);
@@ -79,14 +76,27 @@ export default function MerchantProfileSettings() {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
                 <div className="flex items-center space-x-4 mb-6">
-                  <div className="h-20 w-20 rounded-full bg-primary/10 overflow-hidden border border-border">
-                    {profile?.AvatarURL ? (
-                      <img src={profile.AvatarURL} alt="Profile" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-primary font-bold text-xl">
-                        {profile?.Name?.charAt(0) || 'S'}
-                      </div>
-                    )}
+                  {/* Avatar with disabled "Change Photo" badge */}
+                  <div className="relative shrink-0">
+                    <div className="h-20 w-20 rounded-full bg-primary/10 overflow-hidden border border-border">
+                      {profile?.AvatarURL ? (
+                        <img src={profile.AvatarURL} alt="Profile" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-primary font-bold text-xl">
+                          {profile?.Name?.charAt(0) || 'S'}
+                        </div>
+                      )}
+                    </div>
+                    {/* Change Photo stub — will be wired to bucket upload when backend endpoint is ready */}
+                    <button
+                      type="button"
+                      disabled
+                      title="Photo upload coming soon"
+                      aria-label="Change profile photo (coming soon)"
+                      className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md opacity-60 cursor-not-allowed focus:outline-none"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                   <div>
                     <h3 className="font-bold font-display text-foreground">{profile?.Name}</h3>
@@ -109,12 +119,6 @@ export default function MerchantProfileSettings() {
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input id="phone" {...register('phone')} placeholder="e.g. 08123456789" className="rounded-xl border-border bg-background" />
                   {errors.phone && <p className="text-sm text-rose-500">{errors.phone.message}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="avatar_url">Avatar URL</Label>
-                  <Input id="avatar_url" {...register('avatar_url')} placeholder="https://example.com/avatar.jpg" className="rounded-xl border-border bg-background" />
-                  {errors.avatar_url && <p className="text-sm text-rose-500">{errors.avatar_url.message}</p>}
                 </div>
 
                 <div className="flex justify-end">
@@ -145,10 +149,6 @@ export default function MerchantProfileSettings() {
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Staff ID</p>
                 <p className="text-sm text-foreground font-semibold mt-1">{profile?.staff_id}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">User ID</p>
-                <p className="text-sm text-foreground font-semibold mt-1">{profile?.user_id}</p>
               </div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Account Created</p>

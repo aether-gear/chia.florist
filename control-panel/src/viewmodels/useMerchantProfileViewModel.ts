@@ -26,7 +26,7 @@ export function useMerchantProfileViewModel() {
     loadProfile();
   }, []);
 
-  const saveProfile = async (updateData: { name?: string; phone?: string; avatar_url?: string }) => {
+  const saveProfile = async (updateData: { name?: string; phone?: string }) => {
     try {
       setLoading(true);
       const res = await fetchApi('/profile', {
