@@ -83,3 +83,33 @@ type ProductImageUploadService interface {
 	Upload(params UploadProductImagesParams) ([]UploadedProductImage, error)
 	Delete(assetKeys []string) error
 }
+
+type ProductPerformanceRepository interface {
+	UpsertPerformance(
+		ctx context.Context,
+		exec transaction.Executor,
+		perf domain.ProductPerformance,
+		basePrice int64,
+	) error
+
+	IncrementViewCount(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+	) error
+
+	GetProductStats(
+		ctx context.Context,
+		exec transaction.Executor,
+		params GetProductStatsParams,
+	) ([]domain.ProductStats, int, error)
+}
+
+type ProductStockHistoryRepository interface {
+	RecordStockEvent(
+		ctx context.Context,
+		exec transaction.Executor,
+		event domain.ProductStockEvent,
+	) error
+}
+

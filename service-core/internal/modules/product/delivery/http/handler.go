@@ -19,6 +19,7 @@ type ProductHandler struct {
 	saveProduct     *usecase.SaveProductUsecase
 	deleteProduct   *usecase.DeleteProductUsecase
 	addProductImage *usecase.AddProductImagesUsecase
+	getProductStats *usecase.GetProductStatsUsecase
 }
 
 func NewProductHandler(
@@ -27,6 +28,7 @@ func NewProductHandler(
 	saveProduct *usecase.SaveProductUsecase,
 	deleteProduct *usecase.DeleteProductUsecase,
 	addProductImage *usecase.AddProductImagesUsecase,
+	getProductStats *usecase.GetProductStatsUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
 		findProducts:    findProducts,
@@ -34,6 +36,7 @@ func NewProductHandler(
 		saveProduct:     saveProduct,
 		deleteProduct:   deleteProduct,
 		addProductImage: addProductImage,
+		getProductStats: getProductStats,
 	}
 }
 
@@ -238,13 +241,15 @@ func (h *ProductHandler) SaveProduct(w http.ResponseWriter, r *http.Request) err
 	}
 
 	input := usecase.SaveProductInput{
-		ID:          productID,
-		SKU:         req.SKU,
-		Name:        req.Name,
-		Description: req.Description,
-		Status:      string(req.Status),
-		Price:       req.Price,
-		Weight:      req.Weight,
+		ID:                   productID,
+		SKU:                  req.SKU,
+		Name:                 req.Name,
+		Description:          req.Description,
+		Status:               string(req.Status),
+		Price:                req.Price,
+		Weight:               req.Weight,
+		CostPrice:            req.CostPrice,
+		SupplierLeadTimeDays: req.SupplierLeadTimeDays,
 	}
 
 	err := h.saveProduct.Execute(r.Context(), input)
@@ -339,4 +344,78 @@ func (s productStatusDTO) isStatusValid() bool {
 	default:
 		return false
 	}
+}
+
+func (h *ProductHandler) GetProductStats(w http.ResponseWriter, r *http.Request) error {
+	page := apphttp.QueryIntDefault(r, "page", 1)
+	if page <= 0 {
+		page = 1
+	}
+	limit := apphttp.QueryIntDefault(r, "limit", 10)
+	if limit <= 0 {
+		limit = 10
+	}
+
+	name := apphttp.Query(r, "name")
+	id := apphttp.Query(r, "id")
+	sort := apphttp.Query(r, "sort")
+
+	input := usecase.GetProductStatsInput{
+		Page:  page,
+		Limit: limit,
+		Sort:  sort,
+	}
+	if name != "" {
+		input.Name = &name
+	}
+	if id != "" {
+		input.ID = &id
+	}
+
+	stats, total, err := h.getProductStats.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	results := make([]productStatsResponse, 0, len(stats))
+	for _, s := range stats {
+		var thumb *string
+		if s.Thumbnail != "" {
+			t := s.Thumbnail
+			thumb = &t
+		}
+
+		results = append(results, productStatsResponse{
+			ID:                   s.Product.ID,
+			SKU:                  s.Product.SKU,
+			Name:                 s.Product.Name,
+			Slug:                 s.Product.Slug,
+			Status:               string(s.Product.Status),
+			Price:                s.Product.Price,
+			CostPrice:            s.Performance.CostPrice,
+			SupplierLeadTimeDays: s.Performance.SupplierLeadTimeDays,
+			GrossMarginPct:       s.Performance.GrossMarginPct,
+			ViewCount:            s.Performance.ViewCount,
+			TotalStock:           s.TotalStock,
+			SalesVelocity7d:      s.SalesVelocity7d,
+			SalesVelocity30d:     s.SalesVelocity30d,
+			SalesVelocity90d:     s.SalesVelocity90d,
+			ConversionRate:       s.ConversionRate,
+			RevenueContribPct:    s.RevenueContribPct,
+			ReturnRate:           s.ReturnRate,
+			AverageRating:        s.AverageRating,
+			ReviewCount:          s.ReviewCount,
+			Thumbnail:            thumb,
+		})
+	}
+
+	response := map[string]interface{}{
+		"stats": results,
+		"page":  page,
+		"limit": limit,
+		"total": total,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
 }

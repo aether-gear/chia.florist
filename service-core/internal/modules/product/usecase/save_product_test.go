@@ -41,6 +41,26 @@ type mockExecutor struct {
 	transaction.Executor
 }
 
+type mockProductPerformanceRepository struct {
+	repository.ProductPerformanceRepository
+	upsertCalled bool
+	upsertPerf   domain.ProductPerformance
+	upsertPrice  int64
+	upsertErr    error
+}
+
+func (m *mockProductPerformanceRepository) UpsertPerformance(
+	ctx context.Context,
+	exec transaction.Executor,
+	perf domain.ProductPerformance,
+	basePrice int64,
+) error {
+	m.upsertCalled = true
+	m.upsertPerf = perf
+	m.upsertPrice = basePrice
+	return m.upsertErr
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -50,8 +70,9 @@ func TestSaveProduct_Success_NewProduct(t *testing.T) {
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
 	exec := &mockExecutor{}
+	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec)
+	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
 
 	desc := "New product description"
 	weight := 1.5
@@ -113,8 +134,9 @@ func TestSaveProduct_Success_UpdateProduct(t *testing.T) {
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
 	exec := &mockExecutor{}
+	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec)
+	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
 
 	productID := uuid.New()
 	desc := "Updated description"
@@ -177,8 +199,9 @@ func TestSaveProduct_InvalidInput_EmptyName(t *testing.T) {
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
 	exec := &mockExecutor{}
+	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec)
+	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
 
 	input := SaveProductInput{
 		ID:     nil,
@@ -199,8 +222,9 @@ func TestSaveProduct_InvalidInput_NegativePrice(t *testing.T) {
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
 	exec := &mockExecutor{}
+	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec)
+	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
 
 	input := SaveProductInput{
 		ID:     nil,
@@ -222,8 +246,9 @@ func TestSaveProduct_RepoError(t *testing.T) {
 	repo := &mockProductRepository{saveErr: expectedErr}
 	slugGen := &mockSlugGenerator{}
 	exec := &mockExecutor{}
+	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec)
+	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
 
 	input := SaveProductInput{
 		ID:     nil,

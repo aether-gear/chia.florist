@@ -18,10 +18,11 @@ import (
 )
 
 type CreateInventoryUsecase struct {
-	inventoryRepo repository.InventoryRepository
-	productRepo   productRepository.ProductRepository
-	shopRepo      shopRepo.ShopRepository
-	executor      transaction.Executor
+	inventoryRepo    repository.InventoryRepository
+	productRepo      productRepository.ProductRepository
+	shopRepo         shopRepo.ShopRepository
+	executor         transaction.Executor
+	stockHistoryRepo productRepository.ProductStockHistoryRepository
 }
 
 func NewCreateInventoryUsecase(
@@ -29,12 +30,14 @@ func NewCreateInventoryUsecase(
 	productRepo productRepository.ProductRepository,
 	shopRepo shopRepo.ShopRepository,
 	executor transaction.Executor,
+	stockHistoryRepo productRepository.ProductStockHistoryRepository,
 ) *CreateInventoryUsecase {
 	return &CreateInventoryUsecase{
-		inventoryRepo: inventoryRepo,
-		productRepo:   productRepo,
-		shopRepo:      shopRepo,
-		executor:      executor,
+		inventoryRepo:    inventoryRepo,
+		productRepo:      productRepo,
+		shopRepo:         shopRepo,
+		executor:         executor,
+		stockHistoryRepo: stockHistoryRepo,
 	}
 }
 
@@ -48,7 +51,8 @@ func (u *CreateInventoryUsecase) Execute(
 	ctx context.Context,
 	input CreateInventoryInput,
 ) error {
-	product, err := u.productRepo.GetByID(ctx, u.executor, input.ProductID)
+	product, err := u.productRepo.
+		GetByID(ctx, u.executor, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to load product: %w", err)
 	}
@@ -56,7 +60,8 @@ func (u *CreateInventoryUsecase) Execute(
 		return apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
 	}
 
-	shop, err := u.shopRepo.GetByID(ctx, u.executor, input.ShopID)
+	shop, err := u.shopRepo.
+		GetByID(ctx, u.executor, input.ShopID)
 	if err != nil {
 		return fmt.Errorf("failed to load shop: %w", err)
 	}
@@ -65,7 +70,10 @@ func (u *CreateInventoryUsecase) Execute(
 	}
 
 	existing, err := u.inventoryRepo.
-		GetByProductIDAndShopID(ctx, u.executor, input.ProductID, input.ShopID)
+		GetByProductIDAndShopID(ctx, u.executor,
+			input.ProductID,
+			input.ShopID,
+		)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory: %w", err)
 	}
@@ -89,9 +97,23 @@ func (u *CreateInventoryUsecase) Execute(
 		return err
 	}
 
-	if err := u.inventoryRepo.Create(ctx, u.executor, inventory); err != nil {
+	if err := u.inventoryRepo.
+		Create(ctx, u.executor, inventory); err != nil {
 		return fmt.Errorf("failed to save inventory: %w", err)
 	}
+
+	go func() {
+		event := productDomain.ProductStockEvent{
+			ProductID: inventory.ProductID,
+			ShopID:    inventory.ShopID,
+			Available: inventory.TotalStock - inventory.ReservedStock,
+		}
+
+		_ = u.stockHistoryRepo.
+			RecordStockEvent(context.Background(), u.executor,
+				event,
+			)
+	}()
 
 	return nil
 }

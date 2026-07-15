@@ -23,6 +23,7 @@ type GetProductUsecase struct {
 	inventoryRepo  inventoryRepo.InventoryRepository
 	productImgRepo repository.ProductImageRepository
 	shopRepo       shopRepo.ShopRepository
+	perfRepo       repository.ProductPerformanceRepository
 }
 
 func NewGetProductUsecase(
@@ -32,6 +33,7 @@ func NewGetProductUsecase(
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productImgRepo repository.ProductImageRepository,
 	shopRepo shopRepo.ShopRepository,
+	perfRepo repository.ProductPerformanceRepository,
 ) *GetProductUsecase {
 	return &GetProductUsecase{
 		executor:       executor,
@@ -40,6 +42,7 @@ func NewGetProductUsecase(
 		inventoryRepo:  inventoryRepo,
 		productImgRepo: productImgRepo,
 		shopRepo:       shopRepo,
+		perfRepo:       perfRepo,
 	}
 }
 
@@ -72,6 +75,11 @@ func (u *GetProductUsecase) Execute(
 	if product == nil {
 		return nil, nil
 	}
+
+	go func() {
+		// Increment view count in background
+		_ = u.perfRepo.IncrementViewCount(context.Background(), u.executor, product.ID)
+	}()
 
 	inventories, err := u.inventoryRepo.
 		ListByProductID(ctx, u.executor, product.ID)

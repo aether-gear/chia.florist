@@ -18,7 +18,21 @@ var (
 	ProductSortModified query.SortKey = "modified"
 	ProductSortArchived query.SortKey = "archived"
 	ProductSortStock    query.SortKey = "stock"
+
+	ProductSortViewCount     query.SortKey = "view_count"
+	ProductSortSales30d      query.SortKey = "sales_velocity_30d"
+	ProductSortSales7d       query.SortKey = "sales_velocity_7d"
+	ProductSortRevenue       query.SortKey = "revenue_contribution"
+	ProductSortGrossMargin   query.SortKey = "gross_margin_pct"
 )
+
+type GetProductStatsParams struct {
+	ID   *string
+	Name *string
+
+	query.Pagination
+	query.Sorts
+}
 
 type FindProductParams struct {
 	ID   *string

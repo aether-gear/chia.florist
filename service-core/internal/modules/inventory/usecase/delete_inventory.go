@@ -6,23 +6,28 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepository "service-core/internal/modules/product/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
 )
 
 type DeleteInventoryUsecase struct {
-	inventoryRepo repository.InventoryRepository
-	executor      transaction.Executor
+	inventoryRepo    repository.InventoryRepository
+	executor         transaction.Executor
+	stockHistoryRepo productRepository.ProductStockHistoryRepository
 }
 
 func NewDeleteInventoryUsecase(
 	inventoryRepo repository.InventoryRepository,
 	executor transaction.Executor,
+	stockHistoryRepo productRepository.ProductStockHistoryRepository,
 ) *DeleteInventoryUsecase {
 	return &DeleteInventoryUsecase{
-		inventoryRepo: inventoryRepo,
-		executor:      executor,
+		inventoryRepo:    inventoryRepo,
+		executor:         executor,
+		stockHistoryRepo: stockHistoryRepo,
 	}
 }
 
@@ -59,6 +64,16 @@ func (u *DeleteInventoryUsecase) Execute(
 		); err != nil {
 		return fmt.Errorf("failed to delete inventory: %w", err)
 	}
+
+	go func() {
+		_ = u.stockHistoryRepo.RecordStockEvent(context.Background(), u.executor,
+			productDomain.ProductStockEvent{
+				ProductID: input.ProductID,
+				ShopID:    input.ShopID,
+				Available: 0,
+			},
+		)
+	}()
 
 	return nil
 }
