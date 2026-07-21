@@ -39,7 +39,7 @@ services:
         value: disable
       - key: SUPABASE_PROJECT_URL
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: SUPABASE_SUPA_KEY
         sync: false
       - key: STORAGE_BUCKET
         sync: false

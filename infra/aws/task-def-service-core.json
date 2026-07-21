@@ -31,7 +31,7 @@
         { "name": "POSTGRES_DB_USER",            "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/POSTGRES_DB_USER" },
         { "name": "POSTGRES_DB_PASSWORD",        "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/POSTGRES_DB_PASSWORD" },
         { "name": "SUPABASE_PROJECT_URL",        "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_PROJECT_URL" },
-        { "name": "SUPABASE_SERVICE_ROLE_KEY",   "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_SERVICE_ROLE_KEY" },
+        { "name": "SUPABASE_SUPA_KEY",   "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_SUPA_KEY" },
         { "name": "STORAGE_BUCKET",              "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/STORAGE_BUCKET" },
         { "name": "RAJAONGKIR_DESTINATION_URL",  "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/RAJAONGKIR_DESTINATION_URL" },
         { "name": "RAJAONGKIR_CALCULATE_URL",    "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/RAJAONGKIR_CALCULATE_URL" },

@@ -4,7 +4,7 @@
 #
 # Setup:
 #   fly launch --no-deploy
-#   fly secrets set JWT_SECRET=... SUPABASE_SERVICE_ROLE_KEY=...
+#   fly secrets set JWT_SECRET=... SUPABASE_SUPA_KEY=...
 #   fly deploy
 
 app            = "chia-florist-service-core"

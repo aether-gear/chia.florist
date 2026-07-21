@@ -15,7 +15,7 @@ This document describes how to provision and inject secrets for each deployment 
 | `POSTGRES_DB_PORT` | Database port (6543) | — |
 | `POSTGRES_DB_SSLMODE` | `disable` or `require` | — |
 | `SUPABASE_PROJECT_URL` | Supabase project URL | — |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role JWT | ✅ |
+| `SUPABASE_SUPA_KEY` | Supabase service role JWT | ✅ |
 | `STORAGE_BUCKET` | Storage bucket name | — |
 | `STORAGE_SIGNED_URL_EXPIRY` | URL expiry seconds | — |
 | `RAJAONGKIR_DESTINATION_URL` | Komerce destination endpoint | — |

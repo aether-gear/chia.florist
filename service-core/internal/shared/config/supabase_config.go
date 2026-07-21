@@ -36,7 +36,7 @@ func LoadSupabaseConfig() SupabaseConfig {
 		password       = GetEnv("SUPABASE_DB_PASSWORD", "")
 		sslMode        = GetEnv("SUPABASE_DB_SSLMODE", "")
 		projectURL     = GetEnv("SUPABASE_PROJECT_URL", "")
-		serviceRoleKey = GetEnv("SUPABASE_SERVICE_ROLE_KEY", "")
+		serviceRoleKey = GetEnv("SUPABASE_SUPA_KEY", "")
 		dbVersion      = GetEnv("", "")
 		storageVersion = GetEnv("", "")
 	)
