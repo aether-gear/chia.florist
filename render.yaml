@@ -84,9 +84,9 @@ services:
           name: chia-service-core
           type: web
           property: host
-      - key: SUPABASE_URL
+      - key: SUPABASE_CHIA_URL
         sync: false
-      - key: SUPABASE_KEY
+      - key: SUPABASE_CHIA_KEY
         sync: false
 
   # --- control-panel (React SPA) --- #

@@ -32,8 +32,8 @@ This document describes how to provision and inject secrets for each deployment 
 | Variable | Description |
 |---|---|
 | `SERVICE_CORE_API_URL` | Internal URL of service-core |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_KEY` | Supabase anon/service key |
+| `SUPABASE_CHIA_URL` | Supabase project URL |
+| `SUPABASE_CHIA_KEY` | Supabase anon/service key |
 
 ### control-panel
 | Variable | Description |

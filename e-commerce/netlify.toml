@@ -34,8 +34,8 @@
 
 [context.production]
   [context.production.environment]
-    SERVICE_CORE_API_URL = "https://api.chia.florist"
+    NUXT_PUBLIC_SERVICE_CORE_API_URL = "https://api.chia.florist"
 
 [context.staging]
   [context.staging.environment]
-    SERVICE_CORE_API_URL = "https://api.staging.chia.florist"
+    NUXT_PUBLIC_SERVICE_CORE_API_URL = "https://api.staging.chia.florist"

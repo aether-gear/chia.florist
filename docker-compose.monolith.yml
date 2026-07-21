@@ -67,11 +67,9 @@ services:
       HOST:                 0.0.0.0
       PORT:                 4000
       SERVICE_CORE_API_URL: http://service-core:7129
-      SUPABASE_URL:         ${SUPABASE_PROJECT_URL}
-      SUPABASE_KEY:         ${SUPABASE_SUPA_KEY}
       NUXT_PUBLIC_SERVICE_CORE_API_URL: http://service-core:7129
-      NUXT_PUBLIC_SUPABASE_URL:         ${SUPABASE_PROJECT_URL}
-      NUXT_PUBLIC_SUPABASE_KEY:         ${SUPABASE_SUPA_KEY}
+      SUPABASE_CHIA_URL:         ${SUPABASE_CHIA_URL}
+      SUPABASE_CHIA_KEY:         ${SUPABASE_CHIA_KEY}
     expose:
       - "4000"
     depends_on:

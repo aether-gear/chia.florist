@@ -24,8 +24,8 @@
       ],
       "secrets": [
         { "name": "SERVICE_CORE_API_URL", "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SERVICE_CORE_API_URL" },
-        { "name": "SUPABASE_URL",         "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_PROJECT_URL" },
-        { "name": "SUPABASE_KEY",         "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_SUPA_KEY" }
+        { "name": "SUPABASE_CHIA_URL", "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_CHIA_URL" },
+        { "name": "SUPABASE_CHIA_KEY", "valueFrom": "arn:aws:ssm:ap-southeast-1:ACCOUNT_ID:parameter/chia-florist/SUPABASE_CHIA_KEY" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -qO- http://localhost:4000/ || exit 1"],

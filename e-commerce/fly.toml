@@ -3,7 +3,7 @@
 #
 # Setup:
 #   fly launch --no-deploy
-#   fly secrets set SUPABASE_URL=... SUPABASE_KEY=...
+#   fly secrets set SUPABASE_CHIA_URL=... SUPABASE_CHIA_KEY=...
 #   fly deploy
 
 app            = "chia-florist-e-commerce"
@@ -16,7 +16,8 @@ primary_region = "sin"
   HOST             = "0.0.0.0"
   PORT             = "4000"
   NODE_ENV         = "production"
-  # Override in fly secrets: SERVICE_CORE_API_URL
+  # Override in fly secrets: NUXT_PUBLIC_SERVICE_CORE_API_URL
+
 
 [http_service]
   internal_port        = 4000
