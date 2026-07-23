@@ -5,8 +5,9 @@ import * as z from 'zod';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Save, AlertCircle, Loader2, Camera } from 'lucide-react';
+import { Save, AlertCircle, Loader2 } from 'lucide-react';
 import { useMerchantProfileViewModel } from '../../viewmodels/useMerchantProfileViewModel';
+import AvatarUpload from '../../components/AvatarUpload';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name is required (min 2 chars)'),
@@ -76,28 +77,16 @@ export default function MerchantProfileSettings() {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
                 <div className="flex items-center space-x-4 mb-6">
-                  {/* Avatar with disabled "Change Photo" badge */}
-                  <div className="relative shrink-0">
-                    <div className="h-20 w-20 rounded-full bg-primary/10 overflow-hidden border border-border">
-                      {profile?.AvatarURL ? (
-                        <img src={profile.AvatarURL} alt="Profile" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-primary font-bold text-xl">
-                          {profile?.Name?.charAt(0) || 'S'}
-                        </div>
-                      )}
-                    </div>
-                    {/* Change Photo stub — will be wired to bucket upload when backend endpoint is ready */}
-                    <button
-                      type="button"
-                      disabled
-                      title="Photo upload coming soon"
-                      aria-label="Change profile photo (coming soon)"
-                      className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md opacity-60 cursor-not-allowed focus:outline-none"
-                    >
-                      <Camera className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  {/* Dynamic AvatarUpload Component */}
+                  {profile && (
+                    <AvatarUpload
+                      userId={profile.user_id}
+                      currentAvatarUrl={profile.AvatarURL}
+                      displayName={profile.Name}
+                      onUploadComplete={(url) => saveProfile({ avatar_url: url })}
+                      onRemoveComplete={() => saveProfile({ avatar_url: '' })}
+                    />
+                  )}
                   <div>
                     <h3 className="font-bold font-display text-foreground">{profile?.Name}</h3>
                     <p className="text-sm text-muted-foreground">@{profile?.Username}</p>
