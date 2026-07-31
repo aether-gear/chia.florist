@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	applogger "service-core/internal/common/logger"
 	shipping "service-core/internal/infra/shipping"
 	addressDomain "service-core/internal/modules/address/domain"
 	orderDomain "service-core/internal/modules/order/domain"
@@ -205,6 +206,14 @@ func (m *uosMockLogisticsProvider) TrackShipment(_ context.Context, _ shipping.T
 	return nil, nil
 }
 
+type uosMockAuditLogger struct {
+	events []applogger.AuditEvent
+}
+
+func (m *uosMockAuditLogger) Log(_ context.Context, event applogger.AuditEvent) {
+	m.events = append(m.events, event)
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -226,6 +235,7 @@ func TestUpdateOrderStatus_SimpleTransition(t *testing.T) {
 		&uosMockAddressRepo{},
 		&uosMockShopAddressRepo{},
 		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
 	)
 
 	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
@@ -315,6 +325,7 @@ func TestUpdateOrderStatus_ShippedCourierManual(t *testing.T) {
 		addressRepo,
 		shopAddressRepo,
 		logisticsMock,
+		&uosMockAuditLogger{},
 	)
 
 	// Verify courier mode with manual tracking input (Milestone 1 check)
@@ -415,6 +426,7 @@ func TestUpdateOrderStatus_ShippedSelfDelivery(t *testing.T) {
 		addressRepo,
 		shopAddressRepo,
 		logisticsMock,
+		&uosMockAuditLogger{},
 	)
 
 	// Verify Milestone 2: Self delivery
@@ -471,6 +483,7 @@ func TestUpdateOrderStatus_InvalidTransition(t *testing.T) {
 		&uosMockAddressRepo{},
 		&uosMockShopAddressRepo{},
 		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
 	)
 
 	// Can't transition directly from Pending to Shipped
@@ -552,6 +565,7 @@ func TestUpdateOrderStatus_DefaultFulfillment(t *testing.T) {
 		addressRepo,
 		shopAddressRepo,
 		logisticsMock,
+		&uosMockAuditLogger{},
 	)
 
 	// If FulfillmentMethod is not provided, it should default to courier
@@ -570,5 +584,107 @@ func TestUpdateOrderStatus_DefaultFulfillment(t *testing.T) {
 
 	if logisticsMock.calledInput == nil {
 		t.Fatal("expected logistics provider to be called by default")
+	}
+}
+
+func TestUpdateOrderStatus_AuditLogging_Success(t *testing.T) {
+	orderID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusConfirmed,
+	}
+
+	orderRepo := &uosMockOrderRepo{order: order}
+	auditLogger := &uosMockAuditLogger{}
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		&uosMockOrderItemRepo{},
+		&uosMockShipmentRepo{},
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		auditLogger,
+	)
+
+	_, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusProcessing,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(auditLogger.events) != 1 {
+		t.Fatalf("expected 1 audit event, got %d", len(auditLogger.events))
+	}
+
+	event := auditLogger.events[0]
+	if event.Category != "user_action" {
+		t.Errorf("expected Category 'user_action', got %q", event.Category)
+	}
+	if event.Action != "update_order_status" {
+		t.Errorf("expected Action 'update_order_status', got %q", event.Action)
+	}
+	if event.Resource != "order" {
+		t.Errorf("expected Resource 'order', got %q", event.Resource)
+	}
+	if event.ResourceID != orderID.String() {
+		t.Errorf("expected ResourceID %q, got %q", orderID.String(), event.ResourceID)
+	}
+	if event.Outcome != applogger.OutcomeSuccess {
+		t.Errorf("expected Outcome 'success', got %q", event.Outcome)
+	}
+	oldStatusVal, ok := event.Metadata["old_status"].(string)
+	if !ok || oldStatusVal != "confirmed" {
+		t.Errorf("expected old_status 'confirmed', got %v", event.Metadata["old_status"])
+	}
+	newStatusVal, ok := event.Metadata["new_status"].(string)
+	if !ok || newStatusVal != "processing" {
+		t.Errorf("expected new_status 'processing', got %v", event.Metadata["new_status"])
+	}
+}
+
+func TestUpdateOrderStatus_AuditLogging_Failure(t *testing.T) {
+	orderID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusPending,
+	}
+
+	orderRepo := &uosMockOrderRepo{order: order}
+	auditLogger := &uosMockAuditLogger{}
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		&uosMockOrderItemRepo{},
+		&uosMockShipmentRepo{},
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		auditLogger,
+	)
+
+	// Invalid status transition Pending -> Delivered
+	_, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusDelivered,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if len(auditLogger.events) != 1 {
+		t.Fatalf("expected 1 audit event, got %d", len(auditLogger.events))
+	}
+
+	event := auditLogger.events[0]
+	if event.Outcome != applogger.OutcomeFailure {
+		t.Errorf("expected Outcome 'failure', got %q", event.Outcome)
+	}
+	if event.Metadata["error"] == nil {
+		t.Errorf("expected error in metadata, got nil")
 	}
 }

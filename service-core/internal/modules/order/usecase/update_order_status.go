@@ -7,6 +7,7 @@ import (
 	"time"
 
 	apperrors "service-core/internal/common/errors"
+	applogger "service-core/internal/common/logger"
 	shipping "service-core/internal/infra/shipping"
 	addressRepo "service-core/internal/modules/address/repository"
 	"service-core/internal/modules/order/domain"
@@ -36,6 +37,7 @@ type UpdateOrderStatusUsecase struct {
 	addressRepo     addressRepo.CustomerAddressRepository
 	shopAddressRepo addressRepo.ShopAddressRepository
 	logistics       shipping.LogisticsProvider
+	auditLogger     applogger.AuditLogger
 }
 
 func NewUpdateOrderStatusUsecase(
@@ -47,6 +49,7 @@ func NewUpdateOrderStatusUsecase(
 	addressRepo addressRepo.CustomerAddressRepository,
 	shopAddressRepo addressRepo.ShopAddressRepository,
 	logistics shipping.LogisticsProvider,
+	auditLogger applogger.AuditLogger,
 ) *UpdateOrderStatusUsecase {
 	return &UpdateOrderStatusUsecase{
 		executor:        executor,
@@ -57,6 +60,7 @@ func NewUpdateOrderStatusUsecase(
 		addressRepo:     addressRepo,
 		shopAddressRepo: shopAddressRepo,
 		logistics:       logistics,
+		auditLogger:     auditLogger,
 	}
 }
 
@@ -81,25 +85,60 @@ type UpdateOrderStatusResult struct {
 func (u *UpdateOrderStatusUsecase) Execute(
 	ctx context.Context,
 	input UpdateOrderStatusInput,
-) (*UpdateOrderStatusResult, error) {
-	order, err := u.orderRepo.
-		GetByID(ctx, u.executor, input.OrderID)
+) (res *UpdateOrderStatusResult, err error) {
+	var oldStatus string
+	defer func() {
+		if err != nil {
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category:   "user_action",
+				Action:     "update_order_status",
+				Resource:   "order",
+				ResourceID: input.OrderID.String(),
+				Outcome:    applogger.OutcomeFailure,
+				Metadata: map[string]any{
+					"error":      err.Error(),
+					"old_status": oldStatus,
+					"new_status": string(input.Status),
+				},
+			})
+		} else {
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category:   "user_action",
+				Action:     "update_order_status",
+				Resource:   "order",
+				ResourceID: input.OrderID.String(),
+				Outcome:    applogger.OutcomeSuccess,
+				Metadata: map[string]any{
+					"old_status": oldStatus,
+					"new_status": string(input.Status),
+				},
+			})
+		}
+	}()
+
+	order, err := u.orderRepo.GetByID(ctx, u.executor,
+		input.OrderID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
-
 	if order == nil {
 		return nil, apperrors.NewNotFound("order not found")
 	}
 
-	if err := order.UpdateStatus(input.Status); err != nil {
-		return nil, apperrors.NewInvalidInput(err.Error())
+	oldStatus = string(order.Status)
+
+	if errStatus := order.UpdateStatus(input.Status); errStatus != nil {
+		return nil, apperrors.NewInvalidInput(errStatus.Error())
 	}
 
 	// Simple transitions (no side-effects)
 	if input.Status != domain.OrderStatusShipped {
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-			return u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status)
+			return u.orderRepo.UpdateStatus(ctx, exec,
+				order.ID,
+				input.Status,
+			)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to update order status: %w", err)
@@ -110,12 +149,13 @@ func (u *UpdateOrderStatusUsecase) Execute(
 	}
 
 	// processing → shipped
-	items, err := u.orderItemRepo.
-		ListByOrderID(ctx, u.executor, order.ID)
+	items, err := u.orderItemRepo.ListByOrderID(ctx,
+		u.executor,
+		order.ID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list order items: %w", err)
 	}
-
 	if len(items) == 0 {
 		return nil, apperrors.NewInvalidInput("order has no items")
 	}
@@ -152,14 +192,12 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 	// Resolve customer destination district ID
 	// from the order's address.
-	customerAddr, err := u.addressRepo.
-		GetByID(ctx, u.executor,
-			order.AddressID,
-		)
+	customerAddr, err := u.addressRepo.GetByID(ctx, u.executor,
+		order.AddressID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get customer address: %w", err)
 	}
-
 	if customerAddr == nil {
 		return nil, apperrors.NewNotFound("customer address not found")
 	}
@@ -171,14 +209,12 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 	// Resolve shop origin district ID
 	// from the shop's default address.
-	shopAddr, err := u.shopAddressRepo.
-		GetDefaultByShopID(ctx, u.executor,
-			first.ShopID,
-		)
+	shopAddr, err := u.shopAddressRepo.GetDefaultByShopID(ctx, u.executor,
+		first.ShopID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shop address: %w", err)
 	}
-
 	if shopAddr == nil {
 		return nil, apperrors.NewNotFound("shop address not found")
 	}
@@ -252,18 +288,16 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 	var created *shipmentDomain.Shipment
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		if err := u.shipmentRepo.
-			Create(ctx, exec,
-				shipment,
-			); err != nil {
+		if err := u.shipmentRepo.Create(ctx, exec,
+			shipment,
+		); err != nil {
 			return fmt.Errorf("failed to persist shipment: %w", err)
 		}
 
-		if err := u.orderRepo.
-			UpdateStatus(ctx, exec,
-				order.ID,
-				input.Status,
-			); err != nil {
+		if err := u.orderRepo.UpdateStatus(ctx, exec,
+			order.ID,
+			input.Status,
+		); err != nil {
 			return fmt.Errorf("failed to update order status: %w", err)
 		}
 

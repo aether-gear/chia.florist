@@ -810,6 +810,7 @@ func NewContainer(cfg Config,
 				addressRepo,
 				addressShopRepo,
 				infra.LogisticsProvider,
+				auditLogger,
 			),
 		GetOrderTracking: *orderUsecase.
 			NewGetOrderTrackingUsecase(
