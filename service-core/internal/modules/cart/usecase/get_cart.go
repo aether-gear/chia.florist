@@ -64,7 +64,9 @@ func (u *GetCartUsecase) Execute(
 	ctx context.Context,
 	customerID uuid.UUID,
 ) (*GetCartResult, error) {
-	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor, customerID)
+	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor,
+		customerID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve cart: %w", err)
 	}
@@ -88,23 +90,33 @@ func (u *GetCartUsecase) Execute(
 		productIDs = append(productIDs, item.ProductID)
 	}
 
-	products, err := u.productRepo.FindByIDs(ctx, u.executor, productIDs)
+	products, err := u.productRepo.FindByIDs(ctx, u.executor,
+		productIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cart with products: %w", err)
 	}
 
-	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, u.executor, productIDs)
+	inventoryMap, err := u.inventoryRepo.ListByProductIDs(ctx, u.executor,
+		productIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory for cart products: %w", err)
 	}
 
-	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, u.executor, productIDs)
+	imagesMap, err := u.productImgRepo.ListByProductIDs(ctx, u.executor,
+		productIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load images for products: %w", err)
 	}
 
 	productMap := make(map[uuid.UUID]ProductCartResponse)
 	for _, p := range products {
+		if p.DeletedAt != nil {
+			continue
+		}
+
 		inventories := inventoryMap[p.ID]
 		images := imagesMap[p.ID]
 
@@ -126,6 +138,14 @@ func (u *GetCartUsecase) Execute(
 
 		productMap[p.ID] = result
 	}
+
+	activeItems := make([]domain.CartItem, 0, len(cart.Items))
+	for _, item := range cart.Items {
+		if _, ok := productMap[item.ProductID]; ok {
+			activeItems = append(activeItems, item)
+		}
+	}
+	cart.Items = activeItems
 
 	return &GetCartResult{
 		Cart:     cart,

@@ -156,8 +156,9 @@ func (u *CheckoutUsecase) Execute(
 		pricingInput.Shops = append(pricingInput.Shops, shopInput)
 	}
 
-	pricingResult, err := u.pricingService.
-		Calculate(ctx, u.executor, pricingInput)
+	pricingResult, err := u.pricingService.Calculate(ctx, u.executor,
+		pricingInput,
+	)
 	if err != nil {
 		return nil, err
 	}

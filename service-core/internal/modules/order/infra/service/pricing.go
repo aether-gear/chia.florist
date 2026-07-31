@@ -67,24 +67,24 @@ func (s *pricingServiceImpl) Calculate(
 	// primary address unless a specific address is requested
 	var destAddress *addressDomain.CustomerAddress
 	if input.AddressID != nil {
-		addr, err := s.addressRepo.
-			GetByID(ctx, exec, *input.AddressID)
+		addr, err := s.addressRepo.GetByID(ctx, exec,
+			*input.AddressID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve destination address: %w", err)
 		}
-
 		if addr == nil {
 			return nil, apperrors.NewNotFound(addressDomain.ErrAddressNotFound.Error())
 		}
 
 		destAddress = addr
 	} else {
-		addr, err := s.addressRepo.
-			GetDefaultByCustomerID(ctx, exec, input.CustomerID)
+		addr, err := s.addressRepo.GetDefaultByCustomerID(ctx, exec,
+			input.CustomerID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve default destination address: %w", err)
 		}
-
 		if addr == nil {
 			return nil, apperrors.NewConflict(addressDomain.ErrNotFoundDefaultAddress.Error())
 		}
@@ -111,8 +111,9 @@ func (s *pricingServiceImpl) Calculate(
 		shopIDs = append(shopIDs, shopGroup.ShopID)
 	}
 
-	products, err := s.productRepo.
-		FindByIDs(ctx, exec, productIDs)
+	products, err := s.productRepo.FindByIDs(ctx, exec,
+		productIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products: %w", err)
 	}
@@ -122,26 +123,30 @@ func (s *pricingServiceImpl) Calculate(
 		productMap[p.ID] = p
 	}
 
-	inventoryMap, err := s.inventoryRepo.
-		ListByProductIDs(ctx, exec, productIDs)
+	inventoryMap, err := s.inventoryRepo.ListByProductIDs(ctx, exec,
+		productIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory for products: %w", err)
 	}
 
-	courierShopMap, err := s.courierShopRepo.
-		ListsByShopIDs(ctx, exec, shopIDs)
+	courierShopMap, err := s.courierShopRepo.ListsByShopIDs(ctx, exec,
+		shopIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve shop courier configurations: %w", err)
 	}
 
-	originAddresses, err := s.shopAddressRepo.
-		GetDefaultsByShopIDs(ctx, exec, shopIDs)
+	originAddresses, err := s.shopAddressRepo.GetDefaultsByShopIDs(ctx, exec,
+		shopIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve origin addresses: %w", err)
 	}
 
-	shops, err := s.shopRepo.
-		FindByIDs(ctx, exec, shopIDs)
+	shops, err := s.shopRepo.FindByIDs(ctx, exec,
+		shopIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load shops: %w", err)
 	}
@@ -344,11 +349,12 @@ func (s *pricingServiceImpl) Calculate(
 	)
 
 	if input.PaymentMethodID != nil {
-		pm, err := s.paymentMethodRepo.GetByID(ctx, exec, *input.PaymentMethodID)
+		pm, err := s.paymentMethodRepo.GetByID(ctx, exec,
+			*input.PaymentMethodID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve payment method: %w", err)
 		}
-
 		if pm == nil {
 			return nil, apperrors.NewNotFound("selected payment method is not available")
 		}
@@ -364,12 +370,12 @@ func (s *pricingServiceImpl) Calculate(
 			Total:           totalAll + fee,
 		}
 	} else {
-		pms, err := s.paymentMethodRepo.
-			ListAll(ctx, exec, nil)
+		pms, err := s.paymentMethodRepo.ListAll(ctx, exec,
+			nil,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load payment methods: %w", err)
 		}
-
 		if len(pms) == 0 {
 			return nil, apperrors.NewNotFound("payment method is not available")
 		}

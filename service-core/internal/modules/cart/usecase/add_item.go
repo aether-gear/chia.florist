@@ -43,6 +43,8 @@ type AddItemInput struct {
 	Quantity                      int
 }
 
+const MaxCartItemQuantity = 80
+
 func (u *AddItemUsecase) Execute(
 	ctx context.Context,
 	input AddItemInput,
@@ -55,13 +57,16 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewInvalidInput(domain.ErrInvalidQuantity.Error())
 	}
 
-	inventory, err := u.inventoryRepo.
-		GetByProductIDAndShopID(
-			ctx,
-			u.executor,
-			input.ProductID,
-			input.ShopID,
-		)
+	// Added to prevent user from adding too many items at once.
+	// Tbh, this is a simple rule after all.
+	if input.Quantity >= MaxCartItemQuantity {
+		return apperrors.NewBadRequest(fmt.Sprintf("quantity cannot exceed %d", MaxCartItemQuantity))
+	}
+
+	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(ctx, u.executor,
+		input.ProductID,
+		input.ShopID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
 	}
@@ -69,8 +74,9 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	product, err := u.productRepo.
-		GetByID(ctx, u.executor, input.ProductID)
+	product, err := u.productRepo.GetByID(ctx, u.executor,
+		input.ProductID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
@@ -78,12 +84,9 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	cart, err := u.cartRepo.
-		GetWithItemsByCustomerID(
-			ctx,
-			u.executor,
-			input.CustomerID,
-		)
+	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor,
+		input.CustomerID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
@@ -103,11 +106,10 @@ func (u *AddItemUsecase) Execute(
 	}
 
 	targetQuantity := input.Quantity
-	if existingItem := cart.
-		FindItem(
-			input.ProductID,
-			input.ShopID,
-		); existingItem != nil &&
+	if existingItem := cart.FindItem(
+		input.ProductID,
+		input.ShopID,
+	); existingItem != nil &&
 		existingItem.DeletedAt == nil {
 
 		targetQuantity += existingItem.Quantity
@@ -116,12 +118,11 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
-	if err := cart.
-		AddItem(
-			input.ProductID,
-			input.ShopID,
-			input.Quantity,
-		); err != nil {
+	if err := cart.AddItem(
+		input.ProductID,
+		input.ShopID,
+		input.Quantity,
+	); err != nil {
 		return apperrors.NewInvalidInput(err.Error())
 	}
 
