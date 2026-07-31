@@ -28,6 +28,7 @@ CREATE TABLE payments (
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
+    paid_at TIMESTAMP,
 
     CONSTRAINT fk_payment_order_id
         FOREIGN KEY (order_id)

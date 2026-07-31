@@ -7,6 +7,10 @@ import (
 
 	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
+	orderDomain "service-core/internal/modules/order/domain"
+	orderRepo "service-core/internal/modules/order/repository"
+	paymentDomain "service-core/internal/modules/payment/domain"
 	paymentRepo "service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
 )
@@ -29,6 +33,10 @@ type SyncPendingPaymentsUsecase struct {
 	executor       transaction.Executor
 	logger         applogger.Logger
 	lookbackWindow time.Duration
+	transactor     transaction.Transactor
+	orderRepo      orderRepo.OrderRepository
+	orderItemRepo  orderRepo.OrderItemRepository
+	inventoryRepo  inventoryRepo.InventoryRepository
 }
 
 func NewSyncPendingPaymentsUsecase(
@@ -38,6 +46,10 @@ func NewSyncPendingPaymentsUsecase(
 	executor transaction.Executor,
 	logger applogger.Logger,
 	lookbackWindow time.Duration,
+	transactor transaction.Transactor,
+	orderRepo orderRepo.OrderRepository,
+	orderItemRepo orderRepo.OrderItemRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
 ) *SyncPendingPaymentsUsecase {
 	return &SyncPendingPaymentsUsecase{
 		paymentRepo:    paymentRepo,
@@ -46,6 +58,10 @@ func NewSyncPendingPaymentsUsecase(
 		executor:       executor,
 		logger:         logger,
 		lookbackWindow: lookbackWindow,
+		transactor:     transactor,
+		orderRepo:      orderRepo,
+		orderItemRepo:  orderItemRepo,
+		inventoryRepo:  inventoryRepo,
 	}
 }
 
@@ -62,8 +78,9 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 	since := time.Now().UTC().Add(-u.lookbackWindow)
 	var msg string
 
-	payments, err := u.paymentRepo.
-		ListPendingGateway(ctx, u.executor, since)
+	payments, err := u.paymentRepo.ListPendingGateway(ctx, u.executor,
+		since,
+	)
 	if err != nil {
 		msg = "failed to list pending gateway payments"
 		u.logger.Error(ctx, msg,
@@ -71,7 +88,6 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 		)
 		return
 	}
-
 	if len(payments) == 0 {
 		msg = "no pending gateway payments in window"
 		u.logger.Info(ctx, msg)
@@ -87,13 +103,14 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 	resolved := 0
 	for _, payment := range payments {
 		if payment.ProviderOrderID == nil {
+			u.logger.Error(ctx, "gateway payment is missing provider order id",
+				applogger.Field{Key: "payment_id", Value: payment.ID.String()},
+			)
 			continue
 		}
 
 		gatewayOrderID := *payment.ProviderOrderID
-
-		result, err := u.paymentGateway.
-			GetTransactionStatus(ctx, gatewayOrderID)
+		result, err := u.paymentGateway.GetTransactionStatus(ctx, gatewayOrderID)
 		if err != nil {
 			msg = "failed to fetch transaction status"
 			u.logger.Error(ctx, msg,
@@ -106,6 +123,31 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 
 		// Skip if Midtrans still reports pending — nothing to do yet.
 		if result.Status == paymentgateway.NotificationStatusPending {
+			if payment.ExpiresAt != nil && time.Now().UTC().After(*payment.ExpiresAt) {
+				msg = "payment has expired locally, cancelling at gateway and expiring locally"
+				u.logger.Info(ctx, msg,
+					applogger.Field{Key: "payment_id", Value: payment.ID.String()},
+					applogger.Field{Key: "gateway_order_id", Value: gatewayOrderID},
+				)
+
+				// Best effort cancel at gateway
+				if err := u.paymentGateway.CancelTransaction(ctx, gatewayOrderID); err != nil {
+					u.logger.Warn(ctx, "failed to cancel transaction at gateway, proceeding with local expiry",
+						applogger.Field{Key: "payment_id", Value: payment.ID.String()},
+						applogger.Field{Key: "gateway_order_id", Value: gatewayOrderID},
+						applogger.Field{Key: "error", Value: err.Error()},
+					)
+				}
+
+				if err := u.expirePaymentLocally(ctx, payment); err != nil {
+					u.logger.Error(ctx, "failed to locally expire payment",
+						applogger.Field{Key: "payment_id", Value: payment.ID.String()},
+						applogger.Field{Key: "error", Value: err.Error()},
+					)
+				} else {
+					resolved++
+				}
+			}
 			continue
 		}
 
@@ -146,4 +188,44 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 		applogger.Field{Key: "resolved", Value: resolved},
 		applogger.Field{Key: "skipped", Value: fmt.Sprintf("%d", len(payments)-resolved)},
 	)
+}
+
+func (u *SyncPendingPaymentsUsecase) expirePaymentLocally(
+	ctx context.Context,
+	payment paymentDomain.Payment,
+) error {
+	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.paymentRepo.UpdateStatus(ctx, exec,
+			payment.ID,
+			paymentDomain.PaymentStatusExpired,
+		); err != nil {
+			return fmt.Errorf("failed to update payment status: %w", err)
+		}
+
+		if err := u.orderRepo.UpdateStatus(ctx, exec,
+			payment.OrderID,
+			orderDomain.OrderStatusCancelled,
+		); err != nil {
+			return fmt.Errorf("failed to update order status: %w", err)
+		}
+
+		orderItems, err := u.orderItemRepo.ListByOrderID(ctx, exec,
+			payment.OrderID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to list order items: %w", err)
+		}
+
+		for _, item := range orderItems {
+			if err := u.inventoryRepo.Release(ctx, exec,
+				item.ProductID,
+				item.ShopID,
+				item.Quantity,
+			); err != nil {
+				return fmt.Errorf("failed to release inventory for product %s: %w", item.ProductID, err)
+			}
+		}
+
+		return nil
+	})
 }

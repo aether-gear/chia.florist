@@ -38,7 +38,8 @@ func (r *paymentRepositoryImpl) GetByID(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE id = $1
 	`
@@ -74,7 +75,8 @@ func (r *paymentRepositoryImpl) GetByOrderID(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE order_id = $1
 		ORDER BY created_at DESC
@@ -105,7 +107,8 @@ func (r *paymentRepositoryImpl) UpdateStatus(
 		UPDATE payments
 		SET
 			status = $2,
-			updated_at = NOW()
+			updated_at = NOW(),
+			paid_at = CASE WHEN $2 = 'paid' THEN NOW() ELSE paid_at END
 		WHERE id = $1
 	`
 
@@ -120,6 +123,9 @@ func (r *paymentRepositoryImpl) Save(
 	exec transaction.Executor,
 	payment domain.Payment,
 ) error {
+	now := time.Now()
+	payment.UpdatedAt = &now
+
 	query := `
 		INSERT INTO payments (
 			id,
@@ -133,10 +139,11 @@ func (r *paymentRepositoryImpl) Save(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		)
 		VALUES (
-			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
 		)
 		ON CONFLICT (id)
 		DO UPDATE SET
@@ -149,7 +156,8 @@ func (r *paymentRepositoryImpl) Save(
 			amount = EXCLUDED.amount,
 			status = EXCLUDED.status,
 			expires_at = EXCLUDED.expires_at,
-			updated_at = EXCLUDED.updated_at
+			updated_at = EXCLUDED.updated_at,
+			paid_at = EXCLUDED.paid_at
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -165,6 +173,7 @@ func (r *paymentRepositoryImpl) Save(
 		payment.ExpiresAt,
 		payment.CreatedAt,
 		payment.UpdatedAt,
+		payment.PaidAt,
 	)
 
 	return err
@@ -187,6 +196,7 @@ func (r *paymentRepositoryImpl) scanPayment(
 		&payment.ExpiresAt,
 		&payment.CreatedAt,
 		&payment.UpdatedAt,
+		&payment.PaidAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("mapping payment model to domain failed: %w", err)
@@ -217,7 +227,8 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE order_id = ANY($1::uuid[])
 		ORDER BY order_id, created_at DESC
@@ -249,6 +260,7 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			&p.ExpiresAt,
 			&p.CreatedAt,
 			&p.UpdatedAt,
+			&p.PaidAt,
 		)
 		return p, err
 	})
@@ -277,7 +289,8 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE status = 'pending'
 		  AND provider = 'gateway'
@@ -307,6 +320,7 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			&p.ExpiresAt,
 			&p.CreatedAt,
 			&p.UpdatedAt,
+			&p.PaidAt,
 		)
 		return p, err
 	})

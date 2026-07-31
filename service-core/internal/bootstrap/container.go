@@ -724,6 +724,10 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				log,
 				time.Duration(cfg.PaymentSync.LookbackHours)*time.Hour,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
+				inventoryRepo,
 			),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(

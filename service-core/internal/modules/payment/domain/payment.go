@@ -41,6 +41,7 @@ type Payment struct {
 	Status PaymentStatus
 
 	ExpiresAt *time.Time
+	PaidAt    *time.Time
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
