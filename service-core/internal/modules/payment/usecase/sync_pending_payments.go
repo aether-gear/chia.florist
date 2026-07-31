@@ -195,6 +195,18 @@ func (u *SyncPendingPaymentsUsecase) expirePaymentLocally(
 	payment paymentDomain.Payment,
 ) error {
 	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		order, err := u.orderRepo.GetByID(ctx, exec, payment.OrderID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve order: %w", err)
+		}
+		if order == nil {
+			return fmt.Errorf("order not found: %s", payment.OrderID)
+		}
+
+		if err := order.UpdateStatus(orderDomain.OrderStatusCancelled); err != nil {
+			return fmt.Errorf("invalid order status transition: %w", err)
+		}
+
 		if err := u.paymentRepo.UpdateStatus(ctx, exec,
 			payment.ID,
 			paymentDomain.PaymentStatusExpired,

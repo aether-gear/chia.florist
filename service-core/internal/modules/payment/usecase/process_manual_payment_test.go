@@ -466,3 +466,25 @@ func TestProcessManualPayment_PaymentEventCreateFails(t *testing.T) {
 		t.Fatal("expected error when payment event creation fails")
 	}
 }
+
+func TestProcessManualPayment_InvalidOrderStatusTransition(t *testing.T) {
+	ctx := context.Background()
+	orderID := uuid.New()
+	paymentID := uuid.New()
+
+	payment := &paymentDomain.Payment{
+		ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending,
+		Amount: 50000, Provider: "manual", CreatedAt: time.Now(),
+	}
+	// Order is already delivered, so transition to confirmed is invalid
+	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusDelivered}
+	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
+	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
+	oiRepo := &mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}
+
+	err := newManualUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo, oiRepo, &mockInventoryRepo{}).
+		Execute(ctx, ProcessManualPaymentInput{PaymentID: paymentID, Action: "confirm"})
+	if err == nil {
+		t.Fatal("expected error for invalid order status transition (delivered -> confirmed), got nil")
+	}
+}

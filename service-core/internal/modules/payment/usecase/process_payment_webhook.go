@@ -68,7 +68,49 @@ type ProcessPaymentWebhookInput struct {
 func (u *ProcessPaymentWebhookUsecase) Execute(
 	ctx context.Context,
 	input ProcessPaymentWebhookInput,
-) error {
+) (err error) {
+	var (
+		orderIDStr string
+		txStatus   string
+		eventID    uuid.UUID
+		markErr    error
+	)
+
+	defer func() {
+		if err != nil &&
+			orderIDStr != "" &&
+			eventID != uuid.Nil {
+
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category:   "user_action",
+				Action:     "webhook_processing_failed",
+				Resource:   "payment",
+				ResourceID: orderIDStr,
+				Outcome:    applogger.OutcomeFailure,
+				Metadata: map[string]any{
+					"error":              err.Error(),
+					"transaction_status": txStatus,
+					"webhook_event_id":   eventID.String(),
+				},
+			})
+		} else if markErr != nil &&
+			orderIDStr != "" &&
+			eventID != uuid.Nil {
+
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category:   "user_action",
+				Action:     "webhook_mark_processed_failed",
+				Resource:   "payment",
+				ResourceID: orderIDStr,
+				Outcome:    applogger.OutcomeFailure,
+				Metadata: map[string]any{
+					"error":            markErr.Error(),
+					"webhook_event_id": eventID.String(),
+				},
+			})
+		}
+	}()
+
 	// Extract idempotency fields from the raw payload
 	//
 	// The system reads order_id and transaction_status directly
@@ -78,12 +120,12 @@ func (u *ProcessPaymentWebhookUsecase) Execute(
 	// This lets the system persist the event first and
 	// avoid hitting the gateway on duplicate deliveries
 	// the system can detect locally.
-	orderIDStr, _ := input.Payload["order_id"].(string)
+	orderIDStr, _ = input.Payload["order_id"].(string)
 	if orderIDStr == "" {
 		return apperrors.NewBadRequest("missing order_id in webhook payload")
 	}
 
-	txStatus, _ := input.Payload["transaction_status"].(string)
+	txStatus, _ = input.Payload["transaction_status"].(string)
 	if txStatus == "" {
 		return apperrors.NewBadRequest("missing transaction_status in webhook payload")
 	}
@@ -109,10 +151,9 @@ func (u *ProcessPaymentWebhookUsecase) Execute(
 		ReceivedAt:        time.Now().UTC(),
 	}
 
-	canonicalEvent, err := u.webhookEventRepo.
-		Upsert(ctx, u.executor,
-			webhookEvent,
-		)
+	canonicalEvent, err := u.webhookEventRepo.Upsert(ctx, u.executor,
+		webhookEvent,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to persist webhook event: %w", err)
 	}
@@ -124,59 +165,33 @@ func (u *ProcessPaymentWebhookUsecase) Execute(
 
 	// Use the canonical event ID for subsequent status updates
 	// (it may belong to an earlier delivery attempt, not the one just inserted).
-	eventID := canonicalEvent.ID
+	eventID = canonicalEvent.ID
 
 	// Process the webhook
 	//
 	// Any error here is recorded on the persisted event and
 	// re-surfaced to the caller
 	// (non-2xx → Midtrans will retry delivery).
-	if err := u.process(ctx, input.Payload); err != nil {
-		// MarkFailed and the audit log are intentionally
-		// outside the main transaction so they persist
-		// even when the inner tx rolls back.
+	if err = u.process(ctx, input.Payload); err != nil {
+		// MarkFailed is intentionally outside the main transaction
+		// so it persists even when the inner tx rolls back.
 		_ = u.webhookEventRepo.MarkFailed(ctx, u.executor,
 			eventID,
 			err.Error(),
 		)
 
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category:   "user_action",
-			Action:     "webhook_processing_failed",
-			Resource:   "payment",
-			ResourceID: orderIDStr,
-			Outcome:    applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"error":              err.Error(),
-				"transaction_status": txStatus,
-				"webhook_event_id":   eventID.String(),
-			},
-		})
-
 		return err
 	}
 
 	// Stamp the event as processed
-	if err := u.webhookEventRepo.MarkProcessed(ctx,
-		u.executor,
+	if markErr = u.webhookEventRepo.MarkProcessed(ctx, u.executor,
 		eventID,
-	); err != nil {
+	); markErr != nil {
 		// Non-fatal: the payment itself was updated correctly.
 		//
 		// Log and continue — the event will show as 'received'
 		// but won't be re-processed because the payment status
 		// is no longer 'pending'.
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category:   "user_action",
-			Action:     "webhook_mark_processed_failed",
-			Resource:   "payment",
-			ResourceID: orderIDStr,
-			Outcome:    applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"error":            err.Error(),
-				"webhook_event_id": eventID.String(),
-			},
-		})
 	}
 
 	return nil
@@ -190,25 +205,26 @@ func (u *ProcessPaymentWebhookUsecase) process(
 	ctx context.Context,
 	payload map[string]any,
 ) error {
-	notifResult, err := u.paymentGateway.
-		ParseNotification(ctx, payload)
+	notifResult, err := u.paymentGateway.ParseNotification(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to parse gateway notification: %w", err)
 	}
 
 	orderID, err := uuid.Parse(notifResult.GatewayOrderID)
 	if err != nil {
-		return apperrors.NewBadRequest(fmt.Sprintf("invalid order ID in gateway response: %s",
-			notifResult.GatewayOrderID))
+		return apperrors.NewBadRequest(fmt.Sprintf(
+			"invalid order ID in gateway response: %s",
+			notifResult.GatewayOrderID),
+		)
 	}
 
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		payment, err := u.paymentRepo.
-			GetByOrderID(ctx, exec, orderID)
+		payment, err := u.paymentRepo.GetByOrderID(ctx, exec,
+			orderID,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve payment: %w", err)
 		}
-
 		if payment == nil {
 			return apperrors.NewNotFound("payment not found for order")
 		}
@@ -254,18 +270,26 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			return nil
 		}
 
-		if err := u.paymentRepo.UpdateStatus(
-			ctx,
-			exec,
+		order, err := u.orderRepo.GetByID(ctx, exec, payment.OrderID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve order: %w", err)
+		}
+		if order == nil {
+			return apperrors.NewNotFound("order not found for payment")
+		}
+
+		if err := order.UpdateStatus(newOrderStatus); err != nil {
+			return apperrors.NewInvalidInput(err.Error())
+		}
+
+		if err := u.paymentRepo.UpdateStatus(ctx, exec,
 			payment.ID,
 			newPaymentStatus,
 		); err != nil {
 			return fmt.Errorf("failed to update payment status: %w", err)
 		}
 
-		if err := u.orderRepo.UpdateStatus(
-			ctx,
-			exec,
+		if err := u.orderRepo.UpdateStatus(ctx, exec,
 			payment.OrderID,
 			newOrderStatus,
 		); err != nil {
@@ -275,8 +299,9 @@ func (u *ProcessPaymentWebhookUsecase) process(
 		if action == "commit" ||
 			action == "release" {
 
-			orderItems, err := u.orderItemRepo.
-				ListByOrderID(ctx, exec, payment.OrderID)
+			orderItems, err := u.orderItemRepo.ListByOrderID(ctx, exec,
+				payment.OrderID,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to list order items: %w", err)
 			}
@@ -293,29 +318,21 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			for _, item := range orderItems {
 				switch action {
 				case "commit":
-					if err := u.inventoryRepo.
-						Commit(
-							ctx,
-							exec,
-							item.ProductID,
-							item.ShopID,
-							item.Quantity,
-						); err != nil {
-						return fmt.Errorf("failed to commit inventory for product %s: %w",
-							item.ProductID, err)
+					if err := u.inventoryRepo.Commit(ctx, exec,
+						item.ProductID,
+						item.ShopID,
+						item.Quantity,
+					); err != nil {
+						return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
 					}
 
 				case "release":
-					if err := u.inventoryRepo.
-						Release(
-							ctx,
-							exec,
-							item.ProductID,
-							item.ShopID,
-							item.Quantity,
-						); err != nil {
-						return fmt.Errorf("failed to release inventory for product %s: %w",
-							item.ProductID, err)
+					if err := u.inventoryRepo.Release(ctx, exec,
+						item.ProductID,
+						item.ShopID,
+						item.Quantity,
+					); err != nil {
+						return fmt.Errorf("failed to release inventory for product %s: %w", item.ProductID, err)
 					}
 				}
 			}
@@ -328,9 +345,9 @@ func (u *ProcessPaymentWebhookUsecase) process(
 		// reduces the active load previously reserved
 		// during checkout
 		if payment.PaymentAccountID != nil {
-			if err := u.paymentAccRepo.
-				DecrementLoad(ctx, exec, *payment.PaymentAccountID); err != nil {
-
+			if err := u.paymentAccRepo.DecrementLoad(ctx, exec,
+				*payment.PaymentAccountID,
+			); err != nil {
 				return fmt.Errorf("failed to decrement payment account load: %w", err)
 			}
 		}
@@ -359,8 +376,7 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			CreatedAt: time.Now(),
 		}
 
-		if err := u.paymentEventRepo.
-			Create(ctx, exec, paymentEvent); err != nil {
+		if err := u.paymentEventRepo.Create(ctx, exec, paymentEvent); err != nil {
 			return fmt.Errorf("failed to create payment event: %w", err)
 		}
 

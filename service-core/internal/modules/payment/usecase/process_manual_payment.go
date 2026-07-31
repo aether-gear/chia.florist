@@ -61,25 +61,21 @@ func (u *ProcessManualPaymentUsecase) Execute(
 	input ProcessManualPaymentInput,
 ) error {
 	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		payment, err := u.paymentRepo.
-			GetByID(ctx, exec, input.PaymentID)
+		payment, err := u.paymentRepo.GetByID(ctx, exec,
+			input.PaymentID,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve payment: %w", err)
 		}
-
 		if payment == nil {
 			return apperrors.NewNotFound("payment not found")
 		}
 
-		if payment.Provider !=
-			string(domain.PaymentProviderManual) {
-
+		if payment.Provider != string(domain.PaymentProviderManual) {
 			return apperrors.NewBadRequest("only manual payments can be processed manually")
 		}
 
-		if payment.Status !=
-			paymentDomain.PaymentStatusPending {
-
+		if payment.Status != paymentDomain.PaymentStatusPending {
 			return apperrors.NewConflict("payment is not pending")
 		}
 
@@ -110,26 +106,37 @@ func (u *ProcessManualPaymentUsecase) Execute(
 			return apperrors.NewBadRequest(fmt.Sprintf("invalid manual action: %s", input.Action))
 		}
 
-		if err := u.paymentRepo.UpdateStatus(
-			ctx,
-			exec,
+		order, err := u.orderRepo.GetByID(ctx, exec,
+			payment.OrderID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve order: %w", err)
+		}
+		if order == nil {
+			return apperrors.NewNotFound("order not found")
+		}
+
+		if err := order.UpdateStatus(newOrderStatus); err != nil {
+			return apperrors.NewInvalidInput(err.Error())
+		}
+
+		if err := u.paymentRepo.UpdateStatus(ctx, exec,
 			payment.ID,
 			newPaymentStatus,
 		); err != nil {
 			return fmt.Errorf("failed to update payment status: %w", err)
 		}
 
-		if err := u.orderRepo.UpdateStatus(
-			ctx,
-			exec,
+		if err := u.orderRepo.UpdateStatus(ctx, exec,
 			payment.OrderID,
 			newOrderStatus,
 		); err != nil {
 			return fmt.Errorf("failed to update order status: %w", err)
 		}
 
-		orderItems, err := u.orderItemRepo.
-			ListByOrderID(ctx, exec, payment.OrderID)
+		orderItems, err := u.orderItemRepo.ListByOrderID(ctx, exec,
+			payment.OrderID,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to list order items: %w", err)
 		}
@@ -146,9 +153,7 @@ func (u *ProcessManualPaymentUsecase) Execute(
 		for _, item := range orderItems {
 			switch action {
 			case "commit":
-				if err := u.inventoryRepo.Commit(
-					ctx,
-					exec,
+				if err := u.inventoryRepo.Commit(ctx, exec,
 					item.ProductID,
 					item.ShopID,
 					item.Quantity,
@@ -157,9 +162,7 @@ func (u *ProcessManualPaymentUsecase) Execute(
 				}
 
 			case "release":
-				if err := u.inventoryRepo.Release(
-					ctx,
-					exec,
+				if err := u.inventoryRepo.Release(ctx, exec,
 					item.ProductID,
 					item.ShopID,
 					item.Quantity,
@@ -176,9 +179,9 @@ func (u *ProcessManualPaymentUsecase) Execute(
 		// reduces the active load previously reserved
 		// during checkout
 		if payment.PaymentAccountID != nil {
-			if err := u.paymentAccRepo.
-				DecrementLoad(ctx, exec, *payment.PaymentAccountID); err != nil {
-
+			if err := u.paymentAccRepo.DecrementLoad(ctx, exec,
+				*payment.PaymentAccountID,
+			); err != nil {
 				return fmt.Errorf("failed to decrement payment account load: %w", err)
 			}
 		}
@@ -206,8 +209,7 @@ func (u *ProcessManualPaymentUsecase) Execute(
 			CreatedAt: time.Now(),
 		}
 
-		if err := u.paymentEventRepo.
-			Create(ctx, exec, paymentEvent); err != nil {
+		if err := u.paymentEventRepo.Create(ctx, exec, paymentEvent); err != nil {
 			return fmt.Errorf("failed to create payment event: %w", err)
 		}
 

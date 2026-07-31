@@ -1000,3 +1000,28 @@ func TestProcessPaymentWebhook_PaymentEventCreateFails(t *testing.T) {
 		t.Fatal("expected error when payment event creation fails")
 	}
 }
+
+func TestProcessPaymentWebhook_InvalidOrderStatusTransition(t *testing.T) {
+	ctx := context.Background()
+	orderID := uuid.New()
+	paymentID := uuid.New()
+
+	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
+	// Order is already delivered, so transition to cancelled is invalid
+	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusDelivered}
+	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
+	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
+	gateway := &mockPaymentGateway{
+		result: &paymentgateway.NotificationResult{
+			GatewayOrderID: orderID.String(),
+			Status:         paymentgateway.NotificationStatusCancel,
+		},
+	}
+
+	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo,
+		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "cancel"}})
+	if err == nil {
+		t.Fatal("expected error for invalid order status transition via webhook, got nil")
+	}
+}
