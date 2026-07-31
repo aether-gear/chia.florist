@@ -15,6 +15,8 @@ import (
 	"service-core/internal/modules/order/repository"
 	paymentDomain "service-core/internal/modules/payment/domain"
 	paymentRepo "service-core/internal/modules/payment/repository"
+	productDomain "service-core/internal/modules/product/domain"
+	productRepo "service-core/internal/modules/product/repository"
 	shipmentDomain "service-core/internal/modules/shipment/domain"
 	shipmentRepo "service-core/internal/modules/shipment/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -22,13 +24,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// DEFAULT_SHIPMENT_WEIGHT_GRAMS is a placeholder weight (in grams) used when
-// creating a Komerce shipment order. Replace with actual product weight once
-// weight tracking is added to the inventory / product schema.
+// DEFAULT_SHIPMENT_WEIGHT_GRAMS is a fallback weight (in grams) used when
+// product weight is not specified on the product schema.
 const DEFAULT_SHIPMENT_WEIGHT_GRAMS = 1000
 
 // DEFAULT_SHIPMENT_ITEM_QTY is a placeholder item quantity used for the
-// Komerce order creation call. Refactor once per-item weight is available.
+// Komerce order creation call.
 const DEFAULT_SHIPMENT_ITEM_QTY = 1
 
 type UpdateOrderStatusUsecase struct {
@@ -38,6 +39,7 @@ type UpdateOrderStatusUsecase struct {
 	orderItemRepo   repository.OrderItemRepository
 	inventoryRepo   inventoryRepo.InventoryRepository
 	paymentRepo     paymentRepo.PaymentRepository
+	productRepo     productRepo.ProductRepository
 	shipmentRepo    shipmentRepo.ShipmentRepository
 	addressRepo     addressRepo.CustomerAddressRepository
 	shopAddressRepo addressRepo.ShopAddressRepository
@@ -52,6 +54,7 @@ func NewUpdateOrderStatusUsecase(
 	orderItemRepo repository.OrderItemRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	paymentRepo paymentRepo.PaymentRepository,
+	productRepo productRepo.ProductRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
 	addressRepo addressRepo.CustomerAddressRepository,
 	shopAddressRepo addressRepo.ShopAddressRepository,
@@ -65,6 +68,7 @@ func NewUpdateOrderStatusUsecase(
 		orderItemRepo:   orderItemRepo,
 		inventoryRepo:   inventoryRepo,
 		paymentRepo:     paymentRepo,
+		productRepo:     productRepo,
 		shipmentRepo:    shipmentRepo,
 		addressRepo:     addressRepo,
 		shopAddressRepo: shopAddressRepo,
@@ -251,38 +255,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, apperrors.NewInvalidInput("order has no items")
 	}
 
-	// All items within a single order share
-	// the same courier selection (captured at checkout per shop).
-	//
-	// Use the first item as the reference.
-	first := items[0]
-
-	method := shipmentDomain.FulfillmentMethodCourier
-	if input.FulfillmentMethod != nil &&
-		*input.FulfillmentMethod != "" {
-		method = shipmentDomain.FulfillmentMethod(*input.FulfillmentMethod)
-	}
-
-	var courierCode, courierService string
-	if method == shipmentDomain.FulfillmentMethodCourier {
-		if first.CourierCode != nil {
-			courierCode = *first.CourierCode
-		}
-
-		if first.CourierService != nil {
-			courierService = *first.CourierService
-		}
-
-		if courierCode == "" || courierService == "" {
-			return nil, apperrors.NewInvalidInput("order items have no courier information")
-		}
-	} else {
-		courierCode = string(shipmentDomain.FulfillmentMethodSelfDelivery)
-		courierService = string(shipmentDomain.FulfillmentMethodSelfDelivery)
-	}
-
-	// Resolve customer destination district ID
-	// from the order's address.
+	// Resolve customer destination district ID from the order's address
 	customerAddr, err := u.addressRepo.GetByID(ctx, u.executor,
 		order.AddressID,
 	)
@@ -298,91 +271,176 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, fmt.Errorf("invalid destination district ID %q: %w", customerAddr.Detail.DistrictID, err)
 	}
 
-	// Resolve shop origin district ID
-	// from the shop's default address.
-	shopAddr, err := u.shopAddressRepo.GetDefaultByShopID(ctx, u.executor,
-		first.ShopID,
-	)
+	// Fetch product details for all items to calculate accurate shipping weights
+	var productIDs []uuid.UUID
+	for _, item := range items {
+		productIDs = append(productIDs, item.ProductID)
+	}
+	products, err := u.productRepo.FindByIDs(ctx, u.executor, productIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shop address: %w", err)
+		return nil, fmt.Errorf("failed to load products: %w", err)
 	}
-	if shopAddr == nil {
-		return nil, apperrors.NewNotFound("shop address not found")
-	}
-
-	originAreaID, err := strconv.Atoi(shopAddr.Detail.DistrictID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid origin district ID %q: %w", shopAddr.Detail.DistrictID, err)
+	productMap := make(map[uuid.UUID]productDomain.Product, len(products))
+	for _, p := range products {
+		productMap[p.ID] = p
 	}
 
-	var trackingNumber *string
-	if method == shipmentDomain.FulfillmentMethodCourier {
-		// Build a human-readable item name
-		// for the Komerce order.
-		itemName := first.ProductName
-		if len(items) > 1 {
-			itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(items)-1)
+	// Group order items by ShopID for per-shop shipment processing
+	type shopGroup struct {
+		shopID uuid.UUID
+		items  []domain.OrderItem
+	}
+	var groups []shopGroup
+	groupMap := make(map[uuid.UUID]int)
+	for _, item := range items {
+		idx, exists := groupMap[item.ShopID]
+		if !exists {
+			groupMap[item.ShopID] = len(groups)
+			groups = append(groups, shopGroup{
+				shopID: item.ShopID,
+				items:  []domain.OrderItem{item},
+			})
+		} else {
+			groups[idx].items = append(groups[idx].items, item)
 		}
+	}
 
-		orderInput := shipping.CreateOrderInput{
-			OriginAreaID:         originAreaID,
-			DestinationAreaID:    destAreaID,
-			CourierCode:          courierCode,
-			CourierService:       courierService,
-			Weight:               DEFAULT_SHIPMENT_WEIGHT_GRAMS,
-			UniqueOrderID:        order.Number,
-			ItemName:             itemName,
-			ItemPrice:            order.Subtotal,
-			ItemQty:              DEFAULT_SHIPMENT_ITEM_QTY,
-			ShipperName:          shopAddr.Label,
-			ShipperPhone:         derefPhone(shopAddr.Phone),
-			ShipperAddress:       shopAddr.Detail.FullAddress,
-			ReceiverName:         customerAddr.ReceiverName,
-			ReceiverPhone:        derefPhone(customerAddr.Phone),
-			ReceiverAddress:      customerAddr.Detail.FullAddress,
-			ManualTrackingNumber: input.TrackingNumber,
-		}
-
-		// Cost is pulled from the order's ShippingFee
-		// stored at checkout (OQ1).
-		//
-		// Weight uses the placeholder constant above
-		// until product weight is tracked.
-		komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
-		}
-
-		tracking := komerceResult.TrackingNumber
-		trackingNumber = &tracking
+	method := shipmentDomain.FulfillmentMethodCourier
+	if input.FulfillmentMethod != nil && *input.FulfillmentMethod != "" {
+		method = shipmentDomain.FulfillmentMethod(*input.FulfillmentMethod)
 	}
 
 	now := time.Now()
-	shipment := shipmentDomain.Shipment{
-		ID:                uuid.New(),
-		OrderID:           order.ID,
-		Status:            shipmentDomain.ShipmentStatusCreated,
-		FulfillmentMethod: method,
-		TrackingNumber:    trackingNumber,
-		Courier:           courierCode,
-		Service:           courierService,
-		Cost:              order.ShippingFee,
-		Weight:            DEFAULT_SHIPMENT_WEIGHT_GRAMS,
-		OriginID:          shopAddr.Detail.DistrictID,
-		DestinationID:     customerAddr.Detail.DistrictID,
-		CreatedAt:         now,
+	var shipmentsToCreate []shipmentDomain.Shipment
+
+	for idx, group := range groups {
+		first := group.items[0]
+
+		var courierCode, courierService string
+		if method == shipmentDomain.FulfillmentMethodCourier {
+			if first.CourierCode != nil {
+				courierCode = *first.CourierCode
+			}
+			if first.CourierService != nil {
+				courierService = *first.CourierService
+			}
+			if courierCode == "" || courierService == "" {
+				return nil, apperrors.NewInvalidInput("order items have no courier information")
+			}
+		} else {
+			courierCode = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+			courierService = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+		}
+
+		shopAddr, err := u.shopAddressRepo.GetDefaultByShopID(ctx, u.executor,
+			group.shopID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get shop address: %w", err)
+		}
+		if shopAddr == nil {
+			return nil, apperrors.NewNotFound("shop address not found")
+		}
+
+		originAreaID, err := strconv.Atoi(shopAddr.Detail.DistrictID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid origin district ID %q: %w", shopAddr.Detail.DistrictID, err)
+		}
+
+		// Calculate total weight and item quantity for this shop's shipment
+		var shopTotalWeightGrams int
+		var shopTotalItemQty int
+		var shopSubtotal int64
+		for _, item := range group.items {
+			qty := item.Quantity
+			if qty <= 0 {
+				qty = 1
+			}
+			weight := DEFAULT_SHIPMENT_WEIGHT_GRAMS
+			if p, ok := productMap[item.ProductID]; ok && p.Weight != nil && *p.Weight > 0 {
+				weight = int(*p.Weight)
+			}
+			shopTotalWeightGrams += weight * qty
+			shopTotalItemQty += qty
+			shopSubtotal += item.Subtotal
+		}
+
+		var trackingNumber *string
+		if method == shipmentDomain.FulfillmentMethodCourier {
+			itemName := first.ProductName
+			if len(group.items) > 1 {
+				itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(group.items)-1)
+			}
+
+			uniqueOrderID := order.Number
+			if len(groups) > 1 {
+				uniqueOrderID = fmt.Sprintf("%s-%d", order.Number, idx+1)
+			}
+
+			orderInput := shipping.CreateOrderInput{
+				OriginAreaID:         originAreaID,
+				DestinationAreaID:    destAreaID,
+				CourierCode:          courierCode,
+				CourierService:       courierService,
+				Weight:               shopTotalWeightGrams,
+				UniqueOrderID:        uniqueOrderID,
+				ItemName:             itemName,
+				ItemPrice:            shopSubtotal,
+				ItemQty:              shopTotalItemQty,
+				ShipperName:          shopAddr.Label,
+				ShipperPhone:         derefPhone(shopAddr.Phone),
+				ShipperAddress:       shopAddr.Detail.FullAddress,
+				ReceiverName:         customerAddr.ReceiverName,
+				ReceiverPhone:        derefPhone(customerAddr.Phone),
+				ReceiverAddress:      customerAddr.Detail.FullAddress,
+				ManualTrackingNumber: input.TrackingNumber,
+			}
+
+			komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
+			}
+
+			tracking := komerceResult.TrackingNumber
+			trackingNumber = &tracking
+		}
+
+		shipmentCost := first.ShippingFee
+		if shipmentCost == 0 && len(groups) == 1 {
+			shipmentCost = order.ShippingFee
+		}
+
+		shipment := shipmentDomain.Shipment{
+			ID:                uuid.New(),
+			OrderID:           order.ID,
+			Status:            shipmentDomain.ShipmentStatusCreated,
+			FulfillmentMethod: method,
+			TrackingNumber:    trackingNumber,
+			Courier:           courierCode,
+			Service:           courierService,
+			Cost:              shipmentCost,
+			Weight:            shopTotalWeightGrams,
+			OriginID:          shopAddr.Detail.DistrictID,
+			DestinationID:     customerAddr.Detail.DistrictID,
+			CreatedAt:         now,
+		}
+
+		if err := shipment.Validate(); err != nil {
+			return nil, apperrors.NewInvalidInput(err.Error())
+		}
+
+		shipmentsToCreate = append(shipmentsToCreate, shipment)
 	}
 
-	if err := shipment.Validate(); err != nil {
-		return nil, apperrors.NewInvalidInput(err.Error())
-	}
-
-	var created *shipmentDomain.Shipment
+	var firstCreated *shipmentDomain.Shipment
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		if err := u.shipmentRepo.Create(ctx, exec,
-			shipment,
-		); err != nil {
-			return fmt.Errorf("failed to persist shipment: %w", err)
+		for i, shipment := range shipmentsToCreate {
+			if err := u.shipmentRepo.Create(ctx, exec, shipment); err != nil {
+				return fmt.Errorf("failed to persist shipment: %w", err)
+			}
+			if i == 0 {
+				firstCreated = &shipmentsToCreate[0]
+			}
 		}
 
 		if err := u.orderRepo.UpdateStatus(ctx, exec,
@@ -392,7 +450,6 @@ func (u *UpdateOrderStatusUsecase) Execute(
 			return fmt.Errorf("failed to update order status: %w", err)
 		}
 
-		created = &shipment
 		return nil
 	})
 	if err != nil {
@@ -401,7 +458,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 	return &UpdateOrderStatusResult{
 		Order:    *order,
-		Shipment: created,
+		Shipment: firstCreated,
 	}, nil
 }
 
