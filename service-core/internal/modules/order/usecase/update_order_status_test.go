@@ -3,12 +3,15 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	applogger "service-core/internal/common/logger"
 	shipping "service-core/internal/infra/shipping"
 	addressDomain "service-core/internal/modules/address/domain"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
 	orderDomain "service-core/internal/modules/order/domain"
 	orderRepo "service-core/internal/modules/order/repository"
+	paymentDomain "service-core/internal/modules/payment/domain"
 	shipmentDomain "service-core/internal/modules/shipment/domain"
 	transaction "service-core/internal/shared/transaction"
 
@@ -90,8 +93,82 @@ func (m *uosMockOrderItemRepo) SaveBulk(_ context.Context, _ transaction.Executo
 	return nil
 }
 
+type uosMockInventoryRepo struct {
+	committed map[uuid.UUID]int
+	released  map[uuid.UUID]int
+	err       error
+}
+
+func (m *uosMockInventoryRepo) GetByProductIDAndShopID(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID) (*inventoryDomain.Inventory, error) {
+	return nil, nil
+}
+func (m *uosMockInventoryRepo) ListByProductID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]inventoryDomain.Inventory, error) {
+	return nil, nil
+}
+func (m *uosMockInventoryRepo) ListByProductIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) (map[uuid.UUID][]inventoryDomain.Inventory, error) {
+	return nil, nil
+}
+func (m *uosMockInventoryRepo) ListByShopID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]inventoryDomain.Inventory, error) {
+	return nil, nil
+}
+func (m *uosMockInventoryRepo) Create(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
+	return nil
+}
+func (m *uosMockInventoryRepo) Reserve(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
+	return nil
+}
+func (m *uosMockInventoryRepo) Release(_ context.Context, _ transaction.Executor, productID uuid.UUID, _ uuid.UUID, qty int) error {
+	if m.released == nil {
+		m.released = make(map[uuid.UUID]int)
+	}
+	m.released[productID] += qty
+	return m.err
+}
+func (m *uosMockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, productID uuid.UUID, _ uuid.UUID, qty int) error {
+	if m.committed == nil {
+		m.committed = make(map[uuid.UUID]int)
+	}
+	m.committed[productID] += qty
+	return m.err
+}
+func (m *uosMockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
+	return nil
+}
+func (m *uosMockInventoryRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID) error {
+	return nil
+}
+
+type uosMockPaymentRepo struct {
+	payment *paymentDomain.Payment
+	err     error
+}
+
+func (m *uosMockPaymentRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.Payment, error) {
+	return nil, nil
+}
+func (m *uosMockPaymentRepo) GetByOrderID(_ context.Context, _ transaction.Executor, orderID uuid.UUID) (*paymentDomain.Payment, error) {
+	if m.payment != nil && m.payment.OrderID == orderID {
+		return m.payment, nil
+	}
+	return nil, m.err
+}
+func (m *uosMockPaymentRepo) ListByOrderIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
+func (m *uosMockPaymentRepo) UpdateStatus(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ paymentDomain.PaymentStatus) error {
+	return nil
+}
+func (m *uosMockPaymentRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.Payment) error {
+	return nil
+}
+func (m *uosMockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, _ time.Time) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
+
 type uosMockShipmentRepo struct {
+	shipment        *shipmentDomain.Shipment
 	createdShipment *shipmentDomain.Shipment
+	updatedShipment *shipmentDomain.Shipment
 	err             error
 }
 
@@ -99,8 +176,11 @@ func (m *uosMockShipmentRepo) GetByID(_ context.Context, _ transaction.Executor,
 	return nil, nil
 }
 
-func (m *uosMockShipmentRepo) GetByOrderID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*shipmentDomain.Shipment, error) {
-	return nil, nil
+func (m *uosMockShipmentRepo) GetByOrderID(_ context.Context, _ transaction.Executor, orderID uuid.UUID) (*shipmentDomain.Shipment, error) {
+	if m.shipment != nil && m.shipment.OrderID == orderID {
+		return m.shipment, nil
+	}
+	return nil, m.err
 }
 
 func (m *uosMockShipmentRepo) ListByOrderIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]shipmentDomain.Shipment, error) {
@@ -112,8 +192,9 @@ func (m *uosMockShipmentRepo) Create(_ context.Context, _ transaction.Executor, 
 	return m.err
 }
 
-func (m *uosMockShipmentRepo) Update(_ context.Context, _ transaction.Executor, _ shipmentDomain.Shipment) error {
-	return nil
+func (m *uosMockShipmentRepo) Update(_ context.Context, _ transaction.Executor, shipment shipmentDomain.Shipment) error {
+	m.updatedShipment = &shipment
+	return m.err
 }
 
 type uosMockAddressRepo struct {
@@ -218,7 +299,7 @@ func (m *uosMockAuditLogger) Log(_ context.Context, event applogger.AuditEvent) 
 // Tests
 // ===========================================================================
 
-func TestUpdateOrderStatus_SimpleTransition(t *testing.T) {
+func TestUpdateOrderStatus_Confirmed_PaymentNotPaid(t *testing.T) {
 	orderID := uuid.New()
 	order := &orderDomain.Order{
 		ID:     orderID,
@@ -226,11 +307,73 @@ func TestUpdateOrderStatus_SimpleTransition(t *testing.T) {
 	}
 
 	orderRepo := &uosMockOrderRepo{order: order}
+	paymentRepo := &uosMockPaymentRepo{
+		payment: &paymentDomain.Payment{
+			OrderID: orderID,
+			Status:  paymentDomain.PaymentStatusPending,
+		},
+	}
+
 	usecase := NewUpdateOrderStatusUsecase(
 		&uosMockExecutor{},
 		&uosMockTransactor{},
 		orderRepo,
 		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		paymentRepo,
+		&uosMockShipmentRepo{},
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
+	)
+
+	_, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusConfirmed,
+	})
+
+	if err == nil {
+		t.Fatal("expected error when confirming order without paid payment, got nil")
+	}
+}
+
+func TestUpdateOrderStatus_Confirmed_Success(t *testing.T) {
+	orderID := uuid.New()
+	productID := uuid.New()
+	shopID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusPending,
+	}
+
+	items := []orderDomain.OrderItem{
+		{
+			ID:        uuid.New(),
+			OrderID:   orderID,
+			ShopID:    shopID,
+			ProductID: productID,
+			Quantity:  2,
+		},
+	}
+
+	orderRepo := &uosMockOrderRepo{order: order}
+	orderItemRepo := &uosMockOrderItemRepo{items: items}
+	inventoryRepo := &uosMockInventoryRepo{}
+	paymentRepo := &uosMockPaymentRepo{
+		payment: &paymentDomain.Payment{
+			OrderID: orderID,
+			Status:  paymentDomain.PaymentStatusPaid,
+		},
+	}
+
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		orderItemRepo,
+		inventoryRepo,
+		paymentRepo,
 		&uosMockShipmentRepo{},
 		&uosMockAddressRepo{},
 		&uosMockShopAddressRepo{},
@@ -251,12 +394,194 @@ func TestUpdateOrderStatus_SimpleTransition(t *testing.T) {
 		t.Errorf("expected status Confirmed, got %s", res.Order.Status)
 	}
 
-	if res.Shipment != nil {
-		t.Errorf("expected no shipment for simple transition, got %+v", res.Shipment)
+	if inventoryRepo.committed[productID] != 2 {
+		t.Errorf("expected 2 committed for product %s, got %d", productID, inventoryRepo.committed[productID])
+	}
+}
+
+func TestUpdateOrderStatus_Processing_PaymentNotPaid(t *testing.T) {
+	orderID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusConfirmed,
 	}
 
-	if orderRepo.updatedState.status != orderDomain.OrderStatusConfirmed {
-		t.Errorf("expected status Confirmed in DB, got %s", orderRepo.updatedState.status)
+	orderRepo := &uosMockOrderRepo{order: order}
+	paymentRepo := &uosMockPaymentRepo{
+		payment: &paymentDomain.Payment{
+			OrderID: orderID,
+			Status:  paymentDomain.PaymentStatusPending,
+		},
+	}
+
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		paymentRepo,
+		&uosMockShipmentRepo{},
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
+	)
+
+	_, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusProcessing,
+	})
+
+	if err == nil {
+		t.Fatal("expected error when moving to processing without paid payment, got nil")
+	}
+}
+
+func TestUpdateOrderStatus_Processing_Success(t *testing.T) {
+	orderID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusConfirmed,
+	}
+
+	orderRepo := &uosMockOrderRepo{order: order}
+	paymentRepo := &uosMockPaymentRepo{
+		payment: &paymentDomain.Payment{
+			OrderID: orderID,
+			Status:  paymentDomain.PaymentStatusPaid,
+		},
+	}
+
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		paymentRepo,
+		&uosMockShipmentRepo{},
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
+	)
+
+	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusProcessing,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if res.Order.Status != orderDomain.OrderStatusProcessing {
+		t.Errorf("expected status Processing, got %s", res.Order.Status)
+	}
+}
+
+func TestUpdateOrderStatus_Cancelled_ReleasesInventory(t *testing.T) {
+	orderID := uuid.New()
+	productID := uuid.New()
+	shopID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusPending,
+	}
+
+	items := []orderDomain.OrderItem{
+		{
+			ID:        uuid.New(),
+			OrderID:   orderID,
+			ShopID:    shopID,
+			ProductID: productID,
+			Quantity:  3,
+		},
+	}
+
+	orderRepo := &uosMockOrderRepo{order: order}
+	orderItemRepo := &uosMockOrderItemRepo{items: items}
+	inventoryRepo := &uosMockInventoryRepo{}
+
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		orderItemRepo,
+		inventoryRepo,
+		&uosMockPaymentRepo{},
+		&uosMockShipmentRepo{},
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
+	)
+
+	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusCancelled,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if res.Order.Status != orderDomain.OrderStatusCancelled {
+		t.Errorf("expected status Cancelled, got %s", res.Order.Status)
+	}
+
+	if inventoryRepo.released[productID] != 3 {
+		t.Errorf("expected 3 released for product %s, got %d", productID, inventoryRepo.released[productID])
+	}
+}
+
+func TestUpdateOrderStatus_Delivered_ClosesShipment(t *testing.T) {
+	orderID := uuid.New()
+	shipmentID := uuid.New()
+	order := &orderDomain.Order{
+		ID:     orderID,
+		Status: orderDomain.OrderStatusShipped,
+	}
+
+	shipment := &shipmentDomain.Shipment{
+		ID:      shipmentID,
+		OrderID: orderID,
+		Status:  shipmentDomain.ShipmentStatusInTransit,
+	}
+
+	orderRepo := &uosMockOrderRepo{order: order}
+	shipmentRepo := &uosMockShipmentRepo{shipment: shipment}
+
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepo,
+		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
+		shipmentRepo,
+		&uosMockAddressRepo{},
+		&uosMockShopAddressRepo{},
+		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
+	)
+
+	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusDelivered,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if res.Order.Status != orderDomain.OrderStatusDelivered {
+		t.Errorf("expected status Delivered, got %s", res.Order.Status)
+	}
+
+	if shipmentRepo.updatedShipment == nil || shipmentRepo.updatedShipment.Status != shipmentDomain.ShipmentStatusDelivered {
+		t.Errorf("expected shipment status Delivered, got %v", shipmentRepo.updatedShipment)
 	}
 }
 
@@ -321,6 +646,8 @@ func TestUpdateOrderStatus_ShippedCourierManual(t *testing.T) {
 		&uosMockTransactor{},
 		orderRepo,
 		orderItemRepo,
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
 		shipmentRepo,
 		addressRepo,
 		shopAddressRepo,
@@ -328,7 +655,6 @@ func TestUpdateOrderStatus_ShippedCourierManual(t *testing.T) {
 		&uosMockAuditLogger{},
 	)
 
-	// Verify courier mode with manual tracking input (Milestone 1 check)
 	fulfillmentMethod := "courier"
 	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
 		OrderID:           orderID,
@@ -422,6 +748,8 @@ func TestUpdateOrderStatus_ShippedSelfDelivery(t *testing.T) {
 		&uosMockTransactor{},
 		orderRepo,
 		orderItemRepo,
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
 		shipmentRepo,
 		addressRepo,
 		shopAddressRepo,
@@ -429,7 +757,6 @@ func TestUpdateOrderStatus_ShippedSelfDelivery(t *testing.T) {
 		&uosMockAuditLogger{},
 	)
 
-	// Verify Milestone 2: Self delivery
 	fulfillmentMethod := "self_delivery"
 	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
 		OrderID:           orderID,
@@ -479,6 +806,8 @@ func TestUpdateOrderStatus_InvalidTransition(t *testing.T) {
 		&uosMockTransactor{},
 		orderRepo,
 		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
 		&uosMockShipmentRepo{},
 		&uosMockAddressRepo{},
 		&uosMockShopAddressRepo{},
@@ -486,7 +815,6 @@ func TestUpdateOrderStatus_InvalidTransition(t *testing.T) {
 		&uosMockAuditLogger{},
 	)
 
-	// Can't transition directly from Pending to Shipped
 	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
 		OrderID: orderID,
 		Status:  orderDomain.OrderStatusShipped,
@@ -561,6 +889,8 @@ func TestUpdateOrderStatus_DefaultFulfillment(t *testing.T) {
 		&uosMockTransactor{},
 		orderRepo,
 		orderItemRepo,
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
 		shipmentRepo,
 		addressRepo,
 		shopAddressRepo,
@@ -568,7 +898,6 @@ func TestUpdateOrderStatus_DefaultFulfillment(t *testing.T) {
 		&uosMockAuditLogger{},
 	)
 
-	// If FulfillmentMethod is not provided, it should default to courier
 	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
 		OrderID: orderID,
 		Status:  orderDomain.OrderStatusShipped,
@@ -595,12 +924,20 @@ func TestUpdateOrderStatus_AuditLogging_Success(t *testing.T) {
 	}
 
 	orderRepo := &uosMockOrderRepo{order: order}
+	paymentRepo := &uosMockPaymentRepo{
+		payment: &paymentDomain.Payment{
+			OrderID: orderID,
+			Status:  paymentDomain.PaymentStatusPaid,
+		},
+	}
 	auditLogger := &uosMockAuditLogger{}
 	usecase := NewUpdateOrderStatusUsecase(
 		&uosMockExecutor{},
 		&uosMockTransactor{},
 		orderRepo,
 		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		paymentRepo,
 		&uosMockShipmentRepo{},
 		&uosMockAddressRepo{},
 		&uosMockShopAddressRepo{},
@@ -660,6 +997,8 @@ func TestUpdateOrderStatus_AuditLogging_Failure(t *testing.T) {
 		&uosMockTransactor{},
 		orderRepo,
 		&uosMockOrderItemRepo{},
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
 		&uosMockShipmentRepo{},
 		&uosMockAddressRepo{},
 		&uosMockShopAddressRepo{},
@@ -667,7 +1006,6 @@ func TestUpdateOrderStatus_AuditLogging_Failure(t *testing.T) {
 		auditLogger,
 	)
 
-	// Invalid status transition Pending -> Delivered
 	_, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
 		OrderID: orderID,
 		Status:  orderDomain.OrderStatusDelivered,

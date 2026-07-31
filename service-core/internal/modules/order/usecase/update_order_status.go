@@ -10,8 +10,11 @@ import (
 	applogger "service-core/internal/common/logger"
 	shipping "service-core/internal/infra/shipping"
 	addressRepo "service-core/internal/modules/address/repository"
+	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
+	paymentDomain "service-core/internal/modules/payment/domain"
+	paymentRepo "service-core/internal/modules/payment/repository"
 	shipmentDomain "service-core/internal/modules/shipment/domain"
 	shipmentRepo "service-core/internal/modules/shipment/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -33,6 +36,8 @@ type UpdateOrderStatusUsecase struct {
 	transactor      transaction.Transactor
 	orderRepo       repository.OrderRepository
 	orderItemRepo   repository.OrderItemRepository
+	inventoryRepo   inventoryRepo.InventoryRepository
+	paymentRepo     paymentRepo.PaymentRepository
 	shipmentRepo    shipmentRepo.ShipmentRepository
 	addressRepo     addressRepo.CustomerAddressRepository
 	shopAddressRepo addressRepo.ShopAddressRepository
@@ -45,6 +50,8 @@ func NewUpdateOrderStatusUsecase(
 	transactor transaction.Transactor,
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
+	inventoryRepo inventoryRepo.InventoryRepository,
+	paymentRepo paymentRepo.PaymentRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
 	addressRepo addressRepo.CustomerAddressRepository,
 	shopAddressRepo addressRepo.ShopAddressRepository,
@@ -56,6 +63,8 @@ func NewUpdateOrderStatusUsecase(
 		transactor:      transactor,
 		orderRepo:       orderRepo,
 		orderItemRepo:   orderItemRepo,
+		inventoryRepo:   inventoryRepo,
+		paymentRepo:     paymentRepo,
 		shipmentRepo:    shipmentRepo,
 		addressRepo:     addressRepo,
 		shopAddressRepo: shopAddressRepo,
@@ -132,8 +141,45 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, apperrors.NewInvalidInput(errStatus.Error())
 	}
 
-	// Simple transitions (no side-effects)
-	if input.Status != domain.OrderStatusShipped {
+	switch input.Status {
+	case domain.OrderStatusConfirmed:
+		payment, err := u.paymentRepo.GetByOrderID(ctx, u.executor, order.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get payment: %w", err)
+		}
+		if payment == nil || payment.Status != paymentDomain.PaymentStatusPaid {
+			return nil, apperrors.NewInvalidInput("cannot confirm order without confirmed payment")
+		}
+
+		items, err := u.orderItemRepo.ListByOrderID(ctx, u.executor, order.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list order items: %w", err)
+		}
+
+		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+			for _, item := range items {
+				if err := u.inventoryRepo.Commit(ctx, exec, item.ProductID, item.ShopID, item.Quantity); err != nil {
+					return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
+				}
+			}
+			return u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status)
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result := UpdateOrderStatusResult{Order: *order}
+		return &result, nil
+
+	case domain.OrderStatusProcessing:
+		payment, err := u.paymentRepo.GetByOrderID(ctx, u.executor, order.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get payment: %w", err)
+		}
+		if payment == nil || payment.Status != paymentDomain.PaymentStatusPaid {
+			return nil, apperrors.NewInvalidInput("cannot move order to processing without confirmed payment")
+		}
+
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 			return u.orderRepo.UpdateStatus(ctx, exec,
 				order.ID,
@@ -142,6 +188,51 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to update order status: %w", err)
+		}
+
+		result := UpdateOrderStatusResult{Order: *order}
+		return &result, nil
+
+	case domain.OrderStatusDelivered:
+		shipment, err := u.shipmentRepo.GetByOrderID(ctx, u.executor, order.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get shipment: %w", err)
+		}
+
+		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+			if shipment != nil {
+				if err := shipment.UpdateStatus(shipmentDomain.ShipmentStatusDelivered); err != nil {
+					return fmt.Errorf("failed to update shipment status: %w", err)
+				}
+				if err := u.shipmentRepo.Update(ctx, exec, *shipment); err != nil {
+					return fmt.Errorf("failed to persist shipment: %w", err)
+				}
+			}
+			return u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status)
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result := UpdateOrderStatusResult{Order: *order, Shipment: shipment}
+		return &result, nil
+
+	case domain.OrderStatusCancelled:
+		items, err := u.orderItemRepo.ListByOrderID(ctx, u.executor, order.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list order items: %w", err)
+		}
+
+		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+			for _, item := range items {
+				if err := u.inventoryRepo.Release(ctx, exec, item.ProductID, item.ShopID, item.Quantity); err != nil {
+					return fmt.Errorf("failed to release inventory for product %s: %w", item.ProductID, err)
+				}
+			}
+			return u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status)
+		})
+		if err != nil {
+			return nil, err
 		}
 
 		result := UpdateOrderStatusResult{Order: *order}
