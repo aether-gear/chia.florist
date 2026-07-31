@@ -6,6 +6,7 @@ import { useAddress } from '~/composables/useAddress'
 import { useOrders } from '~/composables/useOrders'
 import type { OrderTab } from '~/composables/useOrders'
 import { supabaseService } from '~/services/supabaseService'
+import { orderService } from '~/services/orderService'
 import type { UserAddress } from '~/types/address'
 import type { BackendOrder } from '~/types/order'
 
@@ -133,8 +134,8 @@ function onImgLoad(e: Event) {
 
 function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
   e.stopPropagation()
-  const cx = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX
-  const cy = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY
+  const cx = e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0)
+  const cy = e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0)
   dragMode.value = mode
   dragStartX.value = cx; dragStartY.value = cy
   initCbX.value = cbX.value; initCbY.value = cbY.value
@@ -142,8 +143,8 @@ function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
 }
 
 function startImgPan(e: MouseEvent | TouchEvent) {
-  const cx = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX
-  const cy = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY
+  const cx = e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0)
+  const cy = e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0)
   dragMode.value = 'img'
   lastPanX.value = cx; lastPanY.value = cy
 }
@@ -197,7 +198,7 @@ function onGlobalMove(cx: number, cy: number) {
 
 function onMouseMove(e: MouseEvent)  { onGlobalMove(e.clientX, e.clientY) }
 function onMouseUp()                  { dragMode.value = null }
-function onTouchMoveCrop(e: TouchEvent) { if (e.touches.length === 1) { e.preventDefault(); onGlobalMove(e.touches[0].clientX, e.touches[0].clientY) } }
+function onTouchMoveCrop(e: TouchEvent) { const touch = e.touches[0]; if (e.touches.length === 1 && touch) { e.preventDefault(); onGlobalMove(touch.clientX, touch.clientY) } }
 function onTouchEndCrop()             { dragMode.value = null }
 
 function onCropZoomChange() {
