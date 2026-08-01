@@ -3,6 +3,46 @@ import { computed, watch } from 'vue'
 import { cartService } from '~/services/cartService'
 import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Global
 
+/* ─── Custom Design Payload ────────────────────────────────────────────── */
+// Full structured description of a custom board design for backend integration.
+// Backend can use this to store the design, generate a production preview, and track the order.
+export interface CustomDesignPayload {
+  version: '1.0'
+  physicalSize: string         // e.g. "1.8x2.5m"
+  physicalSizeId: string       // e.g. "medium"
+  price: number
+  heightRatio: number          // 0–1, split between upper/lower sections
+  upper: {
+    headerText: string; bodyText: string
+    headerFontSize: number; bodyFontSize: number
+    headerFont: string; bodyFont: string
+    headerAlign: string; bodyAlign: string
+    bgColor: string; headerColor: string; bodyColor: string
+    cornerStyle: string
+  }
+  lower: {
+    headerText: string; bodyText: string
+    headerFontSize: number; bodyFontSize: number
+    headerFont: string; bodyFont: string
+    headerAlign: string; bodyAlign: string
+    bgColor: string; headerColor: string; bodyColor: string
+    cornerStyle: string
+  }
+  border: { style: string; color: string; width: number; center: boolean }
+  elements: Array<{
+    id: string; type: 'image' | 'brush'
+    x: number; y: number
+    // image-specific
+    src?: string; frame?: string; width?: number; zoom?: number; cropX?: number; cropY?: number
+    // brush-specific
+    brushType?: string; size?: number; color?: string; rotation?: number
+  }>
+  topCrest: { enabled: boolean; style: string; primary: string; secondary: string; size: number }
+  bottomCrest: { enabled: boolean; style: string; primary: string; secondary: string; size: number }
+  previewBase64: string        // PNG thumbnail generated in browser
+  generatedAt: string          // ISO timestamp
+}
+
 export interface CartItem {
   id: string
   name: string
@@ -13,6 +53,7 @@ export interface CartItem {
   color?: string
   isCustom?: boolean
   shopId?: string
+  customDesign?: CustomDesignPayload  // only present for custom board orders
 }
 
 export interface Order {
@@ -350,8 +391,21 @@ export const useCart = () => {
       )
       if (existingItem) {
         existingItem.quantity += qty
+        // Update the design payload if provided
+        if (item.customDesign) existingItem.customDesign = item.customDesign
       } else {
         cart.value.push({ ...item, quantity: qty })
+      }
+      // Persist full design payload to localStorage for backend integration
+      if (import.meta.client && item.customDesign) {
+        try {
+          localStorage.setItem(`custom_design_${item.id}`, JSON.stringify(item.customDesign))
+          // TODO: POST /custom-orders once backend endpoint is ready:
+          // await fetch('/api/custom-orders', { method: 'POST', body: JSON.stringify(item.customDesign) })
+          console.info('[Chia Florist] Custom Design Payload (ready for backend):', item.customDesign)
+        } catch (e) {
+          console.warn('Could not persist custom design to localStorage:', e)
+        }
       }
       return
     }
