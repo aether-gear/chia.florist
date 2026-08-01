@@ -1,3 +1,13 @@
+export interface Shop {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string | null;
+}
+
 export interface ShopAddress {
   id: string;
   label: string;

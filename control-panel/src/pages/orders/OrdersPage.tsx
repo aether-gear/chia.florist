@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   PackageOpen,
   ArrowUpDown,
@@ -13,12 +14,14 @@ import {
   Edit3,
   Activity,
   AlertCircle,
-  Sprout
+  Sprout,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useOrdersViewModel } from '../../viewmodels/useOrdersViewModel';
 import { useOrderActionsViewModel } from '../../viewmodels/useOrderActionsViewModel';
+import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
@@ -28,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../../components/ui/input';
 
 export default function OrdersPage() {
+  const { isAdmin } = useAuthMeViewModel();
   const {
     data,
     loading,
@@ -193,11 +197,20 @@ export default function OrdersPage() {
       <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
 
         {/* Header */}
-        <div>
-          <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
-          <p className="text-muted-foreground text-sm">
-            Verify payments, fulfill shipments, and manage orders
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
+            <p className="text-muted-foreground text-sm">
+              Verify payments, fulfill shipments, and manage orders
+            </p>
+          </div>
+          {isAdmin && (
+            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5 self-start sm:self-auto">
+              <Link to="/admin/analytics?tab=orders">
+                <BarChart3 className="h-3.5 w-3.5" /> View Order Analytics →
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Order Workspace Section */}
