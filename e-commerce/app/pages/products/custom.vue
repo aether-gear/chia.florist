@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useCart } from '~/composables/useCart'
+import { useCart, normalizeHexColor, calculateDesignChecksum } from '~/composables/useCart'
 import type { CustomDesignPayload } from '~/composables/useCart'
 
 definePageMeta({ layout: false })
@@ -208,17 +208,17 @@ const randomizeDesign = () => {
   border.value.center = Math.random() > 0.5
   upper.value.cornerStyle = rand(CORNERS).id
   lower.value.cornerStyle = rand(CORNERS).id
-  
+
   topCrest.value.enabled = Math.random() > 0.5
   topCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
   topCrest.value.primary = rand(BG_PRESETS)
   topCrest.value.secondary = rand(BG_PRESETS)
-  
+
   bottomCrest.value.enabled = Math.random() > 0.5
   bottomCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
   bottomCrest.value.primary = rand(BG_PRESETS)
   bottomCrest.value.secondary = rand(BG_PRESETS)
-  
+
   // Interactive scale bounce feedback
   boardScale.value = boardScale.value * 0.95
   setTimeout(updateScale, 150)
@@ -519,34 +519,137 @@ const generateBoardSnapshot = (): Promise<string> => {
 }
 
 /* ─── PAYLOAD BUILDER ──────────────────────────────────────────────── */
-const buildCustomDesignPayload = (previewBase64: string): CustomDesignPayload => ({
-  version: '1.0',
-  physicalSize: SIZES.find(s => s.id === physicalSize.value)?.label ?? '',
-  physicalSizeId: physicalSize.value,
-  price: totalPrice.value,
-  heightRatio: heightRatio.value,
-  upper: { ...upper.value },
-  lower: { ...lower.value },
-  border: { ...border.value },
-  elements: elements.value.map(el => {
-    if (el.type === 'image') {
-      const img = el as CanvasImage
-      return { id: img.id, type: 'image', x: img.x, y: img.y, src: img.src, frame: img.frame, width: img.width, zoom: img.zoom, cropX: img.cropX, cropY: img.cropY }
+const buildCustomDesignPayload = (previewBase64: string): CustomDesignPayload => {
+  const payload: CustomDesignPayload = {
+    metadata: {
+      version: '1.0.0',
+      editorVersion: '1.0.0',
+      platform: 'web',
+      locale: 'id-ID',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      checksum: ''
+    },
+    layout: {
+      physicalSizeId: physicalSize.value as any,
+      upperHeightRatio: heightRatio.value,
+      border: {
+        style: border.value.style as any,
+        colorHex: normalizeHexColor(border.value.color, '#F5C842'),
+        widthPx: border.value.width,
+        showCenterDivider: border.value.center
+      }
+    },
+    sections: {
+      upper: {
+        bgColorHex: normalizeHexColor(upper.value.bgColor, '#C0392B'),
+        cornerStyle: upper.value.cornerStyle as any,
+        header: {
+          text: upper.value.headerText || null,
+          fontId: upper.value.headerFont as any,
+          fontSizePx: upper.value.headerFontSize,
+          fontColorHex: normalizeHexColor(upper.value.headerColor, '#FFD700'),
+          alignment: upper.value.headerAlign as any
+        },
+        body: {
+          text: upper.value.bodyText || null,
+          fontId: upper.value.bodyFont as any,
+          fontSizePx: upper.value.bodyFontSize,
+          fontColorHex: normalizeHexColor(upper.value.bodyColor, '#FFFFFF'),
+          alignment: upper.value.bodyAlign as any
+        }
+      },
+      lower: {
+        bgColorHex: normalizeHexColor(lower.value.bgColor, '#1A3A5C'),
+        cornerStyle: lower.value.cornerStyle as any,
+        header: {
+          text: lower.value.headerText || null,
+          fontId: lower.value.headerFont as any,
+          fontSizePx: lower.value.headerFontSize,
+          fontColorHex: normalizeHexColor(lower.value.headerColor, '#FFFFFF'),
+          alignment: lower.value.headerAlign as any
+        },
+        body: {
+          text: lower.value.bodyText || null,
+          fontId: lower.value.bodyFont as any,
+          fontSizePx: lower.value.bodyFontSize,
+          fontColorHex: normalizeHexColor(lower.value.bodyColor, '#FFFFFF'),
+          alignment: lower.value.bodyAlign as any
+        }
+      }
+    },
+    decorations: {
+      topCrest: {
+        visible: topCrest.value.enabled,
+        variantId: topCrest.value.style as any,
+        primaryColorHex: normalizeHexColor(topCrest.value.primary, '#E63946'),
+        secondaryColorHex: normalizeHexColor(topCrest.value.secondary, '#F1FAEE'),
+        scalePercent: topCrest.value.size
+      },
+      bottomCrest: {
+        visible: bottomCrest.value.enabled,
+        variantId: bottomCrest.value.style as any,
+        primaryColorHex: normalizeHexColor(bottomCrest.value.primary, '#E63946'),
+        secondaryColorHex: normalizeHexColor(bottomCrest.value.secondary, '#F1FAEE'),
+        scalePercent: bottomCrest.value.size
+      }
+    },
+    elements: elements.value.map(el => {
+      if (el.type === 'image') {
+        const img = el as CanvasImage
+        return {
+          id: img.id,
+          type: 'image' as const,
+          src: img.src,
+          frameStyle: img.frame as any,
+          crop: { xPercent: img.cropX, yPercent: img.cropY, zoom: img.zoom },
+          transform: {
+            xPercent: img.x,
+            yPercent: img.y,
+            scalePercent: img.width,
+            rotationDeg: 0
+          }
+        }
+      }
+      const br = el as BrushStroke
+      return {
+        id: br.id,
+        type: 'brush' as const,
+        brushType: br.brushType as any,
+        colorHex: normalizeHexColor(br.color, '#E85D75'),
+        transform: {
+          xPercent: br.x,
+          yPercent: br.y,
+          scalePercent: br.size,
+          rotationDeg: br.rotation
+        }
+      }
+    }),
+    assets: {
+      previewBase64: previewBase64 || null,
+      previewAssetId: null,
+      previewUrl: null,
+      bucketPath: null,
+      storageProvider: 'supabase'
     }
-    const br = el as BrushStroke
-    return { id: br.id, type: 'brush', x: br.x, y: br.y, brushType: br.brushType, size: br.size, color: br.color, rotation: br.rotation }
-  }),
-  topCrest:    { ...topCrest.value },
-  bottomCrest: { ...bottomCrest.value },
-  previewBase64,
-  generatedAt: new Date().toISOString(),
-})
+  }
+
+  payload.metadata.checksum = calculateDesignChecksum(payload)
+  return payload
+}
 
 /* ─── CART ────────────────────────────────────────────────────────── */
+const handleFinalizeAndOrder = () => {
+  showReview.value = true
+  const design = buildCustomDesignPayload(snapshotDataUrl.value || '')
+  console.log('[Chia Florist] Finalize & Order Clicked - Custom Design JSON Payload:\n', JSON.stringify(design, null, 2))
+}
+
 const addToCartHandler = async () => {
   isAdding.value = true
   const previewUrl   = snapshotDataUrl.value || '/images/custom-preview.png'
   const design       = buildCustomDesignPayload(snapshotDataUrl.value)
+  console.log('[Chia Florist] Finalized Custom Design Payload for Cart/Order:\n', JSON.stringify(design, null, 2))
   const itemId       = 'custom-' + Date.now()
   addToCart({
     id: itemId,
@@ -557,6 +660,7 @@ const addToCartHandler = async () => {
     color: upper.value.bgColor,
     shopId: '99ef0062-1040-4574-a4be-0123abce5670',
     isCustom: true,
+    itemType: 'custom',
     customDesign: design,
   }, 1)
   isAdding.value = false; showReview.value = false; showToast.value = true
@@ -579,6 +683,8 @@ watch(showReview, async (open) => {
   await nextTick()
   try {
     snapshotDataUrl.value = await generateBoardSnapshot()
+    const updatedDesign = buildCustomDesignPayload(snapshotDataUrl.value)
+    console.log('[Chia Florist] Review Modal Open - Generated Custom Design Payload:\n', JSON.stringify(updatedDesign, null, 2))
   } catch (e) {
     console.warn('Snapshot generation failed:', e)
   } finally {
@@ -1253,7 +1359,7 @@ onUnmounted(() => {
                 <span class="cval">{{ border.width }}px</span>
               </div>
             </div>
-            
+
             <!-- Center Border Toggle -->
             <div class="tg" style="margin-top: 1rem;">
               <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing: 0.05em;">
@@ -1261,7 +1367,7 @@ onUnmounted(() => {
                 SHOW CENTER BORDER
               </label>
             </div>
-            
+
             <!-- Preview -->
             <div class="tg">
               <div class="tg-label">PREVIEW</div>
@@ -1305,7 +1411,7 @@ onUnmounted(() => {
               <button class="stg-btn" :class="{ active: activeSection === 'upper' }" @click="activeSection = 'upper'">Top Crest</button>
               <button class="stg-btn" :class="{ active: activeSection === 'lower' }" @click="activeSection = 'lower'">Bottom Base</button>
             </div>
-            
+
             <div class="tg" style="margin-top: 1rem;">
               <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing:0.05em;">
                 <input type="checkbox" v-model="floralSec.enabled" style="width:16px;height:16px;accent-color:#c4703e;"/>
@@ -1324,7 +1430,7 @@ onUnmounted(() => {
                   </button>
                 </div>
               </div>
-              
+
               <div class="tg">
                 <div class="tg-label">SIZE SCALING</div>
                 <div class="cr">
@@ -1365,7 +1471,7 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
-          <button id="btn-finalize-footer" class="finalize-btn" @click="showReview = true">
+          <button id="btn-finalize-footer" class="finalize-btn" @click="handleFinalizeAndOrder">
             <span class="fb-left">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>

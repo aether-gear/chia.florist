@@ -1,4 +1,5 @@
 // app/types/order.ts
+import type { CustomDesignPayload } from '~/composables/useCart'
 
 export interface CreateOrderPaymentInput {
   id: string
@@ -11,9 +12,13 @@ export interface CreateOrderCourierInput {
 }
 
 export interface CreateOrderItemInput {
-  product_id: string
+  item_type?: 'standard' | 'custom'
+  product_id?: string
   name: string
+  physical_size_id?: string
   quantity: number
+  unit_price?: number
+  custom_design?: CustomDesignPayload
 }
 
 export interface CreateOrderShopInput {

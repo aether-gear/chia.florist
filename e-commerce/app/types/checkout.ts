@@ -1,4 +1,5 @@
 // app/types/checkout.ts
+import type { CustomDesignPayload } from '~/composables/useCart'
 
 export interface CheckoutAddress {
   id: string
@@ -22,12 +23,16 @@ export interface SelectedCourier {
 }
 
 export interface CheckoutItem {
-  product_id: string
+  product_id?: string
   shop_id: string
   name: string
   price: number
   quantity: number
   subtotal: number
+  item_type?: 'standard' | 'custom'
+  custom_design?: CustomDesignPayload
+  size?: string
+  color?: string
 }
 
 export interface CheckoutShop {
@@ -65,12 +70,19 @@ export interface SelectedCourierInput {
   service: string
 }
 
+export interface CheckoutShopItemInput {
+  item_type: 'standard' | 'custom'
+  product_id?: string
+  product_name?: string
+  physical_size_id?: string
+  quantity: number
+  unit_price?: number
+  custom_design?: CustomDesignPayload
+}
+
 export interface CheckoutShopInput {
   shop_id: string
-  items: {
-    product_id: string
-    quantity: number
-  }[]
+  items: CheckoutShopItemInput[]
   courier?: SelectedCourierInput
 }
 
@@ -79,3 +91,4 @@ export interface CheckoutRequest {
   payment_method_id?: string
   shops: CheckoutShopInput[]
 }
+

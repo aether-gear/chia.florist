@@ -334,17 +334,28 @@ onMounted(async () => {
       selectedAddressId.value = defaultAddr.address_id || ''
     }
 
-    const shopsMap: Record<string, { product_id: string; quantity: number }[]> = {}
+    const shopsMap: Record<string, any[]> = {}
     checkoutItems.value.forEach(item => {
-      if (item.isCustom) return
       const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
       if (!shopsMap[shopId]) {
         shopsMap[shopId] = []
       }
-      shopsMap[shopId].push({
-        product_id: item.id,
-        quantity: item.quantity
-      })
+      if (item.isCustom) {
+        shopsMap[shopId].push({
+          item_type: 'custom',
+          product_name: item.name,
+          physical_size_id: item.customDesign?.layout?.physicalSizeId || item.size || 'medium',
+          unit_price: item.price,
+          quantity: item.quantity,
+          custom_design: item.customDesign
+        })
+      } else {
+        shopsMap[shopId].push({
+          item_type: 'standard',
+          product_id: item.id,
+          quantity: item.quantity
+        })
+      }
     })
 
     const shopsPayload = Object.keys(shopsMap).map(shopId => ({
@@ -423,39 +434,49 @@ const runCalculate = async () => {
     const backendShopsPayload: any[] = []
 
     checkoutData.value.shops.forEach(shop => {
-      const nonCustomItems = shop.items.filter(item => {
-        const localItem = checkoutItems.value.find(i => i.id === item.product_id)
-        return !localItem?.isCustom
-      })
+      const courier = selectedCouriers.value[shop.shop_id]
+      let courierPayload = courier || (shop.selected_courier ? {
+        code: shop.selected_courier.code,
+        service: shop.selected_courier.service
+      } : undefined)
 
-      if (nonCustomItems.length > 0) {
-        const courier = selectedCouriers.value[shop.shop_id]
-        let courierPayload = courier || (shop.selected_courier ? {
-          code: shop.selected_courier.code,
-          service: shop.selected_courier.service
-        } : undefined)
+      if (!courierPayload) {
+        const options = courierOptionsMap.value[shop.shop_id]
+        const firstOption = options && options[0]
+        if (firstOption) {
+          courierPayload = { code: firstOption.code, service: firstOption.service }
+          selectedCouriers.value[shop.shop_id] = { code: firstOption.code, service: firstOption.service }
+        } else {
+          courierPayload = { code: 'jne', service: 'REG' }
+          selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
+        }
+      }
 
-        if (!courierPayload) {
-          const options = courierOptionsMap.value[shop.shop_id]
-          const firstOption = options && options[0]
-          if (firstOption) {
-            courierPayload = { code: firstOption.code, service: firstOption.service }
-            selectedCouriers.value[shop.shop_id] = { code: firstOption.code, service: firstOption.service }
-          } else {
-            courierPayload = { code: 'jne', service: 'REG' }
-            selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
+      const shopItemsPayload = shop.items.map(item => {
+        const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && item.item_type === 'custom'))
+        if (localItem?.isCustom || item.item_type === 'custom') {
+          const design = localItem?.customDesign || item.custom_design
+          return {
+            item_type: 'custom' as const,
+            product_name: item.name,
+            physical_size_id: design?.layout?.physicalSizeId || 'medium',
+            unit_price: item.price,
+            quantity: item.quantity,
+            custom_design: design
           }
         }
+        return {
+          item_type: 'standard' as const,
+          product_id: item.product_id,
+          quantity: item.quantity
+        }
+      })
 
-        backendShopsPayload.push({
-          shop_id: shop.shop_id,
-          items: nonCustomItems.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity
-          })),
-          courier: courierPayload
-        })
-      }
+      backendShopsPayload.push({
+        shop_id: shop.shop_id,
+        items: shopItemsPayload,
+        courier: courierPayload
+      })
     })
 
     let res: CheckoutResponse | null = null
@@ -667,11 +688,26 @@ const handlePlaceOrder = async () => {
           code: courier.code,
           service: courier.service
         },
-        items: shop.items.map(item => ({
-          product_id: item.product_id,
-          name: item.name,
-          quantity: item.quantity
-        }))
+        items: shop.items.map(item => {
+          const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && item.item_type === 'custom'))
+          if (localItem?.isCustom || item.item_type === 'custom') {
+            const design = localItem?.customDesign || item.custom_design
+            return {
+              item_type: 'custom' as const,
+              name: item.name,
+              physical_size_id: design?.layout?.physicalSizeId || 'medium',
+              quantity: item.quantity,
+              unit_price: item.price,
+              custom_design: design
+            }
+          }
+          return {
+            item_type: 'standard' as const,
+            product_id: item.product_id,
+            name: item.name,
+            quantity: item.quantity
+          }
+        })
       }
     })
 

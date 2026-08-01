@@ -2,6 +2,18 @@
 import { bootstrapConfig } from '~/utils/bootstrap'
 import type { BackendCartResponse } from '~/types/cart'
 import type { CheckoutRequest, CheckoutResponse } from '~/types/checkout'
+import type { CustomDesignPayload } from '~/composables/useCart'
+
+export interface AddCartItemPayload {
+  item_type: 'standard' | 'custom'
+  shop_id: string
+  quantity: number
+  product_id?: string
+  product_name?: string
+  physical_size_id?: string
+  unit_price?: number
+  custom_design?: CustomDesignPayload
+}
 
 export const cartService = {
   async getCart(): Promise<BackendCartResponse> {
@@ -10,7 +22,7 @@ export const cartService = {
     })
   },
 
-  async addItem(data: { product_id: string; shop_id: string; quantity: number }): Promise<{ message: string }> {
+  async addItem(data: AddCartItemPayload): Promise<{ message: string }> {
     return bootstrapConfig.fetchApi<{ message: string }>('/carts/items/', {
       method: 'POST',
       body: data
@@ -44,3 +56,4 @@ export const cartService = {
     })
   }
 }
+
