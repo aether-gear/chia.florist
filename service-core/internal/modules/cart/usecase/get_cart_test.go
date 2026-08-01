@@ -2,16 +2,17 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"service-core/internal/infra/storage"
 	cartDomain "service-core/internal/modules/cart/domain"
 	cartRepo "service-core/internal/modules/cart/repository"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
-	"service-core/internal/infra/storage"
 	"service-core/internal/shared/image"
 	transaction "service-core/internal/shared/transaction"
 
@@ -125,13 +126,15 @@ func TestGetCart_Success_NoDeletedProducts(t *testing.T) {
 		Items: []cartDomain.CartItem{
 			{
 				ID:        uuid.New(),
-				ProductID: productID1,
+				ItemType:  cartDomain.ItemTypeStandard,
+				ProductID: &productID1,
 				ShopID:    shopID,
 				Quantity:  2,
 			},
 			{
 				ID:        uuid.New(),
-				ProductID: productID2,
+				ItemType:  cartDomain.ItemTypeStandard,
+				ProductID: &productID2,
 				ShopID:    shopID,
 				Quantity:  1,
 			},
@@ -224,13 +227,15 @@ func TestGetCart_Success_WithDeletedProducts(t *testing.T) {
 		Items: []cartDomain.CartItem{
 			{
 				ID:        uuid.New(),
-				ProductID: productIDActive,
+				ItemType:  cartDomain.ItemTypeStandard,
+				ProductID: &productIDActive,
 				ShopID:    shopID,
 				Quantity:  2,
 			},
 			{
 				ID:        uuid.New(),
-				ProductID: productIDDeleted,
+				ItemType:  cartDomain.ItemTypeStandard,
+				ProductID: &productIDDeleted,
 				ShopID:    shopID,
 				Quantity:  1,
 			},
@@ -274,7 +279,7 @@ func TestGetCart_Success_WithDeletedProducts(t *testing.T) {
 	if len(result.Cart.Items) != 1 {
 		t.Errorf("expected 1 active cart item, got %d", len(result.Cart.Items))
 	}
-	if result.Cart.Items[0].ProductID != productIDActive {
+	if result.Cart.Items[0].ProductID == nil || *result.Cart.Items[0].ProductID != productIDActive {
 		t.Errorf("expected remaining item to be active product, got %v", result.Cart.Items[0].ProductID)
 	}
 
@@ -301,14 +306,14 @@ func TestGetCart_Success_ProductNotFound(t *testing.T) {
 		Items: []cartDomain.CartItem{
 			{
 				ID:        uuid.New(),
-				ProductID: productIDNotFound,
+				ItemType:  cartDomain.ItemTypeStandard,
+				ProductID: &productIDNotFound,
 				ShopID:    shopID,
 				Quantity:  2,
 			},
 		},
 	}
 
-	// Repository returns no products
 	products := []productDomain.Product{}
 	inventories := map[uuid.UUID][]inventoryDomain.Inventory{}
 	images := map[uuid.UUID][]productDomain.ProductImage{}
@@ -332,5 +337,56 @@ func TestGetCart_Success_ProductNotFound(t *testing.T) {
 
 	if len(result.Products) != 0 {
 		t.Errorf("expected 0 products in map, got %d", len(result.Products))
+	}
+}
+
+func TestGetCart_Success_WithCustomItem(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	shopID := uuid.New()
+	customItemID := uuid.New()
+	customPayload := json.RawMessage(`{"metadata":{"version":"1.0.0"},"layout":{"physicalSizeId":"medium"}}`)
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items: []cartDomain.CartItem{
+			{
+				ID:           customItemID,
+				ItemType:     cartDomain.ItemTypeCustom,
+				ProductID:    nil,
+				ShopID:       shopID,
+				Quantity:     1,
+				CustomDesign: customPayload,
+			},
+		},
+	}
+
+	cartR := &mockCartRepository{cart: cart}
+	invR := &mockInventoryRepository{inventories: map[uuid.UUID][]inventoryDomain.Inventory{}}
+	prodR := &mockProductRepository{products: []productDomain.Product{}}
+	imgR := &mockProductImageRepository{images: map[uuid.UUID][]productDomain.ProductImage{}}
+	store := &mockStorageProvider{}
+	exec := &mockExecutor{}
+
+	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, store, exec)
+	result, err := uc.Execute(ctx, customerID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Cart.Items) != 1 {
+		t.Fatalf("expected 1 cart item, got %d", len(result.Cart.Items))
+	}
+
+	item := result.Cart.Items[0]
+	if item.ItemType != cartDomain.ItemTypeCustom {
+		t.Errorf("expected ItemTypeCustom, got %s", item.ItemType)
+	}
+	if item.ProductID != nil {
+		t.Errorf("expected nil ProductID for custom item, got %v", item.ProductID)
+	}
+	if string(item.CustomDesign) != string(customPayload) {
+		t.Errorf("unexpected custom design payload: %s", string(item.CustomDesign))
 	}
 }

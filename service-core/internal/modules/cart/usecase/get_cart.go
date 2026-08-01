@@ -87,7 +87,12 @@ func (u *GetCartUsecase) Execute(
 
 	productIDs := make([]uuid.UUID, 0, len(cart.Items))
 	for _, item := range cart.Items {
-		productIDs = append(productIDs, item.ProductID)
+		// Custom items have no catalogue entry — skip product lookup
+		if item.ItemType == domain.ItemTypeCustom ||
+			item.ProductID == nil {
+			continue
+		}
+		productIDs = append(productIDs, *item.ProductID)
 	}
 
 	products, err := u.productRepo.FindByIDs(ctx, u.executor,
@@ -141,14 +146,23 @@ func (u *GetCartUsecase) Execute(
 
 	activeItems := make([]domain.CartItem, 0, len(cart.Items))
 	for _, item := range cart.Items {
-		if _, ok := productMap[item.ProductID]; ok {
+		if item.ItemType == domain.ItemTypeCustom {
+			// Custom items always stay in the cart regardless of product map
 			activeItems = append(activeItems, item)
+			continue
+		}
+		if item.ProductID != nil {
+			if _, ok := productMap[*item.ProductID]; ok {
+				activeItems = append(activeItems, item)
+			}
 		}
 	}
 	cart.Items = activeItems
 
-	return &GetCartResult{
+	result := GetCartResult{
 		Cart:     cart,
 		Products: productMap,
-	}, nil
+	}
+
+	return &result, nil
 }

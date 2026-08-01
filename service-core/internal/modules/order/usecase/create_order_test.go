@@ -1075,7 +1075,7 @@ func TestCreateOrder_InvariantCartItemsRemovedAfterOrder(t *testing.T) {
 			ID:         uuid.New(),
 			CustomerID: customerID,
 			Items: []cartDomain.CartItem{
-				{ID: uuid.New(), ProductID: productID, ShopID: shopID, Quantity: 2},
+				{ID: uuid.New(), ProductID: &productID, ShopID: shopID, Quantity: 2},
 			},
 		},
 	}

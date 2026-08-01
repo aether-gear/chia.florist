@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,19 +24,47 @@ func (c *Cart) AddItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 	}
 
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].ShopID == shopID {
-			c.Items[i].Quantity += qty
+		item := &c.Items[i]
+		// Skip custom items,
+		// they are never deduplicated by product_id
+		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID == shopID {
+			item.Quantity += qty
 			return nil
 		}
 	}
 
+	pid := productID
 	c.Items = append(c.Items, CartItem{
 		ID:        uuid.New(),
-		ProductID: productID,
+		ItemType:  ItemTypeStandard,
+		ProductID: &pid,
 		ShopID:    shopID,
 		Quantity:  qty,
 	})
 
+	return nil
+}
+
+// AddCustomItem appends a new custom design
+// item to the cart.
+//
+// Custom items are never deduplicated,
+// each canvas design is independent.
+func (c *Cart) AddCustomItem(shopID uuid.UUID, qty int, design json.RawMessage) error {
+	if qty <= 0 {
+		return ErrInvalidQuantity
+	}
+	c.Items = append(c.Items, CartItem{
+		ID:           uuid.New(),
+		ItemType:     ItemTypeCustom,
+		ProductID:    nil,
+		ShopID:       shopID,
+		Quantity:     qty,
+		CustomDesign: design,
+	})
 	return nil
 }
 
@@ -45,16 +74,21 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 	}
 
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].ShopID == shopID {
-
+		item := &c.Items[i]
+		// Skip custom items,
+		// they are managed by ID, not by product_id
+		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID == shopID {
 			if qty == 0 {
 				now := time.Now()
-				c.Items[i].DeletedAt = &now
+				item.DeletedAt = &now
 				return nil
 			}
 
-			c.Items[i].Quantity = qty
-			c.Items[i].DeletedAt = nil
+			item.Quantity = qty
+			item.DeletedAt = nil
 			return nil
 		}
 	}
@@ -63,9 +97,11 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		return nil
 	}
 
+	pid := productID
 	c.Items = append(c.Items, CartItem{
 		ID:        uuid.New(),
-		ProductID: productID,
+		ItemType:  ItemTypeStandard,
+		ProductID: &pid,
 		ShopID:    shopID,
 		Quantity:  qty,
 		DeletedAt: nil,
@@ -76,17 +112,38 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 
 func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) {
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].ShopID == shopID {
+		item := &c.Items[i]
+		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID == shopID {
 			now := time.Now()
-			c.Items[i].DeletedAt = &now
+			item.DeletedAt = &now
 			return
 		}
 	}
 }
 
+// RemoveCustomItem soft-deletes a custom cart item by its own UUID.
+// Returns false if the item was not found.
+func (c *Cart) RemoveCustomItem(cartItemID uuid.UUID) bool {
+	for i := range c.Items {
+		if c.Items[i].ID == cartItemID && c.Items[i].ItemType == ItemTypeCustom {
+			now := time.Now()
+			c.Items[i].DeletedAt = &now
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Cart) HasItem(productID uuid.UUID, shopID uuid.UUID) bool {
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].ShopID == shopID {
+		item := &c.Items[i]
+		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID == shopID {
 			return true
 		}
 	}
@@ -95,8 +152,12 @@ func (c *Cart) HasItem(productID uuid.UUID, shopID uuid.UUID) bool {
 
 func (c *Cart) FindItem(productID uuid.UUID, shopID uuid.UUID) *CartItem {
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].ShopID == shopID {
-			return &c.Items[i]
+		item := &c.Items[i]
+		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID == shopID {
+			return item
 		}
 	}
 
@@ -108,8 +169,11 @@ func (c *Cart) HasProductInAnotherShop(productID uuid.UUID, shopID uuid.UUID) bo
 		if item.DeletedAt != nil {
 			continue
 		}
-
-		if item.ProductID == productID && item.ShopID != shopID {
+		// Custom items have no product_id to compare
+		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID != shopID {
 			return true
 		}
 	}

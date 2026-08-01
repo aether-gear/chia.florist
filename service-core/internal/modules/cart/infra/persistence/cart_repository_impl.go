@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -26,18 +27,20 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 	customerID uuid.UUID,
 ) (*domain.Cart, error) {
 	query := `
-		SELECT 
+		SELECT
 			c.id,
 			c.customer_id,
 			c.created_at,
 			c.updated_at,
 			ci.id,
+			ci.item_type,
 			ci.product_id,
 			ci.shop_id,
-			ci.quantity
+			ci.quantity,
+			ci.custom_design
 		FROM carts c
-		LEFT JOIN cart_items ci 
-			ON ci.cart_id = c.id 
+		LEFT JOIN
+			cart_items ci ON ci.cart_id = c.id
 			AND ci.deleted_at IS NULL
 		WHERE c.customer_id = $1
 		ORDER BY ci.created_at
@@ -53,17 +56,18 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 	defer rows.Close()
 
 	var cart *domain.Cart
-
 	for rows.Next() {
 		var (
-			cID       uuid.UUID
-			custID    uuid.UUID
-			createdAt time.Time
-			updatedAt *time.Time
-			itemID    *uuid.UUID
-			productID *uuid.UUID
-			shopID    *uuid.UUID
-			quantity  *int
+			cID          uuid.UUID
+			custID       uuid.UUID
+			createdAt    time.Time
+			updatedAt    *time.Time
+			itemID       *uuid.UUID
+			itemType     *string
+			productID    *uuid.UUID
+			shopID       *uuid.UUID
+			quantity     *int
+			customDesign []byte
 		)
 
 		err := rows.Scan(
@@ -72,9 +76,11 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			&createdAt,
 			&updatedAt,
 			&itemID,
+			&itemType,
 			&productID,
 			&shopID,
 			&quantity,
+			&customDesign,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("mapping cart with items model to domain failed: %w", err)
@@ -91,11 +97,17 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 		}
 
 		if itemID != nil {
+			it := domain.ItemTypeStandard
+			if itemType != nil && *itemType == string(domain.ItemTypeCustom) {
+				it = domain.ItemTypeCustom
+			}
 			cart.Items = append(cart.Items, domain.CartItem{
-				ID:        *itemID,
-				ProductID: *productID,
-				ShopID:    *shopID,
-				Quantity:  *quantity,
+				ID:           *itemID,
+				ItemType:     it,
+				ProductID:    productID,
+				ShopID:       *shopID,
+				Quantity:     *quantity,
+				CustomDesign: json.RawMessage(customDesign),
 			})
 		}
 	}
@@ -113,13 +125,18 @@ func (r *cartRepositoryImpl) NewCart(
 	customerID uuid.UUID,
 ) (*domain.Cart, error) {
 	query := `
-		INSERT INTO carts (customer_id)
+		INSERT INTO carts (
+			customer_id
+		)
 		VALUES ($1)
-		RETURNING id, customer_id, created_at, updated_at
+		RETURNING
+			id,
+			customer_id,
+			created_at,
+			updated_at
 	`
 
 	var cart domain.Cart
-
 	err := exec.QueryRow(ctx, query, customerID).Scan(
 		&cart.ID,
 		&cart.CustomerID,
@@ -140,63 +157,93 @@ func (r *cartRepositoryImpl) Save(
 	exec transaction.Executor,
 	cart *domain.Cart,
 ) error {
-	updateItemQuery := `
-		UPDATE cart_items
-		SET deleted_at = NOW(), updated_at = NOW()
-		WHERE cart_id = $1 AND product_id = $2 AND shop_id = $3 AND deleted_at IS NULL
-	`
-
-	insertItemQuery := `
+	const insertStandardQuery = `
 		INSERT INTO cart_items (
 			cart_id,
+			item_type,
 			product_id,
 			shop_id,
 			quantity
 		)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (
-			cart_id,
-			product_id
-		) 
+		VALUES ($1,'standard',$2,$3,$4)
+		ON CONFLICT (cart_id, product_id)
 		WHERE deleted_at IS NULL
-		DO UPDATE 
-		SET 
-			quantity = EXCLUDED.quantity,
+			AND item_type = 'standard'
+		DO UPDATE SET
+			quantity   = EXCLUDED.quantity,
 			updated_at = NOW()
+	`
+
+	const insertCustomQuery = `
+		INSERT INTO cart_items (
+			cart_id,
+			item_type,
+			shop_id,
+			quantity,
+			custom_design
+		)
+		VALUES ($1,'custom',$2,$3,$4)
+	`
+
+	const softDeleteByProductQuery = `
+		UPDATE cart_items
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE cart_id = $1
+			AND product_id = $2
+			AND shop_id = $3
+			AND deleted_at IS NULL
+	`
+
+	const softDeleteByIDQuery = `
+		UPDATE cart_items
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $1
+			AND deleted_at IS NULL
 	`
 
 	for _, item := range cart.Items {
 		if item.DeletedAt != nil {
-			_, err := exec.Exec(ctx, updateItemQuery,
-				cart.ID,
-				item.ProductID,
-				item.ShopID,
-			)
-			if err != nil {
-				return fmt.Errorf("update cart items failed: %w", err)
+			if item.ItemType == domain.ItemTypeCustom {
+				if _, err := exec.Exec(ctx, softDeleteByIDQuery, item.ID); err != nil {
+					return fmt.Errorf("soft-delete custom cart item failed: %w", err)
+				}
+			} else {
+				if _, err := exec.Exec(ctx, softDeleteByProductQuery,
+					cart.ID, item.ProductID, item.ShopID,
+				); err != nil {
+					return fmt.Errorf("soft-delete standard cart item failed: %w", err)
+				}
 			}
 			continue
 		}
 
-		_, err := exec.Exec(ctx, insertItemQuery,
-			cart.ID,
-			item.ProductID,
-			item.ShopID,
-			item.Quantity,
-		)
-		if err != nil {
-			return fmt.Errorf("insert cart failed: %w", err)
+		if item.ItemType == domain.ItemTypeCustom {
+			if _, err := exec.Exec(ctx, insertCustomQuery,
+				cart.ID, item.ShopID, item.Quantity, []byte(item.CustomDesign),
+			); err != nil {
+				return fmt.Errorf("insert custom cart item failed: %w", err)
+			}
+		} else {
+			if _, err := exec.Exec(ctx, insertStandardQuery,
+				cart.ID, item.ProductID, item.ShopID, item.Quantity,
+			); err != nil {
+				return fmt.Errorf("insert standard cart item failed: %w", err)
+			}
 		}
 	}
 
-	updateCartQuery := `
+	const updateCartQuery = `
 		UPDATE carts
-		SET updated_at = NOW()
+		SET
+			updated_at = NOW()
 		WHERE id = $1
 	`
 
-	_, err := exec.Exec(ctx, updateCartQuery, cart.ID)
-	if err != nil {
+	if _, err := exec.Exec(ctx, updateCartQuery, cart.ID); err != nil {
 		return fmt.Errorf("update cart failed: %w", err)
 	}
 
@@ -210,7 +257,9 @@ func (r *cartRepositoryImpl) DeleteByCustomerID(
 ) error {
 	query := `
 		UPDATE cart_items ci
-		SET deleted_at = NOW(), updated_at = NOW()
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
 		FROM carts c
 		WHERE ci.cart_id = c.id
 			AND c.customer_id = $1

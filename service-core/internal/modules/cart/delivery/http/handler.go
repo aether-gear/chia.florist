@@ -6,32 +6,39 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	authdomain "service-core/internal/modules/authentication/domain"
+	domain "service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/usecase"
 
 	"github.com/google/uuid"
 )
 
 type CartHandler struct {
-	addItem    *usecase.AddItemUsecase
-	getCart    *usecase.GetCartUsecase
-	updateItem *usecase.UpdateItemUsecase
-	removeItem *usecase.RemoveItemUsecase
-	checkout   *usecase.CheckoutUsecase
+	addItem          *usecase.AddItemUsecase
+	addCustomItem    *usecase.AddCustomItemUsecase
+	getCart          *usecase.GetCartUsecase
+	updateItem       *usecase.UpdateItemUsecase
+	removeItem       *usecase.RemoveItemUsecase
+	removeCustomItem *usecase.RemoveCustomItemUsecase
+	checkout         *usecase.CheckoutUsecase
 }
 
 func NewCartHandler(
 	addItem *usecase.AddItemUsecase,
+	addCustomItem *usecase.AddCustomItemUsecase,
 	getCart *usecase.GetCartUsecase,
 	updateItem *usecase.UpdateItemUsecase,
 	removeItem *usecase.RemoveItemUsecase,
+	removeCustomItem *usecase.RemoveCustomItemUsecase,
 	checkout *usecase.CheckoutUsecase,
 ) *CartHandler {
 	return &CartHandler{
-		addItem:    addItem,
-		getCart:    getCart,
-		updateItem: updateItem,
-		removeItem: removeItem,
-		checkout:   checkout,
+		addItem:          addItem,
+		addCustomItem:    addCustomItem,
+		getCart:          getCart,
+		updateItem:       updateItem,
+		removeItem:       removeItem,
+		removeCustomItem: removeCustomItem,
+		checkout:         checkout,
 	}
 }
 
@@ -44,8 +51,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewForbidden("customer account required")
 	}
 
-	result, err := h.getCart.
-		Execute(r.Context(), *authCtx.CustomerID)
+	result, err := h.getCart.Execute(r.Context(), *authCtx.CustomerID)
 	if err != nil {
 		return err
 	}
@@ -57,11 +63,27 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 	items := make([]cartItemView, 0, len(result.Cart.Items))
 
 	for _, item := range result.Cart.Items {
+		// Custom items: echo the design payload back; price resolved in M2
+		if item.ItemType == domain.ItemTypeCustom {
+			items = append(items, cartItemView{
+				CartItemID:   item.ID,
+				ItemType:     string(item.ItemType),
+				ShopID:       item.ShopID,
+				Name:         "(Custom Board)",
+				Price:        0,
+				Quantity:     item.Quantity,
+				Subtotal:     0,
+				Image:        productImageResponse{},
+				CustomDesign: item.CustomDesign,
+			})
+			continue
+		}
+
 		if result.Products == nil {
 			continue
 		}
 
-		productData, ok := result.Products[item.ProductID]
+		productData, ok := result.Products[*item.ProductID]
 		if !ok {
 			continue
 		}
@@ -76,13 +98,15 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		items = append(items, cartItemView{
-			ProductID: item.ProductID,
-			ShopID:    item.ShopID,
-			Name:      productData.Product.Name,
-			Price:     price,
-			Quantity:  quantity,
-			Subtotal:  subtotal,
-			Image:     image,
+			CartItemID: item.ID,
+			ItemType:   string(item.ItemType),
+			ProductID:  item.ProductID,
+			ShopID:     item.ShopID,
+			Name:       productData.Product.Name,
+			Price:      price,
+			Quantity:   quantity,
+			Subtotal:   subtotal,
+			Image:      image,
 		})
 
 		total += subtotal
@@ -113,30 +137,52 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewForbidden("customer account required")
 	}
 
-	productID, err := uuid.Parse(req.ProductID)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid product id")
-	}
-
 	shopID, err := uuid.Parse(req.ShopID)
 	if err != nil {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	if req.Quantity <= 0 {
-		return apperrors.NewBadRequest("invalid quantity")
-	}
+	if req.ItemType == "custom" {
+		if len(req.CustomDesign) == 0 {
+			return apperrors.NewBadRequest("custom_design is required for custom items")
+		}
+		if req.PhysicalSizeID == "" {
+			return apperrors.NewBadRequest("physical_size_id is required for custom items")
+		}
 
-	input := usecase.AddItemInput{
-		CustomerID: *authCtx.CustomerID,
-		ProductID: productID,
-		ShopID:    shopID,
-		Quantity:  req.Quantity,
-	}
+		input := usecase.AddCustomItemInput{
+			CustomerID:     *authCtx.CustomerID,
+			ShopID:         shopID,
+			Quantity:       req.Quantity,
+			ProductName:    req.ProductName,
+			PhysicalSizeID: req.PhysicalSizeID,
+			CustomDesign:   req.CustomDesign,
+		}
+		if err := h.addCustomItem.Execute(r.Context(), input); err != nil {
+			return err
+		}
+	} else {
+		// Standard path — existing logic preserved
+		if req.ProductID == nil {
+			return apperrors.NewBadRequest("product_id is required for standard items")
+		}
+		productID, err := uuid.Parse(*req.ProductID)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid product id")
+		}
+		if req.Quantity <= 0 {
+			return apperrors.NewBadRequest("invalid quantity")
+		}
 
-	if err := h.addItem.
-		Execute(r.Context(), input); err != nil {
-		return err
+		input := usecase.AddItemInput{
+			CustomerID: *authCtx.CustomerID,
+			ProductID:  productID,
+			ShopID:     shopID,
+			Quantity:   req.Quantity,
+		}
+		if err := h.addItem.Execute(r.Context(), input); err != nil {
+			return err
+		}
 	}
 
 	response := map[string]string{
@@ -178,13 +224,12 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 
 	input := usecase.UpdateItemInput{
 		CustomerID: *authCtx.CustomerID,
-		ProductID: productID,
-		ShopID:    shopID,
-		Quantity:  req.Quantity,
+		ProductID:  productID,
+		ShopID:     shopID,
+		Quantity:   req.Quantity,
 	}
 
-	if err := h.updateItem.
-		Execute(r.Context(), input); err != nil {
+	if err := h.updateItem.Execute(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -217,8 +262,8 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 
 	input := usecase.RemoveItemInput{
 		CustomerID: *authCtx.CustomerID,
-		ProductID: productID,
-		ShopID:    shopID,
+		ProductID:  productID,
+		ShopID:     shopID,
 	}
 
 	if err := h.removeItem.Execute(r.Context(), input); err != nil {
@@ -255,8 +300,7 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	result, err := h.checkout.
-		Execute(r.Context(), *authCtx, input)
+	result, err := h.checkout.Execute(r.Context(), *authCtx, input)
 	if err != nil {
 		return err
 	}
@@ -367,8 +411,7 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-	result, err := h.checkout.
-		Execute(r.Context(), *authCtx, input)
+	result, err := h.checkout.Execute(r.Context(), *authCtx, input)
 	if err != nil {
 		return err
 	}
@@ -531,4 +574,31 @@ func (h *CartHandler) parseCheckoutInput(
 		AddressID:       addressID,
 		ShopInput:       shopInput,
 	}, nil
+}
+
+func (h *CartHandler) RemoveCustomItem(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	cartItemID, err := apphttp.ParamUUID(r, "cartItemID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid cart item id")
+	}
+
+	input := usecase.RemoveCustomItemInput{
+		CustomerID: *authCtx.CustomerID,
+		CartItemID: cartItemID,
+	}
+
+	if err := h.removeCustomItem.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]string{"message": "item removed"})
+	return nil
 }

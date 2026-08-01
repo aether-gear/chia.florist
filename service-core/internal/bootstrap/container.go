@@ -101,11 +101,13 @@ type Container struct {
 	CreateStaff     staffUsecase.CreateStaffUsecase
 	AddStaffAccount staffUsecase.AddStaffAccountUsecase
 
-	GetCart    cartUsecase.GetCartUsecase
-	AddItem    cartUsecase.AddItemUsecase
-	UpdateItem cartUsecase.UpdateItemUsecase
-	RemoveItem cartUsecase.RemoveItemUsecase
-	Checkout   cartUsecase.CheckoutUsecase
+	GetCart         cartUsecase.GetCartUsecase
+	AddItem         cartUsecase.AddItemUsecase
+	AddCustomItem   cartUsecase.AddCustomItemUsecase
+	UpdateItem      cartUsecase.UpdateItemUsecase
+	RemoveItem      cartUsecase.RemoveItemUsecase
+	RemoveCustomItem cartUsecase.RemoveCustomItemUsecase
+	Checkout        cartUsecase.CheckoutUsecase
 
 	ListLocations locationUsecase.ListLocationUsecase
 
@@ -552,6 +554,12 @@ func NewContainer(cfg Config,
 				inventoryRepo,
 				productRepo,
 			),
+		AddCustomItem: *cartUsecase.
+			NewAddCustomItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
+			),
 		UpdateItem: *cartUsecase.
 			NewUpdateItemUsecase(
 				infra.TransactionExecutor,
@@ -562,6 +570,12 @@ func NewContainer(cfg Config,
 			),
 		RemoveItem: *cartUsecase.
 			NewRemoveItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
+			),
+		RemoveCustomItem: *cartUsecase.
+			NewRemoveCustomItemUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				cartRepo,
