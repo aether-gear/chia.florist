@@ -24,6 +24,7 @@ import (
 	threatIntelUsecase "service-core/internal/modules/threat_intel/usecase"
 
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
+	analyticsPersistence "service-core/internal/modules/analytics/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
 	cartPersistence "service-core/internal/modules/cart/infra/persistence"
@@ -47,6 +48,7 @@ import (
 	orderSvc "service-core/internal/modules/order/infra/service"
 
 	addressUsecase "service-core/internal/modules/address/usecase"
+	analyticsUsecase "service-core/internal/modules/analytics/usecase"
 	authenUsecase "service-core/internal/modules/authentication/usecase"
 	cartUsecase "service-core/internal/modules/cart/usecase"
 	courierUsecase "service-core/internal/modules/courier/usecase"
@@ -172,6 +174,12 @@ type Container struct {
 
 	AnalyzeIP threatIntelUsecase.AnalyzeIPUsecase
 	GetGeoIP  threatIntelUsecase.GetGeoIPUsecase
+
+	GetOrderMetrics     analyticsUsecase.GetOrderMetricsUsecase
+	GetPaymentMetrics   analyticsUsecase.GetPaymentMetricsUsecase
+	GetShipmentMetrics  analyticsUsecase.GetShipmentMetricsUsecase
+	GetInventoryMetrics analyticsUsecase.GetInventoryMetricsUsecase
+	GetProductMetrics   analyticsUsecase.GetProductMetricsUsecase
 }
 
 func NewContainer(cfg Config,
@@ -224,6 +232,7 @@ func NewContainer(cfg Config,
 		shipmentRepo            = shipmentPersistence.NewShipmentRepositoryImpl()
 		shipmentEventRepo       = shipmentPersistence.NewShipmentEventRepositoryImpl()
 		threatIntelRepo         = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
+		analyticsRepo           = analyticsPersistence.NewAnalyticsRepositoryImpl()
 	)
 
 	var (
@@ -887,6 +896,12 @@ func NewContainer(cfg Config,
 		),
 		AnalyzeIP: *threatIntelUsecase.NewAnalyzeIPUsecase(threatIntelRepo),
 		GetGeoIP:  *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
+
+		GetOrderMetrics:     *analyticsUsecase.NewGetOrderMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetPaymentMetrics:   *analyticsUsecase.NewGetPaymentMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetShipmentMetrics:  *analyticsUsecase.NewGetShipmentMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetInventoryMetrics: *analyticsUsecase.NewGetInventoryMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetProductMetrics:   *analyticsUsecase.NewGetProductMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 	}
 
 	// Populate the sync job on the infra struct so App.Run can start it.
