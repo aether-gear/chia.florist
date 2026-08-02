@@ -27,7 +27,7 @@ func (c *Cart) AddItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		item := &c.Items[i]
 		// Skip custom items,
 		// they are never deduplicated by product_id
-		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
@@ -38,11 +38,11 @@ func (c *Cart) AddItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 
 	pid := productID
 	c.Items = append(c.Items, CartItem{
-		ID:        uuid.New(),
-		ItemType:  ItemTypeStandard,
-		ProductID: &pid,
-		ShopID:    shopID,
-		Quantity:  qty,
+		ID:                 uuid.New(),
+		ProductVariantType: ProductVariantTypeStandard,
+		ProductID:          &pid,
+		ShopID:             shopID,
+		Quantity:           qty,
 	})
 
 	return nil
@@ -58,12 +58,12 @@ func (c *Cart) AddCustomItem(shopID uuid.UUID, qty int, design json.RawMessage) 
 		return ErrInvalidQuantity
 	}
 	c.Items = append(c.Items, CartItem{
-		ID:           uuid.New(),
-		ItemType:     ItemTypeCustom,
-		ProductID:    nil,
-		ShopID:       shopID,
-		Quantity:     qty,
-		CustomDesign: design,
+		ID:                 uuid.New(),
+		ProductVariantType: ProductVariantTypeCustom,
+		ProductID:          nil,
+		ShopID:             shopID,
+		Quantity:           qty,
+		CustomDesign:       design,
 	})
 	return nil
 }
@@ -77,7 +77,7 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		item := &c.Items[i]
 		// Skip custom items,
 		// they are managed by ID, not by product_id
-		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
@@ -99,12 +99,12 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 
 	pid := productID
 	c.Items = append(c.Items, CartItem{
-		ID:        uuid.New(),
-		ItemType:  ItemTypeStandard,
-		ProductID: &pid,
-		ShopID:    shopID,
-		Quantity:  qty,
-		DeletedAt: nil,
+		ID:                 uuid.New(),
+		ProductVariantType: ProductVariantTypeStandard,
+		ProductID:          &pid,
+		ShopID:             shopID,
+		Quantity:           qty,
+		DeletedAt:          nil,
 	})
 
 	return nil
@@ -113,7 +113,7 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) {
 	for i := range c.Items {
 		item := &c.Items[i]
-		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
@@ -128,7 +128,7 @@ func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) {
 // Returns false if the item was not found.
 func (c *Cart) RemoveCustomItem(cartItemID uuid.UUID) bool {
 	for i := range c.Items {
-		if c.Items[i].ID == cartItemID && c.Items[i].ItemType == ItemTypeCustom {
+		if c.Items[i].ID == cartItemID && c.Items[i].ProductVariantType == ProductVariantTypeCustom {
 			now := time.Now()
 			c.Items[i].DeletedAt = &now
 			return true
@@ -140,7 +140,7 @@ func (c *Cart) RemoveCustomItem(cartItemID uuid.UUID) bool {
 func (c *Cart) HasItem(productID uuid.UUID, shopID uuid.UUID) bool {
 	for i := range c.Items {
 		item := &c.Items[i]
-		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
@@ -153,7 +153,7 @@ func (c *Cart) HasItem(productID uuid.UUID, shopID uuid.UUID) bool {
 func (c *Cart) FindItem(productID uuid.UUID, shopID uuid.UUID) *CartItem {
 	for i := range c.Items {
 		item := &c.Items[i]
-		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
@@ -170,7 +170,7 @@ func (c *Cart) HasProductInAnotherShop(productID uuid.UUID, shopID uuid.UUID) bo
 			continue
 		}
 		// Custom items have no product_id to compare
-		if item.ItemType == ItemTypeCustom || item.ProductID == nil {
+		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID != shopID {

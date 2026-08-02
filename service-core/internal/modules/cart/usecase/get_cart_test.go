@@ -125,18 +125,18 @@ func TestGetCart_Success_NoDeletedProducts(t *testing.T) {
 		CustomerID: customerID,
 		Items: []cartDomain.CartItem{
 			{
-				ID:        uuid.New(),
-				ItemType:  cartDomain.ItemTypeStandard,
-				ProductID: &productID1,
-				ShopID:    shopID,
-				Quantity:  2,
+				ID:                 uuid.New(),
+				ProductVariantType: cartDomain.ProductVariantTypeStandard,
+				ProductID:          &productID1,
+				ShopID:             shopID,
+				Quantity:           2,
 			},
 			{
-				ID:        uuid.New(),
-				ItemType:  cartDomain.ItemTypeStandard,
-				ProductID: &productID2,
-				ShopID:    shopID,
-				Quantity:  1,
+				ID:                 uuid.New(),
+				ProductVariantType: cartDomain.ProductVariantTypeStandard,
+				ProductID:          &productID2,
+				ShopID:             shopID,
+				Quantity:           1,
 			},
 		},
 	}
@@ -226,18 +226,18 @@ func TestGetCart_Success_WithDeletedProducts(t *testing.T) {
 		CustomerID: customerID,
 		Items: []cartDomain.CartItem{
 			{
-				ID:        uuid.New(),
-				ItemType:  cartDomain.ItemTypeStandard,
-				ProductID: &productIDActive,
-				ShopID:    shopID,
-				Quantity:  2,
+				ID:                 uuid.New(),
+				ProductVariantType: cartDomain.ProductVariantTypeStandard,
+				ProductID:          &productIDActive,
+				ShopID:             shopID,
+				Quantity:           2,
 			},
 			{
-				ID:        uuid.New(),
-				ItemType:  cartDomain.ItemTypeStandard,
-				ProductID: &productIDDeleted,
-				ShopID:    shopID,
-				Quantity:  1,
+				ID:                 uuid.New(),
+				ProductVariantType: cartDomain.ProductVariantTypeStandard,
+				ProductID:          &productIDDeleted,
+				ShopID:             shopID,
+				Quantity:           1,
 			},
 		},
 	}
@@ -305,11 +305,11 @@ func TestGetCart_Success_ProductNotFound(t *testing.T) {
 		CustomerID: customerID,
 		Items: []cartDomain.CartItem{
 			{
-				ID:        uuid.New(),
-				ItemType:  cartDomain.ItemTypeStandard,
-				ProductID: &productIDNotFound,
-				ShopID:    shopID,
-				Quantity:  2,
+				ID:                 uuid.New(),
+				ProductVariantType: cartDomain.ProductVariantTypeStandard,
+				ProductID:          &productIDNotFound,
+				ShopID:             shopID,
+				Quantity:           2,
 			},
 		},
 	}
@@ -352,12 +352,12 @@ func TestGetCart_Success_WithCustomItem(t *testing.T) {
 		CustomerID: customerID,
 		Items: []cartDomain.CartItem{
 			{
-				ID:           customItemID,
-				ItemType:     cartDomain.ItemTypeCustom,
-				ProductID:    nil,
-				ShopID:       shopID,
-				Quantity:     1,
-				CustomDesign: customPayload,
+				ID:                 customItemID,
+				ProductVariantType: cartDomain.ProductVariantTypeCustom,
+				ProductID:          nil,
+				ShopID:             shopID,
+				Quantity:           1,
+				CustomDesign:       customPayload,
 			},
 		},
 	}
@@ -380,8 +380,8 @@ func TestGetCart_Success_WithCustomItem(t *testing.T) {
 	}
 
 	item := result.Cart.Items[0]
-	if item.ItemType != cartDomain.ItemTypeCustom {
-		t.Errorf("expected ItemTypeCustom, got %s", item.ItemType)
+	if item.ProductVariantType != cartDomain.ProductVariantTypeCustom {
+		t.Errorf("expected ProductVariantTypeCustom, got %s", item.ProductVariantType)
 	}
 	if item.ProductID != nil {
 		t.Errorf("expected nil ProductID for custom item, got %v", item.ProductID)

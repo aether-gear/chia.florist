@@ -33,7 +33,7 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			c.created_at,
 			c.updated_at,
 			ci.id,
-			ci.item_type,
+			ci.product_variant_type,
 			ci.product_id,
 			ci.shop_id,
 			ci.quantity,
@@ -58,16 +58,16 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 	var cart *domain.Cart
 	for rows.Next() {
 		var (
-			cID          uuid.UUID
-			custID       uuid.UUID
-			createdAt    time.Time
-			updatedAt    *time.Time
-			itemID       *uuid.UUID
-			itemType     *string
-			productID    *uuid.UUID
-			shopID       *uuid.UUID
-			quantity     *int
-			customDesign []byte
+			cID                uuid.UUID
+			custID             uuid.UUID
+			createdAt          time.Time
+			updatedAt          *time.Time
+			itemID             *uuid.UUID
+			ProductVariantType *string
+			productID          *uuid.UUID
+			shopID             *uuid.UUID
+			quantity           *int
+			customDesign       []byte
 		)
 
 		err := rows.Scan(
@@ -76,7 +76,7 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			&createdAt,
 			&updatedAt,
 			&itemID,
-			&itemType,
+			&ProductVariantType,
 			&productID,
 			&shopID,
 			&quantity,
@@ -97,17 +97,17 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 		}
 
 		if itemID != nil {
-			it := domain.ItemTypeStandard
-			if itemType != nil && *itemType == string(domain.ItemTypeCustom) {
-				it = domain.ItemTypeCustom
+			it := domain.ProductVariantTypeStandard
+			if ProductVariantType != nil && *ProductVariantType == string(domain.ProductVariantTypeCustom) {
+				it = domain.ProductVariantTypeCustom
 			}
 			cart.Items = append(cart.Items, domain.CartItem{
-				ID:           *itemID,
-				ItemType:     it,
-				ProductID:    productID,
-				ShopID:       *shopID,
-				Quantity:     *quantity,
-				CustomDesign: json.RawMessage(customDesign),
+				ID:                 *itemID,
+				ProductVariantType: it,
+				ProductID:          productID,
+				ShopID:             *shopID,
+				Quantity:           *quantity,
+				CustomDesign:       json.RawMessage(customDesign),
 			})
 		}
 	}
@@ -160,7 +160,7 @@ func (r *cartRepositoryImpl) Save(
 	const insertStandardQuery = `
 		INSERT INTO cart_items (
 			cart_id,
-			item_type,
+			product_variant_type,
 			product_id,
 			shop_id,
 			quantity
@@ -168,7 +168,7 @@ func (r *cartRepositoryImpl) Save(
 		VALUES ($1,'standard',$2,$3,$4)
 		ON CONFLICT (cart_id, product_id)
 		WHERE deleted_at IS NULL
-			AND item_type = 'standard'
+			AND product_variant_type = 'standard'
 		DO UPDATE SET
 			quantity   = EXCLUDED.quantity,
 			updated_at = NOW()
@@ -177,7 +177,7 @@ func (r *cartRepositoryImpl) Save(
 	const insertCustomQuery = `
 		INSERT INTO cart_items (
 			cart_id,
-			item_type,
+			product_variant_type,
 			shop_id,
 			quantity,
 			custom_design
@@ -207,7 +207,7 @@ func (r *cartRepositoryImpl) Save(
 
 	for _, item := range cart.Items {
 		if item.DeletedAt != nil {
-			if item.ItemType == domain.ItemTypeCustom {
+			if item.ProductVariantType == domain.ProductVariantTypeCustom {
 				if _, err := exec.Exec(ctx, softDeleteByIDQuery, item.ID); err != nil {
 					return fmt.Errorf("soft-delete custom cart item failed: %w", err)
 				}
@@ -221,7 +221,7 @@ func (r *cartRepositoryImpl) Save(
 			continue
 		}
 
-		if item.ItemType == domain.ItemTypeCustom {
+		if item.ProductVariantType == domain.ProductVariantTypeCustom {
 			if _, err := exec.Exec(ctx, insertCustomQuery,
 				cart.ID, item.ShopID, item.Quantity, []byte(item.CustomDesign),
 			); err != nil {

@@ -23,10 +23,10 @@ func (m *mockTransactor) WithinTransaction(ctx context.Context, fn func(transact
 
 type mockSaveCartRepository struct {
 	cartRepo.CartRepository
-	cart     *cartDomain.Cart
-	saved    bool
-	saveErr  error
-	getErr   error
+	cart    *cartDomain.Cart
+	saved   bool
+	saveErr error
+	getErr  error
 }
 
 func (m *mockSaveCartRepository) GetWithItemsByCustomerID(
@@ -106,8 +106,8 @@ func TestAddCustomItem_Success(t *testing.T) {
 	}
 
 	item := cartR.cart.Items[0]
-	if item.ItemType != cartDomain.ItemTypeCustom {
-		t.Errorf("expected ItemTypeCustom, got %s", item.ItemType)
+	if item.ProductVariantType != cartDomain.ProductVariantTypeCustom {
+		t.Errorf("expected ProductVariantTypeCustom, got %s", item.ProductVariantType)
 	}
 	if item.ProductID != nil {
 		t.Errorf("expected nil ProductID, got %v", item.ProductID)

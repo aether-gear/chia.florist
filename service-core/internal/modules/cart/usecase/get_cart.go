@@ -88,7 +88,7 @@ func (u *GetCartUsecase) Execute(
 	productIDs := make([]uuid.UUID, 0, len(cart.Items))
 	for _, item := range cart.Items {
 		// Custom items have no catalogue entry — skip product lookup
-		if item.ItemType == domain.ItemTypeCustom ||
+		if item.ProductVariantType == domain.ProductVariantTypeCustom ||
 			item.ProductID == nil {
 			continue
 		}
@@ -146,7 +146,7 @@ func (u *GetCartUsecase) Execute(
 
 	activeItems := make([]domain.CartItem, 0, len(cart.Items))
 	for _, item := range cart.Items {
-		if item.ItemType == domain.ItemTypeCustom {
+		if item.ProductVariantType == domain.ProductVariantTypeCustom {
 			// Custom items always stay in the cart regardless of product map
 			activeItems = append(activeItems, item)
 			continue

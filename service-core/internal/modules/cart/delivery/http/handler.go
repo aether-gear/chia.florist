@@ -64,17 +64,17 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 
 	for _, item := range result.Cart.Items {
 		// Custom items: echo the design payload back; price resolved in M2
-		if item.ItemType == domain.ItemTypeCustom {
+		if item.ProductVariantType == domain.ProductVariantTypeCustom {
 			items = append(items, cartItemView{
-				CartItemID:   item.ID,
-				ItemType:     string(item.ItemType),
-				ShopID:       item.ShopID,
-				Name:         "(Custom Board)",
-				Price:        0,
-				Quantity:     item.Quantity,
-				Subtotal:     0,
-				Image:        productImageResponse{},
-				CustomDesign: item.CustomDesign,
+				CartItemID:         item.ID,
+				ProductVariantType: string(item.ProductVariantType),
+				ShopID:             item.ShopID,
+				Name:               "(Custom Board)",
+				Price:              0,
+				Quantity:           item.Quantity,
+				Subtotal:           0,
+				Image:              productImageResponse{},
+				CustomDesign:       item.CustomDesign,
 			})
 			continue
 		}
@@ -98,15 +98,15 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		items = append(items, cartItemView{
-			CartItemID: item.ID,
-			ItemType:   string(item.ItemType),
-			ProductID:  item.ProductID,
-			ShopID:     item.ShopID,
-			Name:       productData.Product.Name,
-			Price:      price,
-			Quantity:   quantity,
-			Subtotal:   subtotal,
-			Image:      image,
+			CartItemID:         item.ID,
+			ProductVariantType: string(item.ProductVariantType),
+			ProductID:          item.ProductID,
+			ShopID:             item.ShopID,
+			Name:               productData.Product.Name,
+			Price:              price,
+			Quantity:           quantity,
+			Subtotal:           subtotal,
+			Image:              image,
 		})
 
 		total += subtotal
@@ -142,7 +142,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	if req.ItemType == "custom" {
+	if req.ProductVariantType == "custom" {
 		if len(req.CustomDesign) == 0 {
 			return apperrors.NewBadRequest("custom_design is required for custom items")
 		}

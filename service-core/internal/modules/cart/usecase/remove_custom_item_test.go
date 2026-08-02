@@ -21,12 +21,12 @@ func TestRemoveCustomItem_Success(t *testing.T) {
 		CustomerID: customerID,
 		Items: []cartDomain.CartItem{
 			{
-				ID:           customItemID,
-				ItemType:     cartDomain.ItemTypeCustom,
-				ProductID:    nil,
-				ShopID:       shopID,
-				Quantity:     1,
-				CustomDesign: json.RawMessage(`{"metadata":{"version":"1.0.0"}}`),
+				ID:                 customItemID,
+				ProductVariantType: cartDomain.ProductVariantTypeCustom,
+				ProductID:          nil,
+				ShopID:             shopID,
+				Quantity:           1,
+				CustomDesign:       json.RawMessage(`{"metadata":{"version":"1.0.0"}}`),
 			},
 		},
 	}
@@ -68,12 +68,12 @@ func TestRemoveCustomItem_NotFound_ItemDoesNotExist(t *testing.T) {
 		CustomerID: customerID,
 		Items: []cartDomain.CartItem{
 			{
-				ID:           customItemID,
-				ItemType:     cartDomain.ItemTypeCustom,
-				ProductID:    nil,
-				ShopID:       shopID,
-				Quantity:     1,
-				CustomDesign: json.RawMessage(`{"metadata":{"version":"1.0.0"}}`),
+				ID:                 customItemID,
+				ProductVariantType: cartDomain.ProductVariantTypeCustom,
+				ProductID:          nil,
+				ShopID:             shopID,
+				Quantity:           1,
+				CustomDesign:       json.RawMessage(`{"metadata":{"version":"1.0.0"}}`),
 			},
 		},
 	}
