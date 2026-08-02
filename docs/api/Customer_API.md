@@ -42,11 +42,12 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [X] List My Addresses
     - [X] Save My Address
     - [X] Delete My Address
-  - [X] Cart
-    - [X] Get Cart
-    - [X] Add Item
-    - [X] Update Item
-    - [X] Remove Item
+  - [ ] Cart
+    - [ ] Get Cart
+    - [ ] Add Item
+    - [ ] Update Item
+    - [ ] Remove Item
+    - [ ] Remove Custom Item
   - [ ] Checkout
     - [ ] Estimate Checkout
     - [ ] Calculate Checkout
@@ -974,7 +975,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 - **Method**: `GET`
 - **Endpoint**: `/carts`
-- **Description**: Retrieve the current cart of the authenticated customer, including all items with subtotals and a grand total.
+- **Description**: Retrieve the current cart of the authenticated customer, including standard and custom product items with subtotals and grand total.
 - **Authentication**: Customer
 - **Request Body**: None
 
@@ -986,14 +987,51 @@ These endpoints require a valid customer session set via the Sign In or Verify A
   "total": 170000,
   "items": [
     {
+      "cart_item_id": "d1a2b3c4-e5f6-7890-abcd-ef1234567890",
+      "product_variant_type": "standard",
       "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
       "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
-      "name":       "Anniversary",
+      "name":       "Anniversary Flower Stand",
       "price":      85000,
       "quantity":   2,
       "subtotal":   170000,
       "images": {
         "thumbnail": "https://example.com/thumbnail.jpg"
+      }
+    },
+    {
+      "cart_item_id": "e5f6a7b8-c9d0-1234-ef56-789012345678",
+      "product_variant_type": "custom",
+      "product_id": null,
+      "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name":       "(Custom Board)",
+      "price":      0,
+      "quantity":   1,
+      "subtotal":   0,
+      "images": {},
+      "custom_design": {
+        "metadata": {
+          "version": "1.0.0",
+          "editorVersion": "1.0.0",
+          "platform": "web",
+          "checksum": "a8f3b9e1"
+        },
+        "layout": {
+          "physicalSizeId": "medium",
+          "upperHeightRatio": 0.58
+        },
+        "sections": {
+          "upper": {
+            "header": { "text": "Selamat & Sukses", "fontId": "playfair" },
+            "body": { "text": "Jane Doe", "fontId": "inter" }
+          },
+          "lower": {
+            "body": { "text": "PT. Tech Nusantara", "fontId": "inter" }
+          }
+        },
+        "assets": {
+          "previewUrl": "https://chia-florist.supabase.co/storage/v1/object/public/custom-previews/designs/2026/08/order-board-a8f3b9e1.png"
+        }
       }
     }
   ]
@@ -1011,16 +1049,67 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 - **Method**: `POST`
 - **Endpoint**: `/carts/items`
-- **Description**: Add a product to the cart. If the item already exists, quantity is incremented.
+- **Description**: Add a standard catalog product or custom-designed flower board item to the customer's cart. The item type is specified by `product_variant_type`.
 - **Authentication**: Customer
-- **Request Body**:
-  ```json
-  {
-    "product_id": "string (UUID, required)",
-    "shop_id":    "string (UUID, required)",
-    "quantity":   1
+
+#### Request Body (Standard Product Item)
+
+```json
+{
+  "product_variant_type": "standard",
+  "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+  "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "quantity": 1
+}
+```
+
+#### Request Body (Custom Product Item)
+
+```json
+{
+  "product_variant_type": "custom",
+  "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "quantity": 1,
+  "product_name": "Custom Board — Selamat & Sukses",
+  "physical_size_id": "medium",
+  "custom_design": {
+    "metadata": {
+      "version": "1.0.0",
+      "editorVersion": "1.0.0",
+      "platform": "web",
+      "checksum": "a8f3b9e1"
+    },
+    "layout": {
+      "physicalSizeId": "medium",
+      "upperHeightRatio": 0.58
+    },
+    "sections": {
+      "upper": {
+        "header": { "text": "Selamat & Sukses", "fontId": "playfair" },
+        "body": { "text": "Jane Doe", "fontId": "inter" }
+      },
+      "lower": {
+        "body": { "text": "PT. Tech Nusantara", "fontId": "inter" }
+      }
+    },
+    "assets": {
+      "previewUrl": "https://chia-florist.supabase.co/storage/v1/object/public/custom-previews/designs/2026/08/order-board-a8f3b9e1.png"
+    }
   }
-  ```
+}
+```
+
+#### Field Descriptions
+
+| Field                  | Type   | Required | Description |
+|------------------------|--------|----------|-------------|
+| `product_variant_type` | string | No       | Variant type discriminator (`"standard"` or `"custom"`). Defaults to `"standard"`. |
+| `product_id`           | string | Optional | Product UUID. Required when `product_variant_type` is `"standard"`. |
+| `shop_id`              | string | Yes      | Shop UUID where the item is purchased. |
+| `quantity`             | int    | Yes      | Quantity of items (`> 0`). |
+| `product_name`         | string | Optional | Human-readable title for custom products. Required when `product_variant_type` is `"custom"`. |
+| `physical_size_id`     | string | Optional | Physical size identifier (e.g. `"medium"`). Required when `product_variant_type` is `"custom"`. |
+| `custom_design`        | object | Optional | Full v1.0.0 canvas design JSON snapshot payload. Required when `product_variant_type` is `"custom"`. |
 
 #### Response `200 OK`
 
@@ -1032,14 +1121,14 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 | Status             | Condition |
 |--------------------|-----------|
-| `400 Bad Request`  | `product_id` or `shop_id` is not a valid UUID, or `quantity` is `<= 0`. |
+| `400 Bad Request`  | Missing required fields (`product_id` for standard, `custom_design` / `physical_size_id` for custom), invalid UUIDs, or `quantity <= 0`. |
 | `401 Unauthorized` | Missing or invalid session. |
 
 ### Update Item
 
 - **Method**: `PUT`
 - **Endpoint**: `/carts/items/{shopID}/{productID}`
-- **Description**: Update the quantity of a specific item in the cart. Setting quantity to `0` is treated as removal depending on the usecase implementation.
+- **Description**: Update the quantity of a specific standard item in the cart.
 - **Authentication**: Customer
 - **Request Body**:
   ```json
@@ -1072,7 +1161,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 - **Method**: `DELETE`
 - **Endpoint**: `/carts/items/{shopID}/{productID}`
-- **Description**: Remove a specific item from the cart entirely.
+- **Description**: Remove a specific standard item from the cart entirely by product ID.
 - **Authentication**: Customer
 - **Request Body**: None
 
@@ -1096,6 +1185,34 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `400 Bad Request`  | `shopID` or `productID` is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
 
+### Remove Custom Item
+
+- **Method**: `DELETE`
+- **Endpoint**: `/carts/items/custom/{cartItemID}`
+- **Description**: Remove a specific custom-designed item from the cart using its `cart_item_id`.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter    | Type          | Description |
+|--------------|---------------|-------------|
+| `cartItemID` | UUID (string) | The unique `cart_item_id` of the custom item to remove. |
+
+#### Response `200 OK`
+
+```json
+{ "message": "item removed" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `cartItemID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Custom item not found in cart. |
+
 ## Checkout
 
 ### Estimate Checkout
@@ -1112,12 +1229,23 @@ These endpoints require a valid customer session set via the Sign In or Verify A
         "shop_id": "string (UUID, required)",
         "items": [
           {
-            "product_id": "string (UUID, required)",
-            "quantity":   80
+            "product_variant_type": "standard",
+            "product_id": "string (UUID, required for standard)",
+            "quantity": 1
+          },
+          {
+            "product_variant_type": "custom",
+            "product_name": "Custom Board — Selamat & Sukses",
+            "physical_size_id": "medium",
+            "quantity": 1,
+            "custom_design": {
+              "metadata": { "version": "1.0.0" },
+              "layout": { "physicalSizeId": "medium" }
+            }
           }
         ],
         "courier": {
-          "code":    "jne",
+          "code": "jne",
           "service": "REG"
         }
       }
@@ -1307,12 +1435,23 @@ These endpoints require a valid customer session set via the Sign In or Verify A
         "shop_id": "string (UUID, required)",
         "items": [
           {
-            "product_id": "string (UUID, required)",
-            "quantity":   1
+            "product_variant_type": "standard",
+            "product_id": "string (UUID, required for standard)",
+            "quantity": 1
+          },
+          {
+            "product_variant_type": "custom",
+            "product_name": "Custom Board — Selamat & Sukses",
+            "physical_size_id": "medium",
+            "quantity": 1,
+            "custom_design": {
+              "metadata": { "version": "1.0.0" },
+              "layout": { "physicalSizeId": "medium" }
+            }
           }
         ],
         "courier": {
-          "code":    "jne",
+          "code": "jne",
           "service": "REG"
         }
       }
@@ -1470,6 +1609,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 			"items": [
 				{
 					"id": "e73f9f49-b3b3-4c8e-8fee-dc5d4a0207ab",
+					"product_variant_type": "standard",
 					"product_id": "480eec7c-d950-4927-a570-1fc3dc20df67",
 					"product_name": "Prosperity Grand Opening Stand",
 					"quantity": 3,
@@ -1480,6 +1620,24 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 					"courier_code": "tiki",
 					"courier_service": "SDS",
 					"shipping_fee": 770000
+				},
+				{
+					"id": "f84a9f49-b3b3-4c8e-8fee-dc5d4a0207ac",
+					"product_variant_type": "custom",
+					"product_id": null,
+					"product_name": "Custom Board — Selamat & Sukses",
+					"quantity": 1,
+					"unit_price": 650000,
+					"subtotal": 650000,
+					"shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
+					"shop_name": "dayum",
+					"courier_code": "tiki",
+					"courier_service": "SDS",
+					"shipping_fee": 0,
+					"custom_design": {
+						"physical_size_id": "medium",
+						"preview_url": "https://chia-florist.supabase.co/storage/v1/object/public/custom-previews/designs/2026/08/order-board-a8f3b9e1.png"
+					}
 				}
 			],
 			"payment": {
@@ -1767,7 +1925,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 - **Method**: `POST`
 - **Endpoint**: `/order`
-- **Description**: Place a new order and create the associated invoice, order items, invoice items, and payment details. It locks the inventory for the purchased products and returns the assigned payment account and instructions.
+- **Description**: Place a new order and create the associated invoice, order items, invoice items, and payment details. It locks the inventory for standard catalog products (bypassing stock reservation for custom flower board items) and returns the assigned payment account and instructions.
 - **Authentication**: Customer
 - **Request Body**:
   ```json
@@ -1780,16 +1938,37 @@ These endpoints require a valid customer session set via the Sign In or Verify A
     "shops": [
       {
         "shop_id": "string (UUID, required)",
-        "name": "string (required)",
+        "name": "Chia Medan Satria",
         "selected_courier": {
           "code": "jne",
           "service": "REG"
         },
         "items": [
           {
-            "product_id": "string (UUID, required)",
-            "name": "string (required)",
+            "product_variant_type": "standard",
+            "product_id": "e7b0c950-6d33-4f51-b851-93c10a421234",
+            "name": "Prosperity Grand Opening Stand",
             "quantity": 1
+          },
+          {
+            "product_variant_type": "custom",
+            "name": "Custom Board — Selamat & Sukses",
+            "physical_size_id": "medium",
+            "quantity": 1,
+            "custom_design": {
+              "metadata": {
+                "version": "1.0.0",
+                "checksum": "a8f3b9e1"
+              },
+              "layout": { "physicalSizeId": "medium", "upperHeightRatio": 0.58 },
+              "sections": {
+                "upper": { "header": { "text": "Selamat & Sukses", "fontId": "playfair" } },
+                "lower": { "body": { "text": "PT. Tech Nusantara", "fontId": "inter" } }
+              },
+              "assets": {
+                "previewUrl": "https://chia-florist.supabase.co/storage/v1/object/public/custom-previews/designs/2026/08/order-board-a8f3b9e1.png"
+              }
+            }
           }
         ]
       }
@@ -1802,6 +1981,8 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 > Only manual payments are currently supported. If `is_manual` is set to `false`, the request will return a `403 Forbidden` response.
 >
 > `name` in `shops` refers to the shop's name, and `name` in `items` refers to the product's name.
+>
+> `product_variant_type` defaults to `"standard"` if omitted. When set to `"custom"`, stock reservation is bypassed and the item's price is resolved server-side based on `physical_size_id`.
 
 #### Response `200 OK`
 
