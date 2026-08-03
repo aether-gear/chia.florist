@@ -175,14 +175,20 @@ func (r *cartRepositoryImpl) Save(
 	`
 
 	const insertCustomQuery = `
-		INSERT INTO cart_items (
-			cart_id,
-			product_variant_type,
-			shop_id,
-			quantity,
-			custom_design
-		)
-		VALUES ($1,'custom',$2,$3,$4)
+	    INSERT INTO cart_items (
+	        id,
+	        cart_id,
+	        product_variant_type,
+	        shop_id,
+	        quantity,
+	        custom_design
+	    )
+	    VALUES ($1,$2,'custom',$3,$4,$5)
+	    ON CONFLICT (id)
+	    DO UPDATE SET
+	        quantity      = EXCLUDED.quantity,
+	        custom_design = EXCLUDED.custom_design,
+	        updated_at    = NOW()
 	`
 
 	const softDeleteByProductQuery = `
@@ -221,18 +227,40 @@ func (r *cartRepositoryImpl) Save(
 			continue
 		}
 
-		if item.ProductVariantType == domain.ProductVariantTypeCustom {
-			if _, err := exec.Exec(ctx, insertCustomQuery,
-				cart.ID, item.ShopID, item.Quantity, []byte(item.CustomDesign),
-			); err != nil {
-				return fmt.Errorf("insert custom cart item failed: %w", err)
+		var (
+			query     string
+			args      []any
+			errFormat string
+		)
+
+		switch item.ProductVariantType {
+		case domain.ProductVariantTypeCustom:
+			query = insertCustomQuery
+			args = []any{
+				item.ID,
+				cart.ID,
+				item.ShopID,
+				item.Quantity,
+				item.CustomDesign,
 			}
-		} else {
-			if _, err := exec.Exec(ctx, insertStandardQuery,
-				cart.ID, item.ProductID, item.ShopID, item.Quantity,
-			); err != nil {
-				return fmt.Errorf("insert standard cart item failed: %w", err)
+			errFormat = "insert custom cart item failed: %w"
+
+		case domain.ProductVariantTypeStandard:
+			query = insertStandardQuery
+			args = []any{
+				cart.ID,
+				item.ProductID,
+				item.ShopID,
+				item.Quantity,
 			}
+			errFormat = "insert standard cart item failed: %w"
+
+		default:
+			return fmt.Errorf("unsupported product variant type: %q", item.ProductVariantType)
+		}
+
+		if _, err := exec.Exec(ctx, query, args...); err != nil {
+			return fmt.Errorf(errFormat, err)
 		}
 	}
 
