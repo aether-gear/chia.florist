@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useCart, normalizeHexColor, calculateDesignChecksum } from '~/composables/useCart'
+import { supabaseService } from '~/services/supabaseService'
 import type { CustomDesignPayload } from '~/composables/useCart'
 
 definePageMeta({ layout: false })
@@ -647,11 +648,27 @@ const handleFinalizeAndOrder = () => {
 
 const addToCartHandler = async () => {
   isAdding.value = true
-  const previewUrl   = snapshotDataUrl.value || '/images/custom-preview.png'
-  const design       = buildCustomDesignPayload(snapshotDataUrl.value)
+  const design = buildCustomDesignPayload(snapshotDataUrl.value)
+
+  if (snapshotDataUrl.value && snapshotDataUrl.value.startsWith('data:image/')) {
+    try {
+      const response = await fetch(snapshotDataUrl.value)
+      const blob = await response.blob()
+      const uploadRes = await supabaseService.uploadCustomPreview(blob)
+      if (uploadRes) {
+        design.assets.previewUrl = uploadRes.publicUrl
+        design.assets.bucketPath = uploadRes.bucketPath
+        design.assets.storageProvider = 'supabase'
+      }
+    } catch (err) {
+      console.warn('[Chia Florist] Could not upload custom preview to Supabase:', err)
+    }
+  }
+
+  const previewUrl = design.assets.previewUrl || snapshotDataUrl.value || '/images/custom-preview.png'
   console.log('[Chia Florist] Finalized Custom Design Payload for Cart/Order:\n', JSON.stringify(design, null, 2))
-  const itemId       = 'custom-' + Date.now()
-  addToCart({
+  const itemId = 'custom-' + Date.now()
+  await addToCart({
     id: itemId,
     name: `Custom Board — ${upper.value.headerText || 'My Design'}`,
     price: totalPrice.value,

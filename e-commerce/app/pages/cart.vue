@@ -7,15 +7,20 @@ useHead({
   title: 'Your Shopping Cart - Chia Florist'
 })
 
-// INTEGRASI: Ambil variabel formatted dan fungsi formatRupiah murni dari useCart()
-const { cart, removeFromCart, updateQuantity, cartSubtotal, cartSubtotalFormatted, flushCart, formatRupiah } = useCart()
+const { cart, isLoadingCart, loadCart, removeFromCart, updateQuantity, cartSubtotal, cartSubtotalFormatted, flushCart, formatRupiah } = useCart()
+
+const isPageLoading = ref(true)
 
 onMounted(async () => {
-  await flushCart()
+  try {
+    await flushCart()
+    await loadCart(true)
+  } finally {
+    isPageLoading.value = false
+  }
 })
 
-// SINKRONISASI KURS: Nilai diubah ke Rupiah murni agar sinkron dengan database Supabase/Golang
-const shippingFee = ref(20000) // Diubah ke nominal masuk akal (Rp20.000)
+const shippingFee = ref(20000)
 const promoCode = ref('')
 const discount = ref(0)
 
@@ -25,7 +30,7 @@ const totalPayment = computed(() => {
 
 const applyPromo = () => {
   if (promoCode.value.toUpperCase() === 'CHIAFLORIST') {
-    discount.value = 50000 // Diubah ke nominal potongan Rupiah (Rp50.000)
+    discount.value = 50000
     alert(`Promo code applied successfully! You got a ${formatRupiah(50000)} discount.`)
   } else {
     alert('Invalid promo code.')
@@ -34,6 +39,13 @@ const applyPromo = () => {
 
 const handleCheckout = () => {
   navigateTo('/checkout')
+}
+
+const handleImageError = (event: Event) => {
+  const target = event.target as HTMLImageElement
+  if (target) {
+    target.src = '/images/custom-preview.png'
+  }
 }
 </script>
 
@@ -46,7 +58,40 @@ const handleCheckout = () => {
         <p class="text-sm text-gray-500 mt-1">Review your selections before proceeding to secure checkout.</p>
       </div>
 
-      <div v-if="cart.length === 0" class="bg-white border border-gray-100 rounded-3xl p-16 text-center shadow-sm max-w-xl mx-auto mt-10">
+      <!-- 1. Dedicated Loading Skeleton State -->
+      <div v-if="isPageLoading || isLoadingCart" class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        <div class="lg:col-span-8 bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+          <div v-for="n in 2" :key="n" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 animate-pulse">
+            <div class="w-full sm:w-28 h-28 rounded-2xl bg-gray-200 flex-shrink-0"></div>
+            <div class="flex-1 flex flex-col justify-between space-y-4">
+              <div class="flex justify-between items-start gap-4">
+                <div class="space-y-2 flex-1">
+                  <div class="h-5 bg-gray-200 rounded-md w-3/4"></div>
+                  <div class="h-4 bg-gray-200 rounded-md w-1/2"></div>
+                </div>
+                <div class="h-6 bg-gray-200 rounded-md w-24"></div>
+              </div>
+              <div class="flex justify-between items-center pt-4 border-t border-dashed border-gray-100">
+                <div class="h-8 bg-gray-200 rounded-lg w-28"></div>
+                <div class="h-6 bg-gray-200 rounded-md w-20"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-4 bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 animate-pulse">
+          <div class="h-6 bg-gray-200 rounded-md w-1/2"></div>
+          <div class="space-y-4">
+            <div class="flex justify-between"><div class="h-4 bg-gray-200 rounded-md w-20"></div><div class="h-4 bg-gray-200 rounded-md w-24"></div></div>
+            <div class="flex justify-between"><div class="h-4 bg-gray-200 rounded-md w-28"></div><div class="h-4 bg-gray-200 rounded-md w-20"></div></div>
+            <div class="border-t border-gray-100 pt-4 flex justify-between"><div class="h-6 bg-gray-200 rounded-md w-28"></div><div class="h-6 bg-gray-200 rounded-md w-32"></div></div>
+          </div>
+          <div class="h-12 bg-gray-200 rounded-xl w-full"></div>
+        </div>
+      </div>
+
+      <!-- 2. Empty Cart State -->
+      <div v-else-if="cart.length === 0" class="bg-white border border-gray-100 rounded-3xl p-16 text-center shadow-sm max-w-xl mx-auto mt-10">
         <div class="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#1b4332]">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
@@ -59,19 +104,25 @@ const handleCheckout = () => {
         </NuxtLink>
       </div>
 
+      <!-- 3. Populated Cart Items Grid -->
       <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         
         <div class="lg:col-span-8 bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-          <div v-for="(item, idx) in cart" :key="idx" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
-            <div class="w-full sm:w-28 h-28 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-              <img :src="item.image || '/images/custom-preview.png'" :alt="item.name" class="w-full h-full object-cover" />
+          <div v-for="(item, idx) in cart" :key="item.id || idx" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
+            <div class="w-full sm:w-28 h-28 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 relative">
+              <img 
+                :src="item.image || '/images/custom-preview.png'" 
+                :alt="item.name" 
+                class="w-full h-full object-cover"
+                @error="handleImageError"
+              />
             </div>
 
-            <div class="flex-1 flex flex-col justify-between">
-              <div class="flex justify-between items-start gap-4">
-                <div>
-                  <h3 class="font-bold text-gray-900 text-lg leading-snug">{{ item.name }}</h3>
-                  <div class="flex flex-wrap gap-3 mt-2 text-xs text-gray-500 font-medium">
+            <div class="flex-1 flex flex-col justify-between min-w-0">
+              <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div class="min-w-0 flex-1">
+                  <h3 class="font-bold text-gray-900 text-lg leading-snug break-words">{{ item.name }}</h3>
+                  <div class="flex flex-wrap gap-2.5 mt-2 text-xs text-gray-500 font-medium">
                     <span v-if="item.size" class="bg-gray-100 px-2.5 py-1 rounded-md">Size: {{ item.size }}</span>
                     <div v-if="item.color" class="flex items-center gap-1.5 bg-gray-100 px-2.5 py-1 rounded-md">
                       <span>Color:</span>
@@ -80,16 +131,16 @@ const handleCheckout = () => {
                     <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold">✨ Custom Board</span>
                   </div>
                 </div>
-                <div class="text-xl font-extrabold text-gray-900">
+                <div class="text-xl font-extrabold text-gray-900 flex-shrink-0">
                   {{ formatRupiah(item.price * item.quantity) }}
                 </div>
               </div>
 
               <div class="flex justify-between items-center mt-6 pt-4 border-t border-dashed border-gray-100">
                 <div class="flex border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                  <button @click="updateQuantity(item.id, item.size, item.color, -1)" class="px-3 py-1.5 hover:bg-gray-200 transition text-gray-600 font-bold">-</button>
+                  <button @click="updateQuantity(item.id, item.size, item.color, -1)" class="px-3 py-1.5 hover:bg-gray-200 transition text-gray-600 font-bold cursor-pointer">-</button>
                   <span class="px-4 py-1.5 font-bold text-gray-800 flex items-center select-none text-sm">{{ item.quantity }}</span>
-                  <button @click="updateQuantity(item.id, item.size, item.color, 1)" class="px-3 py-1.5 hover:bg-gray-200 transition text-gray-600 font-bold">+</button>
+                  <button @click="updateQuantity(item.id, item.size, item.color, 1)" class="px-3 py-1.5 hover:bg-gray-200 transition text-gray-600 font-bold cursor-pointer">+</button>
                 </div>
 
                 <button @click="removeFromCart(item.id, item.size, item.color)" class="text-sm font-semibold text-red-500 hover:text-red-700 flex items-center gap-1.5 transition cursor-pointer">

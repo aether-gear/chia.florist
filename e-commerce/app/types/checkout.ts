@@ -29,6 +29,7 @@ export interface CheckoutItem {
   price: number
   quantity: number
   subtotal: number
+  product_variant_type?: 'standard' | 'custom'
   item_type?: 'standard' | 'custom'
   custom_design?: CustomDesignPayload
   size?: string
@@ -71,7 +72,8 @@ export interface SelectedCourierInput {
 }
 
 export interface CheckoutShopItemInput {
-  item_type: 'standard' | 'custom'
+  product_variant_type?: 'standard' | 'custom'
+  item_type?: 'standard' | 'custom'
   product_id?: string
   product_name?: string
   physical_size_id?: string

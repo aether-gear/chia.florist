@@ -5,7 +5,7 @@ import type { CheckoutRequest, CheckoutResponse } from '~/types/checkout'
 import type { CustomDesignPayload } from '~/composables/useCart'
 
 export interface AddCartItemPayload {
-  item_type: 'standard' | 'custom'
+  product_variant_type?: 'standard' | 'custom'
   shop_id: string
   quantity: number
   product_id?: string
@@ -17,13 +17,13 @@ export interface AddCartItemPayload {
 
 export const cartService = {
   async getCart(): Promise<BackendCartResponse> {
-    return bootstrapConfig.fetchApi<BackendCartResponse>('/carts/', {
+    return bootstrapConfig.fetchApi<BackendCartResponse>('/carts', {
       method: 'GET'
     })
   },
 
   async addItem(data: AddCartItemPayload): Promise<{ message: string }> {
-    return bootstrapConfig.fetchApi<{ message: string }>('/carts/items/', {
+    return bootstrapConfig.fetchApi<{ message: string }>('/carts/items', {
       method: 'POST',
       body: data
     })
@@ -38,6 +38,12 @@ export const cartService = {
 
   async removeItem(shopId: string, productId: string): Promise<{ message: string }> {
     return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${shopId}/${productId}`, {
+      method: 'DELETE'
+    })
+  },
+
+  async removeCustomItem(cartItemId: string): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/custom/${cartItemId}`, {
       method: 'DELETE'
     })
   },

@@ -1,8 +1,10 @@
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { useCart } from '~/composables/useCart'
 import { triggerSessionExpired, triggerAuthAlert } from '~/composables/useSessionState'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const authVm = useAuthViewModel()
+  const cartVm = useCart()
 
   if (import.meta.client) {
     const isLoggedIn = useCookie('is_logged_in')
@@ -21,6 +23,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
         if (authVm.isAuthenticated.value) {
           triggerAuthAlert('success', `Signed in successfully. Welcome, ${authVm.currentUser.value?.name || 'Customer'}!`)
+          await cartVm.loadCart(true)
         } else {
           authVm.clearLocalSession()
           triggerAuthAlert('error', 'Google sign-in failed. Please try again.')
@@ -35,7 +38,9 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       try {
         await authVm.fetchCurrentUser()
 
-        if (!authVm.isAuthenticated.value) {
+        if (authVm.isAuthenticated.value) {
+          await cartVm.loadCart(true)
+        } else {
           triggerSessionExpired()
           authVm.clearLocalSession()
         }

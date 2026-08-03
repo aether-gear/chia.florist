@@ -178,13 +178,16 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     merged = JSON.parse(JSON.stringify(res))
   }
 
-  // 1. Gabungkan atribut lokal (size, color, price) untuk produk reguler
+  // 1. Gabungkan atribut lokal (size, color, price) untuk produk reguler & kustom
   merged.shops.forEach(shop => {
     if (!shop.name) {
       shop.name = shopsMap.value[shop.shop_id] || 'Chia Florist'
     }
     shop.items.forEach(item => {
-      const localItem = checkoutItems.value.find(i => i.id === item.product_id)
+      const localItem = checkoutItems.value.find(i =>
+        i.id === item.product_id ||
+        (i.isCustom && ((item as any).product_variant_type === 'custom' || (item as any).item_type === 'custom'))
+      )
       if (localItem) {
         if (localItem.size) {
           (item as any).size = localItem.size
@@ -192,9 +195,8 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
         if (localItem.color) {
           (item as any).color = localItem.color
         }
-        if (localItem.price) {
-          item.price = localItem.price
-          item.subtotal = item.price * item.quantity
+        if (localItem.customDesign && !(item as any).custom_design) {
+          (item as any).custom_design = localItem.customDesign
         }
       }
     })
@@ -203,93 +205,6 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     shop.subtotal = shop.items.reduce((acc, i) => acc + i.subtotal, 0)
     const fee = shop.selected_courier ? shop.selected_courier.fee : 0
     shop.total = shop.subtotal + fee
-  })
-
-  // 2. Tambahkan papan kustom dari simulator
-  if (customItems.length === 0) {
-    merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
-    merged.total_shipping = merged.shops.reduce((acc, s) => acc + (s.selected_courier ? s.selected_courier.fee : 0), 0)
-    merged.total = merged.subtotal + merged.total_shipping
-    return merged
-  }
-
-  const customShopsMap: Record<string, typeof customItems> = {}
-  customItems.forEach(item => {
-    const sId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
-    if (!customShopsMap[sId]) {
-      customShopsMap[sId] = []
-    }
-    customShopsMap[sId].push(item)
-  })
-
-  Object.keys(customShopsMap).forEach(sId => {
-    const items = customShopsMap[sId] || []
-    const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
-    
-    let shopEntry = merged.shops.find(s => s.shop_id === sId)
-    if (shopEntry) {
-      const entry = shopEntry
-      items.forEach(item => {
-        if (entry.items && !entry.items.some(i => i.product_id === item.id)) {
-          entry.items.push({
-            product_id: item.id,
-            shop_id: sId,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            subtotal: item.price * item.quantity,
-            size: item.size,
-            color: item.color
-          } as any)
-        }
-      })
-      entry.subtotal = entry.items ? entry.items.reduce((acc, i) => acc + i.subtotal, 0) : 0
-      const fee = entry.selected_courier ? entry.selected_courier.fee : 0
-      entry.total = entry.subtotal + fee
-    } else {
-      const mockOptions = [
-        { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 },
-        { code: 'tiki', name: 'TIKI', service: 'REG', etd: '2-4 Days', fee: 18000 },
-        { code: 'pos', name: 'POS', service: 'REG', etd: '3-5 Days', fee: 15000 }
-      ]
-      
-      if (!courierOptionsMap.value[sId]) {
-        courierOptionsMap.value[sId] = mockOptions
-      }
-      
-      const selected = selectedCouriers.value[sId] || { code: 'jne', service: 'REG' }
-      if (!selectedCouriers.value[sId]) {
-        selectedCouriers.value[sId] = selected
-      }
-      
-      const defaultOption = { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 }
-      const matchedOption = mockOptions.find(o => o.code === selected.code && o.service === selected.service) || mockOptions[0] || defaultOption
-      
-      shopEntry = {
-        shop_id: sId,
-        name: shopsMap.value[sId] || 'Chia Florist',
-        subtotal: subtotal,
-        total: subtotal + matchedOption.fee,
-        selected_courier: {
-          code: matchedOption.code,
-          service: matchedOption.service,
-          fee: matchedOption.fee
-        },
-        items: items.map(item => ({
-          product_id: item.id,
-          shop_id: sId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          subtotal: item.price * item.quantity,
-          size: item.size,
-          color: item.color
-        })),
-        cost_couriers: mockOptions
-      }
-      merged.shops.push(shopEntry)
-      merged.total_shipping += matchedOption.fee
-    }
   })
 
   merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
@@ -453,10 +368,11 @@ const runCalculate = async () => {
       }
 
       const shopItemsPayload = shop.items.map(item => {
-        const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && item.item_type === 'custom'))
-        if (localItem?.isCustom || item.item_type === 'custom') {
+        const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
+        if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
           const design = localItem?.customDesign || item.custom_design
           return {
+            product_variant_type: 'custom' as const,
             item_type: 'custom' as const,
             product_name: item.name,
             physical_size_id: design?.layout?.physicalSizeId || 'medium',
@@ -466,6 +382,7 @@ const runCalculate = async () => {
           }
         }
         return {
+          product_variant_type: 'standard' as const,
           item_type: 'standard' as const,
           product_id: item.product_id,
           quantity: item.quantity
@@ -689,10 +606,11 @@ const handlePlaceOrder = async () => {
           service: courier.service
         },
         items: shop.items.map(item => {
-          const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && item.item_type === 'custom'))
-          if (localItem?.isCustom || item.item_type === 'custom') {
+          const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
+          if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
             const design = localItem?.customDesign || item.custom_design
             return {
+              product_variant_type: 'custom' as const,
               item_type: 'custom' as const,
               name: item.name,
               physical_size_id: design?.layout?.physicalSizeId || 'medium',
@@ -702,6 +620,7 @@ const handlePlaceOrder = async () => {
             }
           }
           return {
+            product_variant_type: 'standard' as const,
             item_type: 'standard' as const,
             product_id: item.product_id,
             name: item.name,
