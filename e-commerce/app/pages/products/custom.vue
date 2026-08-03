@@ -4,7 +4,7 @@ import { useCart, normalizeHexColor, calculateDesignChecksum } from '~/composabl
 import { supabaseService } from '~/services/supabaseService'
 import type { CustomDesignPayload } from '~/composables/useCart'
 
-definePageMeta({ layout: false })
+definePageMeta({ layout: false, middleware: ['auth'] })
 useHead({
   title: 'Chia Florist — Board Designer',
   meta: [{ name: 'description', content: 'Design your custom flower board with our interactive canvas designer.' }]
@@ -46,9 +46,15 @@ interface FloralCrest { enabled: boolean; style: FloralStyle; primary: string; s
 /* ─── CONSTANTS ───────────────────────────────────────────────────── */
 const boardW = computed(() => 800)
 const boardH = computed(() => {
-  if (physicalSize.value === 'small') return 600
-  if (physicalSize.value === 'large') return 533
-  return 576
+  // Real-world proportions: height = (real_height / real_width) * boardW
+  // small:  1.5 × 2.0m → ratio 2.0/1.5 = 1.333 → too tall; width is 1.5m, height is 2.0m
+  //         canvas: 800 × (2.0/1.5 * 800) would be huge. Instead use portrait 3:4 per size:
+  // small:  1.5m wide × 2.0m tall → 3:4 → h/w = 2.0/1.5 = 1.333 → 600 * 1.5/2.0 = 450 → use 500
+  // medium: 1.8m wide × 2.5m tall → h/w = 2.5/1.8 = 1.389 → use 576
+  // large:  2.0m wide × 3.0m tall → h/w = 3.0/2.0 = 1.500 → use 600  (tallest = largest)
+  if (physicalSize.value === 'small')  return 500   // compact — smallest canvas
+  if (physicalSize.value === 'large')  return 600   // grand   — tallest canvas
+  return 576                                         // standard (medium)
 })
 
 const FONTS: { id: FontId; label: string; family: string }[] = [
@@ -111,9 +117,11 @@ const activeTab     = ref<ToolTab>('text')
 const activeSection = ref<SectionKey>('upper')
 const selectedId    = ref<string | null>(null)
 const physicalSize  = ref('medium')
-const showReview    = ref(false)
-const showToast     = ref(false)
-const isAdding      = ref(false)
+const showReview        = ref(false)
+const showToast         = ref(false)
+const isAdding          = ref(false)
+const showFinalizeChoice = ref(false)   // overlay: go-to-cart or keep designing
+const showThankYou      = ref(false)   // thank-you page overlay after cart add
 
 const brushType     = ref<BrushType>('flower')
 const brushColor    = ref('#e85d75')
@@ -641,9 +649,15 @@ const buildCustomDesignPayload = (previewBase64: string): CustomDesignPayload =>
 
 /* ─── CART ────────────────────────────────────────────────────────── */
 const handleFinalizeAndOrder = () => {
-  showReview.value = true
+  // Show the choice overlay — user decides: go to cart or keep designing
+  showFinalizeChoice.value = true
   const design = buildCustomDesignPayload(snapshotDataUrl.value || '')
   console.log('[Chia Florist] Finalize & Order Clicked - Custom Design JSON Payload:\n', JSON.stringify(design, null, 2))
+}
+
+const openReviewModal = () => {
+  showFinalizeChoice.value = false
+  showReview.value = true
 }
 
 const addToCartHandler = async () => {
@@ -680,8 +694,33 @@ const addToCartHandler = async () => {
     itemType: 'custom',
     customDesign: design,
   }, 1)
-  isAdding.value = false; showReview.value = false; showToast.value = true
-  setTimeout(() => { showToast.value = false; navigateTo('/') }, 3200)
+  isAdding.value = false
+  showReview.value = false
+  showThankYou.value = true
+}
+
+const resetCanvasAndCreateNew = () => {
+  showThankYou.value = false
+  elements.value = []
+  selectedId.value = null
+  snapshotDataUrl.value = ''
+  upper.value = {
+    headerText: 'Selamat & Sukses', bodyText: 'Atas Pelantikan Saudara/i\nNama Lengkap Anda',
+    headerFontSize: 36, bodyFontSize: 20, headerFont: 'playfair', bodyFont: 'inter',
+    headerAlign: 'center', bodyAlign: 'center',
+    bgColor: '#c0392b', headerColor: '#ffd700', bodyColor: '#ffffff', cornerStyle: 'none',
+  }
+  lower.value = {
+    headerText: '', bodyText: 'Nama Pengirim\nNama Instansi / Perusahaan',
+    headerFontSize: 26, bodyFontSize: 22, headerFont: 'bebas', bodyFont: 'inter',
+    headerAlign: 'center', bodyAlign: 'center',
+    bgColor: '#1a3a5c', headerColor: '#ffffff', bodyColor: '#ffffff', cornerStyle: 'none',
+  }
+  border.value = { style: 'solid', color: '#f5c842', width: 12, center: true }
+  topCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
+  bottomCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
+  physicalSize.value = 'medium'
+  heightRatio.value = 0.58
 }
 
 /* ─── KEYBOARD ────────────────────────────────────────────────────── */
@@ -1588,6 +1627,127 @@ onUnmounted(() => {
       </div>
     </Transition>
 
+    <!-- ═══ FINALIZE CHOICE OVERLAY ═══════════════════════════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="showFinalizeChoice" class="modal-backdrop" @click.self="showFinalizeChoice = false" role="dialog" aria-modal="true" aria-label="Finalize options">
+        <div class="choice-panel">
+          <!-- Close -->
+          <button class="rm-close" @click="showFinalizeChoice = false" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+
+          <!-- Header -->
+          <div class="cp-header">
+            <div class="cp-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+              </svg>
+            </div>
+            <p class="cp-eyebrow">DESIGN READY</p>
+            <h2 class="cp-title">What would you like to do?</h2>
+            <p class="cp-desc">Your custom board design has been captured. Choose how you'd like to proceed.</p>
+          </div>
+
+          <!-- Choices -->
+          <div class="cp-choices">
+            <!-- Option A: Review & Add to Cart -->
+            <button class="cp-choice cp-choice--primary" @click="openReviewModal">
+              <div class="cp-choice-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M16.5 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0Zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0Z"/>
+                </svg>
+              </div>
+              <div class="cp-choice-body">
+                <span class="cp-choice-title">Add to Cart</span>
+                <span class="cp-choice-desc">Review your design and proceed to order — {{ formatRupiah(totalPrice) }}</span>
+              </div>
+              <svg class="cp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+
+            <!-- Option B: Keep designing -->
+            <button class="cp-choice cp-choice--secondary" @click="showFinalizeChoice = false">
+              <div class="cp-choice-icon cp-choice-icon--muted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+              <div class="cp-choice-body">
+                <span class="cp-choice-title">Continue Designing</span>
+                <span class="cp-choice-desc">Go back and make more changes to your board</span>
+              </div>
+              <svg class="cp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ═══ THANK YOU OVERLAY ══════════════════════════════════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="showThankYou" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Thank you overlay">
+        <div class="thankyou-panel">
+          
+          <div class="ty-header">
+            <div class="ty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <p class="ty-eyebrow">ORDER CONFIRMED & IN CART</p>
+            <h2 class="ty-title">Thank You for Shopping at Chia Florist!</h2>
+            <p class="ty-desc">Your custom flower board design has been successfully added to your cart. What would you like to do next?</p>
+          </div>
+
+          <!-- Summary Card -->
+          <div class="ty-summary">
+            <div v-if="snapshotDataUrl" class="ty-thumb-wrap">
+              <img :src="snapshotDataUrl" class="ty-thumb" alt="Custom board snapshot" />
+            </div>
+            <div class="ty-summary-info">
+              <span class="ty-item-title">Custom Board — {{ upper.headerText || 'My Design' }}</span>
+              <div class="ty-item-tags">
+                <span class="ty-tag">Size: {{ SIZES.find(s=>s.id===physicalSize)?.label }}</span>
+                <span class="ty-tag ty-tag--green">✨ Custom Design</span>
+              </div>
+              <span class="ty-item-price">{{ formatRupiah(totalPrice) }}</span>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="ty-actions">
+            <!-- Option 1: Go to Home Page -->
+            <button class="ty-btn ty-btn--primary" @click="navigateTo('/')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              Go to Home Page
+            </button>
+
+            <!-- Option 2: Create Another Custom Product -->
+            <button class="ty-btn ty-btn--secondary" @click="resetCanvasAndCreateNew">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Create Another Custom Product
+            </button>
+
+            <!-- Option 3: View Shopping Cart -->
+            <button class="ty-btn ty-btn--cart" @click="navigateTo('/cart')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+              View Shopping Cart
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
@@ -2005,4 +2165,235 @@ button { font-family: inherit; }
   .dr-nav-center { display: none; }
   .dr-scale-chip { display: none; }
 }
+
+/* ─── FINALIZE CHOICE PANEL ──────────────────────────────────────── */
+.choice-panel {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+  overflow: hidden;
+  animation: choiceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes choiceIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.cp-header {
+  padding: 2rem 1.75rem 1.5rem;
+  background: linear-gradient(160deg, #fdf8f5 0%, #fff 100%);
+  border-bottom: 1px solid #f0ebe4;
+  text-align: center;
+}
+.cp-icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #c4703e22, #a85a2e11);
+  border: 1px solid #e5c4a8;
+  display: flex; align-items: center; justify-content: center;
+  color: #c4703e;
+  margin: 0 auto 1rem;
+}
+.cp-icon svg { width: 1.5rem; height: 1.5rem; }
+.cp-eyebrow {
+  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.2em;
+  color: #c4703e; margin-bottom: 0.4rem;
+}
+.cp-title {
+  font-size: 1.25rem; font-weight: 800; color: #1c1813; margin-bottom: 0.5rem;
+}
+.cp-desc {
+  font-size: 0.75rem; color: #a8998d; line-height: 1.5;
+}
+
+.cp-choices {
+  padding: 1.25rem 1.25rem 1.5rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.cp-choice {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.cp-choice--primary {
+  background: linear-gradient(135deg, #c4703e, #a85a2e);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(196,112,62,0.35);
+}
+.cp-choice--primary:hover {
+  background: linear-gradient(135deg, #b5622f, #8f4a22);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(196,112,62,0.45);
+}
+.cp-choice--secondary {
+  background: #f4f0eb;
+  color: #1c1813;
+  border: 1px solid #e5ddd4;
+}
+.cp-choice--secondary:hover {
+  background: #ede8e0;
+  transform: translateY(-1px);
+}
+
+.cp-choice-icon {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.cp-choice-icon--muted {
+  background: rgba(0,0,0,0.06);
+  color: #6b5d52;
+}
+.cp-choice-icon svg { width: 1.1rem; height: 1.1rem; }
+.cp-choice-body { flex: 1; min-width: 0; }
+.cp-choice-title {
+  display: block; font-size: 0.82rem; font-weight: 800; margin-bottom: 0.15rem;
+}
+.cp-choice-desc {
+  display: block; font-size: 0.68rem; opacity: 0.75; line-height: 1.3;
+}
+.cp-arrow {
+  width: 1rem; height: 1rem; flex-shrink: 0; opacity: 0.7;
+  transition: transform 0.15s;
+}
+.cp-choice:hover .cp-arrow { transform: translateX(3px); opacity: 1; }
+
+/* ─── THANK YOU PANEL ────────────────────────────────────────────── */
+.thankyou-panel {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  overflow: hidden;
+  animation: choiceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ty-header {
+  padding: 2.25rem 2rem 1.25rem;
+  background: linear-gradient(160deg, #f3faf5 0%, #fff 100%);
+  border-bottom: 1px solid #e8f3eb;
+  text-align: center;
+}
+.ty-icon {
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  background: rgba(46, 125, 50, 0.1);
+  border: 2px solid rgba(46, 125, 50, 0.25);
+  display: flex; align-items: center; justify-content: center;
+  color: #2e7d32;
+  margin: 0 auto 1.1rem;
+}
+.ty-icon svg { width: 1.8rem; height: 1.8rem; }
+.ty-eyebrow {
+  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.22em;
+  color: #2e7d32; margin-bottom: 0.4rem;
+}
+.ty-title {
+  font-size: 1.35rem; font-weight: 800; color: #1c1813; margin-bottom: 0.5rem;
+}
+.ty-desc {
+  font-size: 0.78rem; color: #6b5d52; line-height: 1.5;
+}
+
+.ty-summary {
+  margin: 1.25rem 1.5rem 0;
+  padding: 1rem;
+  background: #fdfaf7;
+  border: 1px solid #f0ebe4;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.ty-thumb-wrap {
+  width: 90px; height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  background: #111;
+}
+.ty-thumb {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.ty-summary-info {
+  display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 0;
+}
+.ty-item-title {
+  font-size: 0.82rem; font-weight: 800; color: #1c1813;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ty-item-tags {
+  display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+}
+.ty-tag {
+  font-size: 0.62rem; font-weight: 700; color: #6b5d52;
+  background: #ede8e1; padding: 0.15rem 0.45rem; border-radius: 4px;
+}
+.ty-tag--green {
+  color: #2e7d32; background: rgba(46, 125, 50, 0.12);
+}
+.ty-item-price {
+  font-size: 0.88rem; font-weight: 900; color: #c4703e; margin-top: 0.1rem;
+}
+
+.ty-actions {
+  padding: 1.25rem 1.5rem 1.75rem;
+  display: flex; flex-direction: column; gap: 0.65rem;
+}
+.ty-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  padding: 0.85rem 1.2rem;
+  border-radius: 12px;
+  font-size: 0.82rem; font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  width: 100%;
+}
+.ty-btn svg { width: 1.1rem; height: 1.1rem; }
+
+.ty-btn--primary {
+  background: linear-gradient(135deg, #1b4332, #0d281e);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(27,67,50,0.3);
+}
+.ty-btn--primary:hover {
+  background: linear-gradient(135deg, #143326, #05140e);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(27,67,50,0.4);
+}
+
+.ty-btn--secondary {
+  background: linear-gradient(135deg, #c4703e, #a85a2e);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(196,112,62,0.3);
+}
+.ty-btn--secondary:hover {
+  background: linear-gradient(135deg, #b5622f, #8f4a22);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(196,112,62,0.4);
+}
+
+.ty-btn--cart {
+  background: #f4f0eb;
+  color: #1c1813;
+  border: 1px solid #e5ddd4;
+}
+.ty-btn--cart:hover {
+  background: #ede8e0;
+  transform: translateY(-1px);
+}
+
 </style>
