@@ -97,11 +97,11 @@ func (pM PaymentMethod) CalculateFee(amount int64) int64 {
 		return pM.FeeFixed
 
 	case FeeTypePercentage:
-		return int64(float64(amount) * pM.FeePercentage / 100)
+		return int64(float64(amount) * pM.FeePercentage)
 
 	case FeeTypeMixed:
 		return pM.FeeFixed +
-			int64(float64(amount)*pM.FeePercentage/100)
+			int64(float64(amount)*pM.FeePercentage)
 
 	default:
 		return 0

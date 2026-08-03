@@ -81,6 +81,55 @@ func (p *midtransAPIProvider) Supports(code string) bool {
 	return p.getStrategy(code) != nil
 }
 
+func (p *midtransAPIProvider) Name() string {
+	return "midtrans"
+}
+
+func (p *midtransAPIProvider) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod {
+	return []paymentgateway.AllowedPaymentMethod{
+		{
+			Code:          "gopay",
+			Name:          "GoPay",
+			Type:          "ewallet",
+			FeeType:       "percentage",
+			FeePercentage: 0.02,
+			Description:   "Pay using GoPay e-wallet",
+		},
+		{
+			Code:          "shopeepay",
+			Name:          "ShopeePay",
+			Type:          "ewallet",
+			FeeType:       "percentage",
+			FeePercentage: 0.02,
+			Description:   "Pay using ShopeePay e-wallet",
+		},
+		{
+			Code:          "qris",
+			Name:          "QRIS",
+			Type:          "qr_code",
+			FeeType:       "flat",
+			FeeFixed:      1000,
+			Description:   "Pay using QRIS QR Code",
+		},
+		{
+			Code:          "bca_va",
+			Name:          "BCA Virtual Account",
+			Type:          "bank_transfer",
+			FeeType:       "flat",
+			FeeFixed:      4000,
+			Description:   "Pay using BCA Virtual Account",
+		},
+		{
+			Code:          "mandiri_bill",
+			Name:          "Mandiri Bill",
+			Type:          "bank_transfer",
+			FeeType:       "flat",
+			FeeFixed:      4000,
+			Description:   "Pay using Mandiri Bill / VA",
+		},
+	}
+}
+
 type vaNumber struct {
 	Bank     string `json:"bank"`
 	VANumber string `json:"va_number"`

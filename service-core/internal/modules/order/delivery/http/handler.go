@@ -437,7 +437,6 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 		CustomerID:      customerID,
 		AddressID:       parsedAddressID,
 		PaymentMethodID: parsedPaymentMethodID,
-		IsManual:        req.SelectedPayment.IsManual,
 		Shops:           shopsInput,
 	}
 

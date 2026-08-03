@@ -137,6 +137,8 @@ type customTestGateway struct {
 	errs    map[string]error
 }
 
+func (c *customTestGateway) Name() string { return "custom_test_gateway" }
+func (c *customTestGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (c *customTestGateway) Supports(_ string) bool { return true }
 func (c *customTestGateway) Charge(_ context.Context, _ paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	return nil, nil

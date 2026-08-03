@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -23,6 +24,12 @@ func New(cfg Config) (*App, error) {
 	}
 
 	c := NewContainer(cfg, dependencies)
+
+	// Perform startup payment method synchronization
+	if err := c.SyncPaymentMethods(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to sync payment methods: %w", err)
+	}
+
 	r := NewRouter(c)
 
 	return &App{

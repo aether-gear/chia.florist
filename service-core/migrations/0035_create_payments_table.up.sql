@@ -13,7 +13,6 @@ CREATE TABLE payments (
 
     order_id UUID NOT NULL,
     method_id UUID NOT NULL,
-    payment_account_id UUID,
 
     provider TEXT NOT NULL,
 
@@ -37,11 +36,7 @@ CREATE TABLE payments (
 
     CONSTRAINT fk_payment_method_id
         FOREIGN KEY (method_id)
-        REFERENCES payment_methods(id),
-
-    CONSTRAINT fk_payment_account_id
-        FOREIGN KEY (payment_account_id)
-        REFERENCES payment_accounts(id)
+        REFERENCES payment_methods(id)
 );
 
 CREATE INDEX idx_payments_order_id

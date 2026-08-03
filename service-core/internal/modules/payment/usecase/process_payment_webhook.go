@@ -21,7 +21,6 @@ import (
 
 type ProcessPaymentWebhookUsecase struct {
 	paymentRepo      paymentRepo.PaymentRepository
-	paymentAccRepo   paymentRepo.PaymentAccountRepository
 	paymentEventRepo paymentRepo.PaymentEventRepository
 	webhookEventRepo paymentRepo.PaymentWebhookEventRepository
 	orderRepo        orderRepo.OrderRepository
@@ -35,7 +34,6 @@ type ProcessPaymentWebhookUsecase struct {
 
 func NewProcessPaymentWebhookUsecase(
 	paymentRepo paymentRepo.PaymentRepository,
-	paymentAccRepo paymentRepo.PaymentAccountRepository,
 	paymentEventRepo paymentRepo.PaymentEventRepository,
 	webhookEventRepo paymentRepo.PaymentWebhookEventRepository,
 	orderRepo orderRepo.OrderRepository,
@@ -48,7 +46,6 @@ func NewProcessPaymentWebhookUsecase(
 ) *ProcessPaymentWebhookUsecase {
 	return &ProcessPaymentWebhookUsecase{
 		paymentRepo:      paymentRepo,
-		paymentAccRepo:   paymentAccRepo,
 		paymentEventRepo: paymentEventRepo,
 		webhookEventRepo: webhookEventRepo,
 		orderRepo:        orderRepo,
@@ -338,19 +335,6 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			}
 		}
 
-		// Adjust payment account load tracking
-		// after successful resolution
-		//
-		// A successful or failed payment resolution
-		// reduces the active load previously reserved
-		// during checkout
-		if payment.PaymentAccountID != nil {
-			if err := u.paymentAccRepo.DecrementLoad(ctx, exec,
-				*payment.PaymentAccountID,
-			); err != nil {
-				return fmt.Errorf("failed to decrement payment account load: %w", err)
-			}
-		}
 
 		// Emit payment event for audit
 		// and downstream processing

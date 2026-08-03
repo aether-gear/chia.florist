@@ -20,7 +20,6 @@ const (
 type PaymentProvider string
 
 const (
-	PaymentProviderManual  PaymentProvider = "manual"
 	PaymentProviderGateway PaymentProvider = "gateway"
 )
 
@@ -29,7 +28,6 @@ type Payment struct {
 
 	OrderID          uuid.UUID
 	MethodID         uuid.UUID
-	PaymentAccountID *uuid.UUID
 
 	Provider string
 

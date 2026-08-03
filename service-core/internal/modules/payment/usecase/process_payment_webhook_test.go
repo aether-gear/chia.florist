@@ -100,39 +100,7 @@ func (m *mockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Ex
 }
 
 // mockPaymentAccountRepo tracks increments, decrements and supports injecting errors.
-type mockPaymentAccountRepo struct {
-	decremented        []uuid.UUID
-	incremented        []uuid.UUID
-	leastLoadedAccount *paymentDomain.PaymentAccount
-	decrementErr       error
-}
-
-func (m *mockPaymentAccountRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.PaymentAccount) error {
-	return nil
-}
-func (m *mockPaymentAccountRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *mockPaymentAccountRepo) RetrieveLeastLoaded(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return m.leastLoadedAccount, nil
-}
-func (m *mockPaymentAccountRepo) IncrementLoad(_ context.Context, _ transaction.Executor, accountID uuid.UUID) error {
-	m.incremented = append(m.incremented, accountID)
-	return nil
-}
-func (m *mockPaymentAccountRepo) DecrementLoad(_ context.Context, _ transaction.Executor, accountID uuid.UUID) error {
-	if m.decrementErr != nil {
-		return m.decrementErr
-	}
-	m.decremented = append(m.decremented, accountID)
-	return nil
-}
-func (m *mockPaymentAccountRepo) ListByMethodID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *mockPaymentAccountRepo) ListAll(_ context.Context, _ transaction.Executor) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
+type mockPaymentAccountRepo struct{}
 
 // mockPaymentEventRepo tracks created events and supports injecting createErr.
 type mockPaymentEventRepo struct {
@@ -261,6 +229,8 @@ type mockPaymentGateway struct {
 	err    error
 }
 
+func (m *mockPaymentGateway) Name() string { return "mock_gateway" }
+func (m *mockPaymentGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (m *mockPaymentGateway) Charge(_ context.Context, _ paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	return nil, nil
 }
@@ -362,7 +332,7 @@ func newWebhookUsecase(
 		transactor = &mockTransactor{}
 	}
 	return NewProcessPaymentWebhookUsecase(
-		pRepo, paRepo, peRepo,
+		pRepo, peRepo,
 		newMockWebhookEventRepo(),
 		oRepo, oiRepo, iRepo,
 		gateway,
@@ -701,102 +671,7 @@ func TestProcessPaymentWebhook_Idempotent_AlreadyCancelled(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Aggregate invariants: payment account load tracking
-// ---------------------------------------------------------------------------
 
-func TestProcessPaymentWebhook_PaymentAccountLoadDecremented_OnSettle(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	paymentID := uuid.New()
-	accountID := uuid.New()
-
-	payment := &paymentDomain.Payment{
-		ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending,
-		Amount: 100000, Provider: "midtrans", PaymentAccountID: &accountID, CreatedAt: time.Now(),
-	}
-	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
-	paRepo := &mockPaymentAccountRepo{}
-	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
-	gateway := &mockPaymentGateway{
-		result: &paymentgateway.NotificationResult{
-			GatewayOrderID: orderID.String(),
-			Status:         paymentgateway.NotificationStatusSettlement,
-		},
-	}
-
-	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
-		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(paRepo.decremented) != 1 || paRepo.decremented[0] != accountID {
-		t.Errorf("expected DecrementLoad for %v on settle, got %v", accountID, paRepo.decremented)
-	}
-}
-
-func TestProcessPaymentWebhook_PaymentAccountLoadDecremented_OnExpire(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	paymentID := uuid.New()
-	accountID := uuid.New()
-
-	payment := &paymentDomain.Payment{
-		ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending,
-		Amount: 100000, Provider: "midtrans", PaymentAccountID: &accountID, CreatedAt: time.Now(),
-	}
-	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
-	paRepo := &mockPaymentAccountRepo{}
-	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
-	gateway := &mockPaymentGateway{
-		result: &paymentgateway.NotificationResult{
-			GatewayOrderID: orderID.String(),
-			Status:         paymentgateway.NotificationStatusExpire,
-		},
-	}
-
-	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
-		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "expire"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(paRepo.decremented) != 1 || paRepo.decremented[0] != accountID {
-		t.Errorf("expected DecrementLoad for %v on expire, got %v", accountID, paRepo.decremented)
-	}
-}
-
-func TestProcessPaymentWebhook_PaymentAccountLoadNotDecremented_WhenNotSet(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	paymentID := uuid.New()
-
-	// No PaymentAccountID set
-	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
-	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
-	paRepo := &mockPaymentAccountRepo{}
-	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
-	gateway := &mockPaymentGateway{
-		result: &paymentgateway.NotificationResult{
-			GatewayOrderID: orderID.String(),
-			Status:         paymentgateway.NotificationStatusSettlement,
-		},
-	}
-
-	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
-		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(paRepo.decremented) != 0 {
-		t.Errorf("DecrementLoad should not be called when PaymentAccountID is nil, got %v", paRepo.decremented)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Coordination protocol / failure recovery

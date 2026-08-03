@@ -30,7 +30,6 @@ func (r *paymentRepositoryImpl) GetByID(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -67,7 +66,6 @@ func (r *paymentRepositoryImpl) GetByOrderID(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -131,7 +129,6 @@ func (r *paymentRepositoryImpl) Save(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -143,13 +140,12 @@ func (r *paymentRepositoryImpl) Save(
 			paid_at
 		)
 		VALUES (
-			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
 		)
 		ON CONFLICT (id)
 		DO UPDATE SET
 			order_id = EXCLUDED.order_id,
 			method_id = EXCLUDED.method_id,
-			payment_account_id = EXCLUDED.payment_account_id,
 			provider = EXCLUDED.provider,
 			provider_payment_id = EXCLUDED.provider_payment_id,
 			provider_order_id = EXCLUDED.provider_order_id,
@@ -164,7 +160,6 @@ func (r *paymentRepositoryImpl) Save(
 		payment.ID,
 		payment.OrderID,
 		payment.MethodID,
-		payment.PaymentAccountID,
 		payment.Provider,
 		payment.ProviderPaymentID,
 		payment.ProviderOrderID,
@@ -187,7 +182,6 @@ func (r *paymentRepositoryImpl) scanPayment(
 		&payment.ID,
 		&payment.OrderID,
 		&payment.MethodID,
-		&payment.PaymentAccountID,
 		&payment.Provider,
 		&payment.ProviderPaymentID,
 		&payment.ProviderOrderID,
@@ -219,7 +213,6 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -251,7 +244,6 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			&p.ID,
 			&p.OrderID,
 			&p.MethodID,
-			&p.PaymentAccountID,
 			&p.Provider,
 			&p.ProviderPaymentID,
 			&p.ProviderOrderID,
@@ -281,7 +273,6 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -311,7 +302,6 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			&p.ID,
 			&p.OrderID,
 			&p.MethodID,
-			&p.PaymentAccountID,
 			&p.Provider,
 			&p.ProviderPaymentID,
 			&p.ProviderOrderID,

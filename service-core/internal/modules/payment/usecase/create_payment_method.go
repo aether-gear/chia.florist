@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
-	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
 
@@ -27,49 +26,29 @@ func NewSavePaymentMethodUsecase(
 	}
 }
 
-type CreatePaymentMethodInput struct {
-	ID            *uuid.UUID
-	Name          string
-	Code          string
-	Provider      string
-	Type          string
-	IsActive      bool
-	Description   string
-	FeeType       string
-	FeeFixed      int64
-	FeePercentage float64
+type SavePaymentMethodInput struct {
+	ID       uuid.UUID
+	IsActive bool
 }
 
 func (u *SavePaymentMethodUsecase) Execute(
 	ctx context.Context,
-	input CreatePaymentMethodInput,
+	input SavePaymentMethodInput,
 ) error {
-	var id uuid.UUID
-	if input.ID != nil && *input.ID != uuid.Nil {
-		id = *input.ID
-	} else {
-		id = uuid.New()
+	paymentMethod, err := u.paymentMethodRepo.
+		GetByID(ctx, u.executor, input.ID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve payment method: %w", err)
 	}
 
-	paymentMethod := domain.PaymentMethod{
-		ID:            id,
-		Name:          input.Name,
-		Code:          domain.PaymentMethodCode(input.Code),
-		Provider:      input.Provider,
-		Type:          domain.PaymentMethodType(input.Type),
-		IsActive:      input.IsActive,
-		FeeType:       domain.PaymentFeeType(input.FeeType),
-		FeeFixed:      input.FeeFixed,
-		FeePercentage: input.FeePercentage,
-		Description:   input.Description,
+	if paymentMethod == nil {
+		return apperrors.NewNotFound("payment method not found")
 	}
 
-	if err := paymentMethod.Validate(); err != nil {
-		return apperrors.NewInvalidInput(err.Error())
-	}
+	paymentMethod.IsActive = input.IsActive
 
-	err := u.paymentMethodRepo.
-		Save(ctx, u.executor, paymentMethod)
+	err = u.paymentMethodRepo.
+		Save(ctx, u.executor, *paymentMethod)
 	if err != nil {
 		return fmt.Errorf("failed to save payment method: %w", err)
 	}

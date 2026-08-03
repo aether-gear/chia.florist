@@ -12,7 +12,6 @@ type createOrderItemRequest struct {
 
 type createOrderPaymentRequest struct {
 	ID       string `json:"id"`
-	IsManual bool   `json:"is_manual"`
 }
 
 type createOrderCourierRequest struct {

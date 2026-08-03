@@ -90,8 +90,7 @@ func (u *CheckPaymentStatusUsecase) Execute(
 	}
 
 	// Only gateway payments with a ProviderOrderID can be synced.
-	if payment.Provider == string(domain.PaymentProviderManual) ||
-		payment.ProviderOrderID == nil {
+	if payment.ProviderOrderID == nil {
 		return &CheckPaymentStatusResult{Status: payment.Status, Synced: false}, nil
 	}
 

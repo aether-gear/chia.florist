@@ -33,7 +33,6 @@ type CreateOrderUsecase struct {
 	invoiceItemRepo        repository.InvoiceItemRepository
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentMethodRepo      paymentRepo.PaymentMethodRepository
-	paymentAccRepo         paymentRepo.PaymentAccountRepository
 	paymentEventRepo       paymentRepo.PaymentEventRepository
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
@@ -54,7 +53,6 @@ func NewCreateOrderUsecase(
 	invoiceItemRepo repository.InvoiceItemRepository,
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
-	paymentAccRepo paymentRepo.PaymentAccountRepository,
 	paymentEventRepo paymentRepo.PaymentEventRepository,
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
@@ -74,7 +72,6 @@ func NewCreateOrderUsecase(
 		invoiceItemRepo:        invoiceItemRepo,
 		paymentRepo:            paymentRepo,
 		paymentMethodRepo:      paymentMethodRepo,
-		paymentAccRepo:         paymentAccRepo,
 		paymentEventRepo:       paymentEventRepo,
 		paymentInstructionRepo: paymentInstructionRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
@@ -109,7 +106,6 @@ type CreateOrderInput struct {
 	CustomerID      uuid.UUID
 	AddressID       uuid.UUID
 	PaymentMethodID uuid.UUID
-	IsManual        bool
 	Shops           []OrderShopInput
 }
 
@@ -268,122 +264,90 @@ func (u *CreateOrderUsecase) Execute(
 
 	// Process payments through the configured gateway for
 	// methods that require external payment handling.
-	var (
-		paymentAccount       *paymentDomain.PaymentAccount
-		paymentAccountResult *PaymentAccountResult
-		chargeResp           *paymentgateway.ChargeResponse
-	)
+	payment.Provider = method.Provider
 
-	if !input.IsManual {
-		payment.Provider = method.Provider
+	if !u.paymentGateway.Supports(string(method.Code)) {
+		return nil, apperrors.NewBadRequest(fmt.Sprintf("payment method %q is not supported by the payment gateway", method.Code))
+	}
 
-		if !u.paymentGateway.Supports(string(method.Code)) {
-			return nil, apperrors.NewBadRequest(fmt.Sprintf("payment method %q is not supported by the payment gateway", method.Code))
+	var chargeItems []paymentgateway.ChargeItem
+	for _, item := range orderItems {
+		chargeItems = append(chargeItems, paymentgateway.ChargeItem{
+			ID:       item.ProductID.String(),
+			Name:     item.ProductName,
+			Quantity: item.Quantity,
+			Price:    item.UnitPrice,
+		})
+	}
+
+	if pricingResult.TotalShippingFee > 0 {
+		chargeItems = append(chargeItems, paymentgateway.ChargeItem{
+			ID:       "shipping_fee",
+			Name:     "Shipping Fee",
+			Quantity: 1,
+			Price:    pricingResult.TotalShippingFee,
+		})
+	}
+
+	var itemSum int64
+	for _, ci := range chargeItems {
+		itemSum += ci.Price * int64(ci.Quantity)
+	}
+
+	if diff := order.Total - itemSum; diff != 0 {
+		chargeItems = append(chargeItems, paymentgateway.ChargeItem{
+			ID:       "adjustment",
+			Name:     "Fees & Adjustments",
+			Quantity: 1,
+			Price:    diff,
+		})
+	}
+
+	var customerPhone string
+	if user.Phone != nil {
+		customerPhone = *user.Phone
+	}
+
+	chargeResp, err := u.paymentGateway.
+		Charge(
+			ctx,
+			paymentgateway.ChargeRequest{
+				PaymentID:     payment.ID,
+				OrderID:       order.ID,
+				Amount:        order.Total,
+				PaymentType:   string(method.Code),
+				ExpiresAt:     time.Now().Add(time.Hour * 24),
+				CustomerEmail: account.Email,
+				CustomerName:  user.Name,
+				CustomerPhone: customerPhone,
+				Items:         chargeItems,
+			},
+		)
+	if err != nil {
+		return nil, fmt.Errorf("payment gateway charge failed: %w", err)
+	}
+
+	providerPaymentID := chargeResp.GatewayTransactionID
+	providerOrderID := chargeResp.GatewayOrderID
+	payment.ProviderPaymentID = &providerPaymentID
+	payment.ProviderOrderID = &providerOrderID
+	if !chargeResp.ExpiresAt.IsZero() {
+		payment.ExpiresAt = &chargeResp.ExpiresAt
+	}
+
+	var paymentAccountResult *PaymentAccountResult
+	if len(chargeResp.Instructions) > 0 {
+		inst := chargeResp.Instructions[0]
+		accountResult := &PaymentAccountResult{
+			AccountName: inst.Label,
 		}
-
-		var chargeItems []paymentgateway.ChargeItem
-		for _, item := range orderItems {
-			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
-				ID:       item.ProductID.String(),
-				Name:     item.ProductName,
-				Quantity: item.Quantity,
-				Price:    item.UnitPrice,
-			})
+		switch inst.Type {
+		case "qris", "ewallet":
+			accountResult.QRString = &inst.Value
+		case "bank_transfer":
+			accountResult.AccountNumber = &inst.Value
 		}
-
-		if pricingResult.TotalShippingFee > 0 {
-			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
-				ID:       "shipping_fee",
-				Name:     "Shipping Fee",
-				Quantity: 1,
-				Price:    pricingResult.TotalShippingFee,
-			})
-		}
-
-		var itemSum int64
-		for _, ci := range chargeItems {
-			itemSum += ci.Price * int64(ci.Quantity)
-		}
-
-		if diff := order.Total - itemSum; diff != 0 {
-			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
-				ID:       "adjustment",
-				Name:     "Fees & Adjustments",
-				Quantity: 1,
-				Price:    diff,
-			})
-		}
-
-		var customerPhone string
-		if user.Phone != nil {
-			customerPhone = *user.Phone
-		}
-
-		var err error
-		chargeResp, err = u.paymentGateway.
-			Charge(
-				ctx,
-				paymentgateway.ChargeRequest{
-					PaymentID:     payment.ID,
-					OrderID:       order.ID,
-					Amount:        order.Total,
-					PaymentType:   string(method.Code),
-					ExpiresAt:     time.Now().Add(time.Hour * 24),
-					CustomerEmail: account.Email,
-					CustomerName:  user.Name,
-					CustomerPhone: customerPhone,
-					Items:         chargeItems,
-				},
-			)
-		if err != nil {
-			return nil, fmt.Errorf("payment gateway charge failed: %w", err)
-		}
-
-		providerPaymentID := chargeResp.GatewayTransactionID
-		providerOrderID := chargeResp.GatewayOrderID
-		payment.ProviderPaymentID = &providerPaymentID
-		payment.ProviderOrderID = &providerOrderID
-		if !chargeResp.ExpiresAt.IsZero() {
-			payment.ExpiresAt = &chargeResp.ExpiresAt
-		}
-
-		if len(chargeResp.Instructions) > 0 {
-			inst := chargeResp.Instructions[0]
-			accountResult := &PaymentAccountResult{
-				AccountName: inst.Label,
-			}
-			switch inst.Type {
-			case "qris", "ewallet":
-				accountResult.QRString = &inst.Value
-			case "bank_transfer":
-				accountResult.AccountNumber = &inst.Value
-			}
-			paymentAccountResult = accountResult
-		}
-
-	} else {
-		// Assign a payment account for manual payment methods
-		// using the current load-balancing strategy
-		var err error
-		paymentAccount, err = u.paymentAccRepo.
-			RetrieveLeastLoaded(ctx, u.executor, input.PaymentMethodID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to acquire payment account: %w", err)
-		}
-
-		if paymentAccount == nil {
-			return nil, apperrors.NewConflict("no available payment account for the selected method")
-		}
-
-		payment.Provider = method.Provider
-		payment.PaymentAccountID = &paymentAccount.ID
-
-		paymentAccountResult = &PaymentAccountResult{
-			AccountName:   paymentAccount.AccountName,
-			AccountNumber: paymentAccount.AccountNumber,
-			PhoneNumber:   paymentAccount.PhoneNumber,
-			QRString:      paymentAccount.QRString,
-		}
+		paymentAccountResult = accountResult
 	}
 
 	pendingPayload, err := json.Marshal(map[string]string{"status": "pending"})
@@ -437,12 +401,7 @@ func (u *CreateOrderUsecase) Execute(
 				return fmt.Errorf("failed to save payment event: %w", err)
 			}
 
-			if input.IsManual {
-				if err := u.paymentAccRepo.
-					IncrementLoad(ctx, exec, *payment.PaymentAccountID); err != nil {
-					return fmt.Errorf("failed to increment payment account load: %w", err)
-				}
-			}
+
 
 			// Persist gateway channel data (QR string, VA number, deep link)
 			// so it survives the initial checkout response and can be
@@ -512,8 +471,7 @@ func (u *CreateOrderUsecase) Execute(
 		},
 	)
 	if err != nil {
-		if !input.IsManual &&
-			payment.ProviderOrderID != nil {
+		if payment.ProviderOrderID != nil {
 			// Best-effort cancellation:
 			// the gateway transaction exists but our
 			//
@@ -532,20 +490,8 @@ func (u *CreateOrderUsecase) Execute(
 	// such as invoice number, amount, expiration time, and account details
 	if instruction != nil {
 		var vaNumber string
-		if input.IsManual {
-			if paymentAccount != nil {
-				if paymentAccount.AccountNumber != nil {
-					vaNumber = *paymentAccount.AccountNumber
-				} else if paymentAccount.PhoneNumber != nil && *paymentAccount.PhoneNumber != "" {
-					vaNumber = *paymentAccount.PhoneNumber
-				} else if paymentAccount.QRString != nil {
-					vaNumber = *paymentAccount.QRString
-				}
-			}
-		} else {
-			if chargeResp != nil && len(chargeResp.Instructions) > 0 {
-				vaNumber = chargeResp.Instructions[0].Value
-			}
+		if chargeResp != nil && len(chargeResp.Instructions) > 0 {
+			vaNumber = chargeResp.Instructions[0].Value
 		}
 
 		content, err := markdown.Render(

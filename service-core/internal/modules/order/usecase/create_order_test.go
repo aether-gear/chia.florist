@@ -171,33 +171,7 @@ func (m *coMockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.
 
 // --- payment account repo ---
 
-type coMockPaymentAccountRepo struct {
-	incremented        []uuid.UUID
-	leastLoadedAccount *paymentDomain.PaymentAccount
-}
-
-func (m *coMockPaymentAccountRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.PaymentAccount) error {
-	return nil
-}
-func (m *coMockPaymentAccountRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *coMockPaymentAccountRepo) RetrieveLeastLoaded(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return m.leastLoadedAccount, nil
-}
-func (m *coMockPaymentAccountRepo) IncrementLoad(_ context.Context, _ transaction.Executor, accountID uuid.UUID) error {
-	m.incremented = append(m.incremented, accountID)
-	return nil
-}
-func (m *coMockPaymentAccountRepo) DecrementLoad(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *coMockPaymentAccountRepo) ListByMethodID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *coMockPaymentAccountRepo) ListAll(_ context.Context, _ transaction.Executor) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
+type coMockPaymentAccountRepo struct{}
 
 // --- payment event repo ---
 
@@ -380,6 +354,8 @@ type coMockGateway struct {
 	cancelOrderID string
 }
 
+func (m *coMockGateway) Name() string { return "mock_gateway" }
+func (m *coMockGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (m *coMockGateway) Charge(_ context.Context, _ paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	return m.chargeResp, m.chargeErr
 }
@@ -404,6 +380,8 @@ type capturingGateway struct {
 	captured *paymentgateway.ChargeRequest
 }
 
+func (c *capturingGateway) Name() string { return "mock_gateway" }
+func (c *capturingGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (c *capturingGateway) Charge(_ context.Context, req paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	*c.captured = req
 	return c.resp, nil
@@ -517,7 +495,6 @@ func buildUCWith(
 		&coMockInvoiceItemRepo{},
 		paymentStore,
 		paymentMethodRepo,
-		paymentAccRepo,
 		&coMockPaymentEventRepo{},
 		&coMockPaymentInstructionRepo{},
 		channelDataRepo,
@@ -535,7 +512,6 @@ func coInput(customerID, paymentMethodID uuid.UUID, isManual bool, productID, sh
 		CustomerID:      customerID,
 		AddressID:       uuid.New(),
 		PaymentMethodID: paymentMethodID,
-		IsManual:        isManual,
 		Shops: []OrderShopInput{
 			{
 				ShopID:   shopID,
@@ -744,63 +720,7 @@ func TestCreateOrder_Gateway_ChannelDataPersisted(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Happy-path: manual order
-// ===========================================================================
 
-func TestCreateOrder_Manual_Success(t *testing.T) {
-	ctx := context.Background()
-	customerID := uuid.New()
-	productID := uuid.New()
-	shopID := uuid.New()
-	methodID := uuid.New()
-	accountID := uuid.New()
-	accNumber := "1234567890"
-
-	user := coDefaultUser()
-	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Provider: "manual", Type: paymentDomain.TypeBankTransfer, IsActive: true}
-	pricing := coDefaultPricing(productID, shopID)
-
-	paRepo := &coMockPaymentAccountRepo{
-		leastLoadedAccount: &paymentDomain.PaymentAccount{
-			ID:            accountID,
-			AccountName:   "Mandiri Kage",
-			AccountNumber: &accNumber,
-		},
-	}
-
-	paymentStore := &coMockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{}}
-
-	uc := buildUC(nil, &coMockGateway{},
-		&coMockPricingService{result: pricing},
-		&coMockPaymentMethodRepo{method: method},
-		paRepo,
-		&coMockUserRepo{user: user},
-		&coMockAccountRepo{account: acc},
-		&coMockInventoryRepo{},
-		paymentStore,
-		&coMockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
-		nil,
-	)
-
-	result, err := uc.Execute(ctx, coInput(customerID, methodID, true, productID, shopID))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.PaymentAccount == nil {
-		t.Fatal("PaymentAccount should not be nil for manual payment")
-	}
-	if result.PaymentAccount.AccountName != "Mandiri Kage" {
-		t.Errorf("AccountName = %v, want Mandiri Kage", result.PaymentAccount.AccountName)
-	}
-	if result.PaymentAccount.AccountNumber == nil || *result.PaymentAccount.AccountNumber != accNumber {
-		t.Errorf("AccountNumber mismatch: %v", result.PaymentAccount.AccountNumber)
-	}
-	if len(paRepo.incremented) != 1 || paRepo.incremented[0] != accountID {
-		t.Errorf("expected IncrementLoad for %v, got %v", accountID, paRepo.incremented)
-	}
-}
 
 // ===========================================================================
 // Charge response instruction type mapping

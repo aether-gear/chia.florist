@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"time"
 
 	applimiter "service-core/internal/common/limiter"
@@ -62,6 +63,9 @@ import (
 	shopUsecase "service-core/internal/modules/shop/usecase"
 	staffUsecase "service-core/internal/modules/staff/usecase"
 	userUsecase "service-core/internal/modules/user/usecase"
+
+	paymentgateway "service-core/internal/infra/payment-gateway"
+	paymentRepo "service-core/internal/modules/payment/repository"
 )
 
 type Container struct {
@@ -73,6 +77,8 @@ type Container struct {
 	DBExecutor         transaction.Executor
 	DBTransactor       transaction.Transactor
 	GoogleOAuth        appconfig.GoogleOAuthConfig
+	paymentMethodRepo  paymentRepo.PaymentMethodRepository
+	paymentGateway     paymentgateway.Provider
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
@@ -132,12 +138,9 @@ type Container struct {
 	GetShopCouriers  shopUsecase.GetShopCouriersUsecase
 	GetShopProducts  shopUsecase.GetShopProductsUsecase
 
-	CreatePaymentAccount   paymentUsecase.CreatePaymentAccountUsecase
-	ListPaymentAccount     paymentUsecase.ListPaymentAccountUsecase
 	SavePaymentMethod      paymentUsecase.SavePaymentMethodUsecase
 	ListPaymentMethod      paymentUsecase.ListPaymentMethodUsecase
 	ProcessPaymentWebhook  paymentUsecase.ProcessPaymentWebhookUsecase
-	ProcessManualPayment   paymentUsecase.ProcessManualPaymentUsecase
 	SavePaymentInstruction paymentUsecase.SavePaymentInstructionUsecase
 	GetPaymentDetail       paymentUsecase.GetPaymentDetailUsecase
 	CheckPaymentStatus     paymentUsecase.CheckPaymentStatusUsecase
@@ -213,7 +216,6 @@ func NewContainer(cfg Config,
 		addressRepo             = addressPersistence.NewCustomerAddressRepositoryImpl()
 		addressShopRepo         = addressPersistence.NewShopAddressRepositoryImpl()
 		paymentRepo             = paymentPersistence.NewPaymentRepositoryImpl()
-		paymentAccRepo          = paymentPersistence.NewPaymentAccountRepository()
 		paymentMethodRepo       = paymentPersistence.NewPaymentMethodRepository()
 		paymentEventRepo        = paymentPersistence.NewPaymentEventRepositoryImpl()
 		paymentInstructionRepo  = paymentPersistence.NewPaymentInstructionRepositoryImpl()
@@ -298,7 +300,6 @@ func NewContainer(cfg Config,
 	processPaymentWebhook := *paymentUsecase.
 		NewProcessPaymentWebhookUsecase(
 			paymentRepo,
-			paymentAccRepo,
 			paymentEventRepo,
 			paymentWebhookEventRepo,
 			orderRepo,
@@ -319,6 +320,8 @@ func NewContainer(cfg Config,
 		DBExecutor:         infra.TransactionExecutor,
 		DBTransactor:       infra.TransactionProvider,
 		GoogleOAuth:        cfg.GoogleOAuth,
+		paymentMethodRepo:  paymentMethodRepo,
+		paymentGateway:     infra.PaymentGateway,
 
 		FindProducts: *productUsecase.
 			NewFindProductsUsecase(
@@ -680,17 +683,6 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
-		CreatePaymentAccount: *paymentUsecase.
-			NewCreatePaymentAccountUsecase(
-				paymentAccRepo,
-				paymentMethodRepo,
-				infra.TransactionExecutor,
-			),
-		ListPaymentAccount: *paymentUsecase.
-			NewListPaymentAccountUsecase(
-				paymentAccRepo,
-				infra.TransactionExecutor,
-			),
 		SavePaymentMethod: *paymentUsecase.
 			NewSavePaymentMethodUsecase(
 				paymentMethodRepo,
@@ -702,17 +694,6 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 		ProcessPaymentWebhook: processPaymentWebhook,
-		ProcessManualPayment: *paymentUsecase.
-			NewProcessManualPaymentUsecase(
-				paymentRepo,
-				paymentAccRepo,
-				paymentEventRepo,
-				orderRepo,
-				orderItemRepo,
-				inventoryRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
-			),
 		SavePaymentInstruction: *paymentUsecase.
 			NewSavePaymentInstructionUsecase(
 				paymentMethodRepo,
@@ -726,7 +707,6 @@ func NewContainer(cfg Config,
 				invoiceRepo,
 				paymentRepo,
 				paymentMethodRepo,
-				paymentAccRepo,
 				paymentInstructionRepo,
 				paymentChannelDataRepo,
 			),
@@ -796,7 +776,6 @@ func NewContainer(cfg Config,
 				invoiceItemRepo,
 				paymentRepo,
 				paymentMethodRepo,
-				paymentAccRepo,
 				paymentEventRepo,
 				paymentInstructionRepo,
 				paymentChannelDataRepo,
@@ -925,4 +904,8 @@ func NewContainer(cfg Config,
 	)
 
 	return c
+}
+
+func (c *Container) SyncPaymentMethods(ctx context.Context) error {
+	return paymentUsecase.SyncPaymentMethods(ctx, c.paymentMethodRepo, c.DBExecutor, c.paymentGateway)
 }

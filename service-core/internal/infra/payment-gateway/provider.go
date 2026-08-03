@@ -152,7 +152,23 @@ type NotificationResult struct {
 // so each provider can deserialise it itself
 type NotificationPayload map[string]any
 
+type AllowedPaymentMethod struct {
+	Code          string
+	Name          string
+	Type          string // "bank_transfer" | "ewallet" | "qr_code"
+	FeeType       string // "flat" | "percentage" | "mixed"
+	FeeFixed      int64
+	FeePercentage float64
+	Description   string
+}
+
 type Provider interface {
+	// Name returns the unique provider identifier.
+	Name() string
+
+	// AllowedPaymentMethods returns the list of payment methods supported by this provider.
+	AllowedPaymentMethods() []AllowedPaymentMethod
+
 	// Supports returns true if the gateway provider is configured
 	// and capable of handling the given payment channel code.
 	Supports(code string) bool
