@@ -720,11 +720,13 @@ export const useCart = () => {
     const item = cart.value.find(i => i.id === id)
     if (!item) return
 
-    const newQty = item.quantity + change
+    const MAX_CART_QTY = 80
+    const newQty = Math.min(item.quantity + change, MAX_CART_QTY)
     if (newQty <= 0) {
       await removeFromCart(id, size, color)
       return
     }
+    if (newQty === item.quantity) return  // already at cap — nothing to do
 
     item.quantity = newQty
 
