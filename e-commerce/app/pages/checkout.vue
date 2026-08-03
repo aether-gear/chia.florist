@@ -32,7 +32,6 @@ const isProcessing = ref(false)
 // State Management untuk Payment Methods
 const paymentMethods = ref<PaymentMethod[]>([])
 const selectedPaymentMethodId = ref('')
-const isManualTransfer = ref(false)
 const openedCategories = ref<Record<string, boolean>>({})
 
 // Dynamic shop mapping and payment state
@@ -556,7 +555,6 @@ const liveShippingFee = computed(() => {
   return checkoutData.value ? checkoutData.value.total_shipping : 0
 })
 const livePaymentFee = computed(() => {
-  if (isManualTransfer.value) return 0
   if (checkoutData.value?.selected_payment_method?.id === selectedPaymentMethodId.value) {
     return checkoutData.value.selected_payment_method.fee
   }
@@ -633,8 +631,7 @@ const handlePlaceOrder = async () => {
     const payload = {
       address_id: selectedAddressId.value,
       selected_payment: {
-        id: selectedPaymentMethodId.value,
-        is_manual: isManualTransfer.value
+        id: selectedPaymentMethodId.value
       },
       shops: shopsPayload
     }
@@ -644,7 +641,7 @@ const handlePlaceOrder = async () => {
     const paymentInfo = {
       orderId: result.order_id,
       instruction: result.instruction,
-      paymentAccount: result.payment_account,
+      channelData: result.channel_data,
       total: liveTotalPayment.value,
       status: 'pending'
     }
@@ -837,33 +834,8 @@ const handlePlaceOrder = async () => {
           <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
             <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">3. Payment Method</h3>
             
-            <!-- Manual Transfer Toggle Switch -->
-            <div 
-              class="flex items-center justify-between p-4 rounded-2xl border transition-all duration-300"
-              :class="[isManualTransfer ? 'border-[#1b4332] bg-emerald-50/10 shadow-sm font-semibold' : 'border-gray-100 bg-gray-50/30']"
-            >
-              <div class="flex items-center gap-3">
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    v-model="isManualTransfer" 
-                    class="sr-only peer"
-                    :disabled="isLoadingCalculate || isLoadingCheckout"
-                  />
-                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1b4332]"></div>
-                </label>
-                <div class="flex flex-col">
-                  <span class="font-bold text-gray-900 text-xs">Manual Bank Transfer</span>
-                  <span class="text-[10px] text-gray-400 mt-0.5">Pay manually via direct bank transfer</span>
-                </div>
-              </div>
-              <div class="text-right text-xs">
-                <span class="text-emerald-700 font-bold">Free Fee</span>
-              </div>
-            </div>
-
             <!-- Backend Payment Methods Selection (Always Visible) -->
-            <div class="space-y-4 border-t border-gray-100 pt-5 mt-5">
+            <div class="space-y-4">
               <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Select Payment Gateway Channel:</div>
               <div v-if="paymentMethods.length === 0" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4">
                 <p class="text-sm text-gray-500">No payment methods available.</p>
@@ -946,7 +918,7 @@ const handlePlaceOrder = async () => {
 
               <div class="flex justify-between items-center">
                 <span>Payment Fee</span>
-                <span class="text-gray-900 font-bold" :class="[isManualTransfer ? 'text-emerald-700 font-extrabold' : '']">
+                <span class="text-gray-900 font-bold">
                   {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
                 </span>
               </div>

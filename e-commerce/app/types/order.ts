@@ -3,7 +3,6 @@ import type { CustomDesignPayload } from '~/composables/useCart'
 
 export interface CreateOrderPaymentInput {
   id: string
-  is_manual: boolean
 }
 
 export interface CreateOrderCourierInput {
@@ -34,17 +33,17 @@ export interface CreateOrderRequest {
   shops: CreateOrderShopInput[]
 }
 
-export interface CreateOrderPaymentAccountResponse {
-  account_name: string
-  account_number?: string
-  phone_number?: string
-  qr_string?: string
+export interface PaymentChannelDataResponse {
+  channel_type: string
+  display_name: string
+  action_url?: string
+  expires_at?: string
 }
 
 export interface CreateOrderResponse {
   order_id: string
   instruction: string
-  payment_account?: CreateOrderPaymentAccountResponse
+  channel_data?: PaymentChannelDataResponse
 }
 
 // ─── List Orders API ───────────────────────────────────────────────

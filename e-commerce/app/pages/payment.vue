@@ -11,12 +11,11 @@ useHead({
 interface PaymentInfo {
   orderId: string
   instruction: string
-  paymentAccount?: {
-    account_name: string
-    account_number?: string
-    phone_number?: string
-    qr_string?: string
+  channelData?: {
+    channel_type: string
+    display_name: string
     action_url?: string
+    expires_at?: string
   }
   total: number
   expiresAt?: string
@@ -24,7 +23,6 @@ interface PaymentInfo {
 }
 
 const paymentInfoState = useState<PaymentInfo | null>('last-payment-info', () => null)
-const selectedMethod = ref('qris')
 const isLoading = ref(false)
 const errorMsg = ref<string | null>(null)
 
@@ -52,12 +50,11 @@ onMounted(async () => {
       paymentInfoState.value = {
         orderId: orderIdFromQuery,
         instruction: res.instruction || '',
-        paymentAccount: {
-          account_name: res.account_name || res.display_name || 'Chia Florist',
-          account_number: res.account_number,
-          phone_number: res.phone_number,
-          qr_string: res.qr_string || res.action_url
-        },
+        channelData: res.channel_type ? {
+          channel_type: res.channel_type,
+          display_name: res.display_name || 'Payment Gateway',
+          action_url: res.action_url
+        } : undefined,
         total: res.amount,
         expiresAt: res.expires_at,
         status: res.status
@@ -77,13 +74,6 @@ onMounted(async () => {
         console.error(e)
       }
     }
-  }
-
-  // Auto-detect best payment method category
-  if (paymentInfoState.value?.paymentAccount?.qr_string) {
-    selectedMethod.value = 'qris'
-  } else {
-    selectedMethod.value = 'bank'
   }
 
   const updateTimer = () => {
@@ -143,16 +133,10 @@ const instructionHtml = computed(() => {
   return paymentInfoState.value ? renderMarkdown(paymentInfoState.value.instruction) : ''
 })
 
-const paymentAccount = computed(() => {
-  return paymentInfoState.value?.paymentAccount || null
-})
-
 const qrCodeUrl = computed(() => {
-  const qrString = paymentAccount.value?.qr_string || 'ChiaFlorist'
-  if (qrString.startsWith('data:') || qrString.startsWith('http://') || qrString.startsWith('https://')) {
-    return qrString
-  }
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`
+  const actionUrl = paymentInfoState.value?.channelData?.action_url
+  if (!actionUrl) return null
+  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(actionUrl)}`
 })
 
 const isChecking = ref(false)
@@ -272,79 +256,53 @@ const handleCheckPayment = async () => {
           <div class="gap-8 items-start">
 
             <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-              <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">Select Payment Method</h3>
+              <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">Payment Method</h3>
 
-              <div class="space-y-3">
-                <div
-                  @click="selectedMethod = 'qris'"
-                  :class="['p-4 rounded-xl border-2 transition-all pointer-events-auto cursor-pointer flex items-center justify-between', selectedMethod === 'qris' ? 'border-[#1b4332] bg-emerald-50/20' : 'border-gray-100 hover:border-gray-200']"
-                >
+              <!-- Payment Channel Info Card -->
+              <div v-if="paymentInfoState?.channelData" class="flex flex-col justify-between p-6 rounded-2xl border border-gray-100 bg-gray-50/30 gap-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
                   <div class="flex items-center gap-3">
-                    <span class="text-2xl">📱</span>
-                    <span class="text-sm font-bold text-gray-800">QRIS (Automated Verification)</span>
+                    <div class="w-12 h-12 bg-[#1b4332]/5 rounded-xl flex items-center justify-center text-xl">
+                      <span v-if="paymentInfoState.channelData.channel_type === 'ewallet'">📱</span>
+                      <span v-else-if="paymentInfoState.channelData.channel_type === 'bank_transfer'">🏦</span>
+                      <span v-else-if="paymentInfoState.channelData.channel_type === 'qr_code'">🔍</span>
+                      <span v-else>💳</span>
+                    </div>
+                    <div>
+                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selected Provider</span>
+                      <h4 class="font-bold text-gray-900 text-sm mt-0.5">{{ paymentInfoState.channelData.display_name }}</h4>
+                    </div>
                   </div>
-                  <div class="w-4 h-4 rounded-full border-2 border-gray-300 flex items-center justify-center animate-fade" :class="{'bg-[#1b4332] border-[#1b4332]': selectedMethod === 'qris'}"></div>
+                  <!-- Action URL Redirection button if action_url is present -->
+                  <div v-if="paymentInfoState.channelData.action_url" class="w-full md:w-auto">
+                    <a
+                      :href="paymentInfoState.channelData.action_url"
+                      target="_blank"
+                      class="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-2.5 px-5 rounded-xl transition text-xs shadow-sm"
+                    >
+                      Proceed to Payment Page ↗
+                    </a>
+                  </div>
                 </div>
 
-                <div
-                  @click="selectedMethod = 'bank'"
-                  :class="['p-4 rounded-xl border-2 transition-all pointer-events-auto cursor-pointer flex items-center justify-between', selectedMethod === 'bank' ? 'border-[#1b4332] bg-emerald-50/20' : 'border-gray-100 hover:border-gray-200']"
+                <!-- Direct QR Code Display for QRIS / GoPay / ShopeePay -->
+                <div 
+                  v-if="qrCodeUrl && (paymentInfoState.channelData.channel_type === 'qr_code' || paymentInfoState.channelData.channel_type === 'ewallet' || paymentInfoState.channelData.display_name.toLowerCase().includes('gopay') || paymentInfoState.channelData.display_name.toLowerCase().includes('qris'))" 
+                  class="border-t border-gray-100 pt-6 flex flex-col items-center text-center space-y-4"
                 >
-                  <div class="flex items-center gap-3">
-                    <span class="text-2xl">🏦</span>
-                    <span class="text-sm font-bold text-gray-800">Bank Transfer (Manual/VA)</span>
+                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Scan this QR Code with your phone to pay</p>
+                  <div class="w-56 h-56 bg-white border border-gray-100 rounded-3xl flex items-center justify-center shadow-sm overflow-hidden p-4">
+                    <img :src="qrCodeUrl" alt="Payment QR Code" class="w-48 h-48 object-contain" />
                   </div>
-                  <div class="w-4 h-4 rounded-full border-2 border-gray-300 flex items-center justify-center animate-fade" :class="{'bg-[#1b4332] border-[#1b4332]': selectedMethod === 'bank'}"></div>
+                  <p class="text-[10px] text-gray-400 max-w-xs leading-relaxed">
+                    Supports GoPay, OVO, Dana, LinkAja, ShopeePay, and all QRIS-compliant Mobile Banking apps.
+                  </p>
                 </div>
               </div>
 
               <!-- Markdown Payment Instructions from Backend -->
               <div v-if="instructionHtml" class="bg-emerald-50/10 border border-emerald-100/50 rounded-2xl p-6 mb-6 text-left shadow-sm">
                 <div v-html="instructionHtml" class="prose max-w-none"></div>
-              </div>
-
-              <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                <div v-if="selectedMethod === 'qris'" class="text-center space-y-4">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Scan this QR Code to pay</p>
-                  <div class="w-48 h-48 bg-white border border-gray-200 rounded-2xl mx-auto flex items-center justify-center shadow-sm overflow-hidden">
-                    <img :src="qrCodeUrl" alt="QRIS Code" class="w-40 h-40 object-contain" />
-                  </div>
-                  <p class="text-xs text-gray-400 max-w-xs mx-auto">Supports GoPay, OVO, Dana, LinkAja, and all Mobile Banking apps.</p>
-                </div>
-
-                <div v-if="selectedMethod === 'bank'" class="space-y-4">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Transfer details</p>
-                  <div class="bg-white p-4 rounded-xl border border-gray-100 space-y-2">
-                    <div class="flex justify-between text-sm" v-if="paymentAccount">
-                      <span class="text-gray-400 font-medium">Account Holder:</span>
-                      <span class="font-bold text-gray-900">{{ paymentAccount.account_name }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm" v-if="paymentAccount && paymentAccount.account_number">
-                      <span class="text-gray-400 font-medium">Account Number:</span>
-                      <span class="font-mono font-bold text-gray-900 select-all">{{ paymentAccount.account_number }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm" v-if="paymentAccount && paymentAccount.phone_number">
-                      <span class="text-gray-400 font-medium">Phone Number (E-Wallet):</span>
-                      <span class="font-mono font-bold text-gray-900 select-all">{{ paymentAccount.phone_number }}</span>
-                    </div>
-
-                    <template v-if="!paymentAccount">
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-400 font-medium">Bank Name:</span>
-                        <span class="font-bold text-gray-900">Bank Mandiri</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-400 font-medium">Account Number:</span>
-                        <span class="font-mono font-bold text-gray-900 select-all">137-00-123456-7</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-400 font-medium">Account Holder:</span>
-                        <span class="font-bold text-gray-900">CHIA FLORIST STUDIO</span>
-                      </div>
-                    </template>
-                  </div>
-                  <p class="text-[11px] text-gray-400 leading-relaxed">💡 Please write your client details in the reference note for faster verification.</p>
-                </div>
               </div>
 
               <!-- Action Buttons to check/verify payment -->
