@@ -117,7 +117,7 @@ export const supabaseStorage = {
       return { publicUrl, signedUrl };
     } catch (err: any) {
       console.error('Failed to upload file to Supabase:', err);
-      throw new Error(err.message || 'File upload failed');
+      throw new Error(err.message || 'File upload failed', { cause: err });
     }
   },
 
@@ -150,7 +150,7 @@ export const supabaseStorage = {
       const data = await response.json();
       
       // Supabase returns { signedURL: "..." } or { signedUrl: "..." }
-      let signedUrlPath = data?.signedURL || data?.signedUrl || null;
+      const signedUrlPath = data?.signedURL || data?.signedUrl || null;
       if (!signedUrlPath) return null;
 
       // Ensure url is absolute

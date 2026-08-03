@@ -43,19 +43,6 @@ export interface PaymentMethod {
   instruction?: PaymentInstruction | null;
 }
 
-export interface PaymentAccount {
-  id: string;
-  method_id: string;
-  account_name: string;
-  account_number: string | null;
-  phone_number: string | null;
-  qr_string: string | null;
-}
-
 export interface PaymentMethodsResponse {
   methods: PaymentMethod[];
-}
-
-export interface PaymentAccountsResponse {
-  accounts: PaymentAccount[];
 }
