@@ -101,13 +101,13 @@ type Container struct {
 	CreateStaff     staffUsecase.CreateStaffUsecase
 	AddStaffAccount staffUsecase.AddStaffAccountUsecase
 
-	GetCart         cartUsecase.GetCartUsecase
-	AddItem         cartUsecase.AddItemUsecase
-	AddCustomItem   cartUsecase.AddCustomItemUsecase
-	UpdateItem      cartUsecase.UpdateItemUsecase
-	RemoveItem      cartUsecase.RemoveItemUsecase
+	GetCart          cartUsecase.GetCartUsecase
+	AddItem          cartUsecase.AddItemUsecase
+	AddCustomItem    cartUsecase.AddCustomItemUsecase
+	UpdateItem       cartUsecase.UpdateItemUsecase
+	RemoveItem       cartUsecase.RemoveItemUsecase
 	RemoveCustomItem cartUsecase.RemoveCustomItemUsecase
-	Checkout        cartUsecase.CheckoutUsecase
+	Checkout         cartUsecase.CheckoutUsecase
 
 	ListLocations locationUsecase.ListLocationUsecase
 
@@ -155,7 +155,6 @@ type Container struct {
 	GetOrder          orderUsecase.GetOrderUsecase
 	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
 	GetOrderTracking  orderUsecase.GetOrderTrackingUsecase
-
 
 	FindAuditLogs   auditUsecase.FindAuditLogsUsecase
 	GetAuditLog     auditUsecase.GetAuditLogUsecase
@@ -342,9 +341,9 @@ func NewContainer(cfg Config,
 			),
 		SaveProduct: *productUsecase.
 			NewSaveProductUsecase(
+				infra.TransactionProvider,
 				productRepo,
 				slugGen,
-				infra.TransactionExecutor,
 				productPerformanceRepo,
 			),
 		GetProductStats: *productUsecase.
@@ -851,7 +850,6 @@ func NewContainer(cfg Config,
 				infra.LogisticsProvider,
 				addressRepo,
 			),
-
 
 		FindAuditLogs: *auditUsecase.NewFindAuditLogsUsecase(
 			infra.TransactionExecutor,

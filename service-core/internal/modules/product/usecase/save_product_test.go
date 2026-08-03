@@ -41,6 +41,17 @@ type mockExecutor struct {
 	transaction.Executor
 }
 
+type mockTransactor struct {
+	exec transaction.Executor
+}
+
+func (m *mockTransactor) WithinTransaction(
+	ctx context.Context,
+	fn func(transaction.Executor) error,
+) error {
+	return fn(m.exec)
+}
+
 type mockProductPerformanceRepository struct {
 	repository.ProductPerformanceRepository
 	upsertCalled bool
@@ -67,12 +78,12 @@ func (m *mockProductPerformanceRepository) UpsertPerformance(
 
 func TestSaveProduct_Success_NewProduct(t *testing.T) {
 	ctx := context.Background()
+	transactor := &mockTransactor{exec: &mockExecutor{}}
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
-	exec := &mockExecutor{}
 	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
+	uc := NewSaveProductUsecase(transactor, repo, slugGen, perfRepo)
 
 	desc := "New product description"
 	weight := 1.5
@@ -131,12 +142,12 @@ func TestSaveProduct_Success_NewProduct(t *testing.T) {
 
 func TestSaveProduct_Success_UpdateProduct(t *testing.T) {
 	ctx := context.Background()
+	transactor := &mockTransactor{exec: &mockExecutor{}}
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
-	exec := &mockExecutor{}
 	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
+	uc := NewSaveProductUsecase(transactor, repo, slugGen, perfRepo)
 
 	productID := uuid.New()
 	desc := "Updated description"
@@ -196,12 +207,12 @@ func TestSaveProduct_Success_UpdateProduct(t *testing.T) {
 
 func TestSaveProduct_InvalidInput_EmptyName(t *testing.T) {
 	ctx := context.Background()
+	transactor := &mockTransactor{exec: &mockExecutor{}}
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
-	exec := &mockExecutor{}
 	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
+	uc := NewSaveProductUsecase(transactor, repo, slugGen, perfRepo)
 
 	input := SaveProductInput{
 		ID:     nil,
@@ -219,12 +230,12 @@ func TestSaveProduct_InvalidInput_EmptyName(t *testing.T) {
 
 func TestSaveProduct_InvalidInput_NegativePrice(t *testing.T) {
 	ctx := context.Background()
+	transactor := &mockTransactor{exec: &mockExecutor{}}
 	repo := &mockProductRepository{}
 	slugGen := &mockSlugGenerator{}
-	exec := &mockExecutor{}
 	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
+	uc := NewSaveProductUsecase(transactor, repo, slugGen, perfRepo)
 
 	input := SaveProductInput{
 		ID:     nil,
@@ -243,12 +254,12 @@ func TestSaveProduct_InvalidInput_NegativePrice(t *testing.T) {
 func TestSaveProduct_RepoError(t *testing.T) {
 	ctx := context.Background()
 	expectedErr := errors.New("database connection failed")
+	transactor := &mockTransactor{exec: &mockExecutor{}}
 	repo := &mockProductRepository{saveErr: expectedErr}
 	slugGen := &mockSlugGenerator{}
-	exec := &mockExecutor{}
 	perfRepo := &mockProductPerformanceRepository{}
 
-	uc := NewSaveProductUsecase(repo, slugGen, exec, perfRepo)
+	uc := NewSaveProductUsecase(transactor, repo, slugGen, perfRepo)
 
 	input := SaveProductInput{
 		ID:     nil,

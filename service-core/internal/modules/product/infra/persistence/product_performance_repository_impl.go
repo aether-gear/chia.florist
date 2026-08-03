@@ -35,10 +35,10 @@ func (r *productPerformanceRepositoryImpl) UpsertPerformance(
 		)
 		VALUES (
 			$1,
-			$2,
+			$2::bigint,
 			$3,
-			CASE WHEN $2 IS NOT NULL AND $4 > 0
-				 THEN ROUND((($4 - $2)::numeric / $4) * 100, 2)
+			CASE WHEN $2::bigint IS NOT NULL AND $4::bigint > 0
+				 THEN ROUND((($4::bigint - $2::bigint)::numeric / $4::bigint) * 100, 2)
 				 ELSE NULL
 			END,
 			NOW()

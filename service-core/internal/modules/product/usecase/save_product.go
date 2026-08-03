@@ -16,22 +16,22 @@ import (
 )
 
 type SaveProductUsecase struct {
+	transactor  transaction.Transactor
 	productRepo repository.ProductRepository
 	slugGen     slug.Generator
-	executor    transaction.Executor
 	perfRepo    repository.ProductPerformanceRepository
 }
 
 func NewSaveProductUsecase(
+	transactor transaction.Transactor,
 	productRepo repository.ProductRepository,
 	slugGen slug.Generator,
-	executor transaction.Executor,
 	perfRepo repository.ProductPerformanceRepository,
 ) *SaveProductUsecase {
 	return &SaveProductUsecase{
+		transactor:  transactor,
 		productRepo: productRepo,
 		slugGen:     slugGen,
-		executor:    executor,
 		perfRepo:    perfRepo,
 	}
 }
@@ -81,20 +81,29 @@ func (u *SaveProductUsecase) Execute(
 		return err
 	}
 
-	if err := u.productRepo.
-		Save(ctx, u.executor,
-			product,
-		); err != nil {
-		return fmt.Errorf("failed to save product: %w", err)
-	}
-
 	perf := domain.ProductPerformance{
 		ProductID:            productID,
 		CostPrice:            input.CostPrice,
 		SupplierLeadTimeDays: input.SupplierLeadTimeDays,
 	}
-	if err := u.perfRepo.UpsertPerformance(ctx, u.executor, perf, product.Price); err != nil {
-		return fmt.Errorf("failed to save product performance: %w", err)
+
+	if err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.productRepo.Save(ctx, exec,
+			product,
+		); err != nil {
+			return fmt.Errorf("failed to save product: %w", err)
+		}
+
+		if err := u.perfRepo.UpsertPerformance(ctx, exec,
+			perf,
+			product.Price,
+		); err != nil {
+			return fmt.Errorf("failed to save product performance: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	return nil
