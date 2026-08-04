@@ -197,6 +197,8 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 
 	if status != "" {
 		input.Status = &status
+	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
+		input.Status = &statuses
 	}
 
 	orders, total, err := h.findOrders.Execute(r.Context(), input)
@@ -289,6 +291,8 @@ func (h *orderHandler) ListMyOrders(w http.ResponseWriter, r *http.Request) erro
 
 	if status != "" {
 		input.Status = &status
+	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
+		input.Status = &statuses
 	}
 
 	orders, total, err := h.findOrders.Execute(r.Context(), input)

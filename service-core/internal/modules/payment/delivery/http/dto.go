@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 type updatePaymentMethodActiveRequest struct {
 	IsActive bool `json:"is_active"`
 }
@@ -31,21 +30,27 @@ type paymentMethodResponse struct {
 	Instruction   *paymentInstructionResponse `json:"instruction,omitempty"`
 }
 
-
 type savePaymentInstructionRequest struct {
 	Content string `json:"content"`
 }
 
-type getPaymentDetailResponse struct {
-	PaymentID   string     `json:"payment_id"`
-	Status      string     `json:"status"`
-	Amount      int64      `json:"amount"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	ChannelType *string    `json:"channel_type,omitempty"`
-	DisplayName *string    `json:"display_name,omitempty"`
+type paymentChannelDataResponse struct {
+	ChannelType string     `json:"channel_type"`
+	DisplayName string     `json:"display_name"`
 	ActionURL   *string    `json:"action_url,omitempty"`
-	// Rendered instruction markdown:
-	Instruction *string `json:"instruction,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+}
+
+type getPaymentDetailResponse struct {
+	PaymentID   string                      `json:"payment_id"`
+	Status      string                      `json:"status"`
+	Amount      int64                       `json:"amount"`
+	ExpiresAt   *time.Time                  `json:"expires_at,omitempty"`
+	ChannelType *string                     `json:"channel_type,omitempty"`
+	DisplayName *string                     `json:"display_name,omitempty"`
+	ActionURL   *string                     `json:"action_url,omitempty"`
+	ChannelData *paymentChannelDataResponse `json:"channel_data,omitempty"`
+	Instruction *string                     `json:"instruction,omitempty"`
 }
 
 type checkPaymentStatusResponse struct {

@@ -35,8 +35,9 @@ func (u *SavePaymentMethodUsecase) Execute(
 	ctx context.Context,
 	input SavePaymentMethodInput,
 ) error {
-	paymentMethod, err := u.paymentMethodRepo.
-		GetByID(ctx, u.executor, input.ID)
+	paymentMethod, err := u.paymentMethodRepo.GetByID(ctx, u.executor,
+		input.ID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve payment method: %w", err)
 	}
@@ -47,8 +48,9 @@ func (u *SavePaymentMethodUsecase) Execute(
 
 	paymentMethod.IsActive = input.IsActive
 
-	err = u.paymentMethodRepo.
-		Save(ctx, u.executor, *paymentMethod)
+	err = u.paymentMethodRepo.Save(ctx, u.executor,
+		*paymentMethod,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to save payment method: %w", err)
 	}

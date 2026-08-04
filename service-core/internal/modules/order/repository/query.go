@@ -99,6 +99,7 @@ type FindOrderParams struct {
 	Number     *string
 	CustomerID *uuid.UUID
 	Status     *string
+	Statuses   []string
 
 	Pagination query.Pagination
 	Sorts      query.Sorts

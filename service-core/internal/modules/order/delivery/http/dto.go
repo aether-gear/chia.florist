@@ -11,7 +11,7 @@ type createOrderItemRequest struct {
 }
 
 type createOrderPaymentRequest struct {
-	ID       string `json:"id"`
+	ID string `json:"id"`
 }
 
 type createOrderCourierRequest struct {
@@ -151,10 +151,9 @@ type trackingTimelineEventResponse struct {
 }
 
 type orderTrackingResponse struct {
-	OrderID        string                           `json:"order_id"`
-	ShipmentID     string                           `json:"shipment_id"`
-	Courier        string                           `json:"courier"`
-	TrackingNumber *string                          `json:"tracking_number,omitempty"`
+	OrderID        string                          `json:"order_id"`
+	ShipmentID     string                          `json:"shipment_id"`
+	Courier        string                          `json:"courier"`
+	TrackingNumber *string                         `json:"tracking_number,omitempty"`
 	Timeline       []trackingTimelineEventResponse `json:"timeline"`
 }
-

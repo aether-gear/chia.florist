@@ -235,7 +235,15 @@ func (r *orderRepositoryImpl) FindOrders(
 		argPos++
 	}
 
-	if params.Status != nil {
+	if len(params.Statuses) > 0 {
+		placeholders := make([]string, len(params.Statuses))
+		for i, s := range params.Statuses {
+			placeholders[i] = fmt.Sprintf("$%d", argPos)
+			args = append(args, s)
+			argPos++
+		}
+		conditions = append(conditions, fmt.Sprintf("o.status IN (%s)", strings.Join(placeholders, ", ")))
+	} else if params.Status != nil {
 		conditions = append(conditions, fmt.Sprintf("o.status = $%d", argPos))
 		args = append(args, *params.Status)
 		argPos++

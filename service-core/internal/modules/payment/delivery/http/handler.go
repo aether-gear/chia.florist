@@ -39,8 +39,6 @@ func NewPaymentHandler(
 	}
 }
 
-
-
 func (h *PaymentHandler) UpdatePaymentMethodActive(w http.ResponseWriter, r *http.Request) error {
 	idStr := chi.URLParam(r, "methodID")
 	methodID, err := uuid.Parse(idStr)
@@ -139,8 +137,6 @@ func (h *PaymentHandler) HandleMidtransWebhook(w http.ResponseWriter, r *http.Re
 	return nil
 }
 
-
-
 func (h *PaymentHandler) SavePaymentInstruction(w http.ResponseWriter, r *http.Request) error {
 	methodIDStr := chi.URLParam(r, "methodID")
 	methodID, err := uuid.Parse(methodIDStr)
@@ -212,9 +208,14 @@ func (h *PaymentHandler) GetMyOrderPayment(w http.ResponseWriter, r *http.Reques
 		resp.ChannelType = &channelTypeStr
 		resp.DisplayName = &result.ChannelData.DisplayName
 		resp.ActionURL = result.ChannelData.ActionURL
+
+		resp.ChannelData = &paymentChannelDataResponse{
+			ChannelType: channelTypeStr,
+			DisplayName: result.ChannelData.DisplayName,
+			ActionURL:   result.ChannelData.ActionURL,
+			ExpiresAt:   result.ChannelData.ExpiresAt,
+		}
 	}
-
-
 
 	resp.Instruction = result.Instruction
 
