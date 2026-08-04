@@ -4,19 +4,68 @@ import { orderService } from '~/services/orderService'
 import type { BackendOrder } from '~/types/order'
 
 /**
- * Maps the 4 UI tab keys to the backend status strings.
- *   pending    -> pending
+ * Maps the 5 UI tab keys to the backend status strings.
+ *   pending    -> pending (active unexpired payment)
+ *   expired    -> pending | cancelled (payment expired or failed)
  *   processing -> confirmed | processing
  *   shipping   -> shipped
- *   done       -> delivered | cancelled
+ *   done       -> delivered | cancelled (completed / normal user cancellations)
  */
-export type OrderTab = 'pending' | 'processing' | 'shipping' | 'done'
+export type OrderTab = 'pending' | 'expired' | 'processing' | 'shipping' | 'done'
 
 const TAB_STATUSES: Record<OrderTab, string[]> = {
   pending:    ['pending'],
+  expired:    ['pending', 'cancelled'],
   processing: ['confirmed', 'processing'],
   shipping:   ['shipped'],
   done:       ['delivered', 'cancelled']
+}
+
+/**
+ * Checks if an order's payment has expired.
+ * An order is NEVER expired if it is paid or in an active fulfillment state.
+ */
+export const isOrderExpired = (order: BackendOrder): boolean => {
+  if (!order) return false
+
+  // Paid orders or active fulfillment states are NEVER expired
+  if (order.payment?.status === 'paid') return false
+  const nonExpiredStatuses = ['confirmed', 'processing', 'shipped', 'delivered', 'finished']
+  if (nonExpiredStatuses.includes(order.status)) return false
+
+  // Explicitly marked expired or failed payment
+  if (order.payment?.status === 'expired' || order.payment?.status === 'failed') {
+    return true
+  }
+
+  // Pending payment past expires_at timestamp
+  if (order.payment?.expires_at && (order.status === 'pending' || order.payment?.status === 'pending')) {
+    const expiresAt = new Date(order.payment.expires_at).getTime()
+    return Date.now() >= expiresAt
+  }
+
+  return false
+}
+
+/**
+ * Formats time remaining for a pending payment until it expires.
+ */
+export const getTimeRemaining = (expiresAt?: string): string => {
+  if (!expiresAt) return ''
+  const diff = new Date(expiresAt).getTime() - Date.now()
+  if (diff <= 0) return 'Expired'
+
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  }
+  return `${seconds}s`
 }
 
 export const useOrders = () => {
@@ -52,13 +101,21 @@ export const useOrders = () => {
 
       let fetchedOrders = res.orders ?? []
 
-      // Client-side guard: 'pending' (Waiting Payment) tab only shows pending payments
+      // Client-side guard: 'pending' (Waiting Payment) tab only shows active unexpired pending payments
       if (tab === 'pending') {
-        fetchedOrders = fetchedOrders.filter(o => o.payment?.status === 'pending')
+        fetchedOrders = fetchedOrders.filter(o => o.payment?.status === 'pending' && !isOrderExpired(o))
+      }
+      // Client-side guard: 'expired' (Expired Payment) tab shows orders with expired payments
+      if (tab === 'expired') {
+        fetchedOrders = fetchedOrders.filter(o => isOrderExpired(o))
       }
       // Client-side guard: 'processing' (To Ship) tab only shows non-pending payments
       if (tab === 'processing') {
-        fetchedOrders = fetchedOrders.filter(o => o.payment?.status !== 'pending')
+        fetchedOrders = fetchedOrders.filter(o => o.payment?.status !== 'pending' && !isOrderExpired(o))
+      }
+      // Client-side guard: 'done' tab excludes expired orders if listed under cancelled
+      if (tab === 'done') {
+        fetchedOrders = fetchedOrders.filter(o => !isOrderExpired(o))
       }
 
       orders.value      = fetchedOrders
@@ -108,6 +165,8 @@ export const useOrders = () => {
     fetchOrders,
     goToPage,
     formatRupiah,
-    formatDate
+    formatDate,
+    isOrderExpired,
+    getTimeRemaining
   }
 }

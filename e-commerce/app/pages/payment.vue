@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCart } from '~/composables/useCart'
+import { useToast } from '~/composables/useToast'
 import { formatRupiah } from '~/utils/formatter'
 import { orderService } from '~/services/orderService'
 
@@ -25,12 +26,14 @@ interface PaymentInfo {
 const paymentInfoState = useState<PaymentInfo | null>('last-payment-info', () => null)
 const isLoading = ref(false)
 const errorMsg = ref<string | null>(null)
+const toast = useToast()
 
 const route = useRoute()
 
-// --- TIMER LOGIC (Batas Waktu Bayar) ---
-const timeLeft = ref(86400) // 24 jam default dalam detik
+// --- TIMER & POLLING LOGIC ---
+const timeLeft = ref(86400) // 24 hours default in seconds
 let timerInterval: any = null
+let pollInterval: any = null
 
 const formattedTimer = computed(() => {
   const hours = Math.floor(timeLeft.value / 3600)
@@ -38,6 +41,63 @@ const formattedTimer = computed(() => {
   const seconds = timeLeft.value % 60
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 })
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+const startPolling = () => {
+  stopPolling()
+  if (!import.meta.client) return
+
+  // Poll payment status silently every 30 seconds while pending
+  pollInterval = setInterval(async () => {
+    if (paymentInfoState.value?.status !== 'pending') {
+      stopPolling()
+      return
+    }
+    const orderIdVal = orderId.value
+    if (!orderIdVal || orderIdVal === 'CHIA-LOCAL') return
+
+    try {
+      const res = await orderService.checkOrderPaymentStatus(orderIdVal)
+      if (res.status !== 'pending' && paymentInfoState.value) {
+        paymentInfoState.value.status = res.status
+        stopPolling()
+        if (res.status === 'paid') {
+          toast.success('Payment Verified!', 'Your payment has been received and confirmed.')
+        } else if (res.status === 'expired' || res.status === 'cancelled') {
+          toast.error('Order ' + res.status, 'The payment status for this order is now ' + res.status + '.')
+        }
+      }
+    } catch (e) {
+      // Ignore background poll errors
+    }
+  }, 30000)
+}
+
+const handleTimerZero = async () => {
+  stopPolling()
+  const orderIdVal = orderId.value
+  if (orderIdVal && orderIdVal !== 'CHIA-LOCAL') {
+    try {
+      const res = await orderService.checkOrderPaymentStatus(orderIdVal)
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = res.status === 'pending' ? 'expired' : res.status
+      }
+    } catch (e) {
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = 'expired'
+      }
+    }
+  } else if (paymentInfoState.value) {
+    paymentInfoState.value.status = 'expired'
+  }
+  toast.error('Payment Window Expired', 'The time allocated for completing your payment has lapsed.')
+}
 
 onMounted(async () => {
   const orderIdFromQuery = route.query.orderId as string
@@ -47,6 +107,16 @@ onMounted(async () => {
     errorMsg.value = null
     try {
       const res = await orderService.getOrderPaymentDetails(orderIdFromQuery)
+      
+      // Compute status upfront so we don't render instructions if already expired
+      let initialStatus = res.status || 'pending'
+      if (initialStatus !== 'paid' && res.expires_at) {
+        const isPast = new Date().getTime() >= new Date(res.expires_at).getTime()
+        if (isPast) {
+          initialStatus = 'expired'
+        }
+      }
+
       paymentInfoState.value = {
         orderId: orderIdFromQuery,
         instruction: res.instruction || '',
@@ -61,7 +131,7 @@ onMounted(async () => {
         } : undefined),
         total: res.amount,
         expiresAt: res.expires_at,
-        status: res.status
+        status: initialStatus
       }
     } catch (err: any) {
       console.error('Failed to load payment details:', err)
@@ -84,9 +154,19 @@ onMounted(async () => {
     if (paymentInfoState.value?.expiresAt) {
       const now = new Date().getTime()
       const expiry = new Date(paymentInfoState.value.expiresAt).getTime()
-      timeLeft.value = Math.max(0, Math.floor((expiry - now) / 1000))
+      const diff = Math.max(0, Math.floor((expiry - now) / 1000))
+      timeLeft.value = diff
+
+      if (diff <= 0 && paymentInfoState.value.status === 'pending') {
+        handleTimerZero()
+      }
     } else {
-      if (timeLeft.value > 0) timeLeft.value--
+      if (timeLeft.value > 0) {
+        timeLeft.value--
+        if (timeLeft.value <= 0 && paymentInfoState.value?.status === 'pending') {
+          handleTimerZero()
+        }
+      }
     }
   }
 
@@ -94,10 +174,15 @@ onMounted(async () => {
   timerInterval = setInterval(() => {
     updateTimer()
   }, 1000)
+
+  if (paymentInfoState.value?.status === 'pending') {
+    startPolling()
+  }
 })
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval)
+  stopPolling()
 })
 
 const totalPayment = computed(() => {
@@ -158,8 +243,8 @@ const handleCheckPayment = async () => {
       if (paymentInfoState.value) {
         paymentInfoState.value.status = 'paid'
       }
-      
-      // Update session cache if exists
+      stopPolling()
+
       if (import.meta.client) {
         const cached = sessionStorage.getItem('chia-last-payment-info')
         if (cached) {
@@ -172,14 +257,20 @@ const handleCheckPayment = async () => {
           }
         }
       }
-      alert('Payment verified successfully! Thank you.')
+      toast.success('Payment Verified!', 'Thank you! Your payment has been received and confirmed.')
+    } else if (res.status === 'expired' || res.status === 'cancelled') {
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = res.status
+      }
+      stopPolling()
+      toast.error('Order ' + res.status, `Your payment status is currently ${res.status}.`)
     } else {
-      alert(`Payment status is still pending (status: ${res.status}). If you just paid, please wait a minute and verify again.`)
+      toast.info('Payment Pending', 'Payment status is still pending. If you just transferred, please allow a moment for confirmation.')
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
     checkError.value = err.data?.message || err.message || 'Verification failed. Please try again.'
-    alert(checkError.value)
+    toast.error('Verification Error', checkError.value || 'Failed to check status')
   } finally {
     isChecking.value = false
   }
@@ -239,6 +330,68 @@ const handleCheckPayment = async () => {
             </button>
             <button @click="navigateTo('/catalog')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               Continue Shopping
+            </button>
+          </div>
+        </div>
+
+        <!-- Expired State -->
+        <div v-else-if="paymentInfoState?.status === 'expired'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-amber-50/50">
+            <span class="text-4xl">⏰</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-amber-900">Payment Window Expired</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">The payment time limit for this order has lapsed and reserved stock has been released.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Amount:</span>
+              <span class="font-bold text-gray-900">{{ formatRupiah(totalPayment) }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full border border-amber-200">Expired</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              Browse Catalog / Re-Order
+            </button>
+            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+              Back to My Orders
+            </button>
+          </div>
+        </div>
+
+        <!-- Cancelled State -->
+        <div v-else-if="paymentInfoState?.status === 'cancelled'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
+            <span class="text-4xl">🚫</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-red-900">Order Cancelled</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">This order has been cancelled. You can rebuild your arrangement or place a new order from our catalog.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-red-100 text-red-800 text-[10px] font-bold rounded-full border border-red-200">Cancelled</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              Re-Order Flower Arrangement
+            </button>
+            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+              View Order History
             </button>
           </div>
         </div>

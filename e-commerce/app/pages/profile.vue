@@ -16,10 +16,11 @@ const authVm = useAuthViewModel()
 const addressVm = useAddress()
 
 const activeTab = ref('personal')
-const activeOrderStatus = ref<'pending' | 'processing' | 'shipping' | 'done'>('pending')
+const activeOrderStatus = ref<'pending' | 'expired' | 'processing' | 'shipping' | 'done'>('pending')
 
 const statusLabels = {
   pending: 'Waiting Payment',
+  expired: 'Expired Payment',
   processing: 'To Ship',
   shipping: 'Shipping',
   done: 'Done'
@@ -764,9 +765,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Orders tab -->
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
-            <div class="bg-white border border-gray-100 p-2 rounded-2xl shadow-sm grid grid-cols-4 gap-1 text-center font-medium">
+            <div class="bg-white border border-gray-100 p-2 rounded-2xl shadow-sm grid grid-cols-2 sm:grid-cols-5 gap-1 text-center font-medium">
               <button 
-                v-for="status in [{id:'pending', label:'Waiting Payment'}, {id:'processing', label:'To Ship'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
+                v-for="status in [{id:'pending', label:'Waiting Payment'}, {id:'expired', label:'Expired'}, {id:'processing', label:'To Ship'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
                 :key="status.id"
                 @click="activeOrderStatus = status.id as any"
                 :class="['py-3 text-xs sm:text-sm rounded-xl transition-all font-bold', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-400 hover:text-gray-900']"
@@ -798,7 +799,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                       <span class="text-xs font-bold text-gray-400">🗓️ {{ ordersVm.formatDate(order.created_at) }}</span>
                       <span class="text-xs font-mono font-bold text-gray-900 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">{{ order.number }}</span>
                       <div>
-                        <span v-if="order.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
+                        <span v-if="ordersVm.isOrderExpired(order)" class="px-2.5 py-0.5 bg-rose-50 text-rose-700 text-xs font-bold rounded-full border border-rose-100">Expired Payment</span>
+                        <span v-else-if="order.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
                         <span v-else-if="order.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">Confirmed</span>
                         <span v-else-if="order.status === 'processing'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">Arranging Flowers</span>
                         <span v-else-if="order.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">Shipped</span>
@@ -806,6 +808,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                         <span v-else-if="order.status === 'finished'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">Finished</span>
                         <span v-else-if="order.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">Cancelled</span>
                         <span v-else class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full border border-gray-200">{{ order.status }}</span>
+
+                        <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100 ml-2">⏳ {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}</span>
                       </div>
                     </div>
 
@@ -836,14 +840,20 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                       <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Bill</p>
                       <p class="text-base font-extrabold text-[#1b4332] mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 items-center">
                       <button 
-                        v-if="order.status === 'pending'"
+                        v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending'"
                         @click.stop="navigateTo(`/payment?orderId=${order.id}`)"
                         class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
                       >
                         Pay Now
                       </button>
+                      <span 
+                        v-else-if="ordersVm.isOrderExpired(order)"
+                        class="bg-rose-50 text-rose-700 border border-rose-100 px-3 py-2 rounded-xl text-xs font-bold"
+                      >
+                        Expired
+                      </span>
                       <button 
                         @click="openOrderDetail(order)" 
                         class="bg-[#1b4332] hover:bg-[#143326] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
@@ -991,7 +1001,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
             <div>
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Status</p>
               <div class="mt-1 flex items-center gap-2">
-                <span v-if="selectedOrder.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
+                <span v-if="ordersVm.isOrderExpired(selectedOrder)" class="px-2.5 py-0.5 bg-rose-50 text-rose-700 text-xs font-bold rounded-full border border-rose-100">Expired Payment</span>
+                <span v-else-if="selectedOrder.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
                 <span v-else-if="selectedOrder.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">Confirmed</span>
                 <span v-else-if="selectedOrder.status === 'processing'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">Arranging Flowers</span>
                 <span v-else-if="selectedOrder.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">Shipped</span>
