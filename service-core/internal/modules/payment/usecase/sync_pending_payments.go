@@ -2,11 +2,14 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	orderDomain "service-core/internal/modules/order/domain"
 	orderRepo "service-core/internal/modules/order/repository"
@@ -234,6 +237,20 @@ func (u *SyncPendingPaymentsUsecase) expirePaymentLocally(
 				item.ShopID,
 				item.Quantity,
 			); err != nil {
+				if errors.Is(err, inventoryDomain.ErrInsufficientReserved) ||
+					errors.Is(err, apperrors.ErrNotFound) {
+
+					msg := "inventory anomaly during payment reconciliation expiry: reserved stock insufficient or missing"
+					u.logger.Warn(ctx, msg,
+						applogger.Field{Key: "payment_id", Value: payment.ID.String()},
+						applogger.Field{Key: "order_id", Value: payment.OrderID.String()},
+						applogger.Field{Key: "product_id", Value: item.ProductID.String()},
+						applogger.Field{Key: "shop_id", Value: item.ShopID.String()},
+						applogger.Field{Key: "requested_qty", Value: item.Quantity},
+						applogger.Field{Key: "reason", Value: err.Error()},
+					)
+					continue
+				}
 				return fmt.Errorf("failed to release inventory for product %s: %w", item.ProductID, err)
 			}
 		}

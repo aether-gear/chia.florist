@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	inventoryDomain "service-core/internal/modules/inventory/domain"
 	orderDomain "service-core/internal/modules/order/domain"
 	paymentDomain "service-core/internal/modules/payment/domain"
 	transaction "service-core/internal/shared/transaction"
@@ -175,5 +176,81 @@ func TestExpirePastDuePayments_ListError(t *testing.T) {
 	uc.Execute(context.Background())
 	if len(logger.errors) == 0 {
 		t.Error("expected error to be logged")
+	}
+}
+
+func TestExpirePastDuePayments_InventoryAnomalyLogsWarnAndFinalizesState(t *testing.T) {
+	orderID := uuid.New()
+	paymentID := uuid.New()
+	productID := uuid.New()
+	shopID := uuid.New()
+
+	pastTime := time.Now().Add(-10 * time.Minute)
+	pastDuePayment := paymentDomain.Payment{
+		ID:        paymentID,
+		OrderID:   orderID,
+		Provider:  "manual",
+		Status:    paymentDomain.PaymentStatusPending,
+		ExpiresAt: &pastTime,
+	}
+
+	paymentRepo := &mockPaymentExpiryRepo{
+		pastDuePayments: []paymentDomain.Payment{pastDuePayment},
+	}
+	orderRepo := &mockOrderRepo{
+		orders: map[uuid.UUID]*orderDomain.Order{
+			orderID: {
+				ID:     orderID,
+				Status: orderDomain.OrderStatusPending,
+			},
+		},
+	}
+	orderItemRepo := &mockOrderItemRepo{
+		items: map[uuid.UUID][]orderDomain.OrderItem{
+			orderID: {
+				{
+					ID:        uuid.New(),
+					OrderID:   orderID,
+					ProductID: productID,
+					ShopID:    shopID,
+					Quantity:  5,
+				},
+			},
+		},
+	}
+	// Inject inventory release error (ErrInsufficientReserved)
+	inventoryRepo := &mockInventoryRepo{
+		releaseErr: inventoryDomain.ErrInsufficientReserved,
+	}
+	gw := &mockPaymentGateway{}
+	transactor := &mockTransactor{}
+	logger := &mockLogger{}
+
+	uc := NewExpirePastDuePaymentsUsecase(
+		paymentRepo,
+		gw,
+		nil,
+		transactor,
+		orderRepo,
+		orderItemRepo,
+		inventoryRepo,
+		logger,
+		100,
+		5,
+	)
+
+	uc.Execute(context.Background())
+
+	// Payment and order should still be finalized (expired/cancelled)
+	if paymentRepo.updatedStatuses[paymentID] != paymentDomain.PaymentStatusExpired {
+		t.Errorf("expected payment status expired despite inventory anomaly, got %s", paymentRepo.updatedStatuses[paymentID])
+	}
+	if orderRepo.orders[orderID].Status != orderDomain.OrderStatusCancelled {
+		t.Errorf("expected order status cancelled despite inventory anomaly, got %s", orderRepo.orders[orderID].Status)
+	}
+
+	// Should log a WARN message about the inventory anomaly
+	if len(logger.warns) == 0 {
+		t.Error("expected WARN log for inventory anomaly, got 0")
 	}
 }
