@@ -11,13 +11,9 @@ export interface CreateOrderCourierInput {
 }
 
 export interface CreateOrderItemInput {
-  item_type?: 'standard' | 'custom'
-  product_id?: string
+  product_id: string
   name: string
-  physical_size_id?: string
   quantity: number
-  unit_price?: number
-  custom_design?: CustomDesignPayload
 }
 
 export interface CreateOrderShopInput {
@@ -89,7 +85,7 @@ export interface BackendOrder {
   total: number
   created_at: string
   items: BackendOrderItem[]
-  payment: BackendOrderPayment
+  payment?: BackendOrderPayment
 }
 
 export interface ListOrdersResponse {
@@ -107,6 +103,7 @@ export interface GetOrderPaymentDetailsResponse {
   channel_type?: string
   display_name?: string
   action_url?: string
+  channel_data?: PaymentChannelDataResponse
   account_name?: string
   account_number?: string
   phone_number?: string

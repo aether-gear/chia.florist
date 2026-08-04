@@ -50,11 +50,15 @@ onMounted(async () => {
       paymentInfoState.value = {
         orderId: orderIdFromQuery,
         instruction: res.instruction || '',
-        channelData: res.channel_type ? {
+        channelData: res.channel_data ? {
+          channel_type: res.channel_data.channel_type,
+          display_name: res.channel_data.display_name || 'Payment Gateway',
+          action_url: res.channel_data.action_url
+        } : (res.channel_type ? {
           channel_type: res.channel_type,
           display_name: res.display_name || 'Payment Gateway',
           action_url: res.action_url
-        } : undefined,
+        } : undefined),
         total: res.amount,
         expiresAt: res.expires_at,
         status: res.status
