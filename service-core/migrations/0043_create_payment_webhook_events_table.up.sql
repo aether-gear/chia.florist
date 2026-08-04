@@ -23,7 +23,7 @@ CREATE TABLE payment_webhook_events (
     processed_at TIMESTAMP,
 
     CONSTRAINT uq_payment_webhook_events_order_status
-        UNIQUE (gateway_order_id, transaction_status)
+        UNIQUE (order_id, transaction_status)
 );
 
 CREATE INDEX idx_pwe_status ON payment_webhook_events(status);

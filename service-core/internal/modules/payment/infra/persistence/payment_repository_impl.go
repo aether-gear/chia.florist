@@ -104,9 +104,12 @@ func (r *paymentRepositoryImpl) UpdateStatus(
 	query := `
 		UPDATE payments
 		SET
-			status = $2,
+			status = $2::payment_status,
 			updated_at = NOW(),
-			paid_at = CASE WHEN $2 = 'paid' THEN NOW() ELSE paid_at END
+			paid_at = CASE
+				WHEN $2::payment_status = 'paid'::payment_status THEN NOW()
+				ELSE paid_at
+			END
 		WHERE id = $1
 	`
 

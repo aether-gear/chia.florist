@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	config "service-core/internal/shared/config"
 )
@@ -104,28 +105,28 @@ func (p *midtransAPIProvider) AllowedPaymentMethods() []paymentgateway.AllowedPa
 			Description:   "Pay using ShopeePay e-wallet",
 		},
 		{
-			Code:          "qris",
-			Name:          "QRIS",
-			Type:          "qr_code",
-			FeeType:       "flat",
-			FeeFixed:      1000,
-			Description:   "Pay using QRIS QR Code",
+			Code:        "qris",
+			Name:        "QRIS",
+			Type:        "qr_code",
+			FeeType:     "flat",
+			FeeFixed:    1000,
+			Description: "Pay using QRIS QR Code",
 		},
 		{
-			Code:          "bca_va",
-			Name:          "BCA Virtual Account",
-			Type:          "bank_transfer",
-			FeeType:       "flat",
-			FeeFixed:      4000,
-			Description:   "Pay using BCA Virtual Account",
+			Code:        "bca_va",
+			Name:        "BCA Virtual Account",
+			Type:        "bank_transfer",
+			FeeType:     "flat",
+			FeeFixed:    4000,
+			Description: "Pay using BCA Virtual Account",
 		},
 		{
-			Code:          "mandiri_bill",
-			Name:          "Mandiri Bill",
-			Type:          "bank_transfer",
-			FeeType:       "flat",
-			FeeFixed:      4000,
-			Description:   "Pay using Mandiri Bill / VA",
+			Code:        "mandiri_bill",
+			Name:        "Mandiri Bill",
+			Type:        "bank_transfer",
+			FeeType:     "flat",
+			FeeFixed:    4000,
+			Description: "Pay using Mandiri Bill / VA",
 		},
 	}
 }
@@ -230,9 +231,12 @@ func (p *midtransAPIProvider) Charge(
 		return nil, fmt.Errorf("midtrans: unmarshal base charge response: %w", err)
 	}
 
-	if !strings.HasPrefix(baseResp.StatusCode, "2") {
-		return nil, fmt.Errorf("midtrans: charge failed: %s (status %s)",
-			baseResp.StatusMessage, baseResp.StatusCode)
+	if err := mapProviderStatusCode(
+		baseResp.StatusCode,
+		baseResp.StatusMessage,
+		fmt.Sprintf("midtrans charge order %q", req.OrderID),
+	); err != nil {
+		return nil, err
 	}
 
 	instructions, err := strategy.ParseInstructions(respBody)
@@ -316,9 +320,8 @@ func (p *midtransAPIProvider) fetchTransactionStatus(
 		return nil, fmt.Errorf("midtrans: unmarshal status response: %w", err)
 	}
 
-	if !strings.HasPrefix(result.StatusCode, "2") {
-		return nil, fmt.Errorf("midtrans: check transaction %q: %s (status %s)",
-			orderID, result.StatusMessage, result.StatusCode)
+	if err := mapProviderStatusCode(result.StatusCode, result.StatusMessage, fmt.Sprintf("midtrans check transaction %q", orderID)); err != nil {
+		return nil, err
 	}
 
 	grossAmount, err := parseAmount(result.GrossAmount)
@@ -357,10 +360,12 @@ func (p *midtransAPIProvider) CancelTransaction(
 		return fmt.Errorf("midtrans: unmarshal cancel response: %w", err)
 	}
 
-	if !strings.HasPrefix(resp.StatusCode, "2") {
-		return fmt.Errorf("midtrans: cancel transaction %q: %s (status %s)",
-			gatewayOrderID, resp.StatusMessage, resp.StatusCode,
-		)
+	if err := mapProviderStatusCode(
+		resp.StatusCode,
+		resp.StatusMessage,
+		fmt.Sprintf("midtrans cancel transaction %q", gatewayOrderID),
+	); err != nil {
+		return err
 	}
 
 	return nil
@@ -468,20 +473,28 @@ func mapNotificationStatus(txStatus, fraudStatus string) paymentgateway.Notifica
 			return paymentgateway.NotificationStatusChallenge
 		}
 		return paymentgateway.NotificationStatusSettlement
+
 	case "settlement":
 		return paymentgateway.NotificationStatusSettlement
+
 	case "pending":
 		return paymentgateway.NotificationStatusPending
+
 	case "deny":
 		return paymentgateway.NotificationStatusDeny
+
 	case "expire":
 		return paymentgateway.NotificationStatusExpire
+
 	case "cancel":
 		return paymentgateway.NotificationStatusCancel
+
 	case "refund", "partial_refund":
 		return paymentgateway.NotificationStatusRefund
+
 	default:
 		return paymentgateway.NotificationStatus(txStatus)
+
 	}
 }
 
@@ -501,4 +514,31 @@ func parseAmount(raw string) (int64, error) {
 		return 0, fmt.Errorf("parse %q as int64: %w", raw, err)
 	}
 	return amount, nil
+}
+
+// mapProviderStatusCode converts Midtrans status_code strings into
+// valid completions or typed AppErrors (NotFound, BadRequest, Conflict).
+func mapProviderStatusCode(statusCode, statusMessage, contextPrefix string) error {
+	switch statusCode {
+	case "200", "201", "202", "407":
+		return nil
+
+	case "404":
+		return apperrors.NewNotFound(fmt.Sprintf("%s: transaction not found on payment gateway (%s)", contextPrefix, statusMessage))
+
+	case "400":
+		return apperrors.NewBadRequest(fmt.Sprintf("%s: invalid payment gateway request (%s)", contextPrefix, statusMessage))
+
+	case "406":
+		return apperrors.NewConflict(fmt.Sprintf("%s: transaction conflict on payment gateway (%s)", contextPrefix, statusMessage))
+
+	case "412":
+		return apperrors.NewBadRequest(fmt.Sprintf("%s: transaction status cannot be modified on gateway (%s)", contextPrefix, statusMessage))
+
+	default:
+		if strings.HasPrefix(statusCode, "2") {
+			return nil
+		}
+		return fmt.Errorf("%s: %s (status %s)", contextPrefix, statusMessage, statusCode)
+	}
 }

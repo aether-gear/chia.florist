@@ -26,8 +26,8 @@ const (
 type Payment struct {
 	ID uuid.UUID
 
-	OrderID          uuid.UUID
-	MethodID         uuid.UUID
+	OrderID  uuid.UUID
+	MethodID uuid.UUID
 
 	Provider string
 

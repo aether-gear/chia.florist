@@ -21,7 +21,7 @@ func NewPaymentWebhookEventRepositoryImpl() repository.PaymentWebhookEventReposi
 }
 
 // Upsert inserts a new webhook event row.
-// On conflict (order_id, transaction_status) the existing row is returned
+// On conflict (gateway_order_id, transaction_status) the existing row is returned
 // unchanged, allowing the caller to inspect its status before deciding
 // whether to re-process.
 func (r *paymentWebhookEventRepositoryImpl) Upsert(
@@ -34,14 +34,14 @@ func (r *paymentWebhookEventRepositoryImpl) Upsert(
 	insertQuery := `
 		INSERT INTO payment_webhook_events (
 			id,
-			order_id,
+			gateway_order_id,
 			transaction_status,
 			payload,
 			status,
 			received_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (order_id, transaction_status)
+		VALUES ($1,$2,$3,$4,$5,$6)
+		ON CONFLICT (gateway_order_id, transaction_status)
 		DO NOTHING
 	`
 
@@ -62,7 +62,7 @@ func (r *paymentWebhookEventRepositoryImpl) Upsert(
 	selectQuery := `
 		SELECT
 			id,
-			order_id,
+			gateway_order_id,
 			transaction_status,
 			payload,
 			status,
@@ -70,7 +70,7 @@ func (r *paymentWebhookEventRepositoryImpl) Upsert(
 			received_at,
 			processed_at
 		FROM payment_webhook_events
-		WHERE order_id = $1
+		WHERE gateway_order_id = $1
 		  AND transaction_status = $2
 	`
 
@@ -88,7 +88,7 @@ func (r *paymentWebhookEventRepositoryImpl) MarkProcessed(
 	query := `
 		UPDATE payment_webhook_events
 		SET
-			status       = 'processed',
+			status = 'processed',
 			processed_at = $2
 		WHERE id = $1
 	`
@@ -112,7 +112,7 @@ func (r *paymentWebhookEventRepositoryImpl) MarkFailed(
 		UPDATE payment_webhook_events
 		SET
 			status = 'failed',
-			error  = $2
+			error = $2
 		WHERE id = $1
 	`
 
