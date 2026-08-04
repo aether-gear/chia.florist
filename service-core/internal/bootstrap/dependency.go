@@ -29,27 +29,28 @@ type Dependency struct {
 	// PaymentSyncJob is populated by NewContainer after all repos and logger
 	// are available, then started by App.Run.
 	PaymentSyncJob *paymentJob.PaymentSyncJob
+
+	// PaymentExpiryJob is populated by NewContainer after all repos and logger
+	// are available, then started by App.Run.
+	PaymentExpiryJob *paymentJob.PaymentExpiryJob
 }
 
 func NewDependency(cfg Config) (*Dependency, error) {
-	storageProvider, err := supabaseStorage.
-		NewSupabaseProvider(
-			cfg.Storage,
-			cfg.Supabase,
-			&http.Client{},
-		)
+	storageProvider, err := supabaseStorage.NewSupabaseProvider(
+		cfg.Storage,
+		cfg.Supabase,
+		&http.Client{},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	gateway, err := midtransGateway.
-		NewMidtransAPIProvider(cfg.MidTrans)
+	gateway, err := midtransGateway.NewMidtransAPIProvider(cfg.MidTrans)
 	if err != nil {
 		return nil, err
 	}
 
-	rajaOngkir, err := rajaongkir.
-		NewRajaOngkirProvider(cfg.RajaOngkir)
+	rajaOngkir, err := rajaongkir.NewRajaOngkirProvider(cfg.RajaOngkir)
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +60,7 @@ func NewDependency(cfg Config) (*Dependency, error) {
 		return nil, err
 	}
 
-	db, err := database.
-		NewConnection(cfg.DB)
+	db, err := database.NewConnection(cfg.DB)
 	if err != nil {
 		return nil, err
 	}

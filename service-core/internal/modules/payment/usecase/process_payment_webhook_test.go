@@ -98,6 +98,9 @@ func (m *mockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Ex
 	}
 	return result, nil
 }
+func (m *mockPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 // mockPaymentAccountRepo tracks increments, decrements and supports injecting errors.
 type mockPaymentAccountRepo struct{}

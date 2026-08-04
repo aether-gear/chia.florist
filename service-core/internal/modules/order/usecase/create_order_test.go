@@ -168,6 +168,9 @@ func (m *coMockPaymentRepo) Save(_ context.Context, _ transaction.Executor, paym
 func (m *coMockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, _ time.Time) ([]paymentDomain.Payment, error) {
 	return nil, nil
 }
+func (m *coMockPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 // --- payment account repo ---
 

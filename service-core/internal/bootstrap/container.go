@@ -145,6 +145,7 @@ type Container struct {
 	GetPaymentDetail       paymentUsecase.GetPaymentDetailUsecase
 	CheckPaymentStatus     paymentUsecase.CheckPaymentStatusUsecase
 	SyncPendingPayments    paymentUsecase.SyncPendingPaymentsUsecase
+	ExpirePastDuePayments  paymentUsecase.ExpirePastDuePaymentsUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -731,6 +732,19 @@ func NewContainer(cfg Config,
 				orderItemRepo,
 				inventoryRepo,
 			),
+		ExpirePastDuePayments: *paymentUsecase.
+			NewExpirePastDuePaymentsUsecase(
+				paymentRepo,
+				infra.PaymentGateway,
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
+				inventoryRepo,
+				log,
+				cfg.PaymentExpiry.BatchSize,
+				cfg.PaymentExpiry.Concurrency,
+			),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
 			infra.TransactionExecutor,
@@ -895,11 +909,17 @@ func NewContainer(cfg Config,
 		GetProductMetrics:   *analyticsUsecase.NewGetProductMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 	}
 
-	// Populate the sync job on the infra struct so App.Run can start it.
-	interval := time.Duration(cfg.PaymentSync.IntervalMinutes) * time.Minute
+	syncInterval := time.Duration(cfg.PaymentSync.IntervalMinutes) * time.Minute
 	infra.PaymentSyncJob = paymentJob.NewPaymentSyncJob(
 		&c.SyncPendingPayments,
-		interval,
+		syncInterval,
+		log,
+	)
+
+	expiryInterval := time.Duration(cfg.PaymentExpiry.IntervalMinutes) * time.Minute
+	infra.PaymentExpiryJob = paymentJob.NewPaymentExpiryJob(
+		&c.ExpirePastDuePayments,
+		expiryInterval,
 		log,
 	)
 

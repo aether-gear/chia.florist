@@ -19,6 +19,7 @@ type Config struct {
 	GoogleOAuth config.GoogleOAuthConfig
 	WAF         config.WAFConfig
 	PaymentSync config.PaymentSyncConfig
+	PaymentExpiry config.PaymentExpiryConfig
 }
 
 func LoadConfig() Config {
@@ -45,19 +46,20 @@ func LoadConfig() Config {
 	// )
 
 	return Config{
-		App:         config.LoadAppConfig(),
-		Logistics:   config.LoadLogisticsConfig(),
-		JWT:         config.LoadJWTConfig(),
-		Storage:     config.LoadStorageConfig(),
-		Supabase:    supabaseCfg,
-		Postgres:    postgresCfg,
-		DB:          dbConf,
-		SMTP:        config.LoadSMTPConfig(),
-		MidTrans:    config.LoadMidTransConfig(),
-		RajaOngkir:  config.LoadRajaOngkirConfig(),
-		Komerce:     config.LoadKomerceConfig(),
-		GoogleOAuth: config.LoadGoogleOAuthConfig(),
-		WAF:         config.LoadWAFConfig(),
-		PaymentSync: config.LoadPaymentSyncConfig(),
+		App:           config.LoadAppConfig(),
+		Logistics:     config.LoadLogisticsConfig(),
+		JWT:           config.LoadJWTConfig(),
+		Storage:       config.LoadStorageConfig(),
+		Supabase:      supabaseCfg,
+		Postgres:      postgresCfg,
+		DB:            dbConf,
+		SMTP:          config.LoadSMTPConfig(),
+		MidTrans:      config.LoadMidTransConfig(),
+		RajaOngkir:    config.LoadRajaOngkirConfig(),
+		Komerce:       config.LoadKomerceConfig(),
+		GoogleOAuth:   config.LoadGoogleOAuthConfig(),
+		WAF:           config.LoadWAFConfig(),
+		PaymentSync:   config.LoadPaymentSyncConfig(),
+		PaymentExpiry: config.LoadPaymentExpiryConfig(),
 	}
 }

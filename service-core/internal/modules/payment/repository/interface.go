@@ -54,6 +54,15 @@ type PaymentRepository interface {
 		exec transaction.Executor,
 		since time.Time,
 	) ([]domain.Payment, error)
+
+	// ListPastDuePending returns pending payments whose expires_at
+	// is non-null and less than or equal to now.
+	ListPastDuePending(
+		ctx context.Context,
+		exec transaction.Executor,
+		now time.Time,
+		limit int,
+	) ([]domain.Payment, error)
 }
 
 var (
@@ -88,7 +97,6 @@ type PaymentMethodRepository interface {
 		sorts query.Sorts,
 	) ([]domain.PaymentMethod, error)
 }
-
 
 type PaymentEventRepository interface {
 	GetByID(

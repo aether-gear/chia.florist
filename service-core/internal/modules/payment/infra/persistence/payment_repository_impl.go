@@ -323,3 +323,66 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 
 	return payments, nil
 }
+
+func (r *paymentRepositoryImpl) ListPastDuePending(
+	ctx context.Context,
+	exec transaction.Executor,
+	now time.Time,
+	limit int,
+) ([]domain.Payment, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := `
+		SELECT
+			id,
+			order_id,
+			method_id,
+			provider,
+			provider_payment_id,
+			provider_order_id,
+			amount,
+			status,
+			expires_at,
+			created_at,
+			updated_at,
+			paid_at
+		FROM payments
+		WHERE status = 'pending'
+		  AND expires_at IS NOT NULL
+		  AND expires_at <= $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`
+
+	rows, err := exec.Query(ctx, query, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query past due pending payments failed: %w", err)
+	}
+	defer rows.Close()
+
+	payments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Payment, error) {
+		var p domain.Payment
+		err := row.Scan(
+			&p.ID,
+			&p.OrderID,
+			&p.MethodID,
+			&p.Provider,
+			&p.ProviderPaymentID,
+			&p.ProviderOrderID,
+			&p.Amount,
+			&p.Status,
+			&p.ExpiresAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+			&p.PaidAt,
+		)
+		return p, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan past due pending payments failed: %w", err)
+	}
+
+	return payments, nil
+}

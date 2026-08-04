@@ -166,6 +166,9 @@ func (m *uosMockPaymentRepo) Save(_ context.Context, _ transaction.Executor, _ p
 func (m *uosMockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, _ time.Time) ([]paymentDomain.Payment, error) {
 	return nil, nil
 }
+func (m *uosMockPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 type uosMockShipmentRepo struct {
 	shipment         *shipmentDomain.Shipment

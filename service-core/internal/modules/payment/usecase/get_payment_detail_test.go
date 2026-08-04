@@ -86,6 +86,9 @@ func (m *mockOrderDetailPaymentRepo) ListPendingGateway(_ context.Context, _ tra
 	}
 	return nil, nil
 }
+func (m *mockOrderDetailPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 type mockOrderDetailPaymentMethodRepo struct {
 	method *paymentDomain.PaymentMethod

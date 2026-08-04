@@ -14,7 +14,7 @@ type App struct {
 	container    *Container
 	router       *chi.Mux
 	cfg          Config
-	cancelSync   context.CancelFunc
+	cancelJobs   context.CancelFunc
 }
 
 func New(cfg Config) (*App, error) {
@@ -41,10 +41,10 @@ func New(cfg Config) (*App, error) {
 }
 
 func (a *App) Close() {
-	// Stop the reconciliation job first so it doesn't race
+	// Stop background jobs first so they don't race
 	// against the DB connection being closed.
-	if a.cancelSync != nil {
-		a.cancelSync()
+	if a.cancelJobs != nil {
+		a.cancelJobs()
 	}
 
 	if a == nil || a.dependencies == nil {
@@ -55,13 +55,16 @@ func (a *App) Close() {
 }
 
 func (a *App) Run() error {
-	// Start the payment reconciliation job in the background.
-	// It shuts down cleanly when the context is cancelled (in Close).
-	if a.dependencies.PaymentSyncJob != nil {
-		syncCtx, cancel := context.WithCancel(context.Background())
-		a.cancelSync = cancel
+	// Start background jobs (payment reconciliation sync and automated expiry).
+	// They shut down cleanly when the context is cancelled (in Close).
+	jobCtx, cancel := context.WithCancel(context.Background())
+	a.cancelJobs = cancel
 
-		go a.dependencies.PaymentSyncJob.Start(syncCtx)
+	if a.dependencies.PaymentSyncJob != nil {
+		go a.dependencies.PaymentSyncJob.Start(jobCtx)
+	}
+	if a.dependencies.PaymentExpiryJob != nil {
+		go a.dependencies.PaymentExpiryJob.Start(jobCtx)
 	}
 
 	addr := a.cfg.App.Host + ":" + a.cfg.App.Port
