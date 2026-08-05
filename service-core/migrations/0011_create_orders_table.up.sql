@@ -5,7 +5,8 @@ CREATE TYPE order_status
         'processing',
         'shipped',
         'delivered',
-        'cancelled'
+        'cancelled',
+        'expired'
     );
 
 CREATE TABLE orders (
@@ -22,6 +23,8 @@ CREATE TABLE orders (
     total BIGINT NOT NULL,
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    confirmed TIMESTAMP,
+    handling_expires_at TIMESTAMP,
     updated_at TIMESTAMP,
 
     CONSTRAINT fk_orders_customer_id
@@ -41,3 +44,7 @@ CREATE TABLE orders (
     CONSTRAINT orders_total_check
         CHECK (total >= 0)
 );
+
+CREATE INDEX idx_orders_handling_expires_at
+    ON orders(handling_expires_at)
+    WHERE status IN ('confirmed', 'processing');

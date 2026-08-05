@@ -5,6 +5,8 @@ CREATE TYPE payment_status
         'failed',
         'expired',
         'cancelled',
+        'refund_pending',
+        'refund_failed',
         'refunded'
     );
 

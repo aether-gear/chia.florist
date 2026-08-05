@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"service-core/internal/modules/order/domain"
 	transaction "service-core/internal/shared/transaction"
@@ -48,6 +49,21 @@ type OrderRepository interface {
 		exec transaction.Executor,
 		params FindOrderParams,
 	) ([]domain.Order, int, error)
+
+	SetConfirmedAndExpiry(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		confirmedAt time.Time,
+		expiresAt time.Time,
+	) error
+
+	FindExpiredUnfulfilledOrders(
+		ctx context.Context,
+		exec transaction.Executor,
+		now time.Time,
+		limit int,
+	) ([]domain.Order, error)
 }
 
 type OrderItemRepository interface {

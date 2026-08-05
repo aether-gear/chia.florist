@@ -371,6 +371,55 @@ func (p *midtransAPIProvider) CancelTransaction(
 	return nil
 }
 
+func (p *midtransAPIProvider) RefundTransaction(
+	ctx context.Context,
+	req paymentgateway.RefundRequest,
+) (*paymentgateway.RefundResponse, error) {
+	url := fmt.Sprintf("%s/v2/%s/refund", p.baseURL, req.GatewayOrderID)
+	refundKey := fmt.Sprintf("refund-%s-%d", req.GatewayOrderID, time.Now().Unix())
+	reqBodyMap := map[string]any{
+		"refund_key": refundKey,
+		"amount":     req.RefundAmount,
+		"reason":     req.Reason,
+	}
+	bodyBytes, err := json.Marshal(reqBodyMap)
+	if err != nil {
+		return nil, fmt.Errorf("midtrans: marshal refund req: %w", err)
+	}
+
+	respBody, err := p.doRequest(ctx, http.MethodPost, url, bodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("midtrans: refund transaction %q: %w", req.GatewayOrderID, err)
+	}
+
+	var resp struct {
+		StatusCode    string `json:"status_code"`
+		StatusMessage string `json:"status_message"`
+		TransactionID string `json:"transaction_id"`
+		OrderID       string `json:"order_id"`
+		GrossAmount   string `json:"gross_amount"`
+	}
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("midtrans: unmarshal refund response: %w", err)
+	}
+
+	if err := mapProviderStatusCode(
+		resp.StatusCode,
+		resp.StatusMessage,
+		fmt.Sprintf("midtrans refund transaction %q", req.GatewayOrderID),
+	); err != nil {
+		return nil, err
+	}
+
+	amount, _ := parseAmount(resp.GrossAmount)
+	return &paymentgateway.RefundResponse{
+		GatewayTransactionID: resp.TransactionID,
+		GatewayOrderID:       resp.OrderID,
+		RefundAmount:         amount,
+		Status:               resp.StatusCode,
+	}, nil
+}
+
 // doRequest executes an authenticated HTTP request
 // against the Midtrans Core API and returns the
 // raw response body.

@@ -9,12 +9,14 @@ import (
 type PaymentStatus string
 
 const (
-	PaymentStatusPending   PaymentStatus = "pending"
-	PaymentStatusPaid      PaymentStatus = "paid"
-	PaymentStatusFailed    PaymentStatus = "failed"
-	PaymentStatusExpired   PaymentStatus = "expired"
-	PaymentStatusCancelled PaymentStatus = "cancelled"
-	PaymentStatusRefunded  PaymentStatus = "refunded"
+	PaymentStatusPending       PaymentStatus = "pending"
+	PaymentStatusPaid          PaymentStatus = "paid"
+	PaymentStatusFailed        PaymentStatus = "failed"
+	PaymentStatusExpired       PaymentStatus = "expired"
+	PaymentStatusCancelled      PaymentStatus = "cancelled"
+	PaymentStatusRefunded      PaymentStatus = "refunded"
+	PaymentStatusRefundPending PaymentStatus = "refund_pending"
+	PaymentStatusRefundFailed  PaymentStatus = "refund_failed"
 )
 
 type PaymentProvider string

@@ -94,6 +94,16 @@ type InventoryRepository interface {
 		qty int,
 	) error
 
+	// Restock increments stock for the given product and shop by qty
+	// used when a committed order is cancelled/refunded
+	Restock(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+		shopID uuid.UUID,
+		qty int,
+	) error
+
 	Update(
 		ctx context.Context,
 		exec transaction.Executor,

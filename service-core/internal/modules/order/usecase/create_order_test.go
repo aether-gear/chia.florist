@@ -248,6 +248,12 @@ func (m *coMockOrderRepo) Save(_ context.Context, _ transaction.Executor, order 
 func (m *coMockOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
 }
+func (m *coMockOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *coMockOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
+}
 
 // --- order item repo ---
 
@@ -320,6 +326,9 @@ func (m *coMockInventoryRepo) Release(_ context.Context, _ transaction.Executor,
 func (m *coMockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
 	return nil
 }
+func (m *coMockInventoryRepo) Restock(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
+	return nil
+}
 func (m *coMockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
 	return nil
 }
@@ -370,6 +379,9 @@ func (m *coMockGateway) CancelTransaction(_ context.Context, gatewayOrderID stri
 	m.cancelOrderID = gatewayOrderID
 	return nil
 }
+func (m *coMockGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
+}
 func (m *coMockGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
 	return nil, nil
 }
@@ -393,6 +405,9 @@ func (c *capturingGateway) ParseNotification(_ context.Context, _ paymentgateway
 	return nil, nil
 }
 func (c *capturingGateway) CancelTransaction(_ context.Context, _ string) error { return nil }
+func (c *capturingGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
+}
 func (c *capturingGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
 	return nil, nil
 }

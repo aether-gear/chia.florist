@@ -157,6 +157,9 @@ func (c *customTestGateway) GetTransactionStatus(_ context.Context, gatewayOrder
 	return c.results[gatewayOrderID], nil
 }
 func (c *customTestGateway) CancelTransaction(_ context.Context, _ string) error { return nil }
+func (c *customTestGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
+}
 
 func TestSyncPendingPayments_GatewayErrorDoesNotBlockOtherPayments(t *testing.T) {
 	ctx := context.Background()

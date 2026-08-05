@@ -40,6 +40,12 @@ func (m *mockOrderDetailOrderRepo) Save(_ context.Context, _ transaction.Executo
 func (m *mockOrderDetailOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
 }
+func (m *mockOrderDetailOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *mockOrderDetailOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
+}
 
 type mockOrderDetailInvoiceRepo struct {
 	invoice *orderDomain.Invoice

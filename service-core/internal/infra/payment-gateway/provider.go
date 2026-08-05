@@ -162,6 +162,19 @@ type AllowedPaymentMethod struct {
 	Description   string
 }
 
+type RefundRequest struct {
+	GatewayOrderID string
+	RefundAmount   int64
+	Reason         string
+}
+
+type RefundResponse struct {
+	GatewayTransactionID string
+	GatewayOrderID       string
+	RefundAmount         int64
+	Status               string
+}
+
 type Provider interface {
 	// Name returns the unique provider identifier.
 	Name() string
@@ -208,4 +221,11 @@ type Provider interface {
 		ctx context.Context,
 		gatewayOrderID string,
 	) error
+
+	// RefundTransaction requests the gateway to refund
+	// a paid transaction identified by its gateway-side order ID.
+	RefundTransaction(
+		ctx context.Context,
+		req RefundRequest,
+	) (*RefundResponse, error)
 }

@@ -18,6 +18,7 @@ const (
 	OrderStatusShipped    OrderStatus = "shipped"
 	OrderStatusDelivered  OrderStatus = "delivered"
 	OrderStatusCancelled  OrderStatus = "cancelled"
+	OrderStatusExpired    OrderStatus = "expired"
 )
 
 var allowedTransitions = map[OrderStatus][]OrderStatus{
@@ -29,11 +30,13 @@ var allowedTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusConfirmed: {
 		OrderStatusProcessing,
 		OrderStatusCancelled,
+		OrderStatusExpired,
 	},
 
 	OrderStatusProcessing: {
 		OrderStatusShipped,
 		OrderStatusCancelled,
+		OrderStatusExpired,
 	},
 
 	OrderStatusShipped: {
@@ -43,6 +46,8 @@ var allowedTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusDelivered: {},
 
 	OrderStatusCancelled: {},
+
+	OrderStatusExpired: {},
 }
 
 type Order struct {
@@ -58,8 +63,18 @@ type Order struct {
 	ShippingFee int64
 	Total       int64
 
+	ConfirmedAt       *time.Time
+	HandlingExpiresAt *time.Time
+
 	CreatedAt time.Time
 	UpdatedAt *time.Time
+}
+
+func (o Order) IsHandlingExpired(now time.Time) bool {
+	if o.HandlingExpiresAt == nil {
+		return false
+	}
+	return !now.Before(*o.HandlingExpiresAt)
 }
 
 func (o *Order) UpdateStatus(status OrderStatus) error {

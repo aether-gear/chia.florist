@@ -145,6 +145,7 @@ type Container struct {
 	SyncPendingPayments    paymentUsecase.SyncPendingPaymentsUsecase
 	ExpirePastDuePayments  paymentUsecase.ExpirePastDuePaymentsUsecase
 	SyncPaymentMethods     paymentUsecase.SyncPaymentMethodsUsecase
+	ProcessOrderRefund     paymentUsecase.ProcessOrderRefundUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -153,11 +154,12 @@ type Container struct {
 	UpdateShipmentStatus    shipmentUsecase.UpdateShipmentStatusUsecase
 	UpdateShipment          shipmentUsecase.UpdateShipmentUsecase
 
-	CreateOrder       orderUsecase.CreateOrderUsecase
-	FindOrders        orderUsecase.FindOrdersUsecase
-	GetOrder          orderUsecase.GetOrderUsecase
-	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
-	GetOrderTracking  orderUsecase.GetOrderTrackingUsecase
+	CreateOrder             orderUsecase.CreateOrderUsecase
+	FindOrders              orderUsecase.FindOrdersUsecase
+	GetOrder                orderUsecase.GetOrderUsecase
+	UpdateOrderStatus       orderUsecase.UpdateOrderStatusUsecase
+	GetOrderTracking        orderUsecase.GetOrderTrackingUsecase
+	ExpireUnfulfilledOrders orderUsecase.ExpireUnfulfilledOrdersUsecase
 
 	FindAuditLogs   auditUsecase.FindAuditLogsUsecase
 	GetAuditLog     auditUsecase.GetAuditLogUsecase
@@ -750,6 +752,13 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				infra.PaymentGateway,
 			),
+		ProcessOrderRefund: *paymentUsecase.NewProcessOrderRefundUsecase(
+			paymentRepo,
+			infra.PaymentGateway,
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			log,
+		),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
 			infra.TransactionExecutor,
@@ -848,6 +857,24 @@ func NewContainer(cfg Config,
 				infra.LogisticsProvider,
 				addressRepo,
 			),
+		ExpireUnfulfilledOrders: *orderUsecase.NewExpireUnfulfilledOrdersUsecase(
+			orderRepo,
+			orderItemRepo,
+			inventoryRepo,
+			paymentUsecase.NewProcessOrderRefundUsecase(
+				paymentRepo,
+				infra.PaymentGateway,
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				log,
+			),
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			log,
+			auditLogger,
+			100,
+			5,
+		),
 
 		FindAuditLogs: *auditUsecase.NewFindAuditLogsUsecase(
 			infra.TransactionExecutor,

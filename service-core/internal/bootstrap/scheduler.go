@@ -5,6 +5,7 @@ import (
 	"time"
 
 	applogger "service-core/internal/common/logger"
+	orderJob "service-core/internal/modules/order/infra/job"
 	paymentJob "service-core/internal/modules/payment/infra/job"
 )
 
@@ -42,6 +43,13 @@ func NewScheduler(cfg Config, container *Container, logger applogger.Logger) *Sc
 		logger,
 	)
 	s.Register(paymentExpiryJob)
+
+	orderStaffExpiryJob := orderJob.NewOrderStaffExpiryJob(
+		&container.ExpireUnfulfilledOrders,
+		15*time.Minute,
+		logger,
+	)
+	s.Register(orderStaffExpiryJob)
 
 	return s
 }

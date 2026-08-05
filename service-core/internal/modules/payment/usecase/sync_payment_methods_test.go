@@ -65,6 +65,9 @@ func (g *mockSyncGateway) GetTransactionStatus(_ context.Context, _ string) (*pa
 func (g *mockSyncGateway) CancelTransaction(_ context.Context, _ string) error {
 	return nil
 }
+func (g *mockSyncGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
+}
 
 func TestSyncPaymentMethods_Success(t *testing.T) {
 	ctx := context.Background()

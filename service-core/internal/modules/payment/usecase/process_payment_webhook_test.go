@@ -159,6 +159,12 @@ func (m *mockOrderRepo) Save(_ context.Context, _ transaction.Executor, order or
 func (m *mockOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
 }
+func (m *mockOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *mockOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
+}
 
 // mockOrderItemRepo supports configurable saveBulkErr.
 type mockOrderItemRepo struct {
@@ -219,6 +225,9 @@ func (m *mockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, pr
 	m.commits = append(m.commits, fmt.Sprintf("%s-%s-%d", productID, shopID, qty))
 	return nil
 }
+func (m *mockInventoryRepo) Restock(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
+	return nil
+}
 func (m *mockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
 	return nil
 }
@@ -245,6 +254,9 @@ func (m *mockPaymentGateway) GetTransactionStatus(_ context.Context, _ string) (
 }
 func (m *mockPaymentGateway) CancelTransaction(_ context.Context, _ string) error {
 	return nil
+}
+func (m *mockPaymentGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
 }
 func (m *mockPaymentGateway) Supports(_ string) bool {
 	return true

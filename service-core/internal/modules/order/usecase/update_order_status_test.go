@@ -77,6 +77,12 @@ func (m *uosMockOrderRepo) Save(_ context.Context, _ transaction.Executor, _ ord
 func (m *uosMockOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
 }
+func (m *uosMockOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *uosMockOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
+}
 
 type uosMockOrderItemRepo struct {
 	items []orderDomain.OrderItem
@@ -132,6 +138,9 @@ func (m *uosMockInventoryRepo) Commit(_ context.Context, _ transaction.Executor,
 	}
 	m.committed[productID] += qty
 	return m.err
+}
+func (m *uosMockInventoryRepo) Restock(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
+	return nil
 }
 func (m *uosMockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
 	return nil

@@ -109,6 +109,32 @@ func (p *midtransSDKProvider) CancelTransaction(
 	return nil
 }
 
+// RefundTransaction requests Midtrans
+// to refund a paid transaction identified by its gateway-side order ID
+func (p *midtransSDKProvider) RefundTransaction(
+	_ context.Context,
+	req paymentgateway.RefundRequest,
+) (*paymentgateway.RefundResponse, error) {
+	refundReq := &coreapi.RefundReq{
+		RefundKey: fmt.Sprintf("refund-%s-%d", req.GatewayOrderID, time.Now().Unix()),
+		Amount:    req.RefundAmount,
+		Reason:    req.Reason,
+	}
+	resp, midErr := p.client.RefundTransaction(req.GatewayOrderID, refundReq)
+	if midErr != nil {
+		return nil, fmt.Errorf("midtrans: refund transaction %q: %s (status %d)",
+			req.GatewayOrderID, midErr.Message, midErr.StatusCode)
+	}
+
+	grossAmount, _ := parseAmount(resp.GrossAmount)
+	return &paymentgateway.RefundResponse{
+		GatewayTransactionID: resp.TransactionID,
+		GatewayOrderID:       resp.OrderID,
+		RefundAmount:         grossAmount,
+		Status:               resp.TransactionStatus,
+	}, nil
+}
+
 // buildChargeRequest converts the app
 // eneric ChargeRequest into a Midtrans
 // coreapi.ChargeReq.

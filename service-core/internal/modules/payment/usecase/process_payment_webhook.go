@@ -324,6 +324,11 @@ func (u *ProcessPaymentWebhookUsecase) process(
 					); err != nil {
 						return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
 					}
+					now := time.Now().UTC()
+					expiresAt := now.Add(3 * 24 * time.Hour)
+					if err := u.orderRepo.SetConfirmedAndExpiry(ctx, exec, payment.OrderID, now, expiresAt); err != nil {
+						return fmt.Errorf("failed to set order confirmed and expiry timestamp: %w", err)
+					}
 
 				case "release":
 					if err := u.inventoryRepo.Release(ctx, exec,
