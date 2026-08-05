@@ -42,6 +42,27 @@ export interface CreateOrderResponse {
   channel_data?: PaymentChannelDataResponse
 }
 
+// ─── Domain Status Definitions ─────────────────────────────────────
+
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'processing'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'expired'
+
+export type PaymentStatus =
+  | 'pending'
+  | 'paid'
+  | 'failed'
+  | 'expired'
+  | 'cancelled'
+  | 'refunded'
+  | 'refund_pending'
+  | 'refund_failed'
+
 // ─── List Orders API ───────────────────────────────────────────────
 
 export interface ListOrdersQuery {
@@ -53,7 +74,7 @@ export interface ListOrdersQuery {
 
 export interface BackendOrderPayment {
   id: string
-  status: string
+  status: PaymentStatus | string
   provider: string
   amount: number
   expires_at: string
@@ -79,7 +100,7 @@ export interface BackendOrder {
   number: string
   customer_id: string
   address_id: string
-  status: string
+  status: OrderStatus | string
   subtotal: number
   shipping_fee: number
   total: number
@@ -97,7 +118,7 @@ export interface ListOrdersResponse {
 
 export interface GetOrderPaymentDetailsResponse {
   payment_id: string
-  status: string
+  status: PaymentStatus | string
   amount: number
   expires_at: string
   channel_type?: string
@@ -112,7 +133,7 @@ export interface GetOrderPaymentDetailsResponse {
 }
 
 export interface CheckOrderPaymentStatusResponse {
-  status: string
+  status: PaymentStatus | string
   synced: boolean
 }
 

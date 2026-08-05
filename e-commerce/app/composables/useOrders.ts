@@ -4,21 +4,23 @@ import { orderService } from '~/services/orderService'
 import type { BackendOrder } from '~/types/order'
 
 /**
- * Maps the 5 UI tab keys to the backend status strings.
- *   pending    -> pending (active unexpired payment)
- *   expired    -> pending | cancelled (payment expired or failed)
- *   processing -> confirmed | processing
- *   shipping   -> shipped
- *   done       -> delivered | cancelled (completed / normal user cancellations)
+ * Maps Shopee category tab keys to backend status strings.
+ *   all        -> all orders (no status filter query)
+ *   pending    -> pending (To Pay - active unexpired payment)
+ *   processing -> confirmed | processing (To Ship - packing/arranging flowers)
+ *   shipping   -> shipped (To Receive - package in transit)
+ *   completed  -> delivered | finished (Completed - delivered successfully)
+ *   cancelled  -> cancelled | expired (Cancelled / Expired orders)
  */
-export type OrderTab = 'pending' | 'expired' | 'processing' | 'shipping' | 'done'
+export type OrderTab = 'all' | 'pending' | 'processing' | 'shipping' | 'completed' | 'cancelled'
 
 const TAB_STATUSES: Record<OrderTab, string[]> = {
+  all:        [],
   pending:    ['pending'],
-  expired:    ['pending', 'cancelled'],
   processing: ['confirmed', 'processing'],
   shipping:   ['shipped'],
-  done:       ['delivered', 'cancelled']
+  completed:  ['delivered', 'finished'],
+  cancelled:  ['cancelled', 'expired']
 }
 
 /**
@@ -27,6 +29,9 @@ const TAB_STATUSES: Record<OrderTab, string[]> = {
  */
 export const isOrderExpired = (order: BackendOrder): boolean => {
   if (!order) return false
+
+  // Explicit backend order status expired
+  if (order.status === 'expired') return true
 
   // Paid orders or active fulfillment states are NEVER expired
   if (order.payment?.status === 'paid') return false
@@ -45,6 +50,89 @@ export const isOrderExpired = (order: BackendOrder): boolean => {
   }
 
   return false
+}
+
+/**
+ * Generates Shopee-style step-by-step timeline tracking status for an order.
+ */
+export const getOrderTimelineSteps = (order: BackendOrder) => {
+  const isExpired = isOrderExpired(order)
+  const isCancelled = order.status === 'cancelled' || order.payment?.status === 'cancelled'
+
+  if (isCancelled || isExpired) {
+    return [
+      { step: 1, title: 'Order Placed', desc: 'Order submitted to system', done: true, active: false },
+      { step: 2, title: isExpired ? 'Payment Expired' : 'Order Cancelled', desc: isExpired ? 'Payment window lapsed' : 'Order has been cancelled', done: true, error: true, active: true }
+    ]
+  }
+
+  const isPaid = order.payment?.status === 'paid' || ['confirmed', 'processing', 'shipped', 'delivered', 'finished'].includes(order.status)
+  const isProcessing = ['processing', 'shipped', 'delivered', 'finished'].includes(order.status)
+  const isShipped = ['shipped', 'delivered', 'finished'].includes(order.status)
+  const isDelivered = ['delivered', 'finished'].includes(order.status)
+
+  return [
+    { step: 1, title: 'Order Placed', desc: 'Awaiting payment verification', done: true, active: order.status === 'pending' && !isPaid },
+    { step: 2, title: 'Payment Verified', desc: isPaid ? 'Payment received & confirmed' : 'Awaiting payment transfer', done: isPaid, active: isPaid && order.status === 'confirmed' },
+    { step: 3, title: 'Arranging Flowers', desc: isProcessing ? 'Florists preparing bouquet' : 'Waiting for workshop', done: isProcessing, active: order.status === 'processing' },
+    { step: 4, title: 'In Transit', desc: isShipped ? 'Package handed over to courier' : 'Awaiting shipment dispatch', done: isShipped, active: order.status === 'shipped' },
+    { step: 5, title: 'Order Received', desc: isDelivered ? 'Successfully delivered to recipient' : 'Pending final delivery', done: isDelivered, active: isDelivered }
+  ]
+}
+
+/**
+ * Formats order status into human-readable label and Tailwind badge classes.
+ */
+export const getOrderStatusBadge = (order: BackendOrder) => {
+  if (isOrderExpired(order)) {
+    return { label: 'Expired Payment', colorClass: 'bg-rose-50 text-rose-700 border-rose-100' }
+  }
+  switch (order.status) {
+    case 'pending':
+      return { label: 'Waiting Payment', colorClass: 'bg-amber-50 text-amber-700 border-amber-100' }
+    case 'confirmed':
+      return { label: 'Order Confirmed', colorClass: 'bg-indigo-50 text-indigo-700 border-indigo-100' }
+    case 'processing':
+      return { label: 'Arranging Flowers', colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
+    case 'shipped':
+      return { label: 'In Transit', colorClass: 'bg-blue-50 text-blue-700 border-blue-100' }
+    case 'delivered':
+      return { label: 'Completed', colorClass: 'bg-sky-50 text-sky-700 border-sky-100' }
+    case 'finished':
+      return { label: 'Completed', colorClass: 'bg-sky-50 text-sky-700 border-sky-100' }
+    case 'cancelled':
+      return { label: 'Cancelled', colorClass: 'bg-red-50 text-red-700 border-red-100' }
+    case 'expired':
+      return { label: 'Expired', colorClass: 'bg-rose-50 text-rose-700 border-rose-100' }
+    default:
+      return { label: order.status || 'Unknown', colorClass: 'bg-gray-100 text-gray-600 border-gray-200' }
+  }
+}
+
+/**
+ * Formats payment status into human-readable label and Tailwind badge classes.
+ */
+export const getPaymentStatusBadge = (status?: string) => {
+  switch (status) {
+    case 'pending':
+      return { label: 'Payment Pending', colorClass: 'bg-amber-50 text-amber-700 border-amber-100' }
+    case 'paid':
+      return { label: 'Paid & Verified', colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
+    case 'failed':
+      return { label: 'Payment Failed', colorClass: 'bg-red-50 text-red-700 border-red-100' }
+    case 'expired':
+      return { label: 'Payment Expired', colorClass: 'bg-rose-50 text-rose-700 border-rose-100' }
+    case 'cancelled':
+      return { label: 'Payment Cancelled', colorClass: 'bg-gray-100 text-gray-700 border-gray-200' }
+    case 'refunded':
+      return { label: 'Refunded', colorClass: 'bg-purple-50 text-purple-700 border-purple-100' }
+    case 'refund_pending':
+      return { label: 'Refund Pending', colorClass: 'bg-amber-50 text-amber-700 border-amber-100' }
+    case 'refund_failed':
+      return { label: 'Refund Failed', colorClass: 'bg-red-50 text-red-700 border-red-100' }
+    default:
+      return { label: status || 'Unspecified', colorClass: 'bg-gray-100 text-gray-600 border-gray-200' }
+  }
 }
 
 /**
@@ -92,30 +180,31 @@ export const useOrders = () => {
     const statuses = TAB_STATUSES[tab]
 
     try {
-      const res = await orderService.listOrders({
+      const query: any = {
         page,
         limit: pageSize.value,
-        sort: 'latest:desc',
-        status: statuses.join(',')
-      })
+        sort: 'latest:desc'
+      }
+
+      if (statuses && statuses.length > 0) {
+        query.status = statuses.join(',')
+      }
+
+      const res = await orderService.listOrders(query)
 
       let fetchedOrders = res.orders ?? []
 
-      // Client-side guard: 'pending' (Waiting Payment) tab only shows active unexpired pending payments
+      // Client-side guard filters per tab category
       if (tab === 'pending') {
         fetchedOrders = fetchedOrders.filter(o => o.payment?.status === 'pending' && !isOrderExpired(o))
-      }
-      // Client-side guard: 'expired' (Expired Payment) tab shows orders with expired payments
-      if (tab === 'expired') {
-        fetchedOrders = fetchedOrders.filter(o => isOrderExpired(o))
-      }
-      // Client-side guard: 'processing' (To Ship) tab only shows non-pending payments
-      if (tab === 'processing') {
-        fetchedOrders = fetchedOrders.filter(o => o.payment?.status !== 'pending' && !isOrderExpired(o))
-      }
-      // Client-side guard: 'done' tab excludes expired orders if listed under cancelled
-      if (tab === 'done') {
-        fetchedOrders = fetchedOrders.filter(o => !isOrderExpired(o))
+      } else if (tab === 'cancelled') {
+        fetchedOrders = fetchedOrders.filter(o => isOrderExpired(o) || o.status === 'cancelled' || o.payment?.status === 'cancelled')
+      } else if (tab === 'processing') {
+        fetchedOrders = fetchedOrders.filter(o => o.payment?.status !== 'pending' && !isOrderExpired(o) && ['confirmed', 'processing'].includes(o.status))
+      } else if (tab === 'shipping') {
+        fetchedOrders = fetchedOrders.filter(o => !isOrderExpired(o) && o.status === 'shipped')
+      } else if (tab === 'completed') {
+        fetchedOrders = fetchedOrders.filter(o => !isOrderExpired(o) && ['delivered', 'finished'].includes(o.status))
       }
 
       orders.value      = fetchedOrders
@@ -167,6 +256,9 @@ export const useOrders = () => {
     formatRupiah,
     formatDate,
     isOrderExpired,
+    getOrderTimelineSteps,
+    getOrderStatusBadge,
+    getPaymentStatusBadge,
     getTimeRemaining
   }
 }

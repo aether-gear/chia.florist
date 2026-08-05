@@ -396,6 +396,61 @@ const handleCheckPayment = async () => {
           </div>
         </div>
 
+        <!-- Failed State -->
+        <div v-else-if="paymentInfoState?.status === 'failed'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
+            <span class="text-4xl">❌</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-red-900">Payment Failed</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">Your payment transaction was declined or failed to process. Please try checking out again with another payment method.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-red-100 text-red-800 text-[10px] font-bold rounded-full border border-red-200">Failed</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/checkout')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              Try Checkout Again
+            </button>
+            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+              Back to My Orders
+            </button>
+          </div>
+        </div>
+
+        <!-- Refunded / Refund Pending State -->
+        <div v-else-if="paymentInfoState?.status === 'refunded' || paymentInfoState?.status === 'refund_pending'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-purple-50/50">
+            <span class="text-4xl">💸</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-purple-900">{{ paymentInfoState?.status === 'refunded' ? 'Payment Refunded' : 'Refund Pending' }}</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">Your payment for this order is being processed for refund. Please check your bank/e-wallet account statement.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-purple-100 text-purple-800 text-[10px] font-bold rounded-full border border-purple-200">{{ paymentInfoState?.status === 'refunded' ? 'Refunded' : 'Refund Pending' }}</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/profile')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              View My Orders
+            </button>
+          </div>
+        </div>
+
         <div v-else>
           <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
             <div>
