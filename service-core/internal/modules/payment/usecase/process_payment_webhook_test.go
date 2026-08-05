@@ -457,8 +457,8 @@ func TestProcessPaymentWebhook_Expire(t *testing.T) {
 	if payment.Status != paymentDomain.PaymentStatusExpired {
 		t.Errorf("expected payment expired, got %v", payment.Status)
 	}
-	if order.Status != orderDomain.OrderStatusCancelled {
-		t.Errorf("expected order cancelled, got %v", order.Status)
+	if order.Status != orderDomain.OrderStatusExpired {
+		t.Errorf("expected order expired, got %v", order.Status)
 	}
 	expectedRelease := fmt.Sprintf("%s-%s-2", productID, shopID)
 	if len(iRepo.releases) != 1 || iRepo.releases[0] != expectedRelease {

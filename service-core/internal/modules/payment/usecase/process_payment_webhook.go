@@ -252,7 +252,7 @@ func (u *ProcessPaymentWebhookUsecase) process(
 
 		case paymentgateway.NotificationStatusExpire:
 			newPaymentStatus = domain.PaymentStatusExpired
-			newOrderStatus = orderDomain.OrderStatusCancelled
+			newOrderStatus = orderDomain.OrderStatusExpired
 			action = "release"
 
 		case paymentgateway.NotificationStatusCancel:

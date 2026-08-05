@@ -144,8 +144,8 @@ func TestExpirePastDuePayments_Success(t *testing.T) {
 	if paymentRepo.updatedStatuses[paymentID] != paymentDomain.PaymentStatusExpired {
 		t.Errorf("expected payment status expired, got %s", paymentRepo.updatedStatuses[paymentID])
 	}
-	if orderRepo.orders[orderID].Status != orderDomain.OrderStatusCancelled {
-		t.Errorf("expected order status cancelled, got %s", orderRepo.orders[orderID].Status)
+	if orderRepo.orders[orderID].Status != orderDomain.OrderStatusExpired {
+		t.Errorf("expected order status expired, got %s", orderRepo.orders[orderID].Status)
 	}
 	if len(inventoryRepo.releases) != 1 {
 		t.Errorf("expected 1 inventory release call, got %d", len(inventoryRepo.releases))
@@ -241,12 +241,12 @@ func TestExpirePastDuePayments_InventoryAnomalyLogsWarnAndFinalizesState(t *test
 
 	uc.Execute(context.Background())
 
-	// Payment and order should still be finalized (expired/cancelled)
+	// Payment and order should still be finalized (expired)
 	if paymentRepo.updatedStatuses[paymentID] != paymentDomain.PaymentStatusExpired {
 		t.Errorf("expected payment status expired despite inventory anomaly, got %s", paymentRepo.updatedStatuses[paymentID])
 	}
-	if orderRepo.orders[orderID].Status != orderDomain.OrderStatusCancelled {
-		t.Errorf("expected order status cancelled despite inventory anomaly, got %s", orderRepo.orders[orderID].Status)
+	if orderRepo.orders[orderID].Status != orderDomain.OrderStatusExpired {
+		t.Errorf("expected order status expired despite inventory anomaly, got %s", orderRepo.orders[orderID].Status)
 	}
 
 	// Should log a WARN message about the inventory anomaly

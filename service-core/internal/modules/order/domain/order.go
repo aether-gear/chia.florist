@@ -25,6 +25,7 @@ var allowedTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusPending: {
 		OrderStatusConfirmed,
 		OrderStatusCancelled,
+		OrderStatusExpired,
 	},
 
 	OrderStatusConfirmed: {

@@ -305,8 +305,8 @@ func TestSyncPendingPayments_EnforceLocalExpiry(t *testing.T) {
 		t.Errorf("expected payment status to be updated to Expired, got %v", payment.Status)
 	}
 
-	if order.Status != orderDomain.OrderStatusCancelled {
-		t.Errorf("expected order status to be Cancelled, got %v", order.Status)
+	if order.Status != orderDomain.OrderStatusExpired {
+		t.Errorf("expected order status to be Expired, got %v", order.Status)
 	}
 
 	// Verify that inventory was released

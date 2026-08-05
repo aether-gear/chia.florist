@@ -156,7 +156,7 @@ func (u *ExpirePastDuePaymentsUsecase) expireSinglePayment(
 			return fmt.Errorf("order not found: %s", payment.OrderID)
 		}
 
-		if err := order.UpdateStatus(orderDomain.OrderStatusCancelled); err != nil {
+		if err := order.UpdateStatus(orderDomain.OrderStatusExpired); err != nil {
 			return fmt.Errorf("invalid order status transition: %w", err)
 		}
 
@@ -169,9 +169,9 @@ func (u *ExpirePastDuePaymentsUsecase) expireSinglePayment(
 
 		if err := u.orderRepo.UpdateStatus(ctx, exec,
 			payment.OrderID,
-			orderDomain.OrderStatusCancelled,
+			orderDomain.OrderStatusExpired,
 		); err != nil {
-			return fmt.Errorf("failed to update order status to cancelled: %w", err)
+			return fmt.Errorf("failed to update order status to expired: %w", err)
 		}
 
 		orderItems, err := u.orderItemRepo.ListByOrderID(ctx, exec, payment.OrderID)
