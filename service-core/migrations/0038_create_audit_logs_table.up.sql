@@ -29,7 +29,7 @@ CREATE TABLE audit_logs (
 
     metadata    JSONB,
 
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_audit_logs_category

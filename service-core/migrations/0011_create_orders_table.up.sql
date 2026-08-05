@@ -22,11 +22,11 @@ CREATE TABLE orders (
     shipping_fee BIGINT NOT NULL,
     total BIGINT NOT NULL,
 
-    confirmed_at TIMESTAMP,
-    handling_expires_at TIMESTAMP,
+    confirmed_at TIMESTAMPTZ,
+    handling_expires_at TIMESTAMPTZ,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
 
     CONSTRAINT fk_orders_customer_id
         FOREIGN KEY (customer_id)

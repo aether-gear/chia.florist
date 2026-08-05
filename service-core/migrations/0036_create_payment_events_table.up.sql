@@ -7,7 +7,7 @@ CREATE TABLE payment_events (
 
     payload JSONB NOT NULL,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_payment_events_payment_id
         FOREIGN KEY (payment_id)

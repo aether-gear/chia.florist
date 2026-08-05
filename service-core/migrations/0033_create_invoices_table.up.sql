@@ -16,8 +16,8 @@ CREATE TABLE invoices (
     shipping_fee BIGINT NOT NULL,
     total BIGINT NOT NULL,
 
-    issued_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_invoices_order_id
         FOREIGN KEY (order_id)

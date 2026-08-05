@@ -25,11 +25,11 @@ CREATE TABLE payments (
 
     status payment_status NOT NULL DEFAULT 'pending',
 
-    expires_at TIMESTAMP,
+    expires_at TIMESTAMPTZ,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP,
-    paid_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
+    paid_at TIMESTAMPTZ,
 
     CONSTRAINT fk_payment_order_id
         FOREIGN KEY (order_id)

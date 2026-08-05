@@ -4,7 +4,7 @@ CREATE TABLE payment_instructions (
 
     content TEXT NOT NULL,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_payment_instructions_payment_method_id
         FOREIGN KEY (payment_method_id)

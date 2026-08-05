@@ -17,14 +17,14 @@ CREATE TABLE payment_webhook_events (
     -- Populated only when status = 'failed'
     error TEXT,
 
-    received_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- Populated when status transitions to 'processed'
-    processed_at TIMESTAMP,
+    processed_at TIMESTAMPTZ,
 
     CONSTRAINT uq_payment_webhook_events_order_status
-        UNIQUE (order_id, transaction_status)
+        UNIQUE (gateway_order_id, transaction_status)
 );
 
 CREATE INDEX idx_pwe_status ON payment_webhook_events(status);
-CREATE INDEX idx_pwe_order_id ON payment_webhook_events(order_id);
+CREATE INDEX idx_pwe_gateway_order_id ON payment_webhook_events(gateway_order_id);
