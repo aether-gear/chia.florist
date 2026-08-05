@@ -31,9 +31,10 @@ All components in domain, usecase, delivery, and infrastructure layers MUST retr
 - Domain models and usecase business logic MUST use `clock.Now()` for stamping timestamps (`CreatedAt`, `UpdatedAt`, `ConfirmedAt`, `ExpiresAt`, `HandlingExpiresAt`).
 - No business logic or domain code may call `time.Now()` or `time.Now().UTC()`.
 
-### Infrastructure Adapters & External Gateways
-- **Inbound Data**: Webhooks, HTTP responses, or database drivers returning external timestamps MUST normalize those timestamps into the canonical `Asia/Jakarta` timezone using `clock.InAppLocation(t)` before handing data to usecases or domain entities.
-- **Outbound Data**: Adapters communicating with external APIs (e.g. Midtrans Payment Gateway, logistics providers) are responsible for converting canonical timestamps into provider-required formats (e.g. UTC, ISO-8601 strings, Unix Epoch seconds) at the infrastructure boundary.
+### Infrastructure Layer & Database Schema Setup
+- **PostgreSQL Session Timezone**: The DB connection pool (`internal/infra/db/connection.go`) executes `SET timezone TO 'Asia/Jakarta'` via `AfterConnect` callback on every `pgxpool` connection.
+- **Docker Container Environment**: `docker-compose.yml` configures `PGTZ: Asia/Jakarta` and `TZ: Asia/Jakarta` for PostgreSQL and application containers.
+- **Database Schema Standard (`TIMESTAMPTZ`)**: 100% of date/time columns in database migrations (`/migrations`) MUST specify `TIMESTAMPTZ` (Timestamp with time zone) instead of plain `TIMESTAMP`. This guarantees PostgreSQL stores UTC epoch internally while formatting and comparing time relative to `Asia/Jakarta` (`+07:00`).
 
 ### Unit Testing & Determinism
 - Unit tests can mock the current time using `clock.NewMockClock(fixedTime)` or `clock.SetDefault(mockClock)`.
@@ -45,6 +46,9 @@ All components in domain, usecase, delivery, and infrastructure layers MUST retr
 | Scope | Strategy | Example / API |
 | :--- | :--- | :--- |
 | Application Current Time | `clock.Now()` | `now := clock.Now()` |
+| DB Connection Pool | Session Timezone | `SET timezone TO 'Asia/Jakarta'` |
+| DB Table Columns | `TIMESTAMPTZ` | `created_at TIMESTAMPTZ DEFAULT NOW()` |
+| Docker Container | Environment TZ | `PGTZ=Asia/Jakarta`, `TZ=Asia/Jakarta` |
 | Incoming External Timestamps | Convert to WIB | `t = clock.InAppLocation(externalTimestamp)` |
 | Outbound External Requests | Convert to provider spec | `refundKey := fmt.Sprintf("refund-%s-%d", id, clock.Now().Unix())` |
 | Test Environment | Deterministic Mock | `mc := clock.NewMockClock(time.Date(...))` |
