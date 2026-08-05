@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/staff/domain"
 	"service-core/internal/modules/staff/repository"
@@ -63,7 +63,7 @@ func (u *CreateStaffUsecase) Execute(
 	ctx context.Context,
 	input CreateStaffInput,
 ) error {
-	now := time.Now()
+	now := appclock.Now()
 	newUserID := uuid.New()
 	newStaffID := uuid.New()
 

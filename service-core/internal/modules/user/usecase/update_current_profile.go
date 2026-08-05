@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authenRepo "service-core/internal/modules/authentication/repository"
@@ -81,7 +81,7 @@ func (u *UpdateCurrentProfileUsecase) Execute(
 					Name:      input.Name,
 					Phone:     input.Phone,
 					AvatarURL: input.AvatarURL,
-					UpdatedAt: time.Now(),
+					UpdatedAt: appclock.Now(),
 				},
 			); err != nil {
 				return fmt.Errorf("failed to save user profile: %w", err)

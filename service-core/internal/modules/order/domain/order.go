@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	appclock "service-core/internal/common/clock"
+
 	"github.com/google/uuid"
 )
 
@@ -123,7 +125,7 @@ func (o *Order) UpdateStatus(status OrderStatus) error {
 	if (status == OrderStatusConfirmed || status == OrderStatusProcessing) &&
 		o.ConfirmedAt == nil {
 
-		now := time.Now().UTC()
+		now := appclock.Now()
 		expiresAt := now.Add(DefaultHandlingSLAWindow)
 
 		o.ConfirmedAt = &now
@@ -159,7 +161,7 @@ func (o *Order) canTransitionTo(next OrderStatus) bool {
 func NewOrderNumber() string {
 	return fmt.Sprintf(
 		"ORD-%s-%s",
-		time.Now().Format("20060102"),
+		appclock.Now().Format("20060102"),
 		strings.ToUpper(uuid.NewString()[:6]),
 	)
 }

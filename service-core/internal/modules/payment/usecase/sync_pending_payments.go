@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
@@ -78,7 +79,7 @@ func NewSyncPendingPaymentsUsecase(
 // one failure must never prevent the remaining payments
 // from being reconciled.
 func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
-	since := time.Now().UTC().Add(-u.lookbackWindow)
+	since := appclock.Now().Add(-u.lookbackWindow)
 	var msg string
 
 	payments, err := u.paymentRepo.ListPendingGateway(ctx, u.executor,
@@ -126,7 +127,7 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 
 		// Skip if Midtrans still reports pending — nothing to do yet.
 		if result.Status == paymentgateway.NotificationStatusPending {
-			if payment.ExpiresAt != nil && time.Now().UTC().After(*payment.ExpiresAt) {
+			if payment.ExpiresAt != nil && appclock.Now().After(*payment.ExpiresAt) {
 				msg = "payment has expired locally, cancelling at gateway and expiring locally"
 				u.logger.Info(ctx, msg,
 					applogger.Field{Key: "payment_id", Value: payment.ID.String()},

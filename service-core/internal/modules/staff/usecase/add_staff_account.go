@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	authenDomain "service-core/internal/modules/authentication/domain"
@@ -144,7 +144,7 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("staff role not found in database")
 	}
 
-	now := time.Now()
+	now := appclock.Now()
 	newUserID := uuid.New()
 	newAccountID := uuid.New()
 

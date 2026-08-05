@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	shipping "service-core/internal/infra/shipping"
@@ -147,7 +147,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 	// ConfirmedAt and calculate the 3-day handling SLA expiration
 	// (HandlingExpiresAt).
 	if input.Status == domain.OrderStatusConfirmed && order.ConfirmedAt == nil {
-		if errStatus := order.Confirm(time.Now().UTC(), domain.DefaultHandlingSLAWindow); errStatus != nil {
+		if errStatus := order.Confirm(appclock.Now(), domain.DefaultHandlingSLAWindow); errStatus != nil {
 			return nil, apperrors.NewInvalidInput(errStatus.Error())
 		}
 	} else {
@@ -329,7 +329,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		method = shipmentDomain.FulfillmentMethod(*input.FulfillmentMethod)
 	}
 
-	now := time.Now()
+	now := appclock.Now()
 	var shipmentsToCreate []shipmentDomain.Shipment
 
 	for idx, group := range groups {

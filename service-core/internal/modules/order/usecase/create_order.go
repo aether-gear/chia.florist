@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	authenRepo "service-core/internal/modules/authentication/repository"
@@ -134,7 +135,7 @@ func (u *CreateOrderUsecase) Execute(
 	ctx context.Context,
 	input CreateOrderInput,
 ) (*CreateOrderResult, error) {
-	now := time.Now()
+	now := appclock.Now()
 
 	var (
 		method        *paymentDomain.PaymentMethod

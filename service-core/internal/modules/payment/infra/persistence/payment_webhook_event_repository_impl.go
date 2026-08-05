@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -93,7 +93,7 @@ func (r *paymentWebhookEventRepositoryImpl) MarkProcessed(
 		WHERE id = $1
 	`
 
-	_, err := exec.Exec(ctx, query, id, time.Now().UTC())
+	_, err := exec.Exec(ctx, query, id, appclock.Now())
 	if err != nil {
 		return fmt.Errorf("mark webhook event processed failed: %w", err)
 	}

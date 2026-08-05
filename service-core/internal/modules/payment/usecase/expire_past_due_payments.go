@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
@@ -67,7 +67,7 @@ func NewExpirePastDuePaymentsUsecase(
 }
 
 func (u *ExpirePastDuePaymentsUsecase) Execute(ctx context.Context) {
-	now := time.Now().UTC()
+	now := appclock.Now()
 	payments, err := u.paymentRepo.ListPastDuePending(ctx, u.executor, now,
 		u.batchSize,
 	)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -124,7 +125,7 @@ func (r *paymentRepositoryImpl) Save(
 	exec transaction.Executor,
 	payment domain.Payment,
 ) error {
-	now := time.Now()
+	now := appclock.Now()
 	payment.UpdatedAt = &now
 
 	query := `

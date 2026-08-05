@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
@@ -83,7 +83,7 @@ func (u *SyncPaymentMethodsUsecase) Execute(ctx context.Context) error {
 				FeeType:       domain.PaymentFeeType(am.FeeType),
 				FeeFixed:      am.FeeFixed,
 				FeePercentage: am.FeePercentage,
-				CreatedAt:     time.Now(),
+				CreatedAt:     appclock.Now(),
 			}
 			if err := u.methodRepo.Save(ctx, u.executor,
 				newMethod,

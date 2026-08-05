@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	"service-core/internal/modules/analytics/usecase"
@@ -12,11 +13,11 @@ import (
 )
 
 type AnalyticsHandler struct {
-	getOrderMetrics    *usecase.GetOrderMetricsUsecase
-	getPaymentMetrics  *usecase.GetPaymentMetricsUsecase
-	getShipmentMetrics *usecase.GetShipmentMetricsUsecase
+	getOrderMetrics     *usecase.GetOrderMetricsUsecase
+	getPaymentMetrics   *usecase.GetPaymentMetricsUsecase
+	getShipmentMetrics  *usecase.GetShipmentMetricsUsecase
 	getInventoryMetrics *usecase.GetInventoryMetricsUsecase
-	getProductMetrics  *usecase.GetProductMetricsUsecase
+	getProductMetrics   *usecase.GetProductMetricsUsecase
 }
 
 func NewAnalyticsHandler(
@@ -27,11 +28,11 @@ func NewAnalyticsHandler(
 	getProductMetrics *usecase.GetProductMetricsUsecase,
 ) *AnalyticsHandler {
 	return &AnalyticsHandler{
-		getOrderMetrics:    getOrderMetrics,
-		getPaymentMetrics:  getPaymentMetrics,
-		getShipmentMetrics: getShipmentMetrics,
+		getOrderMetrics:     getOrderMetrics,
+		getPaymentMetrics:   getPaymentMetrics,
+		getShipmentMetrics:  getShipmentMetrics,
 		getInventoryMetrics: getInventoryMetrics,
-		getProductMetrics:  getProductMetrics,
+		getProductMetrics:   getProductMetrics,
 	}
 }
 
@@ -301,7 +302,7 @@ func (h *AnalyticsHandler) GetProductMetrics(w http.ResponseWriter, r *http.Requ
 }
 
 func parseDateRange(r *http.Request) (time.Time, time.Time, error) {
-	now := time.Now()
+	now := appclock.Now()
 	from := now.AddDate(0, 0, -30)
 	to := now
 

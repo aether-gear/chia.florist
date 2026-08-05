@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	appcookie "service-core/internal/common/http/cookie"
@@ -165,7 +166,7 @@ func (aM *jwtAuthenticator) trySilentRefresh(
 
 	if session == nil ||
 		session.RevokedAt != nil ||
-		session.ExpiresAt.Before(time.Now()) {
+		session.ExpiresAt.Before(appclock.Now()) {
 
 		return nil, fmt.Errorf("session is invalid, revoked or expired")
 	}
@@ -182,7 +183,7 @@ func (aM *jwtAuthenticator) trySilentRefresh(
 
 	if dbRefreshToken == nil ||
 		dbRefreshToken.RevokedAt != nil ||
-		dbRefreshToken.ExpiresAt.Before(time.Now()) {
+		dbRefreshToken.ExpiresAt.Before(appclock.Now()) {
 
 		return nil, fmt.Errorf("refresh token in db is invalid, revoked or expired")
 	}
@@ -227,7 +228,7 @@ func (aM *jwtAuthenticator) trySilentRefresh(
 		return nil, fmt.Errorf("failed to generate new refresh token: %w", err)
 	}
 
-	now := time.Now()
+	now := appclock.Now()
 	session.ExpiresAt = now.Add(7 * 24 * time.Hour)
 	session.LastActivityAt = &now
 
@@ -292,7 +293,7 @@ func (aM *jwtAuthenticator) authenticate(
 	if session == nil ||
 		session.UserID != claims.UserID ||
 		session.RevokedAt != nil ||
-		session.ExpiresAt.Before(time.Now()) {
+		session.ExpiresAt.Before(appclock.Now()) {
 
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidSession.Error())
 	}

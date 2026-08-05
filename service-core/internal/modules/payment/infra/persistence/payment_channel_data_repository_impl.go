@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -158,7 +158,7 @@ func (r *paymentChannelDataRepositoryImpl) ListByPaymentIDs(
 	// for rows that somehow lack it
 	for k, v := range result {
 		if v.CreatedAt.IsZero() {
-			v.CreatedAt = time.Now()
+			v.CreatedAt = appclock.Now()
 			result[k] = v
 		}
 	}

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	applogger "service-core/internal/common/logger"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	orderDomain "service-core/internal/modules/order/domain"
@@ -61,7 +61,7 @@ func NewExpireUnfulfilledOrdersUsecase(
 }
 
 func (u *ExpireUnfulfilledOrdersUsecase) Execute(ctx context.Context) {
-	now := time.Now().UTC()
+	now := appclock.Now()
 	orders, err := u.orderRepo.FindExpiredUnfulfilledOrders(ctx, u.executor,
 		now,
 		u.batchSize,

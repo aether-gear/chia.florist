@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	paymentgateway "service-core/internal/infra/payment-gateway"
@@ -147,7 +147,7 @@ func (u *ProcessPaymentWebhookUsecase) Execute(
 		TransactionStatus: txStatus,
 		Payload:           payloadBytes,
 		Status:            domain.WebhookEventStatusReceived,
-		ReceivedAt:        time.Now().UTC(),
+		ReceivedAt:        appclock.Now(),
 	}
 
 	canonicalEvent, err := u.webhookEventRepo.Upsert(ctx, u.executor,
@@ -277,7 +277,7 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			return apperrors.NewNotFound("order not found for payment")
 		}
 
-		now := time.Now().UTC()
+		now := appclock.Now()
 		// When payment settlement occurs, invoke order.Confirm on
 		// the domain entity to stamp ConfirmedAt and calculate
 		// the 3-day staff handling SLA (HandlingExpiresAt).
@@ -396,7 +396,7 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			PaymentID: payment.ID,
 			EventName: string(newPaymentStatus),
 			Payload:   payloadBytes,
-			CreatedAt: time.Now(),
+			CreatedAt: appclock.Now(),
 		}
 
 		if err := u.paymentEventRepo.Create(ctx, exec, paymentEvent); err != nil {

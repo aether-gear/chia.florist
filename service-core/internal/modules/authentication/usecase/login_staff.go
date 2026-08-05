@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
@@ -161,7 +162,7 @@ func (u *LoginStaffUsecase) Execute(
 		roleCodes[i] = r.Code
 	}
 
-	now := time.Now()
+	now := appclock.Now()
 	session := domain.Session{
 		ID:        uuid.New(),
 		UserID:    existing.UserID,

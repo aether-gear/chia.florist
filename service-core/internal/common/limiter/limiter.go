@@ -3,6 +3,8 @@ package limiter
 import (
 	"sync"
 	"time"
+
+	appclock "service-core/internal/common/clock"
 )
 
 // Limiter defines the contract for rate limiting clients.
@@ -38,7 +40,7 @@ func (l *InMemorySlidingWindowLimiter) Allow(ip string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	now := time.Now()
+	now := appclock.Now()
 	cutoff := now.Add(-l.window)
 
 	// Retrieve current timestamps for the IP

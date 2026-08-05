@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/product/domain"
 	"service-core/internal/modules/product/repository"
@@ -52,7 +52,7 @@ func (u *SaveProductUsecase) Execute(
 	ctx context.Context,
 	input SaveProductInput,
 ) error {
-	now := time.Now()
+	now := appclock.Now()
 
 	var productID uuid.UUID
 	if input.ID == nil {

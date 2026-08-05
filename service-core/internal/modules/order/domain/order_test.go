@@ -4,11 +4,13 @@ import (
 	"testing"
 	"time"
 
+	appclock "service-core/internal/common/clock"
+
 	"github.com/google/uuid"
 )
 
 func TestOrder_Confirm(t *testing.T) {
-	now := time.Now().UTC()
+	now := appclock.Now()
 	order := Order{
 		ID:     uuid.New(),
 		Status: OrderStatusPending,
@@ -61,7 +63,7 @@ func TestOrder_Validate(t *testing.T) {
 		{
 			name: "confirmed order with SLA timestamps is valid",
 			order: func() Order {
-				now := time.Now()
+				now := appclock.Now()
 				expires := now.Add(72 * time.Hour)
 				return Order{
 					Status:            OrderStatusConfirmed,

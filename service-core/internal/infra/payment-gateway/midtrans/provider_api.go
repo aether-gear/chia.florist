@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	config "service-core/internal/shared/config"
@@ -251,8 +252,7 @@ func (p *midtransAPIProvider) Charge(
 
 	var expiresAt time.Time
 	if baseResp.ExpiryTime != "" {
-		wib, _ := time.LoadLocation("Asia/Jakarta")
-		t, parseErr := time.ParseInLocation("2006-01-02 15:04:05", baseResp.ExpiryTime, wib)
+		t, parseErr := time.ParseInLocation("2006-01-02 15:04:05", baseResp.ExpiryTime, appclock.Location())
 		if parseErr == nil {
 			expiresAt = t
 		}
@@ -376,7 +376,7 @@ func (p *midtransAPIProvider) RefundTransaction(
 	req paymentgateway.RefundRequest,
 ) (*paymentgateway.RefundResponse, error) {
 	url := fmt.Sprintf("%s/v2/%s/refund", p.baseURL, req.GatewayOrderID)
-	refundKey := fmt.Sprintf("refund-%s-%d", req.GatewayOrderID, time.Now().Unix())
+	refundKey := fmt.Sprintf("refund-%s-%d", req.GatewayOrderID, appclock.Now().Unix())
 	reqBodyMap := map[string]any{
 		"refund_key": refundKey,
 		"amount":     req.RefundAmount,

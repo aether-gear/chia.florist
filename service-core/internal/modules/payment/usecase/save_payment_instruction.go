@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
@@ -69,7 +69,7 @@ func (u *SavePaymentInstructionUsecase) Execute(
 			ID:              uuid.New(),
 			PaymentMethodID: input.PaymentMethodID,
 			Content:         input.Content,
-			CreatedAt:       time.Now(),
+			CreatedAt:       appclock.Now(),
 		}
 	}
 

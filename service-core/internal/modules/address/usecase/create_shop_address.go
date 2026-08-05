@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -65,7 +65,7 @@ func (u *CreateShopAddressUsecase) Execute(
 			FullAddress: input.FullAddress,
 			PostalCode:  input.PostalCode,
 		},
-		CreatedAt: time.Now(),
+		CreatedAt: appclock.Now(),
 	}
 
 	err := u.shopAddressRepo.Create(ctx, u.executor, address)

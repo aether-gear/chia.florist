@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	orderDomain "service-core/internal/modules/order/domain"
 	orderRepo "service-core/internal/modules/order/repository"
@@ -84,7 +84,7 @@ func (u *UpdateShipmentStatusUsecase) Execute(
 		Status:      string(input.Status),
 		Description: desc,
 		Location:    loc,
-		Timestamp:   time.Now(),
+		Timestamp:   appclock.Now(),
 	}
 
 	if err := event.Validate(); err != nil {

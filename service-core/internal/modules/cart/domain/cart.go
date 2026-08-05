@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	appclock "service-core/internal/common/clock"
+
 	"github.com/google/uuid"
 )
 
@@ -82,7 +84,7 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
 			if qty == 0 {
-				now := time.Now()
+				now := appclock.Now()
 				item.DeletedAt = &now
 				return nil
 			}
@@ -117,7 +119,7 @@ func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
-			now := time.Now()
+			now := appclock.Now()
 			item.DeletedAt = &now
 			return
 		}
@@ -129,7 +131,7 @@ func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) {
 func (c *Cart) RemoveCustomItem(cartItemID uuid.UUID) bool {
 	for i := range c.Items {
 		if c.Items[i].ID == cartItemID && c.Items[i].ProductVariantType == ProductVariantTypeCustom {
-			now := time.Now()
+			now := appclock.Now()
 			c.Items[i].DeletedAt = &now
 			return true
 		}
