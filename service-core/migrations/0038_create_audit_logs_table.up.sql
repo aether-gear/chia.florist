@@ -2,7 +2,8 @@ CREATE TYPE audit_category
     AS ENUM (
         'user_action',
         'waf_event',
-        'threat_intel'
+        'threat_intel',
+        'system_job'
     );
 
 CREATE TYPE audit_outcome
