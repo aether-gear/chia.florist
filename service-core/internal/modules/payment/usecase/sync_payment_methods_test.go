@@ -94,7 +94,8 @@ func TestSyncPaymentMethods_Success(t *testing.T) {
 	}
 
 	// 1. First sync - inserts all allowed methods
-	err := SyncPaymentMethods(ctx, repo, &mockExecutor{}, gateway)
+	uc1 := NewSyncPaymentMethodsUsecase(repo, &mockExecutor{}, gateway)
+	err := uc1.Execute(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error on first sync: %v", err)
 	}
@@ -123,7 +124,8 @@ func TestSyncPaymentMethods_Success(t *testing.T) {
 
 	// 3. Second sync - update properties, preserve active state
 	gateway.allowedMethods[0].Name = "GoPay New Name"
-	err = SyncPaymentMethods(ctx, repo, &mockExecutor{}, gateway)
+	uc2 := NewSyncPaymentMethodsUsecase(repo, &mockExecutor{}, gateway)
+	err = uc2.Execute(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error on second sync: %v", err)
 	}
@@ -150,7 +152,8 @@ func TestSyncPaymentMethods_Success(t *testing.T) {
 		},
 	}
 
-	err = SyncPaymentMethods(ctx, repo, &mockExecutor{}, gateway2)
+	uc3 := NewSyncPaymentMethodsUsecase(repo, &mockExecutor{}, gateway2)
+	err = uc3.Execute(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error on third sync: %v", err)
 	}

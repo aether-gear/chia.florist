@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"context"
 	"time"
 
 	applimiter "service-core/internal/common/limiter"
@@ -33,7 +32,6 @@ import (
 	customerPersistence "service-core/internal/modules/customer/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
 	orderPersistence "service-core/internal/modules/order/infra/persistence"
-	paymentJob "service-core/internal/modules/payment/infra/job"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
 	productPersistence "service-core/internal/modules/product/infra/persistence"
 	shipmentPersistence "service-core/internal/modules/shipment/infra/persistence"
@@ -146,6 +144,7 @@ type Container struct {
 	CheckPaymentStatus     paymentUsecase.CheckPaymentStatusUsecase
 	SyncPendingPayments    paymentUsecase.SyncPendingPaymentsUsecase
 	ExpirePastDuePayments  paymentUsecase.ExpirePastDuePaymentsUsecase
+	SyncPaymentMethods     paymentUsecase.SyncPaymentMethodsUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -745,6 +744,12 @@ func NewContainer(cfg Config,
 				cfg.PaymentExpiry.BatchSize,
 				cfg.PaymentExpiry.Concurrency,
 			),
+		SyncPaymentMethods: *paymentUsecase.
+			NewSyncPaymentMethodsUsecase(
+				paymentMethodRepo,
+				infra.TransactionExecutor,
+				infra.PaymentGateway,
+			),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
 			infra.TransactionExecutor,
@@ -909,23 +914,5 @@ func NewContainer(cfg Config,
 		GetProductMetrics:   *analyticsUsecase.NewGetProductMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 	}
 
-	syncInterval := time.Duration(cfg.PaymentSync.IntervalMinutes) * time.Minute
-	infra.PaymentSyncJob = paymentJob.NewPaymentSyncJob(
-		&c.SyncPendingPayments,
-		syncInterval,
-		log,
-	)
-
-	expiryInterval := time.Duration(cfg.PaymentExpiry.IntervalMinutes) * time.Minute
-	infra.PaymentExpiryJob = paymentJob.NewPaymentExpiryJob(
-		&c.ExpirePastDuePayments,
-		expiryInterval,
-		log,
-	)
-
 	return c
-}
-
-func (c *Container) SyncPaymentMethods(ctx context.Context) error {
-	return paymentUsecase.SyncPaymentMethods(ctx, c.paymentMethodRepo, c.DBExecutor, c.paymentGateway)
 }

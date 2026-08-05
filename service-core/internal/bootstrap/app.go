@@ -10,10 +10,11 @@ import (
 )
 
 type App struct {
+	cfg          Config
 	dependencies *Dependency
 	container    *Container
+	scheduler    *Scheduler
 	router       *chi.Mux
-	cfg          Config
 	cancelJobs   context.CancelFunc
 }
 
@@ -24,19 +25,20 @@ func New(cfg Config) (*App, error) {
 	}
 
 	c := NewContainer(cfg, dependencies)
+	r := NewRouter(c)
+	scheduler := NewScheduler(cfg, c, c.Logger)
 
-	// Perform startup payment method synchronization
-	if err := c.SyncPaymentMethods(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to sync payment methods: %w", err)
+	initializer := NewInitializer(c)
+	if err := initializer.Run(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to run startup initializer: %w", err)
 	}
 
-	r := NewRouter(c)
-
 	return &App{
+		cfg:          cfg,
 		dependencies: dependencies,
 		container:    c,
+		scheduler:    scheduler,
 		router:       r,
-		cfg:          cfg,
 	}, nil
 }
 
@@ -55,16 +57,14 @@ func (a *App) Close() {
 }
 
 func (a *App) Run() error {
-	// Start background jobs (payment reconciliation sync and automated expiry).
-	// They shut down cleanly when the context is cancelled (in Close).
+	// Start background jobs.
+	//
+	// The background jobs will shut down cleanly when the context is cancelled (in Close).
 	jobCtx, cancel := context.WithCancel(context.Background())
 	a.cancelJobs = cancel
 
-	if a.dependencies.PaymentSyncJob != nil {
-		go a.dependencies.PaymentSyncJob.Start(jobCtx)
-	}
-	if a.dependencies.PaymentExpiryJob != nil {
-		go a.dependencies.PaymentExpiryJob.Start(jobCtx)
+	if a.scheduler != nil {
+		a.scheduler.Start(jobCtx)
 	}
 
 	addr := a.cfg.App.Host + ":" + a.cfg.App.Port

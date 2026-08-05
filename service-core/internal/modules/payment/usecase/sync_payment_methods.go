@@ -5,24 +5,43 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
 )
 
-func SyncPaymentMethods(
-	ctx context.Context,
+// SyncPaymentMethodsUsecase synchronizes the system's payment methods
+// with the active payment gateway provider.
+//
+// It registers newly supported methods, updates metadata for existing methods,
+// and deactivates methods that are no longer allowed by the provider.
+type SyncPaymentMethodsUsecase struct {
+	methodRepo repository.PaymentMethodRepository
+	executor   transaction.Executor
+	gateway    paymentgateway.Provider
+}
+
+func NewSyncPaymentMethodsUsecase(
 	methodRepo repository.PaymentMethodRepository,
 	executor transaction.Executor,
 	gateway paymentgateway.Provider,
-) error {
-	allowedMethods := gateway.AllowedPaymentMethods()
-	providerName := gateway.Name()
+) *SyncPaymentMethodsUsecase {
+	return &SyncPaymentMethodsUsecase{
+		methodRepo: methodRepo,
+		executor:   executor,
+		gateway:    gateway,
+	}
+}
 
-	existingMethods, err := methodRepo.ListAll(ctx, executor, query.Sorts{})
+func (u *SyncPaymentMethodsUsecase) Execute(ctx context.Context) error {
+	allowedMethods := u.gateway.AllowedPaymentMethods()
+	providerName := u.gateway.Name()
+
+	existingMethods, err := u.methodRepo.ListAll(ctx, u.executor, query.Sorts{})
 	if err != nil {
 		return fmt.Errorf("failed to list existing payment methods: %w", err)
 	}
@@ -43,7 +62,6 @@ func SyncPaymentMethods(
 	}
 
 	activeKeys := make(map[key]bool)
-
 	for _, am := range allowedMethods {
 		k := key{
 			code:     am.Code,
@@ -67,7 +85,9 @@ func SyncPaymentMethods(
 				FeePercentage: am.FeePercentage,
 				CreatedAt:     time.Now(),
 			}
-			if err := methodRepo.Save(ctx, executor, newMethod); err != nil {
+			if err := u.methodRepo.Save(ctx, u.executor,
+				newMethod,
+			); err != nil {
 				return fmt.Errorf("failed to save new payment method %s: %w", am.Code, err)
 			}
 		} else {
@@ -78,17 +98,21 @@ func SyncPaymentMethods(
 			updatedMethod.FeeFixed = am.FeeFixed
 			updatedMethod.FeePercentage = am.FeePercentage
 
-			if err := methodRepo.Save(ctx, executor, updatedMethod); err != nil {
+			if err := u.methodRepo.Save(ctx, u.executor,
+				updatedMethod,
+			); err != nil {
 				return fmt.Errorf("failed to update payment method %s: %w", am.Code, err)
 			}
 		}
 	}
 
-	for k, m := range existingMap {
-		if !activeKeys[k] && m.IsActive {
-			m.IsActive = false
-			if err := methodRepo.Save(ctx, executor, *m); err != nil {
-				return fmt.Errorf("failed to deactivate obsolete payment method %s: %w", m.Code, err)
+	for k, method := range existingMap {
+		if !activeKeys[k] && method.IsActive {
+			method.IsActive = false
+			if err := u.methodRepo.Save(ctx, u.executor,
+				*method,
+			); err != nil {
+				return fmt.Errorf("failed to deactivate obsolete payment method %s: %w", method.Code, err)
 			}
 		}
 	}
