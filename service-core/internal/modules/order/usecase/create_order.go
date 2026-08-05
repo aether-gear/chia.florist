@@ -176,6 +176,10 @@ func (u *CreateOrderUsecase) Execute(
 		CreatedAt:   now,
 	}
 
+	if err := order.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid order domain state: %w", err)
+	}
+
 	invoice := order.NewInvoice()
 
 	var (

@@ -126,6 +126,10 @@ func (u *ExpireUnfulfilledOrdersUsecase) expireSingleOrder(
 	ctx context.Context,
 	order orderDomain.Order,
 ) error {
+	if err := order.UpdateStatus(orderDomain.OrderStatusExpired); err != nil {
+		return fmt.Errorf("invalid domain state transition: %w", err)
+	}
+
 	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.orderRepo.UpdateStatus(ctx, exec,
 			order.ID,

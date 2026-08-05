@@ -141,8 +141,19 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 	oldStatus = string(order.Status)
 
-	if errStatus := order.UpdateStatus(input.Status); errStatus != nil {
-		return nil, apperrors.NewInvalidInput(errStatus.Error())
+	// When confirming an unconfirmed order,
+	// invoke the domain Confirm method to stamp
+	//
+	// ConfirmedAt and calculate the 3-day handling SLA expiration
+	// (HandlingExpiresAt).
+	if input.Status == domain.OrderStatusConfirmed && order.ConfirmedAt == nil {
+		if errStatus := order.Confirm(time.Now().UTC(), domain.DefaultHandlingSLAWindow); errStatus != nil {
+			return nil, apperrors.NewInvalidInput(errStatus.Error())
+		}
+	} else {
+		if errStatus := order.UpdateStatus(input.Status); errStatus != nil {
+			return nil, apperrors.NewInvalidInput(errStatus.Error())
+		}
 	}
 
 	switch input.Status {
@@ -166,7 +177,15 @@ func (u *UpdateOrderStatusUsecase) Execute(
 					return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
 				}
 			}
-			return u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status)
+			if err := u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status); err != nil {
+				return err
+			}
+			if order.ConfirmedAt != nil && order.HandlingExpiresAt != nil {
+				if err := u.orderRepo.SetConfirmedAndExpiry(ctx, exec, order.ID, *order.ConfirmedAt, *order.HandlingExpiresAt); err != nil {
+					return fmt.Errorf("failed to set confirmed and expiry timestamps: %w", err)
+				}
+			}
+			return nil
 		})
 		if err != nil {
 			return nil, err

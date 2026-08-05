@@ -42,9 +42,15 @@ CREATE TABLE orders (
         CHECK (shipping_fee >= 0),
 
     CONSTRAINT orders_total_check
-        CHECK (total >= 0)
+        CHECK (total >= 0),
+
+    CONSTRAINT check_orders_handling_sla_timestamps
+        CHECK (
+            (status NOT IN ('confirmed', 'processing')) OR
+            (confirmed_at IS NOT NULL AND handling_expires_at IS NOT NULL)
+        )
 );
 
-CREATE INDEX idx_orders_handling_expires_at
-    ON orders(handling_expires_at)
+CREATE INDEX idx_orders_status_handling_expires_at
+    ON orders(status, handling_expires_at)
     WHERE status IN ('confirmed', 'processing');

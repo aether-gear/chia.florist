@@ -277,8 +277,18 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			return apperrors.NewNotFound("order not found for payment")
 		}
 
-		if err := order.UpdateStatus(newOrderStatus); err != nil {
-			return apperrors.NewInvalidInput(err.Error())
+		now := time.Now().UTC()
+		// When payment settlement occurs, invoke order.Confirm on
+		// the domain entity to stamp ConfirmedAt and calculate
+		// the 3-day staff handling SLA (HandlingExpiresAt).
+		if newOrderStatus == orderDomain.OrderStatusConfirmed {
+			if err := order.Confirm(now, orderDomain.DefaultHandlingSLAWindow); err != nil {
+				return apperrors.NewInvalidInput(err.Error())
+			}
+		} else {
+			if err := order.UpdateStatus(newOrderStatus); err != nil {
+				return apperrors.NewInvalidInput(err.Error())
+			}
 		}
 
 		if err := u.repository.UpdateStatus(ctx, exec,
@@ -293,6 +303,12 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			newOrderStatus,
 		); err != nil {
 			return fmt.Errorf("failed to update order status: %w", err)
+		}
+
+		if newOrderStatus == orderDomain.OrderStatusConfirmed && order.ConfirmedAt != nil && order.HandlingExpiresAt != nil {
+			if err := u.orderRepo.SetConfirmedAndExpiry(ctx, exec, payment.OrderID, *order.ConfirmedAt, *order.HandlingExpiresAt); err != nil {
+				return fmt.Errorf("failed to set order confirmed and expiry timestamp: %w", err)
+			}
 		}
 
 		if action == "commit" ||
@@ -323,11 +339,6 @@ func (u *ProcessPaymentWebhookUsecase) process(
 						item.Quantity,
 					); err != nil {
 						return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
-					}
-					now := time.Now().UTC()
-					expiresAt := now.Add(3 * 24 * time.Hour)
-					if err := u.orderRepo.SetConfirmedAndExpiry(ctx, exec, payment.OrderID, now, expiresAt); err != nil {
-						return fmt.Errorf("failed to set order confirmed and expiry timestamp: %w", err)
 					}
 
 				case "release":
