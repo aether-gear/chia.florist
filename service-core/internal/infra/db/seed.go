@@ -11,6 +11,11 @@ import (
 func RunSeed(conn *Connection) error {
 	ctx := context.Background()
 
+	if err := seeds.SeedRoles(ctx, conn.Pool); err != nil {
+		return fmt.Errorf("seed roles: %w", err)
+	}
+	log.Printf("database: roles seeded")
+
 	if err := seeds.SeedLocations(ctx, conn.Pool); err != nil {
 		return fmt.Errorf("seed locations: %w", err)
 	}
