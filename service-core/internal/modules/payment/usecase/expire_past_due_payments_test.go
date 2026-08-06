@@ -114,7 +114,7 @@ func TestExpirePastDuePayments_Success(t *testing.T) {
 				{
 					ID:        uuid.New(),
 					OrderID:   orderID,
-					ProductID: productID,
+					ProductID: &productID,
 					ShopID:    shopID,
 					Quantity:  2,
 				},
@@ -211,7 +211,7 @@ func TestExpirePastDuePayments_InventoryAnomalyLogsWarnAndFinalizesState(t *test
 				{
 					ID:        uuid.New(),
 					OrderID:   orderID,
-					ProductID: productID,
+					ProductID: &productID,
 					ShopID:    shopID,
 					Quantity:  5,
 				},

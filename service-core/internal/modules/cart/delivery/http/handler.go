@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -8,6 +9,7 @@ import (
 	authdomain "service-core/internal/modules/authentication/domain"
 	domain "service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/usecase"
+	productDomain "service-core/internal/modules/product/domain"
 
 	"github.com/google/uuid"
 )
@@ -63,19 +65,45 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 	items := make([]cartItemView, 0, len(result.Cart.Items))
 
 	for _, item := range result.Cart.Items {
-		// Custom items: echo the design payload back; price resolved in M2
+		// Compute custom product price dynamically by backend-side
 		if item.ProductVariantType == domain.ProductVariantTypeCustom {
+			var price int64
+			var subtotal int64
+			if len(item.CustomDesign) > 0 {
+				if parsedDesign, err := productDomain.ParseCustomDesignPayload(item.CustomDesign); err == nil {
+					breakdown := productDomain.CalculateCustomProductPrice(
+						*parsedDesign,
+						productDomain.DefaultCustomPricingMatrix(),
+					)
+					price = breakdown.TotalPrice
+					subtotal = price * int64(item.Quantity)
+				}
+			}
+
+			imageResp := productImageResponse{}
+			if len(item.CustomDesign) > 0 {
+				var rawMap map[string]interface{}
+				if err := json.Unmarshal(item.CustomDesign, &rawMap); err == nil {
+					if assets, ok := rawMap["assets"].(map[string]interface{}); ok {
+						if previewURL, ok := assets["previewUrl"].(string); ok && previewURL != "" {
+							imageResp.Thumbnail = &previewURL
+						}
+					}
+				}
+			}
+
 			items = append(items, cartItemView{
 				CartItemID:         item.ID,
 				ProductVariantType: string(item.ProductVariantType),
 				ShopID:             item.ShopID,
 				Name:               "(Custom Board)",
-				Price:              0,
+				Price:              price,
 				Quantity:           item.Quantity,
-				Subtotal:           0,
-				Image:              productImageResponse{},
+				Subtotal:           subtotal,
+				Image:              imageResp,
 				CustomDesign:       item.CustomDesign,
 			})
+			total += subtotal
 			continue
 		}
 
@@ -309,13 +337,20 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 	for _, shop := range result.Shops {
 		var itemsResponse []checkoutItemResponse
 		for _, item := range shop.Items {
+			variantType := "standard"
+			if item.IsCustom || item.ProductID == nil {
+				variantType = "custom"
+			}
 			itemsResponse = append(itemsResponse, checkoutItemResponse{
-				ProductID: item.ProductID,
-				ShopID:    item.ShopID,
-				Name:      item.Name,
-				Price:     item.Price,
-				Quantity:  item.Quantity,
-				Subtotal:  item.Subtotal,
+				ProductID:          item.ProductID,
+				CartItemID:         item.CartItemID,
+				ProductVariantType: variantType,
+				IsCustom:           item.IsCustom || item.ProductID == nil,
+				ShopID:             item.ShopID,
+				Name:               item.Name,
+				Price:              item.Price,
+				Quantity:           item.Quantity,
+				Subtotal:           item.Subtotal,
 			})
 		}
 
@@ -420,13 +455,20 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 	for _, shop := range result.Shops {
 		var itemsResponse []checkoutItemResponse
 		for _, item := range shop.Items {
+			variantType := "standard"
+			if item.IsCustom || item.ProductID == nil {
+				variantType = "custom"
+			}
 			itemsResponse = append(itemsResponse, checkoutItemResponse{
-				ProductID: item.ProductID,
-				ShopID:    item.ShopID,
-				Name:      item.Name,
-				Price:     item.Price,
-				Quantity:  item.Quantity,
-				Subtotal:  item.Subtotal,
+				ProductID:          item.ProductID,
+				CartItemID:         item.CartItemID,
+				ProductVariantType: variantType,
+				IsCustom:           item.IsCustom || item.ProductID == nil,
+				ShopID:             item.ShopID,
+				Name:               item.Name,
+				Price:              item.Price,
+				Quantity:           item.Quantity,
+				Subtotal:           item.Subtotal,
 			})
 		}
 
@@ -539,8 +581,40 @@ func (h *CartHandler) parseCheckoutInput(
 
 		var items []usecase.CheckoutItemInput
 		for _, itemReq := range shopReq.Items {
-			productID, err := uuid.Parse(itemReq.ProductID)
-			if err != nil {
+			var productID *uuid.UUID
+			var cartItemID *uuid.UUID
+
+			isCustom := (itemReq.IsCustom != nil && *itemReq.IsCustom) ||
+				itemReq.ProductVariantType == "custom" ||
+				itemReq.ItemType == "custom" ||
+				len(itemReq.CustomDesign) > 0 ||
+				(itemReq.ProductID == nil && itemReq.CartItemID != nil) ||
+				itemReq.ProductID == nil
+
+			if itemReq.ProductID != nil &&
+				*itemReq.ProductID != "" &&
+				*itemReq.ProductID != "null" &&
+				*itemReq.ProductID != "undefined" &&
+				*itemReq.ProductID != "custom" {
+
+				if parsed, err := uuid.Parse(*itemReq.ProductID); err == nil {
+					productID = &parsed
+				} else if !isCustom {
+					return usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid product id")
+				}
+			}
+
+			if itemReq.CartItemID != nil &&
+				*itemReq.CartItemID != "" &&
+				*itemReq.CartItemID != "null" &&
+				*itemReq.CartItemID != "undefined" {
+
+				if parsed, err := uuid.Parse(*itemReq.CartItemID); err == nil {
+					cartItemID = &parsed
+				}
+			}
+
+			if !isCustom && productID == nil && cartItemID == nil {
 				return usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid product id")
 			}
 
@@ -549,8 +623,11 @@ func (h *CartHandler) parseCheckoutInput(
 			}
 
 			items = append(items, usecase.CheckoutItemInput{
-				ProductID: productID,
-				Quantity:  itemReq.Quantity,
+				ProductID:    productID,
+				CartItemID:   cartItemID,
+				IsCustom:     isCustom,
+				CustomDesign: itemReq.CustomDesign,
+				Quantity:     itemReq.Quantity,
 			})
 		}
 

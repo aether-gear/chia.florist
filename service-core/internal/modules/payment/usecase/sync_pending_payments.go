@@ -233,8 +233,11 @@ func (u *SyncPendingPaymentsUsecase) expirePaymentLocally(
 		}
 
 		for _, item := range orderItems {
+			if item.ProductID == nil {
+				continue
+			}
 			if err := u.inventoryRepo.Release(ctx, exec,
-				item.ProductID,
+				*item.ProductID,
 				item.ShopID,
 				item.Quantity,
 			); err != nil {

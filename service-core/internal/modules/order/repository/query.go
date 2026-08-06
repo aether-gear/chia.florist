@@ -1,14 +1,19 @@
 package repository
 
 import (
+	"encoding/json"
+
 	query "service-core/internal/shared/query"
 
 	"github.com/google/uuid"
 )
 
 type PricingItemInput struct {
-	ProductID uuid.UUID
-	Quantity  int
+	ProductID    *uuid.UUID
+	CartItemID   *uuid.UUID
+	IsCustom     bool
+	CustomDesign json.RawMessage
+	Quantity     int
 }
 
 type PricingShopInput struct {
@@ -26,7 +31,9 @@ type PricingInput struct {
 }
 
 type PricingItemResult struct {
-	ProductID   uuid.UUID
+	ProductID   *uuid.UUID
+	CartItemID  *uuid.UUID
+	IsCustom    bool
 	ProductName string
 	Quantity    int
 	UnitPrice   int64

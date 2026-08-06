@@ -1,11 +1,12 @@
 CREATE TABLE invoice_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL,
+    product_variant_type product_variant_type NOT NULL DEFAULT 'standard',
 
     shop_id UUID NOT NULL,
     shop_name VARCHAR(255) NOT NULL,
 
-    product_id UUID NOT NULL,
+    product_id UUID,
     product_name VARCHAR(255) NOT NULL,
 
     quantity INTEGER NOT NULL,

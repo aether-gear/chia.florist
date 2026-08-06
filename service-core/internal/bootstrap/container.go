@@ -289,6 +289,7 @@ func NewContainer(cfg Config,
 
 		pricingService = orderSvc.NewPricingService(
 			addressRepo,
+			cartRepo,
 			shopCourierRepo,
 			inventoryRepo,
 			paymentMethodRepo,

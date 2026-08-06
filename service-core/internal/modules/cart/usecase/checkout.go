@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	authenDomain "service-core/internal/modules/authentication/domain"
 	orderRepo "service-core/internal/modules/order/repository"
@@ -26,8 +27,11 @@ func NewCheckoutUsecase(
 }
 
 type CheckoutItemInput struct {
-	ProductID uuid.UUID
-	Quantity  int
+	ProductID    *uuid.UUID
+	CartItemID   *uuid.UUID
+	IsCustom     bool
+	CustomDesign json.RawMessage
+	Quantity     int
 }
 
 type SelectedCourierInput struct {
@@ -63,7 +67,9 @@ type CheckoutCouriersResult struct {
 }
 
 type CheckoutItemResult struct {
-	ProductID   uuid.UUID
+	ProductID   *uuid.UUID
+	CartItemID  *uuid.UUID
+	IsCustom    bool
 	ShopID      uuid.UUID
 	Name        string
 	Price       int64
@@ -147,8 +153,11 @@ func (u *CheckoutUsecase) Execute(
 			shopInput.Items = append(
 				shopInput.Items,
 				orderRepo.PricingItemInput{
-					ProductID: item.ProductID,
-					Quantity:  item.Quantity,
+					ProductID:    item.ProductID,
+					CartItemID:   item.CartItemID,
+					IsCustom:     item.IsCustom,
+					CustomDesign: item.CustomDesign,
+					Quantity:     item.Quantity,
 				},
 			)
 		}
@@ -209,6 +218,8 @@ func (u *CheckoutUsecase) Execute(
 				shopRes.Items,
 				CheckoutItemResult{
 					ProductID:   item.ProductID,
+					CartItemID:  item.CartItemID,
+					IsCustom:    item.IsCustom,
 					ShopID:      shop.ShopID,
 					Name:        item.ProductName,
 					Price:       item.UnitPrice,

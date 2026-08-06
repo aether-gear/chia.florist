@@ -393,7 +393,7 @@ func TestProcessPaymentWebhook_Settlement(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 2}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 2}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	paRepo := &mockPaymentAccountRepo{}
@@ -448,7 +448,7 @@ func TestProcessPaymentWebhook_Expire(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 2}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 2}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	paRepo := &mockPaymentAccountRepo{}
@@ -494,7 +494,7 @@ func TestProcessPaymentWebhook_Cancel(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 1}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 1}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -533,7 +533,7 @@ func TestProcessPaymentWebhook_Deny(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 3}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 3}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -833,7 +833,7 @@ func TestProcessPaymentWebhook_InventoryCommitFails(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 1}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 1}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -862,7 +862,7 @@ func TestProcessPaymentWebhook_InventoryReleaseFails(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 1}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 1}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}

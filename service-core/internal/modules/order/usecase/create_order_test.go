@@ -454,7 +454,7 @@ func coDefaultPricing(productID, shopID uuid.UUID) *orderRepo.PricingResult {
 				ShopID:   shopID,
 				ShopName: "Florist Kage",
 				Items: []orderRepo.PricingItemResult{
-					{ProductID: productID, ProductName: "Bouquet A", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
+					{ProductID: &productID, ProductName: "Bouquet A", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
 				},
 				SelectedCourier: orderRepo.SelectedCourierResult{Code: "jne", Service: "REG", Fee: 15000},
 			},
@@ -546,7 +546,7 @@ func coInput(customerID, paymentMethodID uuid.UUID, isManual bool, productID, sh
 			{
 				ShopID:   shopID,
 				ShopName: "Florist Kage",
-				Items:    []OrderItemInput{{ProductID: productID, ProductName: "Bouquet A", Quantity: 2}},
+				Items:    []OrderItemInput{{ProductID: &productID, ProductName: "Bouquet A", Quantity: 2}},
 			},
 		},
 	}
@@ -873,7 +873,7 @@ func TestCreateOrder_InvariantAdjustmentItemAddedWhenSumDiffers(t *testing.T) {
 				ShopID:   shopID,
 				ShopName: "Kage",
 				Items: []orderRepo.PricingItemResult{
-					{ProductID: productID, ProductName: "Bouquet", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
+					{ProductID: &productID, ProductName: "Bouquet", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
 				},
 				SelectedCourier: orderRepo.SelectedCourierResult{Code: "jne", Service: "REG", Fee: 15000},
 			},

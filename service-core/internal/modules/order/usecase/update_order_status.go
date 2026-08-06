@@ -173,7 +173,10 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 			for _, item := range items {
-				if err := u.inventoryRepo.Commit(ctx, exec, item.ProductID, item.ShopID, item.Quantity); err != nil {
+				if item.ProductID == nil {
+					continue
+				}
+				if err := u.inventoryRepo.Commit(ctx, exec, *item.ProductID, item.ShopID, item.Quantity); err != nil {
 					return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
 				}
 			}
@@ -243,7 +246,10 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 			for _, item := range items {
-				if err := u.inventoryRepo.Release(ctx, exec, item.ProductID, item.ShopID, item.Quantity); err != nil {
+				if item.ProductID == nil {
+					continue
+				}
+				if err := u.inventoryRepo.Release(ctx, exec, *item.ProductID, item.ShopID, item.Quantity); err != nil {
 					return fmt.Errorf("failed to release inventory for product %s: %w", item.ProductID, err)
 				}
 			}
@@ -288,7 +294,9 @@ func (u *UpdateOrderStatusUsecase) Execute(
 	// Fetch product details for all items to calculate accurate shipping weights
 	var productIDs []uuid.UUID
 	for _, item := range items {
-		productIDs = append(productIDs, item.ProductID)
+		if item.ProductID != nil {
+			productIDs = append(productIDs, *item.ProductID)
+		}
 	}
 	products, err := u.productRepo.FindByIDs(ctx, u.executor, productIDs)
 	if err != nil {
@@ -371,8 +379,10 @@ func (u *UpdateOrderStatusUsecase) Execute(
 				qty = 1
 			}
 			weight := DEFAULT_SHIPMENT_WEIGHT_GRAMS
-			if p, ok := productMap[item.ProductID]; ok && p.Weight != nil && *p.Weight > 0 {
-				weight = int(*p.Weight)
+			if item.ProductID != nil {
+				if p, ok := productMap[*item.ProductID]; ok && p.Weight != nil && *p.Weight > 0 {
+					weight = int(*p.Weight)
+				}
 			}
 			shopTotalWeightGrams += weight * qty
 			shopTotalItemQty += qty

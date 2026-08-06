@@ -44,18 +44,34 @@ func NewOrderHandler(
 func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 	items := make([]orderItemResponse, len(o.Items))
 	for j, item := range o.Items {
+		var productIDStr *string
+		if item.ProductID != nil {
+			s := item.ProductID.String()
+			productIDStr = &s
+		}
+		variantType := string(item.ProductVariantType)
+		if variantType == "" {
+			if item.ProductID == nil {
+				variantType = "custom"
+			} else {
+				variantType = "standard"
+			}
+		}
+
 		items[j] = orderItemResponse{
-			ID:               item.ID.String(),
-			ProductID:        item.ProductID.String(),
-			ProductName:      item.ProductName,
-			Quantity:         item.Quantity,
-			UnitPrice:        item.UnitPrice,
-			Subtotal:         item.Subtotal,
-			ShopID:           item.ShopID.String(),
-			ShopName:         item.ShopName,
-			CourierCode:      item.CourierCode,
-			CourierService:   item.CourierService,
-			ShippingFeeTotal: item.ShippingFee,
+			ID:                 item.ID.String(),
+			ProductID:          productIDStr,
+			ProductVariantType: variantType,
+			IsCustom:           item.ProductID == nil || variantType == "custom",
+			ProductName:        item.ProductName,
+			Quantity:           item.Quantity,
+			UnitPrice:          item.UnitPrice,
+			Subtotal:           item.Subtotal,
+			ShopID:             item.ShopID.String(),
+			ShopName:           item.ShopName,
+			CourierCode:        item.CourierCode,
+			CourierService:     item.CourierService,
+			ShippingFeeTotal:   item.ShippingFee,
 		}
 	}
 
@@ -395,24 +411,63 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 
 		var itemsInput []usecase.OrderItemInput
 		for _, itemReq := range shopReq.Items {
-			if itemReq.ProductName == "" {
-				return apperrors.NewBadRequest("invalid product name")
-			}
 			if itemReq.Quantity <= 0 {
 				return apperrors.NewBadRequest("invalid quantity")
 			}
 
-			parsedProductID, err := uuid.Parse(itemReq.ProductID)
-			if err != nil {
+			var productID *uuid.UUID
+			var cartItemID *uuid.UUID
+
+			isCustom := (itemReq.IsCustom != nil && *itemReq.IsCustom) ||
+				itemReq.ProductVariantType == "custom" ||
+				itemReq.ItemType == "custom" ||
+				len(itemReq.CustomDesign) > 0
+
+			if itemReq.ProductID != nil &&
+				*itemReq.ProductID != "" &&
+				*itemReq.ProductID != "null" &&
+				*itemReq.ProductID != "undefined" &&
+				*itemReq.ProductID != "custom" {
+
+				if parsed, err := uuid.Parse(*itemReq.ProductID); err == nil {
+					productID = &parsed
+				} else if !isCustom {
+					return apperrors.NewBadRequest("invalid product id")
+				}
+			}
+
+			if itemReq.CartItemID != nil &&
+				*itemReq.CartItemID != "" &&
+				*itemReq.CartItemID != "null" &&
+				*itemReq.CartItemID != "undefined" {
+
+				if parsed, err := uuid.Parse(*itemReq.CartItemID); err == nil {
+					cartItemID = &parsed
+				}
+			}
+
+			if !isCustom && productID == nil && cartItemID == nil {
 				return apperrors.NewBadRequest("invalid product id")
+			}
+
+			productName := itemReq.ProductName
+			if productName == "" {
+				if isCustom {
+					productName = "(Custom Flower Board)"
+				} else {
+					return apperrors.NewBadRequest("invalid product name")
+				}
 			}
 
 			itemsInput = append(
 				itemsInput,
 				usecase.OrderItemInput{
-					ProductID:   parsedProductID,
-					ProductName: itemReq.ProductName,
-					Quantity:    itemReq.Quantity,
+					ProductID:    productID,
+					CartItemID:   cartItemID,
+					IsCustom:     isCustom,
+					CustomDesign: itemReq.CustomDesign,
+					ProductName:  productName,
+					Quantity:     itemReq.Quantity,
 				},
 			)
 		}

@@ -11,6 +11,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	authenRepo "service-core/internal/modules/authentication/repository"
+	cartDomain "service-core/internal/modules/cart/domain"
 	cartRepo "service-core/internal/modules/cart/repository"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/order/domain"
@@ -31,9 +32,12 @@ const (
 )
 
 type OrderItemInput struct {
-	ProductID   uuid.UUID
-	ProductName string
-	Quantity    int
+	ProductID    *uuid.UUID
+	CartItemID   *uuid.UUID
+	IsCustom     bool
+	CustomDesign json.RawMessage
+	ProductName  string
+	Quantity     int
 }
 
 type OrderCourierInput struct {
@@ -201,19 +205,25 @@ func (u *CreateOrderUsecase) Execute(
 		}
 
 		for _, itemRes := range shopRes.Items {
+			var variantType cartDomain.ProductVariantType = cartDomain.ProductVariantTypeStandard
+			if itemRes.IsCustom || itemRes.ProductID == nil {
+				variantType = cartDomain.ProductVariantTypeCustom
+			}
+
 			orderItem := domain.OrderItem{
-				ID:             uuid.New(),
-				OrderID:        order.ID,
-				ShopID:         shopRes.ShopID,
-				ShopName:       shopRes.ShopName,
-				ProductID:      itemRes.ProductID,
-				ProductName:    itemRes.ProductName,
-				Quantity:       itemRes.Quantity,
-				UnitPrice:      itemRes.UnitPrice,
-				Subtotal:       itemRes.Subtotal,
-				CourierCode:    courierCode,
-				CourierService: courierService,
-				ShippingFee:    shopRes.SelectedCourier.Fee,
+				ID:                 uuid.New(),
+				OrderID:            order.ID,
+				ProductVariantType: variantType,
+				ShopID:             shopRes.ShopID,
+				ShopName:           shopRes.ShopName,
+				ProductID:          itemRes.ProductID,
+				ProductName:        itemRes.ProductName,
+				Quantity:           itemRes.Quantity,
+				UnitPrice:          itemRes.UnitPrice,
+				Subtotal:           itemRes.Subtotal,
+				CourierCode:        courierCode,
+				CourierService:     courierService,
+				ShippingFee:        shopRes.SelectedCourier.Fee,
 			}
 
 			invoiceItem := invoice.NewInvoiceItemFromOrderItem(orderItem)
@@ -224,8 +234,14 @@ func (u *CreateOrderUsecase) Execute(
 	}
 
 	for _, item := range orderItems {
+		var itemID string
+		if item.ProductID != nil {
+			itemID = item.ProductID.String()
+		} else {
+			itemID = item.ID.String()
+		}
 		cItem := paymentgateway.ChargeItem{
-			ID:       item.ProductID.String(),
+			ID:       itemID,
 			Name:     item.ProductName,
 			Quantity: item.Quantity,
 			Price:    item.UnitPrice,
@@ -385,8 +401,11 @@ func (u *CreateOrderUsecase) Execute(
 		}
 
 		for _, item := range orderItems {
+			if item.ProductID == nil {
+				continue
+			}
 			if err := u.inventoryRepo.Reserve(ctx, exec,
-				item.ProductID,
+				*item.ProductID,
 				item.ShopID,
 				item.Quantity,
 			); err != nil {
@@ -400,7 +419,9 @@ func (u *CreateOrderUsecase) Execute(
 		}
 		if cart != nil {
 			for _, item := range orderItems {
-				cart.RemoveItem(item.ProductID, item.ShopID)
+				if item.ProductID != nil {
+					cart.RemoveItem(*item.ProductID, item.ShopID)
+				}
 			}
 
 			if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
@@ -519,8 +540,11 @@ func (u *CreateOrderUsecase) validateAndCalculatePricing(
 			shopInput.Items = append(
 				shopInput.Items,
 				repository.PricingItemInput{
-					ProductID: item.ProductID,
-					Quantity:  item.Quantity,
+					ProductID:    item.ProductID,
+					CartItemID:   item.CartItemID,
+					IsCustom:     item.IsCustom,
+					CustomDesign: item.CustomDesign,
+					Quantity:     item.Quantity,
 				},
 			)
 		}

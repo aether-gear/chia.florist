@@ -327,10 +327,13 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			//   - release  → rollback reserved stock
 			// 				  back to available pool
 			for _, item := range orderItems {
+				if item.ProductID == nil {
+					continue
+				}
 				switch action {
 				case "commit":
 					if err := u.inventoryRepo.Commit(ctx, exec,
-						item.ProductID,
+						*item.ProductID,
 						item.ShopID,
 						item.Quantity,
 					); err != nil {
@@ -339,7 +342,7 @@ func (u *ProcessPaymentWebhookUsecase) process(
 
 				case "release":
 					if err := u.inventoryRepo.Release(ctx, exec,
-						item.ProductID,
+						*item.ProductID,
 						item.ShopID,
 						item.Quantity,
 					); err != nil {

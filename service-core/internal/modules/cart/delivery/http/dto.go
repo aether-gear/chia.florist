@@ -46,8 +46,13 @@ type cartItemView struct {
 }
 
 type checkoutItemRequest struct {
-	ProductID string `json:"product_id"`
-	Quantity  int    `json:"quantity"`
+	ProductID          *string         `json:"product_id,omitempty"`
+	CartItemID         *string         `json:"cart_item_id,omitempty"`
+	ProductVariantType string          `json:"product_variant_type,omitempty"`
+	ItemType           string          `json:"item_type,omitempty"`
+	IsCustom           *bool           `json:"is_custom,omitempty"`
+	Quantity           int             `json:"quantity"`
+	CustomDesign       json.RawMessage `json:"custom_design,omitempty"`
 }
 
 type selectedCourierRequest struct {
@@ -87,12 +92,15 @@ type checkoutCouriersResponse struct {
 }
 
 type checkoutItemResponse struct {
-	ProductID uuid.UUID `json:"product_id"`
-	ShopID    uuid.UUID `json:"shop_id"`
-	Name      string    `json:"name"`
-	Price     int64     `json:"price"`
-	Quantity  int       `json:"quantity"`
-	Subtotal  int64     `json:"subtotal"`
+	ProductID          *uuid.UUID `json:"product_id,omitempty"`
+	CartItemID         *uuid.UUID `json:"cart_item_id,omitempty"`
+	ProductVariantType string     `json:"product_variant_type"`
+	IsCustom           bool       `json:"is_custom"`
+	ShopID             uuid.UUID  `json:"shop_id"`
+	Name               string     `json:"name"`
+	Price              int64      `json:"price"`
+	Quantity           int        `json:"quantity"`
+	Subtotal           int64      `json:"subtotal"`
 }
 
 type selectedCourierResponse struct {

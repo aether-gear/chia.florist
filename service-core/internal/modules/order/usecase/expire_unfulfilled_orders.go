@@ -144,8 +144,11 @@ func (u *ExpireUnfulfilledOrdersUsecase) expireSingleOrder(
 		}
 
 		for _, item := range items {
+			if item.ProductID == nil {
+				continue
+			}
 			if err := u.inventoryRepo.Restock(ctx, exec,
-				item.ProductID,
+				*item.ProductID,
 				item.ShopID,
 				item.Quantity,
 			); err != nil {

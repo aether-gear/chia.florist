@@ -279,7 +279,7 @@ func TestSyncPendingPayments_EnforceLocalExpiry(t *testing.T) {
 			orderID: {
 				{
 					OrderID:   orderID,
-					ProductID: uuid.New(),
+					ProductID: func() *uuid.UUID { u := uuid.New(); return &u }(),
 					ShopID:    uuid.New(),
 					Quantity:  2,
 				},

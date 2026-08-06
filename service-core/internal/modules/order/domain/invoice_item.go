@@ -1,15 +1,20 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	cartDomain "service-core/internal/modules/cart/domain"
+
+	"github.com/google/uuid"
+)
 
 type InvoiceItem struct {
-	ID        uuid.UUID
-	InvoiceID uuid.UUID
+	ID                 uuid.UUID
+	InvoiceID          uuid.UUID
+	ProductVariantType cartDomain.ProductVariantType
 
 	ShopID   uuid.UUID
 	ShopName string
 
-	ProductID   uuid.UUID
+	ProductID   *uuid.UUID
 	ProductName string
 
 	Quantity  int
