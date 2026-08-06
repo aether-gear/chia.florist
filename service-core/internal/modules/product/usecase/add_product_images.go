@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	storage "service-core/internal/infra/storage"
 	"service-core/internal/modules/product/domain"
@@ -101,7 +101,7 @@ func (u *AddProductImagesUsecase) Execute(
 		// source image.
 		mappings []productToVariants
 
-		now = time.Now()
+		now = appclock.Now()
 	)
 
 	for _, img := range input.Images {

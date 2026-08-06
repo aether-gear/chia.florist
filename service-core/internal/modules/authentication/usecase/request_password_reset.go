@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
@@ -58,7 +59,7 @@ func (u *RequestPasswordResetUsecase) Execute(
 	ctx context.Context,
 	params RequestPasswordResetParams,
 ) (*uuid.UUID, error) {
-	now := time.Now()
+	now := appclock.Now()
 
 	account, err := u.accountRepo.
 		GetByEmail(ctx, u.executor, params.Email)

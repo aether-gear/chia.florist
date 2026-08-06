@@ -364,6 +364,39 @@ func (r *inventoryRepositoryImpl) Commit(
 	return nil
 }
 
+func (r *inventoryRepositoryImpl) Restock(
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+	shopID uuid.UUID,
+	qty int,
+) error {
+	query := `
+		UPDATE inventory
+		SET
+			stock      = stock + $1,
+			updated_at = NOW()
+		WHERE
+			product_id  = $2
+			AND shop_id = $3
+	`
+
+	tag, err := exec.Exec(ctx, query,
+		qty,
+		productID,
+		shopID,
+	)
+	if err != nil {
+		return fmt.Errorf("restock inventory failed: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("inventory record not found for product %s and shop %s", productID, shopID)
+	}
+
+	return nil
+}
+
 func (r *inventoryRepositoryImpl) Update(
 	ctx context.Context,
 	exec transaction.Executor,

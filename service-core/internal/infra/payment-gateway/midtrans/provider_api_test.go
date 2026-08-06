@@ -3,12 +3,14 @@ package midtrans
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	config "service-core/internal/shared/config"
 
@@ -539,8 +541,9 @@ func TestCharge_GatewayNonSuccessStatus(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for non-2xx gateway status, got nil")
 	}
-	if !strings.Contains(err.Error(), "charge failed") {
-		t.Errorf("unexpected error: %v", err)
+	var appErr *apperrors.AppError
+	if !errors.As(err, &appErr) || appErr.Type != apperrors.ErrTypeBadRequest {
+		t.Errorf("expected BadRequest AppError, got: %v", err)
 	}
 }
 
@@ -778,6 +781,32 @@ func TestParseNotification_MissingOrderID(t *testing.T) {
 	}
 }
 
+func TestGetTransactionStatus_ExpiredStatus407(t *testing.T) {
+	orderID := uuid.New()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, statusAPIResponse{
+			StatusCode:        "407",
+			StatusMessage:     "Success, transaction is found",
+			TransactionID:     "tx-407-expired",
+			OrderID:           orderID.String(),
+			GrossAmount:       "150000.00",
+			TransactionStatus: "expire",
+		})
+	}
+	p, _ := newTestProvider(t, handler)
+
+	res, err := p.GetTransactionStatus(context.Background(), orderID.String())
+	if err != nil {
+		t.Fatalf("unexpected error for status 407: %v", err)
+	}
+	if res.Status != paymentgateway.NotificationStatusExpire {
+		t.Errorf("expected NotificationStatusExpire, got %v", res.Status)
+	}
+	if res.RawStatus != "expire" {
+		t.Errorf("expected RawStatus expire, got %s", res.RawStatus)
+	}
+}
+
 func TestParseNotification_GatewayErrorStatus(t *testing.T) {
 	orderID := uuid.New()
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -793,6 +822,10 @@ func TestParseNotification_GatewayErrorStatus(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for non-2xx gateway status, got nil")
+	}
+	var appErr *apperrors.AppError
+	if !errors.As(err, &appErr) || appErr.Type != apperrors.ErrTypeNotFound {
+		t.Errorf("expected NotFound AppError for 404 status code, got %v", err)
 	}
 }
 
@@ -852,8 +885,9 @@ func TestCancelTransaction_GatewayErrorStatus(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for non-2xx cancel response, got nil")
 	}
-	if !strings.Contains(err.Error(), "cancel transaction") {
-		t.Errorf("unexpected error: %v", err)
+	var appErr *apperrors.AppError
+	if !errors.As(err, &appErr) || appErr.Type != apperrors.ErrTypeBadRequest {
+		t.Errorf("expected BadRequest AppError for status 412, got: %v", err)
 	}
 }
 

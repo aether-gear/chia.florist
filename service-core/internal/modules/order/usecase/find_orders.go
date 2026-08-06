@@ -56,6 +56,7 @@ type FindOrdersInput struct {
 	Number     *string
 	CustomerID *uuid.UUID
 	Status     *string
+	Statuses   []string
 	Sort       string
 }
 
@@ -120,11 +121,25 @@ func (u *FindOrdersUsecase) Execute(
 		}
 	}
 
+	var statuses []string
+	if len(input.Statuses) > 0 {
+		statuses = input.Statuses
+	} else if input.Status != nil && *input.Status != "" {
+		parts := strings.SplitSeq(*input.Status, ",")
+		for p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				statuses = append(statuses, trimmed)
+			}
+		}
+	}
+
 	params := repository.FindOrderParams{
 		ID:         input.ID,
 		Number:     input.Number,
 		CustomerID: input.CustomerID,
 		Status:     input.Status,
+		Statuses:   statuses,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,

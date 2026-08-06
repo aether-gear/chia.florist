@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react()],
+    envPrefix: ['VITE_', 'SUPABASE_'],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

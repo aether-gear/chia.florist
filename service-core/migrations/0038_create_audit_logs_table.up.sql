@@ -2,7 +2,8 @@ CREATE TYPE audit_category
     AS ENUM (
         'user_action',
         'waf_event',
-        'threat_intel'
+        'threat_intel',
+        'system_job'
     );
 
 CREATE TYPE audit_outcome
@@ -28,7 +29,7 @@ CREATE TABLE audit_logs (
 
     metadata    JSONB,
 
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_audit_logs_category

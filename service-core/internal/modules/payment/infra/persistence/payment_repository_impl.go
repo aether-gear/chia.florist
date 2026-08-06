@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/payment/domain"
 	"service-core/internal/modules/payment/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -30,7 +31,6 @@ func (r *paymentRepositoryImpl) GetByID(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -38,7 +38,8 @@ func (r *paymentRepositoryImpl) GetByID(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE id = $1
 	`
@@ -66,7 +67,6 @@ func (r *paymentRepositoryImpl) GetByOrderID(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -74,7 +74,8 @@ func (r *paymentRepositoryImpl) GetByOrderID(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE order_id = $1
 		ORDER BY created_at DESC
@@ -104,8 +105,12 @@ func (r *paymentRepositoryImpl) UpdateStatus(
 	query := `
 		UPDATE payments
 		SET
-			status = $2,
-			updated_at = NOW()
+			status = $2::payment_status,
+			updated_at = NOW(),
+			paid_at = CASE
+				WHEN $2::payment_status = 'paid'::payment_status THEN NOW()
+				ELSE paid_at
+			END
 		WHERE id = $1
 	`
 
@@ -120,12 +125,14 @@ func (r *paymentRepositoryImpl) Save(
 	exec transaction.Executor,
 	payment domain.Payment,
 ) error {
+	now := appclock.Now()
+	payment.UpdatedAt = &now
+
 	query := `
 		INSERT INTO payments (
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -133,7 +140,8 @@ func (r *paymentRepositoryImpl) Save(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		)
 		VALUES (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
@@ -142,21 +150,20 @@ func (r *paymentRepositoryImpl) Save(
 		DO UPDATE SET
 			order_id = EXCLUDED.order_id,
 			method_id = EXCLUDED.method_id,
-			payment_account_id = EXCLUDED.payment_account_id,
 			provider = EXCLUDED.provider,
 			provider_payment_id = EXCLUDED.provider_payment_id,
 			provider_order_id = EXCLUDED.provider_order_id,
 			amount = EXCLUDED.amount,
 			status = EXCLUDED.status,
 			expires_at = EXCLUDED.expires_at,
-			updated_at = EXCLUDED.updated_at
+			updated_at = EXCLUDED.updated_at,
+			paid_at = EXCLUDED.paid_at
 	`
 
 	_, err := exec.Exec(ctx, query,
 		payment.ID,
 		payment.OrderID,
 		payment.MethodID,
-		payment.PaymentAccountID,
 		payment.Provider,
 		payment.ProviderPaymentID,
 		payment.ProviderOrderID,
@@ -165,6 +172,7 @@ func (r *paymentRepositoryImpl) Save(
 		payment.ExpiresAt,
 		payment.CreatedAt,
 		payment.UpdatedAt,
+		payment.PaidAt,
 	)
 
 	return err
@@ -178,7 +186,6 @@ func (r *paymentRepositoryImpl) scanPayment(
 		&payment.ID,
 		&payment.OrderID,
 		&payment.MethodID,
-		&payment.PaymentAccountID,
 		&payment.Provider,
 		&payment.ProviderPaymentID,
 		&payment.ProviderOrderID,
@@ -187,6 +194,7 @@ func (r *paymentRepositoryImpl) scanPayment(
 		&payment.ExpiresAt,
 		&payment.CreatedAt,
 		&payment.UpdatedAt,
+		&payment.PaidAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("mapping payment model to domain failed: %w", err)
@@ -209,7 +217,6 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -217,7 +224,8 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE order_id = ANY($1::uuid[])
 		ORDER BY order_id, created_at DESC
@@ -240,7 +248,6 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			&p.ID,
 			&p.OrderID,
 			&p.MethodID,
-			&p.PaymentAccountID,
 			&p.Provider,
 			&p.ProviderPaymentID,
 			&p.ProviderOrderID,
@@ -249,6 +256,7 @@ func (r *paymentRepositoryImpl) ListByOrderIDs(
 			&p.ExpiresAt,
 			&p.CreatedAt,
 			&p.UpdatedAt,
+			&p.PaidAt,
 		)
 		return p, err
 	})
@@ -269,7 +277,6 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			id,
 			order_id,
 			method_id,
-			payment_account_id,
 			provider,
 			provider_payment_id,
 			provider_order_id,
@@ -277,7 +284,8 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			status,
 			expires_at,
 			created_at,
-			updated_at
+			updated_at,
+			paid_at
 		FROM payments
 		WHERE status = 'pending'
 		  AND provider = 'gateway'
@@ -298,7 +306,6 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			&p.ID,
 			&p.OrderID,
 			&p.MethodID,
-			&p.PaymentAccountID,
 			&p.Provider,
 			&p.ProviderPaymentID,
 			&p.ProviderOrderID,
@@ -307,11 +314,75 @@ func (r *paymentRepositoryImpl) ListPendingGateway(
 			&p.ExpiresAt,
 			&p.CreatedAt,
 			&p.UpdatedAt,
+			&p.PaidAt,
 		)
 		return p, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("scan pending gateway payments failed: %w", err)
+	}
+
+	return payments, nil
+}
+
+func (r *paymentRepositoryImpl) ListPastDuePending(
+	ctx context.Context,
+	exec transaction.Executor,
+	now time.Time,
+	limit int,
+) ([]domain.Payment, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := `
+		SELECT
+			id,
+			order_id,
+			method_id,
+			provider,
+			provider_payment_id,
+			provider_order_id,
+			amount,
+			status,
+			expires_at,
+			created_at,
+			updated_at,
+			paid_at
+		FROM payments
+		WHERE status = 'pending'
+		  AND expires_at IS NOT NULL
+		  AND expires_at <= $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`
+
+	rows, err := exec.Query(ctx, query, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query past due pending payments failed: %w", err)
+	}
+	defer rows.Close()
+
+	payments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Payment, error) {
+		var p domain.Payment
+		err := row.Scan(
+			&p.ID,
+			&p.OrderID,
+			&p.MethodID,
+			&p.Provider,
+			&p.ProviderPaymentID,
+			&p.ProviderOrderID,
+			&p.Amount,
+			&p.Status,
+			&p.ExpiresAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+			&p.PaidAt,
+		)
+		return p, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan past due pending payments failed: %w", err)
 	}
 
 	return payments, nil

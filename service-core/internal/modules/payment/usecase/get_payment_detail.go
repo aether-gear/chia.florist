@@ -22,7 +22,6 @@ type GetPaymentDetailUsecase struct {
 	invoiceRepo            orderRepo.InvoiceRepository
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentMethodRepo      paymentRepo.PaymentMethodRepository
-	paymentAccRepo         paymentRepo.PaymentAccountRepository
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
 }
@@ -33,7 +32,6 @@ func NewGetPaymentDetailUsecase(
 	invoiceRepo orderRepo.InvoiceRepository,
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
-	paymentAccRepo paymentRepo.PaymentAccountRepository,
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 ) *GetPaymentDetailUsecase {
@@ -43,7 +41,6 @@ func NewGetPaymentDetailUsecase(
 		invoiceRepo:            invoiceRepo,
 		paymentRepo:            paymentRepo,
 		paymentMethodRepo:      paymentMethodRepo,
-		paymentAccRepo:         paymentAccRepo,
 		paymentInstructionRepo: paymentInstructionRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
 	}
@@ -59,7 +56,6 @@ type GetPaymentDetailInput struct {
 type GetPaymentDetailResult struct {
 	Payment        paymentDomain.Payment
 	ChannelData    *paymentDomain.PaymentChannelData
-	PaymentAccount *paymentDomain.PaymentAccount
 	Instruction    *string
 }
 
@@ -98,45 +94,20 @@ func (u *GetPaymentDetailUsecase) Execute(
 
 	var (
 		channelData    *paymentDomain.PaymentChannelData
-		paymentAccount *paymentDomain.PaymentAccount
 		vaNumber       string
 	)
 
-	// Fetch transient details depending on
-	// payment method provider path
-	if payment.PaymentAccountID != nil {
-		acc, err := u.paymentAccRepo.
-			GetByID(ctx, u.executor,
-				*payment.PaymentAccountID,
-			)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve payment account: %w", err)
-		}
+	cd, err := u.paymentChannelDataRepo.
+		GetByPaymentID(ctx, u.executor,
+			payment.ID,
+		)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve payment channel data: %w", err)
+	}
 
-		paymentAccount = acc
-		if acc != nil {
-			if acc.AccountNumber != nil {
-				vaNumber = *acc.AccountNumber
-			} else if acc.PhoneNumber != nil &&
-				*acc.PhoneNumber != "" {
-				vaNumber = *acc.PhoneNumber
-			} else if acc.QRString != nil {
-				vaNumber = *acc.QRString
-			}
-		}
-	} else {
-		cd, err := u.paymentChannelDataRepo.
-			GetByPaymentID(ctx, u.executor,
-				payment.ID,
-			)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve payment channel data: %w", err)
-		}
-
-		channelData = cd
-		if cd != nil && cd.ActionURL != nil {
-			vaNumber = *cd.ActionURL
-		}
+	channelData = cd
+	if cd != nil && cd.ActionURL != nil {
+		vaNumber = *cd.ActionURL
 	}
 
 	var renderedInstruction *string
@@ -186,7 +157,6 @@ func (u *GetPaymentDetailUsecase) Execute(
 	return &GetPaymentDetailResult{
 		Payment:        *payment,
 		ChannelData:    channelData,
-		PaymentAccount: paymentAccount,
 		Instruction:    renderedInstruction,
 	}, nil
 }

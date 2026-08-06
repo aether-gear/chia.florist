@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
@@ -81,7 +82,7 @@ func (u *VerifyAccountUsecase) Execute(
 	ctx context.Context,
 	input VerifyAccountParams,
 ) (*VerifyAccountResult, error) {
-	now := time.Now()
+	now := appclock.Now()
 
 	challenge, err := u.challengeRepo.
 		GetByID(ctx, u.executor, input.ChallengeID)

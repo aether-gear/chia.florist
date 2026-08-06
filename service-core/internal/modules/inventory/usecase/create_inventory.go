@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/inventory/repository"
@@ -87,7 +87,7 @@ func (u *CreateInventoryUsecase) Execute(
 		ShopID:        input.ShopID,
 		TotalStock:    input.Stock,
 		ReservedStock: 0,
-		CreatedAt:     time.Now(),
+		CreatedAt:     appclock.Now(),
 	}
 	if err := inventory.Validate(); err != nil {
 		if errors.Is(err, domain.ErrInvalidStock) || errors.Is(err, domain.ErrInvalidReserved) {

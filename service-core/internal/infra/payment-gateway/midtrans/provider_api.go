@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	appclock "service-core/internal/common/clock"
+	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	config "service-core/internal/shared/config"
 )
@@ -79,6 +81,55 @@ func (p *midtransAPIProvider) getStrategy(code string) channelStrategy {
 
 func (p *midtransAPIProvider) Supports(code string) bool {
 	return p.getStrategy(code) != nil
+}
+
+func (p *midtransAPIProvider) Name() string {
+	return "midtrans"
+}
+
+func (p *midtransAPIProvider) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod {
+	return []paymentgateway.AllowedPaymentMethod{
+		{
+			Code:          "gopay",
+			Name:          "GoPay",
+			Type:          "ewallet",
+			FeeType:       "percentage",
+			FeePercentage: 0.02,
+			Description:   "Pay using GoPay e-wallet",
+		},
+		{
+			Code:          "shopeepay",
+			Name:          "ShopeePay",
+			Type:          "ewallet",
+			FeeType:       "percentage",
+			FeePercentage: 0.02,
+			Description:   "Pay using ShopeePay e-wallet",
+		},
+		{
+			Code:        "qris",
+			Name:        "QRIS",
+			Type:        "qr_code",
+			FeeType:     "flat",
+			FeeFixed:    1000,
+			Description: "Pay using QRIS QR Code",
+		},
+		{
+			Code:        "bca_va",
+			Name:        "BCA Virtual Account",
+			Type:        "bank_transfer",
+			FeeType:     "flat",
+			FeeFixed:    4000,
+			Description: "Pay using BCA Virtual Account",
+		},
+		{
+			Code:        "mandiri_bill",
+			Name:        "Mandiri Bill",
+			Type:        "bank_transfer",
+			FeeType:     "flat",
+			FeeFixed:    4000,
+			Description: "Pay using Mandiri Bill / VA",
+		},
+	}
 }
 
 type vaNumber struct {
@@ -181,9 +232,12 @@ func (p *midtransAPIProvider) Charge(
 		return nil, fmt.Errorf("midtrans: unmarshal base charge response: %w", err)
 	}
 
-	if !strings.HasPrefix(baseResp.StatusCode, "2") {
-		return nil, fmt.Errorf("midtrans: charge failed: %s (status %s)",
-			baseResp.StatusMessage, baseResp.StatusCode)
+	if err := mapProviderStatusCode(
+		baseResp.StatusCode,
+		baseResp.StatusMessage,
+		fmt.Sprintf("midtrans charge order %q", req.OrderID),
+	); err != nil {
+		return nil, err
 	}
 
 	instructions, err := strategy.ParseInstructions(respBody)
@@ -198,8 +252,7 @@ func (p *midtransAPIProvider) Charge(
 
 	var expiresAt time.Time
 	if baseResp.ExpiryTime != "" {
-		wib, _ := time.LoadLocation("Asia/Jakarta")
-		t, parseErr := time.ParseInLocation("2006-01-02 15:04:05", baseResp.ExpiryTime, wib)
+		t, parseErr := time.ParseInLocation("2006-01-02 15:04:05", baseResp.ExpiryTime, appclock.Location())
 		if parseErr == nil {
 			expiresAt = t
 		}
@@ -267,9 +320,8 @@ func (p *midtransAPIProvider) fetchTransactionStatus(
 		return nil, fmt.Errorf("midtrans: unmarshal status response: %w", err)
 	}
 
-	if !strings.HasPrefix(result.StatusCode, "2") {
-		return nil, fmt.Errorf("midtrans: check transaction %q: %s (status %s)",
-			orderID, result.StatusMessage, result.StatusCode)
+	if err := mapProviderStatusCode(result.StatusCode, result.StatusMessage, fmt.Sprintf("midtrans check transaction %q", orderID)); err != nil {
+		return nil, err
 	}
 
 	grossAmount, err := parseAmount(result.GrossAmount)
@@ -308,13 +360,64 @@ func (p *midtransAPIProvider) CancelTransaction(
 		return fmt.Errorf("midtrans: unmarshal cancel response: %w", err)
 	}
 
-	if !strings.HasPrefix(resp.StatusCode, "2") {
-		return fmt.Errorf("midtrans: cancel transaction %q: %s (status %s)",
-			gatewayOrderID, resp.StatusMessage, resp.StatusCode,
-		)
+	if err := mapProviderStatusCode(
+		resp.StatusCode,
+		resp.StatusMessage,
+		fmt.Sprintf("midtrans cancel transaction %q", gatewayOrderID),
+	); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func (p *midtransAPIProvider) RefundTransaction(
+	ctx context.Context,
+	req paymentgateway.RefundRequest,
+) (*paymentgateway.RefundResponse, error) {
+	url := fmt.Sprintf("%s/v2/%s/refund", p.baseURL, req.GatewayOrderID)
+	refundKey := fmt.Sprintf("refund-%s-%d", req.GatewayOrderID, appclock.Now().Unix())
+	reqBodyMap := map[string]any{
+		"refund_key": refundKey,
+		"amount":     req.RefundAmount,
+		"reason":     req.Reason,
+	}
+	bodyBytes, err := json.Marshal(reqBodyMap)
+	if err != nil {
+		return nil, fmt.Errorf("midtrans: marshal refund req: %w", err)
+	}
+
+	respBody, err := p.doRequest(ctx, http.MethodPost, url, bodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("midtrans: refund transaction %q: %w", req.GatewayOrderID, err)
+	}
+
+	var resp struct {
+		StatusCode    string `json:"status_code"`
+		StatusMessage string `json:"status_message"`
+		TransactionID string `json:"transaction_id"`
+		OrderID       string `json:"order_id"`
+		GrossAmount   string `json:"gross_amount"`
+	}
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("midtrans: unmarshal refund response: %w", err)
+	}
+
+	if err := mapProviderStatusCode(
+		resp.StatusCode,
+		resp.StatusMessage,
+		fmt.Sprintf("midtrans refund transaction %q", req.GatewayOrderID),
+	); err != nil {
+		return nil, err
+	}
+
+	amount, _ := parseAmount(resp.GrossAmount)
+	return &paymentgateway.RefundResponse{
+		GatewayTransactionID: resp.TransactionID,
+		GatewayOrderID:       resp.OrderID,
+		RefundAmount:         amount,
+		Status:               resp.StatusCode,
+	}, nil
 }
 
 // doRequest executes an authenticated HTTP request
@@ -419,20 +522,28 @@ func mapNotificationStatus(txStatus, fraudStatus string) paymentgateway.Notifica
 			return paymentgateway.NotificationStatusChallenge
 		}
 		return paymentgateway.NotificationStatusSettlement
+
 	case "settlement":
 		return paymentgateway.NotificationStatusSettlement
+
 	case "pending":
 		return paymentgateway.NotificationStatusPending
+
 	case "deny":
 		return paymentgateway.NotificationStatusDeny
+
 	case "expire":
 		return paymentgateway.NotificationStatusExpire
+
 	case "cancel":
 		return paymentgateway.NotificationStatusCancel
+
 	case "refund", "partial_refund":
 		return paymentgateway.NotificationStatusRefund
+
 	default:
 		return paymentgateway.NotificationStatus(txStatus)
+
 	}
 }
 
@@ -452,4 +563,31 @@ func parseAmount(raw string) (int64, error) {
 		return 0, fmt.Errorf("parse %q as int64: %w", raw, err)
 	}
 	return amount, nil
+}
+
+// mapProviderStatusCode converts Midtrans status_code strings into
+// valid completions or typed AppErrors (NotFound, BadRequest, Conflict).
+func mapProviderStatusCode(statusCode, statusMessage, contextPrefix string) error {
+	switch statusCode {
+	case "200", "201", "202", "407":
+		return nil
+
+	case "404":
+		return apperrors.NewNotFound(fmt.Sprintf("%s: transaction not found on payment gateway (%s)", contextPrefix, statusMessage))
+
+	case "400":
+		return apperrors.NewBadRequest(fmt.Sprintf("%s: invalid payment gateway request (%s)", contextPrefix, statusMessage))
+
+	case "406":
+		return apperrors.NewConflict(fmt.Sprintf("%s: transaction conflict on payment gateway (%s)", contextPrefix, statusMessage))
+
+	case "412":
+		return apperrors.NewBadRequest(fmt.Sprintf("%s: transaction status cannot be modified on gateway (%s)", contextPrefix, statusMessage))
+
+	default:
+		if strings.HasPrefix(statusCode, "2") {
+			return nil
+		}
+		return fmt.Errorf("%s: %s (status %s)", contextPrefix, statusMessage, statusCode)
+	}
 }

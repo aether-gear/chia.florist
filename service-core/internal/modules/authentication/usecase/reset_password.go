@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
@@ -53,7 +53,7 @@ func (u *ResetPasswordUsecase) Execute(
 	ctx context.Context,
 	params ResetPasswordParams,
 ) error {
-	now := time.Now()
+	now := appclock.Now()
 
 	challenge, err := u.challengeRepo.
 		GetByID(ctx, u.executor, params.ChallengeID)

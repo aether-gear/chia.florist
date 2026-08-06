@@ -6,26 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type createPaymentAccountRequest struct {
-	MethodID      string  `json:"method_id"`
-	AccountName   string  `json:"account_name"`
-	AccountNumber *string `json:"account_number"`
-	PhoneNumber   string  `json:"phone_number"`
-	QRString      *string `json:"qr_string"`
-	IsActive      string  `json:"is_active"`
-}
-
-type savePaymentMethodRequest struct {
-	ID            *string `json:"id"`
-	Name          string  `json:"name"`
-	Code          string  `json:"code"`
-	Provider      string  `json:"provider"`
-	Type          string  `json:"type"`
-	IsActive      string  `json:"is_active"`
-	Description   string  `json:"description"`
-	FeeType       string  `json:"fee_type"`
-	FeeFixed      *string `json:"fee_amount"`
-	FeePercentage *string `json:"fee_percentage"`
+type updatePaymentMethodActiveRequest struct {
+	IsActive bool `json:"is_active"`
 }
 
 type paymentInstructionResponse struct {
@@ -48,38 +30,27 @@ type paymentMethodResponse struct {
 	Instruction   *paymentInstructionResponse `json:"instruction,omitempty"`
 }
 
-type paymentAccountResponse struct {
-	ID            uuid.UUID `json:"id"`
-	MethodID      uuid.UUID `json:"method_id"`
-	AccountName   string    `json:"account_name"`
-	AccountNumber *string   `json:"account_number"`
-	PhoneNumber   *string   `json:"phone_number"`
-	QRString      *string   `json:"qr_string"`
-}
-
-type manualPaymentActionRequest struct {
-	Action string `json:"action"`
-}
-
 type savePaymentInstructionRequest struct {
 	Content string `json:"content"`
 }
 
-type getPaymentDetailResponse struct {
-	PaymentID   string     `json:"payment_id"`
-	Status      string     `json:"status"`
-	Amount      int64      `json:"amount"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	ChannelType *string    `json:"channel_type,omitempty"`
-	DisplayName *string    `json:"display_name,omitempty"`
+type paymentChannelDataResponse struct {
+	ChannelType string     `json:"channel_type"`
+	DisplayName string     `json:"display_name"`
 	ActionURL   *string    `json:"action_url,omitempty"`
-	// For manual payments:
-	AccountName   *string `json:"account_name,omitempty"`
-	AccountNumber *string `json:"account_number,omitempty"`
-	PhoneNumber   *string `json:"phone_number,omitempty"`
-	QRString      *string `json:"qr_string,omitempty"`
-	// Rendered instruction markdown:
-	Instruction *string `json:"instruction,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+}
+
+type getPaymentDetailResponse struct {
+	PaymentID   string                      `json:"payment_id"`
+	Status      string                      `json:"status"`
+	Amount      int64                       `json:"amount"`
+	ExpiresAt   *time.Time                  `json:"expires_at,omitempty"`
+	ChannelType *string                     `json:"channel_type,omitempty"`
+	DisplayName *string                     `json:"display_name,omitempty"`
+	ActionURL   *string                     `json:"action_url,omitempty"`
+	ChannelData *paymentChannelDataResponse `json:"channel_data,omitempty"`
+	Instruction *string                     `json:"instruction,omitempty"`
 }
 
 type checkPaymentStatusResponse struct {

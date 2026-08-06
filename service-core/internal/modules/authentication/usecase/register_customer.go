@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
@@ -70,7 +71,7 @@ func (u *RegisterCustomerUsecase) Execute(
 	ctx context.Context,
 	params RegisterCustomerParams,
 ) (*uuid.UUID, error) {
-	now := time.Now()
+	now := appclock.Now()
 
 	existUsr, err := u.userRepo.
 		GetByUsername(ctx, u.executor, params.Username)

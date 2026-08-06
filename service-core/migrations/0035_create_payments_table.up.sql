@@ -5,6 +5,8 @@ CREATE TYPE payment_status
         'failed',
         'expired',
         'cancelled',
+        'refund_pending',
+        'refund_failed',
         'refunded'
     );
 
@@ -13,7 +15,6 @@ CREATE TABLE payments (
 
     order_id UUID NOT NULL,
     method_id UUID NOT NULL,
-    payment_account_id UUID,
 
     provider TEXT NOT NULL,
 
@@ -24,10 +25,11 @@ CREATE TABLE payments (
 
     status payment_status NOT NULL DEFAULT 'pending',
 
-    expires_at TIMESTAMP,
+    expires_at TIMESTAMPTZ,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
+    paid_at TIMESTAMPTZ,
 
     CONSTRAINT fk_payment_order_id
         FOREIGN KEY (order_id)
@@ -36,11 +38,7 @@ CREATE TABLE payments (
 
     CONSTRAINT fk_payment_method_id
         FOREIGN KEY (method_id)
-        REFERENCES payment_methods(id),
-
-    CONSTRAINT fk_payment_account_id
-        FOREIGN KEY (payment_account_id)
-        REFERENCES payment_accounts(id)
+        REFERENCES payment_methods(id)
 );
 
 CREATE INDEX idx_payments_order_id

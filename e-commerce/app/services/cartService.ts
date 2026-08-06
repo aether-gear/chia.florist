@@ -2,16 +2,28 @@
 import { bootstrapConfig } from '~/utils/bootstrap'
 import type { BackendCartResponse } from '~/types/cart'
 import type { CheckoutRequest, CheckoutResponse } from '~/types/checkout'
+import type { CustomDesignPayload } from '~/composables/useCart'
+
+export interface AddCartItemPayload {
+  product_variant_type?: 'standard' | 'custom'
+  shop_id: string
+  quantity: number
+  product_id?: string
+  product_name?: string
+  physical_size_id?: string
+  unit_price?: number
+  custom_design?: CustomDesignPayload
+}
 
 export const cartService = {
   async getCart(): Promise<BackendCartResponse> {
-    return bootstrapConfig.fetchApi<BackendCartResponse>('/carts/', {
+    return bootstrapConfig.fetchApi<BackendCartResponse>('/carts', {
       method: 'GET'
     })
   },
 
-  async addItem(data: { product_id: string; shop_id: string; quantity: number }): Promise<{ message: string }> {
-    return bootstrapConfig.fetchApi<{ message: string }>('/carts/items/', {
+  async addItem(data: AddCartItemPayload): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>('/carts/items', {
       method: 'POST',
       body: data
     })
@@ -30,6 +42,12 @@ export const cartService = {
     })
   },
 
+  async removeCustomItem(cartItemId: string): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/custom/${cartItemId}`, {
+      method: 'DELETE'
+    })
+  },
+
   async checkout(data: CheckoutRequest): Promise<CheckoutResponse> {
     return bootstrapConfig.fetchApi<CheckoutResponse>('/carts/checkout', {
       method: 'POST',
@@ -44,3 +62,4 @@ export const cartService = {
     })
   }
 }
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Package, FileText, Truck, LogOut, Menu, Store, Users, Wallet, Crown, User, ChevronDown, Shield, ClipboardClock } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, FileText, Truck, LogOut, Menu, Store, Users, Wallet, Crown, User, ChevronDown, Shield, ClipboardClock, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
@@ -46,6 +46,7 @@ const navigationGroups: NavigationGroup[] = [
   {
     title: 'ADMIN',
     items: [
+      { name: 'Analytics', href: '/admin/analytics', icon: BarChart3, adminOnly: true },
       { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: true },
       { name: 'Merchants', href: '/admin/merchants', icon: Store, adminOnly: true },
       { name: 'Audit Logs', href: '/admin/audit-logs', icon: ClipboardClock, adminOnly: true },

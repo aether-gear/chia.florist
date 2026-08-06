@@ -6,6 +6,7 @@ import { useAddress } from '~/composables/useAddress'
 import { useOrders } from '~/composables/useOrders'
 import type { OrderTab } from '~/composables/useOrders'
 import { supabaseService } from '~/services/supabaseService'
+import { orderService } from '~/services/orderService'
 import type { UserAddress } from '~/types/address'
 import type { BackendOrder } from '~/types/order'
 
@@ -15,13 +16,15 @@ const authVm = useAuthViewModel()
 const addressVm = useAddress()
 
 const activeTab = ref('personal')
-const activeOrderStatus = ref<'pending' | 'processing' | 'shipping' | 'done'>('pending')
+const activeOrderStatus = ref<OrderTab>('all')
 
-const statusLabels = {
-  pending: 'Waiting Payment',
+const statusLabels: Record<OrderTab, string> = {
+  all: 'All Orders',
+  pending: 'To Pay',
   processing: 'To Ship',
-  shipping: 'Shipping',
-  done: 'Done'
+  shipping: 'To Receive',
+  completed: 'Completed',
+  cancelled: 'Cancelled / Expired'
 }
 
 // Edit address states
@@ -133,8 +136,8 @@ function onImgLoad(e: Event) {
 
 function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
   e.stopPropagation()
-  const cx = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX
-  const cy = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY
+  const cx = e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0)
+  const cy = e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0)
   dragMode.value = mode
   dragStartX.value = cx; dragStartY.value = cy
   initCbX.value = cbX.value; initCbY.value = cbY.value
@@ -142,8 +145,8 @@ function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
 }
 
 function startImgPan(e: MouseEvent | TouchEvent) {
-  const cx = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX
-  const cy = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY
+  const cx = e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0)
+  const cy = e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0)
   dragMode.value = 'img'
   lastPanX.value = cx; lastPanY.value = cy
 }
@@ -197,7 +200,7 @@ function onGlobalMove(cx: number, cy: number) {
 
 function onMouseMove(e: MouseEvent)  { onGlobalMove(e.clientX, e.clientY) }
 function onMouseUp()                  { dragMode.value = null }
-function onTouchMoveCrop(e: TouchEvent) { if (e.touches.length === 1) { e.preventDefault(); onGlobalMove(e.touches[0].clientX, e.touches[0].clientY) } }
+function onTouchMoveCrop(e: TouchEvent) { const touch = e.touches[0]; if (e.touches.length === 1 && touch) { e.preventDefault(); onGlobalMove(touch.clientX, touch.clientY) } }
 function onTouchEndCrop()             { dragMode.value = null }
 
 function onCropZoomChange() {
@@ -763,89 +766,116 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Orders tab -->
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
-            <div class="bg-white border border-gray-100 p-2 rounded-2xl shadow-sm grid grid-cols-4 gap-1 text-center font-medium">
+            <!-- Shopee Category Tabs Bar (Compact) -->
+            <div class="bg-white border border-gray-100 p-1.5 rounded-2xl shadow-xs grid grid-cols-3 sm:grid-cols-6 gap-1 text-center font-medium">
               <button 
-                v-for="status in [{id:'pending', label:'Waiting Payment'}, {id:'processing', label:'To Ship'}, {id:'shipping', label:'Shipping'}, {id:'done', label:'Done'}]"
+                v-for="status in [
+                  { id: 'all', label: 'All' },
+                  { id: 'pending', label: 'To Pay' },
+                  { id: 'processing', label: 'To Ship' },
+                  { id: 'shipping', label: 'To Receive' },
+                  { id: 'completed', label: 'Completed' },
+                  { id: 'cancelled', label: 'Cancelled' }
+                ]"
                 :key="status.id"
                 @click="activeOrderStatus = status.id as any"
-                :class="['py-3 text-xs sm:text-sm rounded-xl transition-all font-bold', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-400 hover:text-gray-900']"
+                :class="['py-2 px-1 text-xs rounded-xl transition-all font-bold cursor-pointer', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50']"
               >
                 {{ status.label }}
               </button>
             </div>
 
             <!-- Loading State -->
-            <div v-if="ordersVm.isLoading.value" class="bg-white border border-gray-100 rounded-2xl p-12 flex flex-col items-center gap-4 shadow-sm">
-              <div class="animate-spin rounded-full h-10 w-10 border-4 border-[#1b4332] border-t-transparent"></div>
-              <p class="text-sm text-gray-400 font-semibold">Loading your orders...</p>
+            <div v-if="ordersVm.isLoading.value" class="bg-white border border-gray-100 rounded-2xl p-8 flex flex-col items-center gap-3 shadow-xs">
+              <div class="animate-spin rounded-full h-8 w-8 border-3 border-[#1b4332] border-t-transparent"></div>
+              <p class="text-xs text-gray-400 font-semibold">Loading your orders...</p>
             </div>
 
             <!-- Error State -->
-            <div v-else-if="ordersVm.error.value" class="bg-red-50 border border-red-100 rounded-2xl p-8 text-center shadow-sm">
-              <div class="text-4xl mb-3">⚠️</div>
-              <h4 class="font-bold text-red-700 text-sm">Failed to load orders</h4>
-              <p class="text-xs text-red-500 mt-1">{{ ordersVm.error.value }}</p>
-              <button @click="loadOrders()" class="mt-4 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition cursor-pointer">Retry</button>
+            <div v-else-if="ordersVm.error.value" class="bg-red-50 border border-red-100 rounded-2xl p-6 text-center shadow-xs">
+              <div class="text-3xl mb-2">⚠️</div>
+              <h4 class="font-bold text-red-700 text-xs">Failed to load orders</h4>
+              <p class="text-[11px] text-red-500 mt-0.5">{{ ordersVm.error.value }}</p>
+              <button @click="loadOrders()" class="mt-3 px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition cursor-pointer">Retry</button>
             </div>
 
-            <!-- Orders list -->
+            <!-- Orders list (Sleek Compact Cards) -->
             <template v-else>
               <div v-if="ordersVm.orders.value.length > 0" class="space-y-4">
-                <div v-for="order in ordersVm.orders.value" :key="order.id" class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition duration-300">
-                  <div class="space-y-3 flex-1">
-                    <div class="flex flex-wrap items-center gap-3">
-                      <span class="text-xs font-bold text-gray-400">🗓️ {{ ordersVm.formatDate(order.created_at) }}</span>
-                      <span class="text-xs font-mono font-bold text-gray-900 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">{{ order.number }}</span>
-                      <div>
-                        <span v-if="order.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
-                        <span v-else-if="order.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">Confirmed</span>
-                        <span v-else-if="order.status === 'processing'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">Arranging Flowers</span>
-                        <span v-else-if="order.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">Shipped</span>
-                        <span v-else-if="order.status === 'delivered'" class="px-2.5 py-0.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-full border border-sky-100">Delivered</span>
-                        <span v-else-if="order.status === 'finished'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">Finished</span>
-                        <span v-else-if="order.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">Cancelled</span>
-                        <span v-else class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full border border-gray-200">{{ order.status }}</span>
-                      </div>
+                <div 
+                  v-for="order in ordersVm.orders.value" 
+                  :key="order.id" 
+                  class="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4 hover:shadow-md transition duration-300"
+                >
+                  <!-- Store Header & Order Info Bar -->
+                  <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-sm">🏬</span>
+                      <h4 class="font-bold text-gray-900 text-xs">Chia Florist Workshop</h4>
+                      <span class="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
+                      <span class="text-xs text-gray-300">|</span>
+                      <span class="text-[11px] font-mono text-gray-500 font-bold">#{{ order.number }}</span>
                     </div>
 
-                    <div class="flex items-center gap-4 py-1">
-                      <div class="flex -space-x-3 overflow-hidden">
-                        <div 
-                          v-for="(item, idx) in order.items.slice(0, 3)" 
-                          :key="idx"
-                          class="inline-flex items-center justify-center h-10 w-10 rounded-lg ring-2 ring-white bg-emerald-50 border border-emerald-100 text-xs font-bold text-[#1b4332]"
-                        >
-                          🌸
-                        </div>
-                        <div v-if="order.items.length > 3" class="inline-flex items-center justify-center h-10 w-10 rounded-lg ring-2 ring-white bg-gray-100 border border-gray-100 text-xs font-bold text-gray-500">
-                          +{{ order.items.length - 3 }}
-                        </div>
-                      </div>
-                      <div class="min-w-0">
-                        <p class="text-xs font-bold text-gray-900 truncate max-w-md">
-                          {{ order.items[0]?.product_name }}{{ order.items.length > 1 ? ` and ${order.items.length - 1} other item(s)` : '' }}
-                        </p>
-                        <p class="text-[10px] text-gray-400 mt-0.5">Total Qty: {{ order.items.reduce((acc, item) => acc + item.quantity, 0) }}</p>
-                      </div>
+                    <!-- Right side: Status Badges -->
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span :class="['px-2.5 py-0.5 text-xs font-bold rounded-full border', ordersVm.getOrderStatusBadge(order).colorClass]">
+                        {{ ordersVm.getOrderStatusBadge(order).label }}
+                      </span>
+                      <span v-if="order.payment?.status && order.payment.status !== 'pending' && order.payment.status !== 'paid'" :class="['px-2.5 py-0.5 text-xs font-bold rounded-full border', ordersVm.getPaymentStatusBadge(order.payment.status).colorClass]">
+                        {{ ordersVm.getPaymentStatusBadge(order.payment.status).label }}
+                      </span>
+                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                        ⏳ Pay in {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}
+                      </span>
                     </div>
                   </div>
 
-                  <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-gray-50 pt-4 md:pt-0">
-                    <div class="text-left md:text-right">
-                      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Bill</p>
-                      <p class="text-base font-extrabold text-[#1b4332] mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
+                  <!-- Product Preview Item -->
+                  <div class="flex items-center justify-between gap-4 py-1">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex-shrink-0 flex items-center justify-center text-xl">
+                        🌸
+                      </div>
+                      <div class="min-w-0">
+                        <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">
+                          {{ order.items[0]?.product_name }}{{ order.items.length > 1 ? ` and ${order.items.length - 1} other item(s)` : '' }}
+                        </h5>
+                        <p class="text-[10px] text-gray-400 mt-0.5 font-medium">
+                          Total Qty: {{ order.items.reduce((acc, item) => acc + item.quantity, 0) }} • Courier: {{ order.items[0]?.courier_code ? `${order.items[0].courier_code.toUpperCase()} ${order.items[0].courier_service}` : 'Standard Delivery' }}
+                        </p>
+                      </div>
                     </div>
-                    <div class="flex gap-2">
+
+                    <div class="text-right flex-shrink-0">
+                      <p class="text-[10px] text-gray-400 font-medium">Order Total</p>
+                      <p class="font-black text-[#1b4332] text-sm mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Card Footer: Action Buttons -->
+                  <div class="flex items-center justify-between gap-3 pt-3 border-t border-gray-50">
+                    <span class="text-[11px] text-gray-400 font-medium">Placed on {{ ordersVm.formatDate(order.created_at) }}</span>
+
+                    <div class="flex items-center gap-2">
                       <button 
-                        v-if="order.status === 'pending'"
+                        v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending'"
                         @click.stop="navigateTo(`/payment?orderId=${order.id}`)"
-                        class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                        class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                       >
                         Pay Now
                       </button>
                       <button 
+                        v-if="order.status === 'shipped' || order.status === 'delivered'"
+                        @click="contactDriver(order.id)"
+                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>💬</span>
+                        <span>Contact Courier</span>
+                      </button>
+                      <button 
                         @click="openOrderDetail(order)" 
-                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                        class="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
                       >
                         View Details
                       </button>
@@ -854,18 +884,21 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
               </div>
 
-              <div v-else class="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
-                <div class="text-5xl mb-4">📑</div>
-                <h4 class="font-bold text-gray-900 text-lg">No Orders Found</h4>
-                <p class="text-sm text-gray-400 mt-1">There are no orders with the "{{ statusLabels[activeOrderStatus] }}" status yet.</p>
+              <div v-else class="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-xs space-y-3">
+                <div class="text-4xl">📑</div>
+                <h4 class="font-bold text-gray-900 text-sm">No Orders Found</h4>
+                <p class="text-xs text-gray-400 max-w-xs mx-auto">There are no orders in the "{{ statusLabels[activeOrderStatus] }}" category.</p>
+                <button @click="navigateTo('/catalog')" class="mt-1 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition cursor-pointer">
+                  Browse Catalog
+                </button>
               </div>
 
               <!-- Pagination -->
-              <div v-if="ordersVm.totalPages.value > 1" class="flex items-center justify-center gap-2">
+              <div v-if="ordersVm.totalPages.value > 1" class="flex items-center justify-center gap-2 pt-2">
                 <button
                   @click="loadOrders(activeOrderStatus as OrderTab, ordersVm.currentPage.value - 1)"
                   :disabled="ordersVm.currentPage.value <= 1"
-                  class="px-3 py-2 text-xs font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                  class="px-3 py-1.5 text-xs font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                 >← Prev</button>
                 <span class="text-xs text-gray-500 font-semibold px-2">
                   Page {{ ordersVm.currentPage.value }} of {{ ordersVm.totalPages.value }}
@@ -873,7 +906,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <button
                   @click="loadOrders(activeOrderStatus as OrderTab, ordersVm.currentPage.value + 1)"
                   :disabled="ordersVm.currentPage.value >= ordersVm.totalPages.value"
-                  class="px-3 py-2 text-xs font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                  class="px-3 py-1.5 text-xs font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                 >Next →</button>
               </div>
             </template>
@@ -969,14 +1002,14 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
     <!-- Independent Order Detail Modal Overlay -->
     <div v-if="selectedOrder" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col justify-between relative animate-fade">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col justify-between relative animate-fade">
         
         <!-- Header -->
         <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
             <div class="flex items-center gap-3">
               <h3 class="font-extrabold text-gray-900 text-base">Order Details</h3>
-              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{{ selectedOrder.number }}</span>
+              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">#{{ selectedOrder.number }}</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-0.5">Placed on {{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
           </div>
@@ -985,35 +1018,89 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
         <!-- Body -->
         <div class="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
-          <!-- Status block -->
-          <div class="flex items-center justify-between bg-emerald-50/10 border border-emerald-100 p-4 rounded-2xl">
+          <!-- Current Status Banner (No Delivery Timeline button here) -->
+          <div class="flex flex-wrap items-center justify-between bg-emerald-50/20 border border-emerald-100 p-4 rounded-2xl gap-3">
             <div>
-              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Status</p>
-              <div class="mt-1 flex items-center gap-2">
-                <span v-if="selectedOrder.status === 'pending'" class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">Pending Payment</span>
-                <span v-else-if="selectedOrder.status === 'confirmed'" class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">Confirmed</span>
-                <span v-else-if="selectedOrder.status === 'processing'" class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">Arranging Flowers</span>
-                <span v-else-if="selectedOrder.status === 'shipped'" class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">Shipped</span>
-                <span v-else-if="selectedOrder.status === 'delivered'" class="px-2.5 py-0.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-full border border-sky-100">Delivered</span>
-                <span v-else-if="selectedOrder.status === 'finished'" class="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full border border-gray-200">Finished</span>
-                <span v-else-if="selectedOrder.status === 'cancelled'" class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-100">Cancelled</span>
-                <span v-else class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full border border-gray-200">{{ selectedOrder.status }}</span>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Order Status</p>
+              <div class="mt-1 flex flex-wrap items-center gap-2">
+                <span :class="['px-3 py-1 text-xs font-bold rounded-full border shadow-2xs', ordersVm.getOrderStatusBadge(selectedOrder).colorClass]">
+                  Order: {{ ordersVm.getOrderStatusBadge(selectedOrder).label }}
+                </span>
+                <span v-if="selectedOrder.payment?.status" :class="['px-3 py-1 text-xs font-bold rounded-full border shadow-2xs', ordersVm.getPaymentStatusBadge(selectedOrder.payment.status).colorClass]">
+                  Payment: {{ ordersVm.getPaymentStatusBadge(selectedOrder.payment.status).label }}
+                </span>
               </div>
             </div>
+          </div>
 
-            <!-- Shipping Detail Button -->
-            <button 
-              @click="toggleShippingOverlay" 
-              class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>🚚</span>
-              <span>Track Shipping</span>
-            </button>
+          <!-- Shipping Information & Delivery Timeline Section -->
+          <div class="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100/60 pb-3">
+              <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+                <span>🚚</span>
+                <span>Shipping Information & Delivery Progress</span>
+              </h4>
+              <span class="text-xs font-bold text-blue-800 bg-blue-100/60 px-2.5 py-0.5 rounded-lg border border-blue-200/50">
+                Courier: {{ selectedOrder.items[0]?.courier_code ? `${selectedOrder.items[0].courier_code.toUpperCase()} ${selectedOrder.items[0].courier_service}` : 'Standard Courier' }}
+              </span>
+            </div>
+
+            <!-- Delivery Progress Log Step Tracker -->
+            <div class="space-y-3 pt-1">
+              <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Real-time Delivery Timeline</p>
+              <div class="relative pl-6 space-y-4 border-l-2 border-blue-200 ml-2">
+                <div 
+                  v-for="step in ordersVm.getOrderTimelineSteps(selectedOrder)" 
+                  :key="step.step"
+                  class="relative"
+                >
+                  <!-- Dot indicator -->
+                  <div 
+                    :class="[
+                      'absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center text-[8px] font-bold',
+                      step.error ? 'bg-rose-500 border-rose-600 text-white ring-4 ring-rose-100' : (step.active ? 'bg-[#1b4332] border-[#1b4332] text-white ring-4 ring-emerald-100' : (step.done ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-400'))
+                    ]"
+                  >
+                    {{ step.done ? '✓' : step.step }}
+                  </div>
+                  <div>
+                    <h5 :class="['text-xs font-bold', step.active || step.done ? 'text-gray-900' : 'text-gray-400']">{{ step.title }}</h5>
+                    <p class="text-[11px] text-gray-500 mt-0.5 font-medium">{{ step.desc }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Information Details Box -->
+          <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-5 space-y-3">
+            <h4 class="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-2">
+              <span>💳</span>
+              <span>Payment Details</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <p class="text-gray-400 font-semibold text-[10px]">PAYMENT METHOD</p>
+                <p class="font-bold text-gray-800 mt-0.5">{{ selectedOrder.payment?.provider ? selectedOrder.payment.provider.toUpperCase() : 'Online Payment Gateway' }}</p>
+              </div>
+              <div>
+                <p class="text-gray-400 font-semibold text-[10px]">PAYMENT STATUS</p>
+                <p class="font-bold text-gray-800 mt-0.5">{{ ordersVm.getPaymentStatusBadge(selectedOrder.payment?.status).label }}</p>
+              </div>
+              <div v-if="selectedOrder.payment?.expires_at && selectedOrder.status === 'pending'">
+                <p class="text-gray-400 font-semibold text-[10px]">EXPIRATION COUNTDOWN</p>
+                <p class="font-bold text-amber-700 mt-0.5">⏳ {{ ordersVm.getTimeRemaining(selectedOrder.payment.expires_at) }}</p>
+              </div>
+              <div>
+                <p class="text-gray-400 font-semibold text-[10px]">ORDER ID</p>
+                <p class="font-mono font-bold text-gray-800 mt-0.5 select-all">{{ selectedOrder.id }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- Items list -->
-          <div class="space-y-4">
-            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ordered Items</h4>
+          <div class="space-y-3">
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ordered Products</h4>
             <div class="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/20">
               <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-4 items-center p-4 bg-white">
                 <div class="w-14 h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-2xl">
@@ -1021,9 +1108,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
                 <div class="flex-1 min-w-0">
                   <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">{{ item.product_name }}</h5>
-                  <div class="flex gap-2 mt-1.5 text-[10px] text-gray-500 font-semibold">
-                    <span class="bg-gray-100 px-2 py-0.5 rounded">{{ item.shop_name }}</span>
-                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{{ item.courier_code }} {{ item.courier_service }}</span>
+                  <div class="flex flex-wrap gap-2 mt-1.5 text-[10px] text-gray-500 font-semibold">
+                    <span class="bg-gray-100 px-2 py-0.5 rounded">Shop: {{ item.shop_name }}</span>
+                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">🚚 {{ item.courier_code.toUpperCase() }} {{ item.courier_service }}</span>
                   </div>
                 </div>
                 <div class="text-right text-xs">
@@ -1093,8 +1180,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 Write Product Review
               </button>
             </div>
-            <div v-else-if="selectedOrder.status === 'cancelled'">
-              <button @click="triggerAlert('This order was cancelled. You can rebuild your cart to re-order.')" class="px-5 py-2.5 bg-red-50 text-red-700 border border-red-100 hover:bg-red-100 text-xs font-bold rounded-xl transition cursor-pointer">
+            <div v-else-if="selectedOrder.status === 'cancelled' || selectedOrder.status === 'expired' || ordersVm.isOrderExpired(selectedOrder)">
+              <button @click="triggerAlert('This order was cancelled or expired. You can rebuild your cart to re-order.')" class="px-5 py-2.5 bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 text-xs font-bold rounded-xl transition cursor-pointer">
                 Order Again
               </button>
             </div>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Package, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Package, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   Table,
@@ -20,6 +21,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { useProductsViewModel } from '../../viewmodels/useProductsViewModel';
 import { useProductStatsViewModel } from '../../viewmodels/useProductStatsViewModel';
+import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import { fetchApi } from '../../lib/api';
 import ProductFormSheet from '../../components/products/ProductFormSheet';
 import ProductPerformanceCharts from '../../components/products/ProductPerformanceCharts';
@@ -30,6 +32,7 @@ import StatusBadge from '../../components/StatusBadge';
 import Pagination from '../../components/Pagination';
 
 export default function ProductsPage() {
+  const { isAdmin } = useAuthMeViewModel();
   const { data, loading, error, refresh, page, limit, setPage } = useProductsViewModel();
   const { data: statsData, loading: statsLoading, error: statsError, refresh: refreshStats } = useProductStatsViewModel();
 
@@ -80,6 +83,13 @@ export default function ProductsPage() {
               Manage your product catalog and inventory
             </p>
           </div>
+          {isAdmin && (
+            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5 self-start sm:self-auto">
+              <Link to="/admin/analytics?tab=products">
+                <BarChart3 className="h-3.5 w-3.5" /> View Inventory Analytics →
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Performance Analytics Section */}

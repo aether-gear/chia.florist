@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	appcookie "service-core/internal/common/http/cookie"
@@ -172,7 +173,7 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-		var accessExpiry time.Time
+	var accessExpiry time.Time
 	var refreshExpiry time.Time
 	if req.RememberMe {
 		accessExpiry = tokens.AccessToken.ExpiresAt
@@ -326,7 +327,7 @@ func (h *authHandler) SignInStaffEmail(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-		var accessExpiry time.Time
+	var accessExpiry time.Time
 	var refreshExpiry time.Time
 	if req.RememberMe {
 		accessExpiry = tokens.AccessToken.ExpiresAt
@@ -408,7 +409,7 @@ func (h *authHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) error 
 		w,
 		appcookie.CookieOAuthState,
 		state,
-		time.Now().Add(10*time.Minute),
+		appclock.Now().Add(10*time.Minute),
 	)
 
 	url := oauth2Config.AuthCodeURL(state, oauth2.AccessTypeOnline)

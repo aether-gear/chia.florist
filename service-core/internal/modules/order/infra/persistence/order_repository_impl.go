@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
@@ -36,6 +37,8 @@ func (r *orderRepositoryImpl) GetByID(
 			subtotal,
 			shipping_fee,
 			total,
+			confirmed_at,
+			handling_expires_at,
 			created_at,
 			updated_at
 		FROM
@@ -55,6 +58,8 @@ func (r *orderRepositoryImpl) GetByID(
 		&order.Subtotal,
 		&order.ShippingFee,
 		&order.Total,
+		&order.ConfirmedAt,
+		&order.HandlingExpiresAt,
 		&order.CreatedAt,
 		&order.UpdatedAt,
 	)
@@ -83,6 +88,8 @@ func (r *orderRepositoryImpl) GetByNumber(
 			subtotal,
 			shipping_fee,
 			total,
+			confirmed_at,
+			handling_expires_at,
 			created_at,
 			updated_at
 		FROM
@@ -102,6 +109,8 @@ func (r *orderRepositoryImpl) GetByNumber(
 		&order.Subtotal,
 		&order.ShippingFee,
 		&order.Total,
+		&order.ConfirmedAt,
+		&order.HandlingExpiresAt,
 		&order.CreatedAt,
 		&order.UpdatedAt,
 	)
@@ -140,6 +149,38 @@ func (r *orderRepositoryImpl) UpdateStatus(
 	return nil
 }
 
+func (r *orderRepositoryImpl) UpdateStatusWithSLA(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+	status domain.OrderStatus,
+	confirmedAt *time.Time,
+	expiresAt *time.Time,
+) error {
+	query := `
+		UPDATE orders
+		SET
+			status              = $2,
+			confirmed_at        = COALESCE($3, confirmed_at),
+			handling_expires_at = COALESCE($4, handling_expires_at),
+			updated_at          = NOW()
+		WHERE
+			id = $1
+	`
+
+	_, err := exec.Exec(ctx, query,
+		id,
+		status,
+		confirmedAt,
+		expiresAt,
+	)
+	if err != nil {
+		return fmt.Errorf("query to update status with SLA: %w", err)
+	}
+
+	return nil
+}
+
 func (r *orderRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,
@@ -155,9 +196,11 @@ func (r *orderRepositoryImpl) Save(
 			subtotal,
 			shipping_fee,
 			total,
+			confirmed_at,
+			handling_expires_at,
 			created_at
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		ON CONFLICT (id)
 		DO UPDATE SET
 			number = EXCLUDED.number,
@@ -166,7 +209,9 @@ func (r *orderRepositoryImpl) Save(
 			status = EXCLUDED.status,
 			subtotal = EXCLUDED.subtotal,
 			shipping_fee = EXCLUDED.shipping_fee,
-			total = EXCLUDED.total
+			total = EXCLUDED.total,
+			confirmed_at = EXCLUDED.confirmed_at,
+			handling_expires_at = EXCLUDED.handling_expires_at
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -178,6 +223,8 @@ func (r *orderRepositoryImpl) Save(
 		order.Subtotal,
 		order.ShippingFee,
 		order.Total,
+		order.ConfirmedAt,
+		order.HandlingExpiresAt,
 		order.CreatedAt,
 	)
 	if err != nil {
@@ -206,6 +253,8 @@ func (r *orderRepositoryImpl) FindOrders(
 			o.subtotal,
 			o.shipping_fee,
 			o.total,
+			o.confirmed_at,
+			o.handling_expires_at,
 			o.created_at,
 			o.updated_at
 	`
@@ -235,7 +284,15 @@ func (r *orderRepositoryImpl) FindOrders(
 		argPos++
 	}
 
-	if params.Status != nil {
+	if len(params.Statuses) > 0 {
+		placeholders := make([]string, len(params.Statuses))
+		for i, s := range params.Statuses {
+			placeholders[i] = fmt.Sprintf("$%d", argPos)
+			args = append(args, s)
+			argPos++
+		}
+		conditions = append(conditions, fmt.Sprintf("o.status IN (%s)", strings.Join(placeholders, ", ")))
+	} else if params.Status != nil {
 		conditions = append(conditions, fmt.Sprintf("o.status = $%d", argPos))
 		args = append(args, *params.Status)
 		argPos++
@@ -336,6 +393,8 @@ func (r *orderRepositoryImpl) FindOrders(
 			&item.Subtotal,
 			&item.ShippingFee,
 			&item.Total,
+			&item.ConfirmedAt,
+			&item.HandlingExpiresAt,
 			&item.CreatedAt,
 			&item.UpdatedAt,
 		)
@@ -351,4 +410,101 @@ func (r *orderRepositoryImpl) FindOrders(
 	}
 
 	return results, total, nil
+}
+
+func (r *orderRepositoryImpl) SetConfirmedAndExpiry(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+	confirmedAt time.Time,
+	expiresAt time.Time,
+) error {
+	query := `
+		UPDATE orders
+		SET
+			confirmed_at        = $2,
+			handling_expires_at = $3,
+			updated_at          = NOW()
+		WHERE
+			id = $1
+	`
+
+	_, err := exec.Exec(ctx, query, id, confirmedAt, expiresAt)
+	if err != nil {
+		return fmt.Errorf("query to set confirmed and expiry failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *orderRepositoryImpl) FindExpiredUnfulfilledOrders(
+	ctx context.Context,
+	exec transaction.Executor,
+	now time.Time,
+	limit int,
+) ([]domain.Order, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := `
+		SELECT
+			id,
+			number,
+			customer_id,
+			address_id,
+			status,
+			subtotal,
+			shipping_fee,
+			total,
+			confirmed_at,
+			handling_expires_at,
+			created_at,
+			updated_at
+		FROM
+			orders
+		WHERE
+			status IN ('confirmed', 'processing')
+			AND handling_expires_at IS NOT NULL
+			AND handling_expires_at <= $1
+		ORDER BY handling_expires_at ASC
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED
+	`
+
+	rows, err := exec.Query(ctx, query, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query expired unfulfilled orders failed: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.Order
+	for rows.Next() {
+		var item domain.Order
+		err := rows.Scan(
+			&item.ID,
+			&item.Number,
+			&item.CustomerID,
+			&item.AddressID,
+			&item.Status,
+			&item.Subtotal,
+			&item.ShippingFee,
+			&item.Total,
+			&item.ConfirmedAt,
+			&item.HandlingExpiresAt,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan expired unfulfilled order failed: %w", err)
+		}
+
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate expired unfulfilled orders failed: %w", err)
+	}
+
+	return results, nil
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCart } from '~/composables/useCart'
+import { useToast } from '~/composables/useToast'
 import { formatRupiah } from '~/utils/formatter'
 import { orderService } from '~/services/orderService'
 
@@ -11,12 +12,11 @@ useHead({
 interface PaymentInfo {
   orderId: string
   instruction: string
-  paymentAccount?: {
-    account_name: string
-    account_number?: string
-    phone_number?: string
-    qr_string?: string
+  channelData?: {
+    channel_type: string
+    display_name: string
     action_url?: string
+    expires_at?: string
   }
   total: number
   expiresAt?: string
@@ -24,15 +24,16 @@ interface PaymentInfo {
 }
 
 const paymentInfoState = useState<PaymentInfo | null>('last-payment-info', () => null)
-const selectedMethod = ref('qris')
 const isLoading = ref(false)
 const errorMsg = ref<string | null>(null)
+const toast = useToast()
 
 const route = useRoute()
 
-// --- TIMER LOGIC (Batas Waktu Bayar) ---
-const timeLeft = ref(86400) // 24 jam default dalam detik
+// --- TIMER & POLLING LOGIC ---
+const timeLeft = ref(86400) // 24 hours default in seconds
 let timerInterval: any = null
+let pollInterval: any = null
 
 const formattedTimer = computed(() => {
   const hours = Math.floor(timeLeft.value / 3600)
@@ -40,6 +41,63 @@ const formattedTimer = computed(() => {
   const seconds = timeLeft.value % 60
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 })
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+const startPolling = () => {
+  stopPolling()
+  if (!import.meta.client) return
+
+  // Poll payment status silently every 30 seconds while pending
+  pollInterval = setInterval(async () => {
+    if (paymentInfoState.value?.status !== 'pending') {
+      stopPolling()
+      return
+    }
+    const orderIdVal = orderId.value
+    if (!orderIdVal || orderIdVal === 'CHIA-LOCAL') return
+
+    try {
+      const res = await orderService.checkOrderPaymentStatus(orderIdVal)
+      if (res.status !== 'pending' && paymentInfoState.value) {
+        paymentInfoState.value.status = res.status
+        stopPolling()
+        if (res.status === 'paid') {
+          toast.success('Payment Verified!', 'Your payment has been received and confirmed.')
+        } else if (res.status === 'expired' || res.status === 'cancelled') {
+          toast.error('Order ' + res.status, 'The payment status for this order is now ' + res.status + '.')
+        }
+      }
+    } catch (e) {
+      // Ignore background poll errors
+    }
+  }, 30000)
+}
+
+const handleTimerZero = async () => {
+  stopPolling()
+  const orderIdVal = orderId.value
+  if (orderIdVal && orderIdVal !== 'CHIA-LOCAL') {
+    try {
+      const res = await orderService.checkOrderPaymentStatus(orderIdVal)
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = res.status === 'pending' ? 'expired' : res.status
+      }
+    } catch (e) {
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = 'expired'
+      }
+    }
+  } else if (paymentInfoState.value) {
+    paymentInfoState.value.status = 'expired'
+  }
+  toast.error('Payment Window Expired', 'The time allocated for completing your payment has lapsed.')
+}
 
 onMounted(async () => {
   const orderIdFromQuery = route.query.orderId as string
@@ -49,18 +107,31 @@ onMounted(async () => {
     errorMsg.value = null
     try {
       const res = await orderService.getOrderPaymentDetails(orderIdFromQuery)
+      
+      // Compute status upfront so we don't render instructions if already expired
+      let initialStatus = res.status || 'pending'
+      if (initialStatus !== 'paid' && res.expires_at) {
+        const isPast = new Date().getTime() >= new Date(res.expires_at).getTime()
+        if (isPast) {
+          initialStatus = 'expired'
+        }
+      }
+
       paymentInfoState.value = {
         orderId: orderIdFromQuery,
         instruction: res.instruction || '',
-        paymentAccount: {
-          account_name: res.account_name || res.display_name || 'Chia Florist',
-          account_number: res.account_number,
-          phone_number: res.phone_number,
-          qr_string: res.qr_string || res.action_url
-        },
+        channelData: res.channel_data ? {
+          channel_type: res.channel_data.channel_type,
+          display_name: res.channel_data.display_name || 'Payment Gateway',
+          action_url: res.channel_data.action_url
+        } : (res.channel_type ? {
+          channel_type: res.channel_type,
+          display_name: res.display_name || 'Payment Gateway',
+          action_url: res.action_url
+        } : undefined),
         total: res.amount,
         expiresAt: res.expires_at,
-        status: res.status
+        status: initialStatus
       }
     } catch (err: any) {
       console.error('Failed to load payment details:', err)
@@ -79,20 +150,23 @@ onMounted(async () => {
     }
   }
 
-  // Auto-detect best payment method category
-  if (paymentInfoState.value?.paymentAccount?.qr_string) {
-    selectedMethod.value = 'qris'
-  } else {
-    selectedMethod.value = 'bank'
-  }
-
   const updateTimer = () => {
     if (paymentInfoState.value?.expiresAt) {
       const now = new Date().getTime()
       const expiry = new Date(paymentInfoState.value.expiresAt).getTime()
-      timeLeft.value = Math.max(0, Math.floor((expiry - now) / 1000))
+      const diff = Math.max(0, Math.floor((expiry - now) / 1000))
+      timeLeft.value = diff
+
+      if (diff <= 0 && paymentInfoState.value.status === 'pending') {
+        handleTimerZero()
+      }
     } else {
-      if (timeLeft.value > 0) timeLeft.value--
+      if (timeLeft.value > 0) {
+        timeLeft.value--
+        if (timeLeft.value <= 0 && paymentInfoState.value?.status === 'pending') {
+          handleTimerZero()
+        }
+      }
     }
   }
 
@@ -100,10 +174,15 @@ onMounted(async () => {
   timerInterval = setInterval(() => {
     updateTimer()
   }, 1000)
+
+  if (paymentInfoState.value?.status === 'pending') {
+    startPolling()
+  }
 })
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval)
+  stopPolling()
 })
 
 const totalPayment = computed(() => {
@@ -143,16 +222,10 @@ const instructionHtml = computed(() => {
   return paymentInfoState.value ? renderMarkdown(paymentInfoState.value.instruction) : ''
 })
 
-const paymentAccount = computed(() => {
-  return paymentInfoState.value?.paymentAccount || null
-})
-
 const qrCodeUrl = computed(() => {
-  const qrString = paymentAccount.value?.qr_string || 'ChiaFlorist'
-  if (qrString.startsWith('data:') || qrString.startsWith('http://') || qrString.startsWith('https://')) {
-    return qrString
-  }
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`
+  const actionUrl = paymentInfoState.value?.channelData?.action_url
+  if (!actionUrl) return null
+  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(actionUrl)}`
 })
 
 const isChecking = ref(false)
@@ -170,8 +243,8 @@ const handleCheckPayment = async () => {
       if (paymentInfoState.value) {
         paymentInfoState.value.status = 'paid'
       }
-      
-      // Update session cache if exists
+      stopPolling()
+
       if (import.meta.client) {
         const cached = sessionStorage.getItem('chia-last-payment-info')
         if (cached) {
@@ -184,14 +257,20 @@ const handleCheckPayment = async () => {
           }
         }
       }
-      alert('Payment verified successfully! Thank you.')
+      toast.success('Payment Verified!', 'Thank you! Your payment has been received and confirmed.')
+    } else if (res.status === 'expired' || res.status === 'cancelled') {
+      if (paymentInfoState.value) {
+        paymentInfoState.value.status = res.status
+      }
+      stopPolling()
+      toast.error('Order ' + res.status, `Your payment status is currently ${res.status}.`)
     } else {
-      alert(`Payment status is still pending (status: ${res.status}). If you just paid, please wait a minute and verify again.`)
+      toast.info('Payment Pending', 'Payment status is still pending. If you just transferred, please allow a moment for confirmation.')
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
     checkError.value = err.data?.message || err.message || 'Verification failed. Please try again.'
-    alert(checkError.value)
+    toast.error('Verification Error', checkError.value || 'Failed to check status')
   } finally {
     isChecking.value = false
   }
@@ -255,6 +334,123 @@ const handleCheckPayment = async () => {
           </div>
         </div>
 
+        <!-- Expired State -->
+        <div v-else-if="paymentInfoState?.status === 'expired'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-amber-50/50">
+            <span class="text-4xl">⏰</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-amber-900">Payment Window Expired</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">The payment time limit for this order has lapsed and reserved stock has been released.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Amount:</span>
+              <span class="font-bold text-gray-900">{{ formatRupiah(totalPayment) }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full border border-amber-200">Expired</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              Browse Catalog / Re-Order
+            </button>
+            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+              Back to My Orders
+            </button>
+          </div>
+        </div>
+
+        <!-- Cancelled State -->
+        <div v-else-if="paymentInfoState?.status === 'cancelled'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
+            <span class="text-4xl">🚫</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-red-900">Order Cancelled</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">This order has been cancelled. You can rebuild your arrangement or place a new order from our catalog.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-red-100 text-red-800 text-[10px] font-bold rounded-full border border-red-200">Cancelled</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              Re-Order Flower Arrangement
+            </button>
+            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+              View Order History
+            </button>
+          </div>
+        </div>
+
+        <!-- Failed State -->
+        <div v-else-if="paymentInfoState?.status === 'failed'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
+            <span class="text-4xl">❌</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-red-900">Payment Failed</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">Your payment transaction was declined or failed to process. Please try checking out again with another payment method.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-red-100 text-red-800 text-[10px] font-bold rounded-full border border-red-200">Failed</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/checkout')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              Try Checkout Again
+            </button>
+            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+              Back to My Orders
+            </button>
+          </div>
+        </div>
+
+        <!-- Refunded / Refund Pending State -->
+        <div v-else-if="paymentInfoState?.status === 'refunded' || paymentInfoState?.status === 'refund_pending'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
+          <div class="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-purple-50/50">
+            <span class="text-4xl">💸</span>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-black text-purple-900">{{ paymentInfoState?.status === 'refunded' ? 'Payment Refunded' : 'Refund Pending' }}</h3>
+            <p class="text-sm text-gray-500 max-w-md mx-auto">Your payment for this order is being processed for refund. Please check your bank/e-wallet account statement.</p>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 max-w-sm mx-auto space-y-3 text-left">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Order ID:</span>
+              <span class="font-mono font-bold text-gray-900 select-all">{{ orderId }}</span>
+            </div>
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-gray-400 font-medium">Status:</span>
+              <span class="px-2.5 py-0.5 bg-purple-100 text-purple-800 text-[10px] font-bold rounded-full border border-purple-200">{{ paymentInfoState?.status === 'refunded' ? 'Refunded' : 'Refund Pending' }}</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <button @click="navigateTo('/profile')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+              View My Orders
+            </button>
+          </div>
+        </div>
+
         <div v-else>
           <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
             <div>
@@ -272,79 +468,53 @@ const handleCheckPayment = async () => {
           <div class="gap-8 items-start">
 
             <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-              <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">Select Payment Method</h3>
+              <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">Payment Method</h3>
 
-              <div class="space-y-3">
-                <div
-                  @click="selectedMethod = 'qris'"
-                  :class="['p-4 rounded-xl border-2 transition-all pointer-events-auto cursor-pointer flex items-center justify-between', selectedMethod === 'qris' ? 'border-[#1b4332] bg-emerald-50/20' : 'border-gray-100 hover:border-gray-200']"
-                >
+              <!-- Payment Channel Info Card -->
+              <div v-if="paymentInfoState?.channelData" class="flex flex-col justify-between p-6 rounded-2xl border border-gray-100 bg-gray-50/30 gap-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
                   <div class="flex items-center gap-3">
-                    <span class="text-2xl">📱</span>
-                    <span class="text-sm font-bold text-gray-800">QRIS (Automated Verification)</span>
+                    <div class="w-12 h-12 bg-[#1b4332]/5 rounded-xl flex items-center justify-center text-xl">
+                      <span v-if="paymentInfoState.channelData.channel_type === 'ewallet'">📱</span>
+                      <span v-else-if="paymentInfoState.channelData.channel_type === 'bank_transfer'">🏦</span>
+                      <span v-else-if="paymentInfoState.channelData.channel_type === 'qr_code'">🔍</span>
+                      <span v-else>💳</span>
+                    </div>
+                    <div>
+                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selected Provider</span>
+                      <h4 class="font-bold text-gray-900 text-sm mt-0.5">{{ paymentInfoState.channelData.display_name }}</h4>
+                    </div>
                   </div>
-                  <div class="w-4 h-4 rounded-full border-2 border-gray-300 flex items-center justify-center animate-fade" :class="{'bg-[#1b4332] border-[#1b4332]': selectedMethod === 'qris'}"></div>
+                  <!-- Action URL Redirection button if action_url is present -->
+                  <div v-if="paymentInfoState.channelData.action_url" class="w-full md:w-auto">
+                    <a
+                      :href="paymentInfoState.channelData.action_url"
+                      target="_blank"
+                      class="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-2.5 px-5 rounded-xl transition text-xs shadow-sm"
+                    >
+                      Proceed to Payment Page ↗
+                    </a>
+                  </div>
                 </div>
 
-                <div
-                  @click="selectedMethod = 'bank'"
-                  :class="['p-4 rounded-xl border-2 transition-all pointer-events-auto cursor-pointer flex items-center justify-between', selectedMethod === 'bank' ? 'border-[#1b4332] bg-emerald-50/20' : 'border-gray-100 hover:border-gray-200']"
+                <!-- Direct QR Code Display for QRIS / GoPay / ShopeePay -->
+                <div 
+                  v-if="qrCodeUrl && (paymentInfoState.channelData.channel_type === 'qr_code' || paymentInfoState.channelData.channel_type === 'ewallet' || paymentInfoState.channelData.display_name.toLowerCase().includes('gopay') || paymentInfoState.channelData.display_name.toLowerCase().includes('qris'))" 
+                  class="border-t border-gray-100 pt-6 flex flex-col items-center text-center space-y-4"
                 >
-                  <div class="flex items-center gap-3">
-                    <span class="text-2xl">🏦</span>
-                    <span class="text-sm font-bold text-gray-800">Bank Transfer (Manual/VA)</span>
+                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Scan this QR Code with your phone to pay</p>
+                  <div class="w-56 h-56 bg-white border border-gray-100 rounded-3xl flex items-center justify-center shadow-sm overflow-hidden p-4">
+                    <img :src="qrCodeUrl" alt="Payment QR Code" class="w-48 h-48 object-contain" />
                   </div>
-                  <div class="w-4 h-4 rounded-full border-2 border-gray-300 flex items-center justify-center animate-fade" :class="{'bg-[#1b4332] border-[#1b4332]': selectedMethod === 'bank'}"></div>
+                  <p class="text-[10px] text-gray-400 max-w-xs leading-relaxed">
+                    Supports GoPay, OVO, Dana, LinkAja, ShopeePay, and all QRIS-compliant Mobile Banking apps.
+                  </p>
                 </div>
               </div>
 
               <!-- Markdown Payment Instructions from Backend -->
               <div v-if="instructionHtml" class="bg-emerald-50/10 border border-emerald-100/50 rounded-2xl p-6 mb-6 text-left shadow-sm">
                 <div v-html="instructionHtml" class="prose max-w-none"></div>
-              </div>
-
-              <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                <div v-if="selectedMethod === 'qris'" class="text-center space-y-4">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Scan this QR Code to pay</p>
-                  <div class="w-48 h-48 bg-white border border-gray-200 rounded-2xl mx-auto flex items-center justify-center shadow-sm overflow-hidden">
-                    <img :src="qrCodeUrl" alt="QRIS Code" class="w-40 h-40 object-contain" />
-                  </div>
-                  <p class="text-xs text-gray-400 max-w-xs mx-auto">Supports GoPay, OVO, Dana, LinkAja, and all Mobile Banking apps.</p>
-                </div>
-
-                <div v-if="selectedMethod === 'bank'" class="space-y-4">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Transfer details</p>
-                  <div class="bg-white p-4 rounded-xl border border-gray-100 space-y-2">
-                    <div class="flex justify-between text-sm" v-if="paymentAccount">
-                      <span class="text-gray-400 font-medium">Account Holder:</span>
-                      <span class="font-bold text-gray-900">{{ paymentAccount.account_name }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm" v-if="paymentAccount && paymentAccount.account_number">
-                      <span class="text-gray-400 font-medium">Account Number:</span>
-                      <span class="font-mono font-bold text-gray-900 select-all">{{ paymentAccount.account_number }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm" v-if="paymentAccount && paymentAccount.phone_number">
-                      <span class="text-gray-400 font-medium">Phone Number (E-Wallet):</span>
-                      <span class="font-mono font-bold text-gray-900 select-all">{{ paymentAccount.phone_number }}</span>
-                    </div>
-
-                    <template v-if="!paymentAccount">
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-400 font-medium">Bank Name:</span>
-                        <span class="font-bold text-gray-900">Bank Mandiri</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-400 font-medium">Account Number:</span>
-                        <span class="font-mono font-bold text-gray-900 select-all">137-00-123456-7</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-400 font-medium">Account Holder:</span>
-                        <span class="font-bold text-gray-900">CHIA FLORIST STUDIO</span>
-                      </div>
-                    </template>
-                  </div>
-                  <p class="text-[11px] text-gray-400 leading-relaxed">💡 Please write your client details in the reference note for faster verification.</p>
-                </div>
               </div>
 
               <!-- Action Buttons to check/verify payment -->

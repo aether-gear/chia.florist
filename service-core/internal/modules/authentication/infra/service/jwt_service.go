@@ -3,8 +3,8 @@ package service
 import (
 	"fmt"
 	"strings"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 
@@ -34,7 +34,7 @@ type jwtClaims struct {
 }
 
 func (j *JWTService) Generate(params repository.GenerateTokenParams) (repository.GeneratedToken, error) {
-	now := time.Now()
+	now := appclock.Now()
 	exp := now.Add(params.Duration)
 
 	staffIDStr := ""

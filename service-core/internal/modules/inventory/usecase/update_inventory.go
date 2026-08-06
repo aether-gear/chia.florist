@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/inventory/domain"
 	"service-core/internal/modules/inventory/repository"
@@ -77,7 +77,7 @@ func (u *UpdateInventoryUsecase) Execute(
 			ProductID:  existing.ProductID,
 			ShopID:     existing.ShopID,
 			Available:  existing.TotalStock - existing.ReservedStock,
-			RecordedAt: time.Now(),
+			RecordedAt: appclock.Now(),
 		}
 
 		_ = u.stockHistoryRepo.

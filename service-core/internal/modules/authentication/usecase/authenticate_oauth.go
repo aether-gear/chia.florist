@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
@@ -79,7 +80,7 @@ func (u *AuthenticateOAuthUsecase) Execute(
 	ctx context.Context,
 	input AuthenticateOAuthParams,
 ) (*AuthenticateOAuthResult, error) {
-	now := time.Now()
+	now := appclock.Now()
 
 	conn, err := u.oauthRepo.
 		GetByProviderAndSubject(

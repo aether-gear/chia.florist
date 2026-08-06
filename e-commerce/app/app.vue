@@ -5,5 +5,6 @@
     </NuxtLayout>
     <CSessionExpiredNotification />
     <CAuthNotificationToast />
+    <CToastContainer />
   </div>
 </template>

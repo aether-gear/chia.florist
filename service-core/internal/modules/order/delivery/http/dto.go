@@ -1,18 +1,25 @@
 package http
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ---- Request DTOs ----
 
 type createOrderItemRequest struct {
-	ProductID   string `json:"product_id"`
-	ProductName string `json:"name"`
-	Quantity    int    `json:"quantity"`
+	ProductID          *string         `json:"product_id,omitempty"`
+	CartItemID         *string         `json:"cart_item_id,omitempty"`
+	ProductVariantType string          `json:"product_variant_type,omitempty"`
+	ItemType           string          `json:"item_type,omitempty"`
+	IsCustom           *bool           `json:"is_custom,omitempty"`
+	ProductName        string          `json:"name"`
+	Quantity           int             `json:"quantity"`
+	CustomDesign       json.RawMessage `json:"custom_design,omitempty"`
 }
 
 type createOrderPaymentRequest struct {
-	ID       string `json:"id"`
-	IsManual bool   `json:"is_manual"`
+	ID string `json:"id"`
 }
 
 type createOrderCourierRequest struct {
@@ -63,17 +70,19 @@ type createOrderResponse struct {
 }
 
 type orderItemResponse struct {
-	ID               string  `json:"id"`
-	ProductID        string  `json:"product_id"`
-	ProductName      string  `json:"product_name"`
-	Quantity         int     `json:"quantity"`
-	UnitPrice        int64   `json:"unit_price"`
-	Subtotal         int64   `json:"subtotal"`
-	ShopID           string  `json:"shop_id"`
-	ShopName         string  `json:"shop_name"`
-	CourierCode      *string `json:"courier_code,omitempty"`
-	CourierService   *string `json:"courier_service,omitempty"`
-	ShippingFeeTotal int64   `json:"shipping_fee"`
+	ID                 string  `json:"id"`
+	ProductID          *string `json:"product_id,omitempty"`
+	ProductVariantType string  `json:"product_variant_type"`
+	IsCustom           bool    `json:"is_custom"`
+	ProductName        string  `json:"product_name"`
+	Quantity           int     `json:"quantity"`
+	UnitPrice          int64   `json:"unit_price"`
+	Subtotal           int64   `json:"subtotal"`
+	ShopID             string  `json:"shop_id"`
+	ShopName           string  `json:"shop_name"`
+	CourierCode        *string `json:"courier_code,omitempty"`
+	CourierService     *string `json:"courier_service,omitempty"`
+	ShippingFeeTotal   int64   `json:"shipping_fee"`
 }
 
 type paymentChannelDataResponse struct {
@@ -152,10 +161,9 @@ type trackingTimelineEventResponse struct {
 }
 
 type orderTrackingResponse struct {
-	OrderID        string                           `json:"order_id"`
-	ShipmentID     string                           `json:"shipment_id"`
-	Courier        string                           `json:"courier"`
-	TrackingNumber *string                          `json:"tracking_number,omitempty"`
+	OrderID        string                          `json:"order_id"`
+	ShipmentID     string                          `json:"shipment_id"`
+	Courier        string                          `json:"courier"`
+	TrackingNumber *string                         `json:"tracking_number,omitempty"`
 	Timeline       []trackingTimelineEventResponse `json:"timeline"`
 }
-

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useCart } from '~/composables/useCart'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useCart, normalizeHexColor, calculateDesignChecksum } from '~/composables/useCart'
+import { supabaseService } from '~/services/supabaseService'
+import type { CustomDesignPayload } from '~/composables/useCart'
 
-definePageMeta({ layout: false })
+definePageMeta({ layout: false, middleware: ['auth'] })
 useHead({
   title: 'Chia Florist — Board Designer',
   meta: [{ name: 'description', content: 'Design your custom flower board with our interactive canvas designer.' }]
@@ -44,9 +46,15 @@ interface FloralCrest { enabled: boolean; style: FloralStyle; primary: string; s
 /* ─── CONSTANTS ───────────────────────────────────────────────────── */
 const boardW = computed(() => 800)
 const boardH = computed(() => {
-  if (physicalSize.value === 'small') return 600
-  if (physicalSize.value === 'large') return 533
-  return 576
+  // Real-world proportions: height = (real_height / real_width) * boardW
+  // small:  1.5 × 2.0m → ratio 2.0/1.5 = 1.333 → too tall; width is 1.5m, height is 2.0m
+  //         canvas: 800 × (2.0/1.5 * 800) would be huge. Instead use portrait 3:4 per size:
+  // small:  1.5m wide × 2.0m tall → 3:4 → h/w = 2.0/1.5 = 1.333 → 600 * 1.5/2.0 = 450 → use 500
+  // medium: 1.8m wide × 2.5m tall → h/w = 2.5/1.8 = 1.389 → use 576
+  // large:  2.0m wide × 3.0m tall → h/w = 3.0/2.0 = 1.500 → use 600  (tallest = largest)
+  if (physicalSize.value === 'small')  return 500   // compact — smallest canvas
+  if (physicalSize.value === 'large')  return 600   // grand   — tallest canvas
+  return 576                                         // standard (medium)
 })
 
 const FONTS: { id: FontId; label: string; family: string }[] = [
@@ -109,9 +117,11 @@ const activeTab     = ref<ToolTab>('text')
 const activeSection = ref<SectionKey>('upper')
 const selectedId    = ref<string | null>(null)
 const physicalSize  = ref('medium')
-const showReview    = ref(false)
-const showToast     = ref(false)
-const isAdding      = ref(false)
+const showReview        = ref(false)
+const showToast         = ref(false)
+const isAdding          = ref(false)
+const showFinalizeChoice = ref(false)   // overlay: go-to-cart or keep designing
+const showThankYou      = ref(false)   // thank-you page overlay after cart add
 
 const brushType     = ref<BrushType>('flower')
 const brushColor    = ref('#e85d75')
@@ -122,6 +132,10 @@ const isBrushMode   = computed(() => activeTab.value === 'brush')
 const containerRef = ref<HTMLElement | null>(null)
 const boardRef     = ref<HTMLElement | null>(null)
 const boardScale   = ref(0.75)
+
+// Snapshot state — generated from real Canvas 2D render at finalize time
+const snapshotDataUrl  = ref<string>('')
+const snapshotLoading  = ref(false)
 
 /* ─── HELPERS ─────────────────────────────────────────────────────── */
 const getFont  = (id: FontId) => FONTS.find(f => f.id === id)?.family ?? "'Inter', sans-serif"
@@ -169,9 +183,76 @@ const floralSec = computed(() => activeSection.value === 'upper' ? topCrest.valu
 
 const selectedEl   = computed(() => elements.value.find(e => e.id === selectedId.value) ?? null)
 const selectedImg  = computed(() => (selectedEl.value?.type === 'image'  ? selectedEl.value : null) as CanvasImage | null)
+const selectedBrush = computed(() => (selectedEl.value?.type === 'brush' ? selectedEl.value : null) as BrushStroke | null)
 const imgElements  = computed(() => elements.value.filter(e => e.type === 'image') as CanvasImage[])
 const brushElements = computed(() => elements.value.filter(e => e.type === 'brush') as BrushStroke[])
-const totalPrice   = computed(() => SIZES.find(s => s.id === physicalSize.value)?.price ?? 200_000)
+
+/* ─── LIVE PRICE BREAKDOWN PREVIEW FORMULA ───────────────────────── */
+const baseSizePrice = computed(() => SIZES.find(s => s.id === physicalSize.value)?.price ?? 200_000)
+const brushFee     = computed(() => brushElements.value.length * 2000)
+
+const uniqueColors = computed(() => {
+  const set = new Set<string>()
+  const add = (c?: string) => {
+    if (c) set.add(normalizeHexColor(c, '#FFFFFF'))
+  }
+  add(upper.value.bgColor)
+  add(lower.value.bgColor)
+  add(upper.value.headerColor)
+  add(upper.value.bodyColor)
+  add(lower.value.headerColor)
+  add(lower.value.bodyColor)
+  if (border.value.style !== 'none' && border.value.width > 0) {
+    add(border.value.color)
+  }
+  if (topCrest.value.enabled) {
+    add(topCrest.value.primary)
+    add(topCrest.value.secondary)
+  }
+  if (bottomCrest.value.enabled) {
+    add(bottomCrest.value.primary)
+    add(bottomCrest.value.secondary)
+  }
+  brushElements.value.forEach(b => add(b.color))
+  return Array.from(set)
+})
+
+const colorFee = computed(() => Math.max(0, uniqueColors.value.length - 3) * 10_000)
+
+const borderFee = computed(() => {
+  if (border.value.style !== 'none' && border.value.width > 0) {
+    if (['double', 'groove', 'ridge', 'ornate'].includes(border.value.style)) {
+      return 15_000
+    }
+  }
+  return 0
+})
+
+const getCrestFee = (crest: FloralCrest) => {
+  if (!crest.enabled) return 0
+  if (crest.style === 'grand') return 45_000
+  if (crest.style === 'modern') return 30_000
+  return 25_000
+}
+
+const accessoriesFee = computed(() => borderFee.value + getCrestFee(topCrest.value) + getCrestFee(bottomCrest.value))
+const mediaFee       = computed(() => imgElements.value.length * 20_000)
+
+const totalPrice     = computed(() => baseSizePrice.value + brushFee.value + colorFee.value + accessoriesFee.value + mediaFee.value)
+
+// Sync sliders with selected brush
+watch(selectedBrush, (br) => {
+  if (br) {
+    brushSize.value     = br.size
+    brushRotation.value = br.rotation
+    brushColor.value    = br.color
+    brushType.value     = br.brushType
+  }
+})
+// Live-update selected brush when sliders change
+watch(brushSize, (v)     => { if (selectedBrush.value) selectedBrush.value.size = v })
+watch(brushRotation, (v) => { if (selectedBrush.value) selectedBrush.value.rotation = v })
+watch(brushColor, (v)    => { if (selectedBrush.value) selectedBrush.value.color = v })
 
 /* ─── SCALE & ANIMATION ───────────────────────────────────────────── */
 const randomizeDesign = () => {
@@ -188,17 +269,17 @@ const randomizeDesign = () => {
   border.value.center = Math.random() > 0.5
   upper.value.cornerStyle = rand(CORNERS).id
   lower.value.cornerStyle = rand(CORNERS).id
-  
+
   topCrest.value.enabled = Math.random() > 0.5
   topCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
   topCrest.value.primary = rand(BG_PRESETS)
   topCrest.value.secondary = rand(BG_PRESETS)
-  
+
   bottomCrest.value.enabled = Math.random() > 0.5
   bottomCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
   bottomCrest.value.primary = rand(BG_PRESETS)
   bottomCrest.value.secondary = rand(BG_PRESETS)
-  
+
   // Interactive scale bounce feedback
   boardScale.value = boardScale.value * 0.95
   setTimeout(updateScale, 150)
@@ -263,7 +344,15 @@ const handleFileInput = (e: Event) => {
 }
 
 /* ─── BRUSH PLACEMENT ─────────────────────────────────────────────── */
+let _suppressBrushPlace = false
+const handleBrushMousedown = (e: MouseEvent, id: string) => {
+  selectedId.value = id
+  _suppressBrushPlace = true
+  startDragEl(e, id)
+}
+
 const handleBoardClick = (e: MouseEvent) => {
+  if (_suppressBrushPlace) { _suppressBrushPlace = false; return }
   if (isBrushMode.value) {
     const r = boardRef.value!.getBoundingClientRect()
     const stroke: BrushStroke = {
@@ -287,7 +376,6 @@ let _dragBX = 0, _dragBY = 0, _dragElX0 = 0, _dragElY0 = 0
 let _divStartY = 0, _divStartR = 0
 
 const startDragEl = (e: MouseEvent, id: string) => {
-  if (isBrushMode.value) return
   e.stopPropagation(); e.preventDefault()
   bringToFront(id)
   const board = boardRef.value; if (!board) return
@@ -320,22 +408,371 @@ const onMouseMove = (e: MouseEvent) => {
 
 const onMouseUp = () => { _draggingEl = false; _draggingDiv = false }
 
+/* ─── SNAPSHOT (Canvas 2D renderer) ───────────────────────────────── */
+// Draws the board design into an offscreen <canvas> and exports a PNG.
+// No external dependencies — pure Browser Canvas API.
+const generateBoardSnapshot = (): Promise<string> => {
+  return new Promise((resolve) => {
+    const W = 800, H = boardH.value
+    const uH = Math.round(heightRatio.value * H)
+    const lH = H - uH
+    const bw = border.value.style !== 'none' ? border.value.width : 0
+
+    const canvas = document.createElement('canvas')
+    canvas.width  = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')!
+
+    // ── Upper section ──────────────────────────────────────────────
+    ctx.fillStyle = upper.value.bgColor
+    ctx.fillRect(0, 0, W, uH)
+
+    // Upper header text
+    if (upper.value.headerText) {
+      const fam = getFont(upper.value.headerFont).replace(/'/g, '')
+      const sz  = Math.round(upper.value.headerFontSize * 0.9)
+      ctx.font      = `700 ${sz}px ${fam}, sans-serif`
+      ctx.fillStyle = upper.value.headerColor
+      ctx.textAlign = upper.value.headerAlign as CanvasTextAlign
+      ctx.textBaseline = 'middle'
+      const tX = upper.value.headerAlign === 'left' ? 32 : upper.value.headerAlign === 'right' ? W - 32 : W / 2
+      ctx.fillText(upper.value.headerText, tX, uH * 0.38, W - 64)
+    }
+    // Upper body text (multiline)
+    if (upper.value.bodyText) {
+      const fam = getFont(upper.value.bodyFont).replace(/'/g, '')
+      const sz  = Math.round(upper.value.bodyFontSize * 0.85)
+      ctx.font      = `${sz}px ${fam}, sans-serif`
+      ctx.fillStyle = upper.value.bodyColor
+      ctx.textAlign = upper.value.bodyAlign as CanvasTextAlign
+      ctx.textBaseline = 'middle'
+      const lines = upper.value.bodyText.split('\n')
+      const tX    = upper.value.bodyAlign === 'left' ? 32 : upper.value.bodyAlign === 'right' ? W - 32 : W / 2
+      lines.forEach((line, i) => {
+        ctx.fillText(line, tX, uH * 0.68 + i * (sz + 8), W - 64)
+      })
+    }
+
+    // ── Lower section ──────────────────────────────────────────────
+    ctx.fillStyle = lower.value.bgColor
+    ctx.fillRect(0, uH, W, lH)
+
+    // Lower header text
+    if (lower.value.headerText) {
+      const fam = getFont(lower.value.headerFont).replace(/'/g, '')
+      const sz  = Math.round(lower.value.headerFontSize * 0.9)
+      ctx.font      = `700 ${sz}px ${fam}, sans-serif`
+      ctx.fillStyle = lower.value.headerColor
+      ctx.textAlign = lower.value.headerAlign as CanvasTextAlign
+      ctx.textBaseline = 'middle'
+      const tX = lower.value.headerAlign === 'left' ? 32 : lower.value.headerAlign === 'right' ? W - 32 : W / 2
+      ctx.fillText(lower.value.headerText, tX, uH + lH * 0.32, W - 64)
+    }
+    // Lower body text (multiline)
+    if (lower.value.bodyText) {
+      const fam = getFont(lower.value.bodyFont).replace(/'/g, '')
+      const sz  = Math.round(lower.value.bodyFontSize * 0.85)
+      ctx.font      = `${sz}px ${fam}, sans-serif`
+      ctx.fillStyle = lower.value.bodyColor
+      ctx.textAlign = lower.value.bodyAlign as CanvasTextAlign
+      ctx.textBaseline = 'middle'
+      const lines = lower.value.bodyText.split('\n')
+      const startY = lower.value.headerText ? uH + lH * 0.58 : uH + lH * 0.4
+      const tX     = lower.value.bodyAlign === 'left' ? 32 : lower.value.bodyAlign === 'right' ? W - 32 : W / 2
+      lines.forEach((line, i) => {
+        ctx.fillText(line, tX, startY + i * (sz + 8), W - 64)
+      })
+    }
+
+    // ── Center divider line ────────────────────────────────────────
+    if (border.value.center && border.value.style !== 'none' && bw > 0) {
+      ctx.strokeStyle = border.value.color
+      ctx.lineWidth   = bw
+      ctx.beginPath()
+      ctx.moveTo(0, uH); ctx.lineTo(W, uH)
+      ctx.stroke()
+    }
+
+    // ── Board border ───────────────────────────────────────────────
+    if (border.value.style !== 'none' && bw > 0) {
+      ctx.strokeStyle = border.value.color
+      ctx.lineWidth   = bw
+      ctx.strokeRect(bw / 2, bw / 2, W - bw, H - bw)
+      // Ornate: double border
+      if (border.value.style === 'ornate') {
+        const gap = Math.max(3, Math.round(bw * 0.4))
+        ctx.lineWidth = Math.max(1, Math.round(bw * 0.35))
+        ctx.strokeRect(bw + gap, bw + gap, W - (bw + gap) * 2, H - (bw + gap) * 2)
+      }
+    }
+
+    // ── Images (drawn async) ──────────────────────────────────────
+    const imgEls = elements.value.filter(e => e.type === 'image') as CanvasImage[]
+    const draws  = imgEls.map(el => new Promise<void>(res => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const px = (el.x / 100) * W
+        const py = (el.y / 100) * H
+        const pw = (el.width / 100) * W
+        ctx.save()
+        ctx.beginPath()
+        if (el.frame === 'circle') {
+          ctx.arc(px, py, pw / 2, 0, Math.PI * 2)
+        } else {
+          ctx.rect(px - pw / 2, py - pw / 2, pw, pw)
+        }
+        ctx.clip()
+        ctx.drawImage(img, px - pw / 2, py - pw / 2, pw, pw)
+        ctx.restore()
+        res()
+      }
+      img.onerror = () => res()
+      img.src = el.src
+    }))
+
+    Promise.all(draws).then(() => {
+      // ── Brush strokes ─────────────────────────────────────────
+      const brushEls = elements.value.filter(e => e.type === 'brush') as BrushStroke[]
+      brushEls.forEach(el => {
+        const cx = (el.x / 100) * W
+        const cy = (el.y / 100) * H
+        const r  = el.size / 2
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate((el.rotation * Math.PI) / 180)
+        ctx.fillStyle = el.color
+        if (el.brushType === 'flower') {
+          for (let i = 0; i < 5; i++) {
+            ctx.save()
+            ctx.rotate((i * 72 * Math.PI) / 180)
+            ctx.beginPath()
+            ctx.ellipse(0, -r * 0.6, r * 0.28, r * 0.5, 0, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.restore()
+          }
+          ctx.fillStyle = '#ffd700'
+          ctx.beginPath()
+          ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2)
+          ctx.fill()
+        } else {
+          // Rose — filled circle with inner highlight
+          ctx.beginPath()
+          ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.fillStyle = 'rgba(0,0,0,0.2)'
+          ctx.beginPath()
+          ctx.arc(r * 0.15, -r * 0.1, r * 0.5, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.fillStyle = '#ffe066'
+          ctx.globalAlpha = 0.7
+          ctx.beginPath()
+          ctx.arc(0, r * 0.1, r * 0.18, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.globalAlpha = 1
+        }
+        ctx.restore()
+      })
+
+      resolve(canvas.toDataURL('image/png', 0.92))
+    })
+  })
+}
+
+/* ─── PAYLOAD BUILDER ──────────────────────────────────────────────── */
+const buildCustomDesignPayload = (previewBase64: string): CustomDesignPayload => {
+  const payload: CustomDesignPayload = {
+    metadata: {
+      version: '1.0.0',
+      editorVersion: '1.0.0',
+      platform: 'web',
+      locale: 'id-ID',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      checksum: ''
+    },
+    layout: {
+      physicalSizeId: physicalSize.value as any,
+      upperHeightRatio: heightRatio.value,
+      border: {
+        style: border.value.style as any,
+        colorHex: normalizeHexColor(border.value.color, '#F5C842'),
+        widthPx: border.value.width,
+        showCenterDivider: border.value.center
+      }
+    },
+    sections: {
+      upper: {
+        bgColorHex: normalizeHexColor(upper.value.bgColor, '#C0392B'),
+        cornerStyle: upper.value.cornerStyle as any,
+        header: {
+          text: upper.value.headerText || null,
+          fontId: upper.value.headerFont as any,
+          fontSizePx: upper.value.headerFontSize,
+          fontColorHex: normalizeHexColor(upper.value.headerColor, '#FFD700'),
+          alignment: upper.value.headerAlign as any
+        },
+        body: {
+          text: upper.value.bodyText || null,
+          fontId: upper.value.bodyFont as any,
+          fontSizePx: upper.value.bodyFontSize,
+          fontColorHex: normalizeHexColor(upper.value.bodyColor, '#FFFFFF'),
+          alignment: upper.value.bodyAlign as any
+        }
+      },
+      lower: {
+        bgColorHex: normalizeHexColor(lower.value.bgColor, '#1A3A5C'),
+        cornerStyle: lower.value.cornerStyle as any,
+        header: {
+          text: lower.value.headerText || null,
+          fontId: lower.value.headerFont as any,
+          fontSizePx: lower.value.headerFontSize,
+          fontColorHex: normalizeHexColor(lower.value.headerColor, '#FFFFFF'),
+          alignment: lower.value.headerAlign as any
+        },
+        body: {
+          text: lower.value.bodyText || null,
+          fontId: lower.value.bodyFont as any,
+          fontSizePx: lower.value.bodyFontSize,
+          fontColorHex: normalizeHexColor(lower.value.bodyColor, '#FFFFFF'),
+          alignment: lower.value.bodyAlign as any
+        }
+      }
+    },
+    decorations: {
+      topCrest: {
+        visible: topCrest.value.enabled,
+        variantId: topCrest.value.style as any,
+        primaryColorHex: normalizeHexColor(topCrest.value.primary, '#E63946'),
+        secondaryColorHex: normalizeHexColor(topCrest.value.secondary, '#F1FAEE'),
+        scalePercent: topCrest.value.size
+      },
+      bottomCrest: {
+        visible: bottomCrest.value.enabled,
+        variantId: bottomCrest.value.style as any,
+        primaryColorHex: normalizeHexColor(bottomCrest.value.primary, '#E63946'),
+        secondaryColorHex: normalizeHexColor(bottomCrest.value.secondary, '#F1FAEE'),
+        scalePercent: bottomCrest.value.size
+      }
+    },
+    elements: elements.value.map(el => {
+      if (el.type === 'image') {
+        const img = el as CanvasImage
+        return {
+          id: img.id,
+          type: 'image' as const,
+          src: img.src,
+          frameStyle: img.frame as any,
+          crop: { xPercent: img.cropX, yPercent: img.cropY, zoom: img.zoom },
+          transform: {
+            xPercent: img.x,
+            yPercent: img.y,
+            scalePercent: img.width,
+            rotationDeg: 0
+          }
+        }
+      }
+      const br = el as BrushStroke
+      return {
+        id: br.id,
+        type: 'brush' as const,
+        brushType: br.brushType as any,
+        colorHex: normalizeHexColor(br.color, '#E85D75'),
+        transform: {
+          xPercent: br.x,
+          yPercent: br.y,
+          scalePercent: br.size,
+          rotationDeg: br.rotation
+        }
+      }
+    }),
+    assets: {
+      previewBase64: previewBase64 || null,
+      previewAssetId: null,
+      previewUrl: null,
+      bucketPath: null,
+      storageProvider: 'supabase'
+    }
+  }
+
+  payload.metadata.checksum = calculateDesignChecksum(payload)
+  return payload
+}
+
 /* ─── CART ────────────────────────────────────────────────────────── */
+const handleFinalizeAndOrder = () => {
+  // Show the choice overlay — user decides: go to cart or keep designing
+  showFinalizeChoice.value = true
+  const design = buildCustomDesignPayload(snapshotDataUrl.value || '')
+  console.log('[Chia Florist] Finalize & Order Clicked - Custom Design JSON Payload:\n', JSON.stringify(design, null, 2))
+}
+
+const openReviewModal = () => {
+  showFinalizeChoice.value = false
+  showReview.value = true
+}
+
 const addToCartHandler = async () => {
   isAdding.value = true
-  await new Promise(r => setTimeout(r, 800))
-  addToCart({
-    id: 'custom-' + Date.now(),
+  const design = buildCustomDesignPayload(snapshotDataUrl.value)
+
+  if (snapshotDataUrl.value && snapshotDataUrl.value.startsWith('data:image/')) {
+    try {
+      const response = await fetch(snapshotDataUrl.value)
+      const blob = await response.blob()
+      const uploadRes = await supabaseService.uploadCustomPreview(blob)
+      if (uploadRes) {
+        design.assets.previewUrl = uploadRes.publicUrl
+        design.assets.bucketPath = uploadRes.bucketPath
+        design.assets.storageProvider = 'supabase'
+      }
+    } catch (err) {
+      console.warn('[Chia Florist] Could not upload custom preview to Supabase:', err)
+    }
+  }
+
+  const previewUrl = design.assets.previewUrl || snapshotDataUrl.value || '/images/custom-preview.png'
+  console.log('[Chia Florist] Finalized Custom Design Payload for Cart/Order:\n', JSON.stringify(design, null, 2))
+  const itemId = 'custom-' + Date.now()
+  await addToCart({
+    id: itemId,
     name: `Custom Board — ${upper.value.headerText || 'My Design'}`,
     price: totalPrice.value,
-    image: '/images/custom-preview.png',
+    image: previewUrl,
     size: SIZES.find(s => s.id === physicalSize.value)?.label ?? '',
     color: upper.value.bgColor,
     shopId: '99ef0062-1040-4574-a4be-0123abce5670',
     isCustom: true,
+    itemType: 'custom',
+    customDesign: design,
   }, 1)
-  isAdding.value = false; showReview.value = false; showToast.value = true
-  setTimeout(() => { showToast.value = false; navigateTo('/') }, 3200)
+  isAdding.value = false
+  showReview.value = false
+  showThankYou.value = true
+}
+
+const resetCanvasAndCreateNew = () => {
+  showThankYou.value = false
+  elements.value = []
+  selectedId.value = null
+  snapshotDataUrl.value = ''
+  upper.value = {
+    headerText: 'Selamat & Sukses', bodyText: 'Atas Pelantikan Saudara/i\nNama Lengkap Anda',
+    headerFontSize: 36, bodyFontSize: 20, headerFont: 'playfair', bodyFont: 'inter',
+    headerAlign: 'center', bodyAlign: 'center',
+    bgColor: '#c0392b', headerColor: '#ffd700', bodyColor: '#ffffff', cornerStyle: 'none',
+  }
+  lower.value = {
+    headerText: '', bodyText: 'Nama Pengirim\nNama Instansi / Perusahaan',
+    headerFontSize: 26, bodyFontSize: 22, headerFont: 'bebas', bodyFont: 'inter',
+    headerAlign: 'center', bodyAlign: 'center',
+    bgColor: '#1a3a5c', headerColor: '#ffffff', bodyColor: '#ffffff', cornerStyle: 'none',
+  }
+  border.value = { style: 'solid', color: '#f5c842', width: 12, center: true }
+  topCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
+  bottomCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
+  physicalSize.value = 'medium'
+  heightRatio.value = 0.58
 }
 
 /* ─── KEYBOARD ────────────────────────────────────────────────────── */
@@ -345,6 +782,23 @@ const onKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected()
   if (e.key === 'Escape') selectedId.value = null
 }
+
+// Trigger snapshot generation when review modal opens
+watch(showReview, async (open) => {
+  if (!open) return
+  snapshotLoading.value = true
+  snapshotDataUrl.value = ''
+  await nextTick()
+  try {
+    snapshotDataUrl.value = await generateBoardSnapshot()
+    const updatedDesign = buildCustomDesignPayload(snapshotDataUrl.value)
+    console.log('[Chia Florist] Review Modal Open - Generated Custom Design Payload:\n', JSON.stringify(updatedDesign, null, 2))
+  } catch (e) {
+    console.warn('Snapshot generation failed:', e)
+  } finally {
+    snapshotLoading.value = false
+  }
+})
 
 /* ─── LIFECYCLE ───────────────────────────────────────────────────── */
 let ro: ResizeObserver | null = null
@@ -567,7 +1021,7 @@ onUnmounted(() => {
 
               <!-- ▼ LOWER SECTION -->
               <div class="board-section"
-                :style="{ top: upperH + 'px', left: 0, right: 0, height: lowerH + 'px', backgroundColor: lower.bgColor, ...lowerCornerStyle }">
+                :style="{ top: upperH + 'px', left: 0, right: 0, height: lowerH + 'px', backgroundColor: lower.bgColor, overflow: 'visible', ...lowerCornerStyle }">
                 <template v-if="lower.cornerStyle === 'floral'">
                   <span class="floral-corner fc-bl">🌸</span>
                   <span class="floral-corner fc-br">🌸</span>
@@ -616,9 +1070,9 @@ onUnmounted(() => {
                     width: (el as BrushStroke).size + 'px', height: (el as BrushStroke).size + 'px',
                     transform: `translate(-50%,-50%) rotate(${(el as BrushStroke).rotation}deg)`,
                     zIndex: idx + 10, color: (el as BrushStroke).color,
-                    pointerEvents: isBrushMode ? 'none' : 'auto', cursor: 'pointer',
+                    pointerEvents: 'auto', cursor: isBrushMode ? 'crosshair' : 'pointer',
                   }"
-                  @mousedown.stop="!isBrushMode && startDragEl($event, el.id)">
+                  @mousedown.stop="handleBrushMousedown($event, el.id)">
                   <!-- Flower SVG -->
                   <svg v-if="(el as BrushStroke).brushType === 'flower'" viewBox="-20 -20 40 40" width="100%" height="100%">
                     <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(0,0,0)"/>
@@ -635,15 +1089,9 @@ onUnmounted(() => {
                     <path d="M0,-9 C4,-6 8,-1 6,3 C9,0 11,5 8,8 C5,11 1,11 0,9 C-1,11 -5,11 -8,8 C-11,5 -9,0 -6,3 C-8,-1 -4,-6 0,-9Z" fill="currentColor" opacity="0.55"/>
                     <circle cx="0" cy="2" r="3" fill="#ffe066" opacity="0.75"/>
                   </svg>
-                  <div v-if="selectedId === el.id && !isBrushMode" class="el-del" @click.stop="deleteSelected" title="Remove">×</div>
+                  <div v-if="selectedId === el.id" class="el-del" @click.stop="deleteSelected" title="Remove">×</div>
                 </div>
               </template>
-
-              <!-- Brush mode overlay -->
-              <div v-if="isBrushMode" class="brush-overlay" @click.stop>
-                <span>{{ brushType === 'flower' ? '🌸' : '🌹' }} Click anywhere to place</span>
-              </div>
-
             </div><!-- /board-frame -->
           </div><!-- /board-scaler -->
         </div><!-- /chess-bg -->
@@ -878,7 +1326,7 @@ onUnmounted(() => {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
-              <p>Select brush type then <strong>click on the canvas</strong> to place. Drag to reposition.</p>
+              <p>Click empty canvas to stamp flowers. Drag or click any placed flower to move, rotate, &amp; edit it live!</p>
             </div>
 
             <div class="tg">
@@ -951,7 +1399,7 @@ onUnmounted(() => {
                   <path d="M0,-9 C4,-6 8,-1 6,3 C9,0 11,5 8,8 C5,11 1,11 0,9 C-1,11 -5,11 -8,8 C-11,5 -9,0 -6,3 C-8,-1 -4,-6 0,-9Z" fill="currentColor" opacity="0.55"/>
                 </template>
               </svg>
-              <span class="bp-label">Preview</span>
+              <span class="bp-label">{{ selectedBrush ? 'Editing selected' : 'Preview (next stamp)' }}</span>
             </div>
 
             <!-- Placed brush list -->
@@ -959,7 +1407,8 @@ onUnmounted(() => {
               <div class="tg-label" style="padding:0.875rem 1rem 0.4rem">PLACED ({{ brushElements.length }})</div>
               <div class="el-list">
                 <div v-for="br in brushElements" :key="br.id" class="el-item"
-                  :class="{ 'el-active': selectedId === br.id }" @click="bringToFront(br.id)">
+                  :class="{ 'el-active': selectedId === br.id }"
+                  @click="selectedId = br.id; bringToFront(br.id)">
                   <div class="el-brush-icon" :style="{ color: br.color }">
                     <svg viewBox="-20 -20 40 40" width="28" height="28">
                       <template v-if="br.brushType === 'flower'">
@@ -975,7 +1424,10 @@ onUnmounted(() => {
                       </template>
                     </svg>
                   </div>
-                  <span style="flex:1;font-size:0.68rem">{{ br.brushType }} · {{ br.size }}px</span>
+                  <div style="flex:1;min-width:0">
+                    <span style="display:block;font-size:0.68rem">{{ br.brushType }} · {{ br.size }}px · {{ br.rotation }}°</span>
+                    <span style="display:block;font-size:0.65rem;color:#999">{{ selectedId === br.id ? '✏️ editing' : 'click to edit' }}</span>
+                  </div>
                   <button class="el-del-list" @click.stop="selectedId = br.id; deleteSelected()">×</button>
                 </div>
               </div>
@@ -1015,7 +1467,7 @@ onUnmounted(() => {
                 <span class="cval">{{ border.width }}px</span>
               </div>
             </div>
-            
+
             <!-- Center Border Toggle -->
             <div class="tg" style="margin-top: 1rem;">
               <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing: 0.05em;">
@@ -1023,7 +1475,7 @@ onUnmounted(() => {
                 SHOW CENTER BORDER
               </label>
             </div>
-            
+
             <!-- Preview -->
             <div class="tg">
               <div class="tg-label">PREVIEW</div>
@@ -1067,7 +1519,7 @@ onUnmounted(() => {
               <button class="stg-btn" :class="{ active: activeSection === 'upper' }" @click="activeSection = 'upper'">Top Crest</button>
               <button class="stg-btn" :class="{ active: activeSection === 'lower' }" @click="activeSection = 'lower'">Bottom Base</button>
             </div>
-            
+
             <div class="tg" style="margin-top: 1rem;">
               <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing:0.05em;">
                 <input type="checkbox" v-model="floralSec.enabled" style="width:16px;height:16px;accent-color:#c4703e;"/>
@@ -1086,7 +1538,7 @@ onUnmounted(() => {
                   </button>
                 </div>
               </div>
-              
+
               <div class="tg">
                 <div class="tg-label">SIZE SCALING</div>
                 <div class="cr">
@@ -1127,7 +1579,7 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
-          <button id="btn-finalize-footer" class="finalize-btn" @click="showReview = true">
+          <button id="btn-finalize-footer" class="finalize-btn" @click="handleFinalizeAndOrder">
             <span class="fb-left">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
@@ -1154,9 +1606,34 @@ onUnmounted(() => {
             <h2 class="rm-title">Your Custom Board</h2>
           </div>
           <div class="rm-body">
-            <!-- Mini board preview -->
-            <div class="rm-board-wrap">
-              <div class="rm-board" :style="boardBorderStyle">
+            <!-- ── Realistic Snapshot Preview ──────────────────────── -->
+            <div class="rm-snapshot-wrap">
+              <!-- Loading shimmer while snapshot generates -->
+              <div v-if="snapshotLoading" class="rm-snapshot-shimmer">
+                <div class="shimmer-bar" style="width:60%;height:14px;margin-bottom:8px"/>
+                <div class="shimmer-bar" style="width:80%;height:10px;margin-bottom:6px"/>
+                <div class="shimmer-bar" style="width:50%;height:10px"/>
+                <p class="snapshot-gen-label">Generating preview…</p>
+              </div>
+              <!-- Real rendered image -->
+              <template v-else-if="snapshotDataUrl">
+                <div class="rm-snapshot-badge">✓ Realistic Preview</div>
+                <img
+                  :src="snapshotDataUrl"
+                  class="rm-snapshot-img"
+                  alt="Your custom board preview"
+                  :style="{ border: border.style !== 'none' && border.width > 0 ? `${border.width}px ${border.style === 'ornate' ? 'solid' : border.style} ${border.color}` : 'none' }"
+                />
+                <!-- Download preview link -->
+                <a :href="snapshotDataUrl" download="my-custom-board.png" class="rm-download-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Save preview image
+                </a>
+              </template>
+              <!-- Fallback: simple color blocks -->
+              <div v-else class="rm-board" :style="boardBorderStyle">
                 <div :style="{ height: (heightRatio * 100)+'%', backgroundColor: upper.bgColor, display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', overflow:'hidden' }">
                   <span :style="{ fontFamily: getFont(upper.headerFont), color: upper.headerColor, fontSize:'13px', fontWeight:700, textAlign:'center' }">{{ upper.headerText || '(no header)' }}</span>
                 </div>
@@ -1165,26 +1642,34 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <!-- Specs -->
+
+            <!-- ── Specs & Price Breakdown ─────────────────────────────── -->
             <div class="rm-specs">
               <div class="spec-row"><span class="sk">Upper Header</span><span class="sv">{{ upper.headerText || '—' }}</span></div>
               <div class="spec-row"><span class="sk">Upper Body</span><span class="sv">{{ upper.bodyText.replace(/\n/g,' / ') || '—' }}</span></div>
               <div class="spec-row"><span class="sk">Lower Body</span><span class="sv">{{ lower.bodyText.replace(/\n/g,' / ') || '—' }}</span></div>
-              <div class="spec-row"><span class="sk">Elements</span><span class="sv">{{ imgElements.length }} image{{ imgElements.length!==1?'s':'' }}, {{ brushElements.length }} brush stroke{{ brushElements.length!==1?'s':'' }}</span></div>
-              <div class="spec-row"><span class="sk">Size</span><span class="sv">{{ SIZES.find(s=>s.id===physicalSize)?.label }} — {{ SIZES.find(s=>s.id===physicalSize)?.desc }}</span></div>
+              
               <div class="spec-divider"/>
-              <div class="spec-row spec-total"><span class="sk">Total</span><span class="sv spec-price">{{ formatRupiah(totalPrice) }}</span></div>
-              <p class="spec-note">* Our team will review your design before production and contact you if adjustments are needed.</p>
+              <div class="sk" style="font-weight:700; font-size:0.75rem; color:#888; margin-bottom:0.25rem; letter-spacing:0.05em;">ESTIMATED PRICE BREAKDOWN</div>
+              <div class="spec-row"><span class="sk">Base Size ({{ SIZES.find(s=>s.id===physicalSize)?.label }})</span><span class="sv">{{ formatRupiah(baseSizePrice) }}</span></div>
+              <div v-if="brushElements.length" class="spec-row"><span class="sk">Brush Strokes ({{ brushElements.length }}× @ 2k)</span><span class="sv">{{ formatRupiah(brushFee) }}</span></div>
+              <div v-if="colorFee > 0" class="spec-row"><span class="sk">Color Palette ({{ uniqueColors.length }} colors)</span><span class="sv">{{ formatRupiah(colorFee) }}</span></div>
+              <div v-if="accessoriesFee > 0" class="spec-row"><span class="sk">Borders & Crests</span><span class="sv">{{ formatRupiah(accessoriesFee) }}</span></div>
+              <div v-if="mediaFee > 0" class="spec-row"><span class="sk">Custom Images ({{ imgElements.length }}× @ 20k)</span><span class="sv">{{ formatRupiah(mediaFee) }}</span></div>
+
+              <div class="spec-divider"/>
+              <div class="spec-row spec-total"><span class="sk">Total Preview</span><span class="sv spec-price">{{ formatRupiah(totalPrice) }}</span></div>
+              <p class="spec-note">* Note: Unit prices and totals are verified and controlled by the server during checkout.</p>
             </div>
           </div>
           <div class="rm-footer">
             <button class="rm-back" @click="showReview = false">Back to Designer</button>
-            <button id="btn-add-to-cart" class="rm-confirm" :class="{ loading: isAdding }" :disabled="isAdding" @click="addToCartHandler">
-              <svg v-if="!isAdding" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <button id="btn-add-to-cart" class="rm-confirm" :class="{ loading: isAdding }" :disabled="isAdding || snapshotLoading" @click="addToCartHandler">
+              <svg v-if="!isAdding && !snapshotLoading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M16.5 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0Zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0Z"/>
               </svg>
               <svg v-else class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-              {{ isAdding ? 'Adding…' : `Add to Cart — ${formatRupiah(totalPrice)}` }}
+              {{ snapshotLoading ? 'Generating preview…' : isAdding ? 'Adding…' : `Add to Cart — ${formatRupiah(totalPrice)}` }}
             </button>
           </div>
         </div>
@@ -1198,6 +1683,127 @@ onUnmounted(() => {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg>
         </div>
         <div><p class="toast-title">Added to cart!</p><p class="toast-sub">Redirecting you home…</p></div>
+      </div>
+    </Transition>
+
+    <!-- ═══ FINALIZE CHOICE OVERLAY ═══════════════════════════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="showFinalizeChoice" class="modal-backdrop" @click.self="showFinalizeChoice = false" role="dialog" aria-modal="true" aria-label="Finalize options">
+        <div class="choice-panel">
+          <!-- Close -->
+          <button class="rm-close" @click="showFinalizeChoice = false" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+
+          <!-- Header -->
+          <div class="cp-header">
+            <div class="cp-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+              </svg>
+            </div>
+            <p class="cp-eyebrow">DESIGN READY</p>
+            <h2 class="cp-title">What would you like to do?</h2>
+            <p class="cp-desc">Your custom board design has been captured. Choose how you'd like to proceed.</p>
+          </div>
+
+          <!-- Choices -->
+          <div class="cp-choices">
+            <!-- Option A: Review & Add to Cart -->
+            <button class="cp-choice cp-choice--primary" @click="openReviewModal">
+              <div class="cp-choice-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M16.5 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0Zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0Z"/>
+                </svg>
+              </div>
+              <div class="cp-choice-body">
+                <span class="cp-choice-title">Add to Cart</span>
+                <span class="cp-choice-desc">Review your design and proceed to order — {{ formatRupiah(totalPrice) }}</span>
+              </div>
+              <svg class="cp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+
+            <!-- Option B: Keep designing -->
+            <button class="cp-choice cp-choice--secondary" @click="showFinalizeChoice = false">
+              <div class="cp-choice-icon cp-choice-icon--muted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+              <div class="cp-choice-body">
+                <span class="cp-choice-title">Continue Designing</span>
+                <span class="cp-choice-desc">Go back and make more changes to your board</span>
+              </div>
+              <svg class="cp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ═══ THANK YOU OVERLAY ══════════════════════════════════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="showThankYou" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Thank you overlay">
+        <div class="thankyou-panel">
+          
+          <div class="ty-header">
+            <div class="ty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <p class="ty-eyebrow">ORDER CONFIRMED & IN CART</p>
+            <h2 class="ty-title">Thank You for Shopping at Chia Florist!</h2>
+            <p class="ty-desc">Your custom flower board design has been successfully added to your cart. What would you like to do next?</p>
+          </div>
+
+          <!-- Summary Card -->
+          <div class="ty-summary">
+            <div v-if="snapshotDataUrl" class="ty-thumb-wrap">
+              <img :src="snapshotDataUrl" class="ty-thumb" alt="Custom board snapshot" />
+            </div>
+            <div class="ty-summary-info">
+              <span class="ty-item-title">Custom Board — {{ upper.headerText || 'My Design' }}</span>
+              <div class="ty-item-tags">
+                <span class="ty-tag">Size: {{ SIZES.find(s=>s.id===physicalSize)?.label }}</span>
+                <span class="ty-tag ty-tag--green">✨ Custom Design</span>
+              </div>
+              <span class="ty-item-price">{{ formatRupiah(totalPrice) }}</span>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="ty-actions">
+            <!-- Option 1: Go to Home Page -->
+            <button class="ty-btn ty-btn--primary" @click="navigateTo('/')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              Go to Home Page
+            </button>
+
+            <!-- Option 2: Create Another Custom Product -->
+            <button class="ty-btn ty-btn--secondary" @click="resetCanvasAndCreateNew">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Create Another Custom Product
+            </button>
+
+            <!-- Option 3: View Shopping Cart -->
+            <button class="ty-btn ty-btn--cart" @click="navigateTo('/cart')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+              View Shopping Cart
+            </button>
+          </div>
+
+        </div>
       </div>
     </Transition>
 
@@ -1519,10 +2125,8 @@ button { font-family: inherit; }
 .rm-header { padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid #f0ebe4; }
 .rm-eyebrow { font-size: 0.6rem; font-weight: 900; letter-spacing: 0.2em; color: #c4703e; margin-bottom: 0.25rem; }
 .rm-title { font-size: 1.4rem; font-weight: 800; color: #1c1813; }
-.rm-body { display: flex; gap: 1.5rem; padding: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
-.rm-board-wrap { flex: 0 0 auto; width: 180px; }
-.rm-board { width: 180px; height: 120px; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
-.rm-specs { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0; }
+.rm-body { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.25rem 1.5rem; }
+.rm-specs { display: flex; flex-direction: column; gap: 0; }
 .spec-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.45rem 0; border-bottom: 1px solid #f0ebe4; gap: 0.75rem; }
 .sk { font-size: 0.68rem; font-weight: 600; color: #a8998d; flex-shrink: 0; }
 .sv { font-size: 0.72rem; font-weight: 600; color: #1c1813; text-align: right; word-break: break-word; }
@@ -1540,6 +2144,62 @@ button { font-family: inherit; }
 .rm-confirm.loading { opacity: 0.8; }
 .spin { animation: spinAnim 0.9s linear infinite; }
 @keyframes spinAnim { to { transform: rotate(360deg); } }
+
+/* ─── SNAPSHOT PREVIEW (Canvas render) ──────────────────────────── */
+.rm-snapshot-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: #111;
+  border-radius: 10px;
+  padding: 1.25rem 1rem 0.75rem;
+  position: relative;
+}
+.rm-snapshot-badge {
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em;
+  color: #4ade80; text-transform: uppercase;
+  background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3);
+  border-radius: 20px; padding: 0.2rem 0.65rem;
+  align-self: flex-start;
+}
+.rm-snapshot-img {
+  width: 100%; max-height: 340px;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: snapIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes snapIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.rm-download-btn {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.68rem; font-weight: 600; color: #9ca3af;
+  text-decoration: none; transition: color 0.15s;
+  padding: 0.3rem 0.5rem; border-radius: 4px;
+}
+.rm-download-btn:hover { color: #e5e7eb; background: rgba(255,255,255,0.06); }
+.rm-snapshot-shimmer {
+  width: 100%; min-height: 180px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0; padding: 2rem;
+}
+.shimmer-bar {
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.snapshot-gen-label {
+  margin-top: 1rem; font-size: 0.68rem; color: #6b7280; font-weight: 600; letter-spacing: 0.05em;
+}
 
 /* ─── SUCCESS TOAST ──────────────────────────────────────────────── */
 .success-toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0.75rem; background: #fff; border: 1px solid #e5ddd4; border-radius: 10px; padding: 0.875rem 1.25rem; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 300; min-width: 240px; }
@@ -1564,4 +2224,235 @@ button { font-family: inherit; }
   .dr-nav-center { display: none; }
   .dr-scale-chip { display: none; }
 }
+
+/* ─── FINALIZE CHOICE PANEL ──────────────────────────────────────── */
+.choice-panel {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+  overflow: hidden;
+  animation: choiceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes choiceIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.cp-header {
+  padding: 2rem 1.75rem 1.5rem;
+  background: linear-gradient(160deg, #fdf8f5 0%, #fff 100%);
+  border-bottom: 1px solid #f0ebe4;
+  text-align: center;
+}
+.cp-icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #c4703e22, #a85a2e11);
+  border: 1px solid #e5c4a8;
+  display: flex; align-items: center; justify-content: center;
+  color: #c4703e;
+  margin: 0 auto 1rem;
+}
+.cp-icon svg { width: 1.5rem; height: 1.5rem; }
+.cp-eyebrow {
+  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.2em;
+  color: #c4703e; margin-bottom: 0.4rem;
+}
+.cp-title {
+  font-size: 1.25rem; font-weight: 800; color: #1c1813; margin-bottom: 0.5rem;
+}
+.cp-desc {
+  font-size: 0.75rem; color: #a8998d; line-height: 1.5;
+}
+
+.cp-choices {
+  padding: 1.25rem 1.25rem 1.5rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.cp-choice {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.cp-choice--primary {
+  background: linear-gradient(135deg, #c4703e, #a85a2e);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(196,112,62,0.35);
+}
+.cp-choice--primary:hover {
+  background: linear-gradient(135deg, #b5622f, #8f4a22);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(196,112,62,0.45);
+}
+.cp-choice--secondary {
+  background: #f4f0eb;
+  color: #1c1813;
+  border: 1px solid #e5ddd4;
+}
+.cp-choice--secondary:hover {
+  background: #ede8e0;
+  transform: translateY(-1px);
+}
+
+.cp-choice-icon {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.cp-choice-icon--muted {
+  background: rgba(0,0,0,0.06);
+  color: #6b5d52;
+}
+.cp-choice-icon svg { width: 1.1rem; height: 1.1rem; }
+.cp-choice-body { flex: 1; min-width: 0; }
+.cp-choice-title {
+  display: block; font-size: 0.82rem; font-weight: 800; margin-bottom: 0.15rem;
+}
+.cp-choice-desc {
+  display: block; font-size: 0.68rem; opacity: 0.75; line-height: 1.3;
+}
+.cp-arrow {
+  width: 1rem; height: 1rem; flex-shrink: 0; opacity: 0.7;
+  transition: transform 0.15s;
+}
+.cp-choice:hover .cp-arrow { transform: translateX(3px); opacity: 1; }
+
+/* ─── THANK YOU PANEL ────────────────────────────────────────────── */
+.thankyou-panel {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  overflow: hidden;
+  animation: choiceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ty-header {
+  padding: 2.25rem 2rem 1.25rem;
+  background: linear-gradient(160deg, #f3faf5 0%, #fff 100%);
+  border-bottom: 1px solid #e8f3eb;
+  text-align: center;
+}
+.ty-icon {
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  background: rgba(46, 125, 50, 0.1);
+  border: 2px solid rgba(46, 125, 50, 0.25);
+  display: flex; align-items: center; justify-content: center;
+  color: #2e7d32;
+  margin: 0 auto 1.1rem;
+}
+.ty-icon svg { width: 1.8rem; height: 1.8rem; }
+.ty-eyebrow {
+  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.22em;
+  color: #2e7d32; margin-bottom: 0.4rem;
+}
+.ty-title {
+  font-size: 1.35rem; font-weight: 800; color: #1c1813; margin-bottom: 0.5rem;
+}
+.ty-desc {
+  font-size: 0.78rem; color: #6b5d52; line-height: 1.5;
+}
+
+.ty-summary {
+  margin: 1.25rem 1.5rem 0;
+  padding: 1rem;
+  background: #fdfaf7;
+  border: 1px solid #f0ebe4;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.ty-thumb-wrap {
+  width: 90px; height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  background: #111;
+}
+.ty-thumb {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.ty-summary-info {
+  display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 0;
+}
+.ty-item-title {
+  font-size: 0.82rem; font-weight: 800; color: #1c1813;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ty-item-tags {
+  display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+}
+.ty-tag {
+  font-size: 0.62rem; font-weight: 700; color: #6b5d52;
+  background: #ede8e1; padding: 0.15rem 0.45rem; border-radius: 4px;
+}
+.ty-tag--green {
+  color: #2e7d32; background: rgba(46, 125, 50, 0.12);
+}
+.ty-item-price {
+  font-size: 0.88rem; font-weight: 900; color: #c4703e; margin-top: 0.1rem;
+}
+
+.ty-actions {
+  padding: 1.25rem 1.5rem 1.75rem;
+  display: flex; flex-direction: column; gap: 0.65rem;
+}
+.ty-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  padding: 0.85rem 1.2rem;
+  border-radius: 12px;
+  font-size: 0.82rem; font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  width: 100%;
+}
+.ty-btn svg { width: 1.1rem; height: 1.1rem; }
+
+.ty-btn--primary {
+  background: linear-gradient(135deg, #1b4332, #0d281e);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(27,67,50,0.3);
+}
+.ty-btn--primary:hover {
+  background: linear-gradient(135deg, #143326, #05140e);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(27,67,50,0.4);
+}
+
+.ty-btn--secondary {
+  background: linear-gradient(135deg, #c4703e, #a85a2e);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(196,112,62,0.3);
+}
+.ty-btn--secondary:hover {
+  background: linear-gradient(135deg, #b5622f, #8f4a22);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(196,112,62,0.4);
+}
+
+.ty-btn--cart {
+  background: #f4f0eb;
+  color: #1c1813;
+  border: 1px solid #e5ddd4;
+}
+.ty-btn--cart:hover {
+  background: #ede8e0;
+  transform: translateY(-1px);
+}
+
 </style>

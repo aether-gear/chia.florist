@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	apperrors "service-core/internal/common/errors"
 	orderDomain "service-core/internal/modules/order/domain"
@@ -116,12 +117,26 @@ func (m *mockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor, 
 	return m.updateErr
 }
 
+func (m *mockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, _ *time.Time, _ *time.Time) error {
+	m.updatedState.id = id
+	m.updatedState.status = status
+	return m.updateErr
+}
+
 func (m *mockOrderRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.Order) error {
 	return nil
 }
 
 func (m *mockOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
+}
+
+func (m *mockOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+
+func (m *mockOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
 }
 
 func TestUpdateShipmentStatus_ShipmentNotFound(t *testing.T) {

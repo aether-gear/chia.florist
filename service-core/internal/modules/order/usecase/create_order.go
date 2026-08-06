@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	authenRepo "service-core/internal/modules/authentication/repository"
+	cartDomain "service-core/internal/modules/cart/domain"
 	cartRepo "service-core/internal/modules/cart/repository"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	"service-core/internal/modules/order/domain"
@@ -21,7 +23,57 @@ import (
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
+
+const (
+	PAYMENT_PROVIDER   = "midtrans"
+	PAYMENT_EXPIRATION = time.Hour * 24
+)
+
+type OrderItemInput struct {
+	ProductID    *uuid.UUID
+	CartItemID   *uuid.UUID
+	IsCustom     bool
+	CustomDesign json.RawMessage
+	ProductName  string
+	Quantity     int
+}
+
+type OrderCourierInput struct {
+	Code    string
+	Service string
+}
+
+type OrderShopInput struct {
+	ShopID   uuid.UUID
+	ShopName string
+	Courier  *OrderCourierInput
+	Items    []OrderItemInput
+}
+
+type CreateOrderInput struct {
+	UserID          uuid.UUID
+	CustomerID      uuid.UUID
+	AddressID       uuid.UUID
+	PaymentMethodID uuid.UUID
+	Shops           []OrderShopInput
+}
+
+type PaymentAccountResult struct {
+	AccountName   string
+	AccountNumber *string
+	PhoneNumber   *string
+	QRString      *string
+}
+
+type CreateOrderResult struct {
+	OrderID        uuid.UUID
+	PaymentAccount *PaymentAccountResult
+	ChannelData    *paymentDomain.PaymentChannelData
+	Instruction    *string
+	Total          int64
+}
 
 type CreateOrderUsecase struct {
 	executor               transaction.Executor
@@ -33,7 +85,6 @@ type CreateOrderUsecase struct {
 	invoiceItemRepo        repository.InvoiceItemRepository
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentMethodRepo      paymentRepo.PaymentMethodRepository
-	paymentAccRepo         paymentRepo.PaymentAccountRepository
 	paymentEventRepo       paymentRepo.PaymentEventRepository
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
@@ -54,7 +105,6 @@ func NewCreateOrderUsecase(
 	invoiceItemRepo repository.InvoiceItemRepository,
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
-	paymentAccRepo paymentRepo.PaymentAccountRepository,
 	paymentEventRepo paymentRepo.PaymentEventRepository,
 	paymentInstructionRepo paymentRepo.PaymentInstructionRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
@@ -74,7 +124,6 @@ func NewCreateOrderUsecase(
 		invoiceItemRepo:        invoiceItemRepo,
 		paymentRepo:            paymentRepo,
 		paymentMethodRepo:      paymentMethodRepo,
-		paymentAccRepo:         paymentAccRepo,
 		paymentEventRepo:       paymentEventRepo,
 		paymentInstructionRepo: paymentInstructionRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
@@ -86,79 +135,391 @@ func NewCreateOrderUsecase(
 	}
 }
 
-type OrderItemInput struct {
-	ProductID   uuid.UUID
-	ProductName string
-	Quantity    int
-}
-
-type OrderCourierInput struct {
-	Code    string
-	Service string
-}
-
-type OrderShopInput struct {
-	ShopID   uuid.UUID
-	ShopName string
-	Courier  *OrderCourierInput
-	Items    []OrderItemInput
-}
-
-type CreateOrderInput struct {
-	UserID          uuid.UUID
-	CustomerID      uuid.UUID
-	AddressID       uuid.UUID
-	PaymentMethodID uuid.UUID
-	IsManual        bool
-	Shops           []OrderShopInput
-}
-
-type PaymentAccountResult struct {
-	AccountName   string
-	AccountNumber *string
-	PhoneNumber   *string
-	QRString      *string
-}
-
-type CreateOrderResult struct {
-	OrderID        uuid.UUID
-	PaymentAccount *PaymentAccountResult
-	ChannelData    *paymentDomain.PaymentChannelData
-	Instruction    *string
-	Total          int64
-}
-
-const PAYMENT_PROVIDER = "midtrans"
-
 func (u *CreateOrderUsecase) Execute(
 	ctx context.Context,
 	input CreateOrderInput,
 ) (*CreateOrderResult, error) {
-	now := time.Now()
+	now := appclock.Now()
 
+	var (
+		method        *paymentDomain.PaymentMethod
+		pricingResult *repository.PricingResult
+		customerName  string
+		customerEmail string
+		customerPhone string
+	)
+
+	// Concurrently fetch & validate payment method/pricing
+	// and customer details
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		method, pricingResult, err = u.validateAndCalculatePricing(gCtx, input)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		customerName, customerEmail, customerPhone, err = u.fetchCustomerDetails(gCtx, input.UserID)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	order := domain.Order{
+		ID:          uuid.New(),
+		Number:      domain.NewOrderNumber(),
+		CustomerID:  input.CustomerID,
+		AddressID:   input.AddressID,
+		Status:      domain.OrderStatusPending,
+		Subtotal:    pricingResult.Subtotal,
+		ShippingFee: pricingResult.TotalShippingFee,
+		Total:       pricingResult.GrandTotal,
+		CreatedAt:   now,
+	}
+
+	if err := order.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid order domain state: %w", err)
+	}
+
+	invoice := order.NewInvoice()
+
+	var (
+		orderItems   []domain.OrderItem
+		invoiceItems []domain.InvoiceItem
+		chargeItems  []paymentgateway.ChargeItem
+
+		expiresAt = now.Add(PAYMENT_EXPIRATION)
+	)
+
+	// Generate order and invoice items from the pricing result to
+	// preserve product, pricing, and shipping details at checkout time
+	for _, shopRes := range pricingResult.Shops {
+		var courierCode, courierService *string
+		if shopRes.SelectedCourier.Code != "" {
+			courierCode = &shopRes.SelectedCourier.Code
+			courierService = &shopRes.SelectedCourier.Service
+		}
+
+		for _, itemRes := range shopRes.Items {
+			var variantType cartDomain.ProductVariantType = cartDomain.ProductVariantTypeStandard
+			if itemRes.IsCustom || itemRes.ProductID == nil {
+				variantType = cartDomain.ProductVariantTypeCustom
+			}
+
+			orderItem := domain.OrderItem{
+				ID:                 uuid.New(),
+				OrderID:            order.ID,
+				ProductVariantType: variantType,
+				ShopID:             shopRes.ShopID,
+				ShopName:           shopRes.ShopName,
+				ProductID:          itemRes.ProductID,
+				ProductName:        itemRes.ProductName,
+				Quantity:           itemRes.Quantity,
+				UnitPrice:          itemRes.UnitPrice,
+				Subtotal:           itemRes.Subtotal,
+				CourierCode:        courierCode,
+				CourierService:     courierService,
+				ShippingFee:        shopRes.SelectedCourier.Fee,
+			}
+
+			invoiceItem := invoice.NewInvoiceItemFromOrderItem(orderItem)
+
+			orderItems = append(orderItems, orderItem)
+			invoiceItems = append(invoiceItems, invoiceItem)
+		}
+	}
+
+	for _, item := range orderItems {
+		var itemID string
+		if item.ProductID != nil {
+			itemID = item.ProductID.String()
+		} else {
+			itemID = item.ID.String()
+		}
+		cItem := paymentgateway.ChargeItem{
+			ID:       itemID,
+			Name:     item.ProductName,
+			Quantity: item.Quantity,
+			Price:    item.UnitPrice,
+		}
+
+		chargeItems = append(chargeItems, cItem)
+	}
+
+	if pricingResult.TotalShippingFee > 0 {
+		chargeItems = append(chargeItems, paymentgateway.ChargeItem{
+			ID:       "shipping_fee",
+			Name:     "Shipping Fee",
+			Quantity: 1,
+			Price:    pricingResult.TotalShippingFee,
+		})
+	}
+
+	var itemSum int64
+	for _, ci := range chargeItems {
+		itemSum += ci.Price * int64(ci.Quantity)
+	}
+
+	if diff := order.Total - itemSum; diff != 0 {
+		chargeItems = append(chargeItems, paymentgateway.ChargeItem{
+			ID:       "adjustment",
+			Name:     "Fees & Adjustments",
+			Quantity: 1,
+			Price:    diff,
+		})
+	}
+
+	payment := paymentDomain.Payment{
+		ID:        uuid.New(),
+		OrderID:   order.ID,
+		MethodID:  input.PaymentMethodID,
+		Amount:    order.Total,
+		Status:    paymentDomain.PaymentStatusPending,
+		CreatedAt: now,
+	}
+
+	chargeResp, err := u.paymentGateway.Charge(
+		ctx,
+		paymentgateway.ChargeRequest{
+			PaymentID:     payment.ID,
+			OrderID:       order.ID,
+			Amount:        order.Total,
+			PaymentType:   string(method.Code),
+			ExpiresAt:     expiresAt,
+			CustomerEmail: customerEmail,
+			CustomerName:  customerName,
+			CustomerPhone: customerPhone,
+			Items:         chargeItems,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("payment gateway charge failed: %w", err)
+	}
+
+	// Process payments through the configured gateway for
+	// methods that require external payment handling.
+	payment.Provider = method.Provider
+	payment.ProviderPaymentID = &chargeResp.GatewayTransactionID
+	payment.ProviderOrderID = &chargeResp.GatewayOrderID
+	if !chargeResp.ExpiresAt.IsZero() {
+		payment.ExpiresAt = &chargeResp.ExpiresAt
+	}
+
+	var (
+		instructionContent   *string
+		instruction          *paymentDomain.PaymentInstruction
+		channelData          *paymentDomain.PaymentChannelData
+		paymentAccountResult *PaymentAccountResult
+	)
+
+	if len(chargeResp.Instructions) > 0 {
+		inst := chargeResp.Instructions[0]
+		accountResult := &PaymentAccountResult{
+			AccountName: inst.Label,
+		}
+
+		switch inst.Type {
+		case "qris", "ewallet":
+			accountResult.QRString = &inst.Value
+
+		case "bank_transfer":
+			accountResult.AccountNumber = &inst.Value
+		}
+
+		paymentAccountResult = accountResult
+	}
+
+	pendingPayload, err := json.Marshal(map[string]string{"status": "pending"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal pending payment event payload: %w", err)
+	}
+
+	paymentEvent := paymentDomain.PaymentEvent{
+		ID:        uuid.New(),
+		PaymentID: payment.ID,
+		EventName: string(paymentDomain.PaymentEventStatusPending),
+		Payload:   pendingPayload,
+		CreatedAt: now,
+	}
+
+	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.orderRepo.Save(ctx, exec, order); err != nil {
+			return fmt.Errorf("failed to save order: %w", err)
+		}
+
+		if err := u.invoiceRepo.Save(ctx, exec, invoice); err != nil {
+			return fmt.Errorf("failed to save invoice: %w", err)
+		}
+
+		if err := u.orderItemRepo.SaveBulk(ctx, exec, orderItems); err != nil {
+			return fmt.Errorf("failed to save order items: %w", err)
+		}
+
+		if err := u.invoiceItemRepo.SaveBulk(ctx, exec, invoiceItems); err != nil {
+			return fmt.Errorf("failed to save invoice items: %w", err)
+		}
+
+		if err := u.paymentRepo.Save(ctx, exec, payment); err != nil {
+			return fmt.Errorf("failed to save payment: %w", err)
+		}
+
+		if err := u.paymentEventRepo.Create(ctx, exec, paymentEvent); err != nil {
+			return fmt.Errorf("failed to save payment event: %w", err)
+		}
+
+		// Persist gateway channel data (QR string, VA number, deep link)
+		// so it survives the initial checkout response and can be
+		// retrieved on any subsequent request.
+		if chargeResp != nil && len(chargeResp.Instructions) > 0 {
+			inst := chargeResp.Instructions[0]
+
+			var actionURL *string
+			if inst.Value != "" {
+				v := inst.Value
+				actionURL = &v
+			}
+
+			cd := paymentDomain.PaymentChannelData{
+				ID:          uuid.New(),
+				PaymentID:   payment.ID,
+				ChannelType: method.Type,
+				DisplayName: inst.Label,
+				ActionURL:   actionURL,
+				ExpiresAt:   payment.ExpiresAt,
+				CreatedAt:   now,
+			}
+
+			if err := u.paymentChannelDataRepo.Save(ctx, exec, cd); err != nil {
+				return fmt.Errorf("failed to save payment channel data: %w", err)
+			}
+
+			channelData = &cd
+		}
+
+		for _, item := range orderItems {
+			if item.ProductID == nil {
+				continue
+			}
+			if err := u.inventoryRepo.Reserve(ctx, exec,
+				*item.ProductID,
+				item.ShopID,
+				item.Quantity,
+			); err != nil {
+				return fmt.Errorf("failed to reserve inventory for product %s: %w", item.ProductID, err)
+			}
+		}
+
+		cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, exec, input.CustomerID)
+		if err != nil {
+			return fmt.Errorf("failed to load cart with items: %w", err)
+		}
+		if cart != nil {
+			for _, item := range orderItems {
+				if item.ProductID != nil {
+					cart.RemoveItem(*item.ProductID, item.ShopID)
+				}
+			}
+
+			if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
+				return fmt.Errorf("failed to update cart: %w", err)
+			}
+		}
+
+		ins, err := u.paymentInstructionRepo.GetByPaymentMethodID(ctx, u.executor,
+			input.PaymentMethodID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve payment instruction: %w", err)
+		}
+
+		instruction = ins
+
+		return nil
+	})
+	if err != nil {
+		if payment.ProviderOrderID != nil {
+			// Best-effort rollback:
+			// the payment transaction has already been created
+			// at the gateway, but persisting the order/payment
+			// in the system database failed.
+			//
+			// Attempt to cancel the gateway transaction to avoid
+			// leaving an orphaned payable transaction.
+			_ = u.paymentGateway.CancelTransaction(ctx, *payment.ProviderOrderID)
+		}
+
+		return nil, err
+	}
+
+	// Render payment instructions with transaction-specific values
+	// such as invoice number, amount, expiration time, and account details
+	if instruction != nil {
+		var vaNumber string
+		if chargeResp != nil && len(chargeResp.Instructions) > 0 {
+			inst := chargeResp.Instructions[0]
+			vaNumber = inst.Value
+		}
+
+		var effectiveExpiresAt time.Time
+		if payment.ExpiresAt != nil {
+			effectiveExpiresAt = *payment.ExpiresAt
+		} else {
+			effectiveExpiresAt = expiresAt
+		}
+
+		content, err := markdown.Render(
+			instruction.Content,
+			map[string]string{
+				"invoice_number": invoice.Number,
+				"amount":         strconv.FormatInt(order.Total, 10),
+				"expired_at":     effectiveExpiresAt.Format(time.RFC3339),
+				"va_number":      vaNumber,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to format payment instruction: %w", err)
+		}
+
+		instructionContent = &content
+	}
+
+	result := CreateOrderResult{
+		OrderID:        order.ID,
+		PaymentAccount: paymentAccountResult,
+		ChannelData:    channelData,
+		Instruction:    instructionContent,
+		Total:          order.Total,
+	}
+
+	return &result, nil
+}
+
+func (u *CreateOrderUsecase) validateAndCalculatePricing(
+	ctx context.Context,
+	input CreateOrderInput,
+) (*paymentDomain.PaymentMethod, *repository.PricingResult, error) {
 	// Ensure the selected payment method exists and can be used
 	// before creating any order-related records
-	method, err := u.paymentMethodRepo.
-		GetByID(ctx, u.executor, input.PaymentMethodID)
+	method, err := u.paymentMethodRepo.GetByID(ctx, u.executor, input.PaymentMethodID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve payment method: %w", err)
+		return nil, nil, fmt.Errorf("failed to retrieve payment method: %w", err)
 	}
-
 	if method == nil {
-		return nil, apperrors.NewNotFound("payment method not found")
+		return nil, nil, apperrors.NewNotFound("payment method not found")
+	}
+	if !u.paymentGateway.Supports(string(method.Code)) {
+		return nil, nil, apperrors.NewBadRequest(fmt.Sprintf("payment method %q is not supported by the payment gateway", method.Code))
 	}
 
-	// Build a pricing request from the checkout input so all
-	// product, shipping, and payment costs can be calculated
 	pricingInput := repository.PricingInput{
 		CustomerID:      input.CustomerID,
 		AddressID:       &input.AddressID,
 		PaymentMethodID: &input.PaymentMethodID,
-		Shops: make(
-			[]repository.PricingShopInput,
-			0,
-			len(input.Shops),
-		),
+		Shops:           make([]repository.PricingShopInput, 0, len(input.Shops)),
 	}
 
 	for _, shop := range input.Shops {
@@ -179,8 +540,11 @@ func (u *CreateOrderUsecase) Execute(
 			shopInput.Items = append(
 				shopInput.Items,
 				repository.PricingItemInput{
-					ProductID: item.ProductID,
-					Quantity:  item.Quantity,
+					ProductID:    item.ProductID,
+					CartItemID:   item.CartItemID,
+					IsCustom:     item.IsCustom,
+					CustomDesign: item.CustomDesign,
+					Quantity:     item.Quantity,
 				},
 			)
 		}
@@ -190,387 +554,38 @@ func (u *CreateOrderUsecase) Execute(
 
 	// Calculate the final order pricing, including item subtotals,
 	// shipping fees, payment fees, and the grand total
-	pricingResult, err := u.pricingService.
-		Calculate(ctx, u.executor, pricingInput)
+	pricingResult, err := u.pricingService.Calculate(ctx, u.executor, pricingInput)
 	if err != nil {
-		return nil, fmt.Errorf("failed to calculate order prices: %w", err)
+		return nil, nil, fmt.Errorf("failed to calculate order prices: %w", err)
 	}
 
-	order := domain.Order{
-		ID:          uuid.New(),
-		Number:      domain.NewOrderNumber(),
-		CustomerID:  input.CustomerID,
-		AddressID:   input.AddressID,
-		Status:      domain.OrderStatusPending,
-		Subtotal:    pricingResult.Subtotal,
-		ShippingFee: pricingResult.TotalShippingFee,
-		Total:       pricingResult.GrandTotal,
-		CreatedAt:   now,
-	}
+	return method, pricingResult, nil
+}
 
-	invoice := order.NewInvoice()
-
-	var orderItems []domain.OrderItem
-	var invoiceItems []domain.InvoiceItem
-
-	// Generate order and invoice items from the pricing result to
-	// preserve product, pricing, and shipping details at checkout time
-	for _, shopRes := range pricingResult.Shops {
-		var courierCode, courierService *string
-		if shopRes.SelectedCourier.Code != "" {
-			courierCode = &shopRes.SelectedCourier.Code
-			courierService = &shopRes.SelectedCourier.Service
-		}
-
-		for _, itemRes := range shopRes.Items {
-			orderItem := domain.OrderItem{
-				ID:             uuid.New(),
-				OrderID:        order.ID,
-				ShopID:         shopRes.ShopID,
-				ShopName:       shopRes.ShopName,
-				ProductID:      itemRes.ProductID,
-				ProductName:    itemRes.ProductName,
-				Quantity:       itemRes.Quantity,
-				UnitPrice:      itemRes.UnitPrice,
-				Subtotal:       itemRes.Subtotal,
-				CourierCode:    courierCode,
-				CourierService: courierService,
-				ShippingFee:    shopRes.SelectedCourier.Fee,
-			}
-
-			invoiceItem := invoice.NewInvoiceItemFromOrderItem(orderItem)
-
-			orderItems = append(orderItems, orderItem)
-			invoiceItems = append(invoiceItems, invoiceItem)
-		}
-	}
-
-	payment := paymentDomain.Payment{
-		ID:        uuid.New(),
-		OrderID:   order.ID,
-		MethodID:  input.PaymentMethodID,
-		Amount:    order.Total,
-		Status:    paymentDomain.PaymentStatusPending,
-		CreatedAt: now,
-	}
-
-	user, err := u.userRepo.
-		GetByID(ctx, u.executor, input.UserID)
+func (u *CreateOrderUsecase) fetchCustomerDetails(
+	ctx context.Context,
+	userID uuid.UUID,
+) (string, string, string, error) {
+	user, err := u.userRepo.GetByID(ctx, u.executor, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+		return "", "", "", fmt.Errorf("failed to retrieve user: %w", err)
+	}
+	if user == nil {
+		return "", "", "", apperrors.NewNotFound("user not found")
 	}
 
-	account, err := u.accountRepo.
-		GetByUserID(ctx, u.executor, user.ID)
+	account, err := u.accountRepo.GetByUserID(ctx, u.executor, user.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve account: %w", err)
+		return "", "", "", fmt.Errorf("failed to retrieve account: %w", err)
+	}
+	if account == nil {
+		return "", "", "", apperrors.NewNotFound("account not found")
 	}
 
-	// Process payments through the configured gateway for
-	// methods that require external payment handling.
-	var (
-		paymentAccount       *paymentDomain.PaymentAccount
-		paymentAccountResult *PaymentAccountResult
-		chargeResp           *paymentgateway.ChargeResponse
-	)
-
-	if !input.IsManual {
-		payment.Provider = method.Provider
-
-		if !u.paymentGateway.Supports(string(method.Code)) {
-			return nil, apperrors.NewBadRequest(fmt.Sprintf("payment method %q is not supported by the payment gateway", method.Code))
-		}
-
-		var chargeItems []paymentgateway.ChargeItem
-		for _, item := range orderItems {
-			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
-				ID:       item.ProductID.String(),
-				Name:     item.ProductName,
-				Quantity: item.Quantity,
-				Price:    item.UnitPrice,
-			})
-		}
-
-		if pricingResult.TotalShippingFee > 0 {
-			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
-				ID:       "shipping_fee",
-				Name:     "Shipping Fee",
-				Quantity: 1,
-				Price:    pricingResult.TotalShippingFee,
-			})
-		}
-
-		var itemSum int64
-		for _, ci := range chargeItems {
-			itemSum += ci.Price * int64(ci.Quantity)
-		}
-
-		if diff := order.Total - itemSum; diff != 0 {
-			chargeItems = append(chargeItems, paymentgateway.ChargeItem{
-				ID:       "adjustment",
-				Name:     "Fees & Adjustments",
-				Quantity: 1,
-				Price:    diff,
-			})
-		}
-
-		var customerPhone string
-		if user.Phone != nil {
-			customerPhone = *user.Phone
-		}
-
-		var err error
-		chargeResp, err = u.paymentGateway.
-			Charge(
-				ctx,
-				paymentgateway.ChargeRequest{
-					PaymentID:     payment.ID,
-					OrderID:       order.ID,
-					Amount:        order.Total,
-					PaymentType:   string(method.Code),
-					ExpiresAt:     time.Now().Add(time.Hour * 24),
-					CustomerEmail: account.Email,
-					CustomerName:  user.Name,
-					CustomerPhone: customerPhone,
-					Items:         chargeItems,
-				},
-			)
-		if err != nil {
-			return nil, fmt.Errorf("payment gateway charge failed: %w", err)
-		}
-
-		providerPaymentID := chargeResp.GatewayTransactionID
-		providerOrderID := chargeResp.GatewayOrderID
-		payment.ProviderPaymentID = &providerPaymentID
-		payment.ProviderOrderID = &providerOrderID
-		if !chargeResp.ExpiresAt.IsZero() {
-			payment.ExpiresAt = &chargeResp.ExpiresAt
-		}
-
-		if len(chargeResp.Instructions) > 0 {
-			inst := chargeResp.Instructions[0]
-			accountResult := &PaymentAccountResult{
-				AccountName: inst.Label,
-			}
-			switch inst.Type {
-			case "qris", "ewallet":
-				accountResult.QRString = &inst.Value
-			case "bank_transfer":
-				accountResult.AccountNumber = &inst.Value
-			}
-			paymentAccountResult = accountResult
-		}
-
-	} else {
-		// Assign a payment account for manual payment methods
-		// using the current load-balancing strategy
-		var err error
-		paymentAccount, err = u.paymentAccRepo.
-			RetrieveLeastLoaded(ctx, u.executor, input.PaymentMethodID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to acquire payment account: %w", err)
-		}
-
-		if paymentAccount == nil {
-			return nil, apperrors.NewConflict("no available payment account for the selected method")
-		}
-
-		payment.Provider = method.Provider
-		payment.PaymentAccountID = &paymentAccount.ID
-
-		paymentAccountResult = &PaymentAccountResult{
-			AccountName:   paymentAccount.AccountName,
-			AccountNumber: paymentAccount.AccountNumber,
-			PhoneNumber:   paymentAccount.PhoneNumber,
-			QRString:      paymentAccount.QRString,
-		}
+	var customerPhone string
+	if user.Phone != nil {
+		customerPhone = *user.Phone
 	}
 
-	pendingPayload, err := json.Marshal(map[string]string{"status": "pending"})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal pending payment event payload: %w", err)
-	}
-
-	paymentEvent := paymentDomain.PaymentEvent{
-		ID:        uuid.New(),
-		PaymentID: payment.ID,
-		EventName: string(paymentDomain.PaymentEventStatusPending),
-		Payload:   pendingPayload,
-		CreatedAt: now,
-	}
-
-	var (
-		instruction *paymentDomain.PaymentInstruction
-		channelData *paymentDomain.PaymentChannelData
-	)
-
-	err = u.transactor.WithinTransaction(
-		ctx,
-		func(exec transaction.Executor) error {
-			if err := u.orderRepo.
-				Save(ctx, exec, order); err != nil {
-				return fmt.Errorf("failed to save order: %w", err)
-			}
-
-			if err := u.invoiceRepo.
-				Save(ctx, exec, invoice); err != nil {
-				return fmt.Errorf("failed to save invoice: %w", err)
-			}
-
-			if err := u.orderItemRepo.
-				SaveBulk(ctx, exec, orderItems); err != nil {
-				return fmt.Errorf("failed to save order items: %w", err)
-			}
-
-			if err := u.invoiceItemRepo.
-				SaveBulk(ctx, exec, invoiceItems); err != nil {
-				return fmt.Errorf("failed to save invoice items: %w", err)
-			}
-
-			if err := u.paymentRepo.
-				Save(ctx, exec, payment); err != nil {
-				return fmt.Errorf("failed to save payment: %w", err)
-			}
-
-			if err := u.paymentEventRepo.
-				Create(ctx, exec, paymentEvent); err != nil {
-				return fmt.Errorf("failed to save payment event: %w", err)
-			}
-
-			if input.IsManual {
-				if err := u.paymentAccRepo.
-					IncrementLoad(ctx, exec, *payment.PaymentAccountID); err != nil {
-					return fmt.Errorf("failed to increment payment account load: %w", err)
-				}
-			}
-
-			// Persist gateway channel data (QR string, VA number, deep link)
-			// so it survives the initial checkout response and can be
-			// retrieved on any subsequent request.
-			if chargeResp != nil && len(chargeResp.Instructions) > 0 {
-				inst := chargeResp.Instructions[0]
-				var actionURL *string
-				if inst.Value != "" {
-					v := inst.Value
-					actionURL = &v
-				}
-
-				cd := paymentDomain.PaymentChannelData{
-					ID:          uuid.New(),
-					PaymentID:   payment.ID,
-					ChannelType: method.Type,
-					DisplayName: inst.Label,
-					ActionURL:   actionURL,
-					ExpiresAt:   payment.ExpiresAt,
-					CreatedAt:   now,
-				}
-
-				if err := u.paymentChannelDataRepo.
-					Save(ctx, exec, cd); err != nil {
-					return fmt.Errorf("failed to save payment channel data: %w", err)
-				}
-
-				channelData = &cd
-			}
-
-			for _, item := range orderItems {
-				if err := u.inventoryRepo.
-					Reserve(
-						ctx,
-						exec,
-						item.ProductID,
-						item.ShopID,
-						item.Quantity,
-					); err != nil {
-					return fmt.Errorf("failed to reserve inventory for product %s: %w", item.ProductID, err)
-				}
-			}
-
-			cart, err := u.cartRepo.
-				GetWithItemsByCustomerID(ctx, exec, input.CustomerID)
-			if err != nil {
-				return fmt.Errorf("failed to load cart with items: %w", err)
-			}
-			if cart != nil {
-				for _, item := range orderItems {
-					cart.RemoveItem(item.ProductID, item.ShopID)
-				}
-
-				if err := u.cartRepo.Save(ctx, exec, cart); err != nil {
-					return fmt.Errorf("failed to update cart: %w", err)
-				}
-			}
-
-			ins, err := u.paymentInstructionRepo.
-				GetByPaymentMethodID(ctx, u.executor, input.PaymentMethodID)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve payment instruction: %w", err)
-			}
-			instruction = ins
-
-			return nil
-		},
-	)
-	if err != nil {
-		if !input.IsManual &&
-			payment.ProviderOrderID != nil {
-			// Best-effort cancellation:
-			// the gateway transaction exists but our
-			//
-			// DB write failed,
-			// attempt to void it so it does not expire unpaid
-			_ = u.paymentGateway.
-				CancelTransaction(ctx, *payment.ProviderOrderID)
-		}
-
-		return nil, err
-	}
-
-	var instructionContent *string
-
-	// Render payment instructions with transaction-specific values
-	// such as invoice number, amount, expiration time, and account details
-	if instruction != nil {
-		var vaNumber string
-		if input.IsManual {
-			if paymentAccount != nil {
-				if paymentAccount.AccountNumber != nil {
-					vaNumber = *paymentAccount.AccountNumber
-				} else if paymentAccount.PhoneNumber != nil && *paymentAccount.PhoneNumber != "" {
-					vaNumber = *paymentAccount.PhoneNumber
-				} else if paymentAccount.QRString != nil {
-					vaNumber = *paymentAccount.QRString
-				}
-			}
-		} else {
-			if chargeResp != nil && len(chargeResp.Instructions) > 0 {
-				vaNumber = chargeResp.Instructions[0].Value
-			}
-		}
-
-		content, err := markdown.Render(
-			instruction.Content,
-			map[string]string{
-				"invoice_number": invoice.Number,
-				"amount":         strconv.FormatInt(order.Total, 10),
-				"expired_at":     now.Add(24 * time.Hour).Format(time.RFC3339),
-				"va_number":      vaNumber,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to format payment instruction: %w", err)
-		}
-
-		instructionContent = &content
-	}
-
-	result := CreateOrderResult{
-		OrderID:        order.ID,
-		PaymentAccount: paymentAccountResult,
-		ChannelData:    channelData,
-		Instruction:    instructionContent,
-		Total:          order.Total,
-	}
-
-	return &result, nil
+	return user.Name, account.Email, customerPhone, nil
 }

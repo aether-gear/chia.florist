@@ -54,6 +54,15 @@ type PaymentRepository interface {
 		exec transaction.Executor,
 		since time.Time,
 	) ([]domain.Payment, error)
+
+	// ListPastDuePending returns pending payments whose expires_at
+	// is non-null and less than or equal to now.
+	ListPastDuePending(
+		ctx context.Context,
+		exec transaction.Executor,
+		now time.Time,
+		limit int,
+	) ([]domain.Payment, error)
 }
 
 var (
@@ -87,54 +96,6 @@ type PaymentMethodRepository interface {
 		exec transaction.Executor,
 		sorts query.Sorts,
 	) ([]domain.PaymentMethod, error)
-}
-
-type PaymentAccountRepository interface {
-	Save(
-		ctx context.Context,
-		exec transaction.Executor,
-		paymentAccount domain.PaymentAccount,
-	) error
-
-	GetByID(
-		ctx context.Context,
-		exec transaction.Executor,
-		paymentID uuid.UUID,
-	) (*domain.PaymentAccount, error)
-
-	// RetrieveLeastLoaded returns the active account with the
-	// lowest current load for the specified payment method
-	RetrieveLeastLoaded(
-		ctx context.Context,
-		exec transaction.Executor,
-		methodID uuid.UUID,
-	) (*domain.PaymentAccount, error)
-
-	// IncrementLoad increases the account's current load after
-	// it has been assigned to a payment
-	IncrementLoad(
-		ctx context.Context,
-		exec transaction.Executor,
-		accountID uuid.UUID,
-	) error
-
-	// DecrementLoad decreases the account's current load when
-	// the payment assignment is released or no longer active
-	DecrementLoad(
-		ctx context.Context,
-		exec transaction.Executor,
-		accountID uuid.UUID,
-	) error
-
-	ListByMethodID(
-		ctx context.Context,
-		exec transaction.Executor,
-		methodID uuid.UUID,
-	) ([]domain.PaymentAccount, error)
-	ListAll(
-		ctx context.Context,
-		exec transaction.Executor,
-	) ([]domain.PaymentAccount, error)
 }
 
 type PaymentEventRepository interface {

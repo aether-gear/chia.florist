@@ -42,13 +42,18 @@ func (u *RemoveItemUsecase) Execute(
 		return apperrors.NewInvalidInput(domain.ErrInvalidShopID.Error())
 	}
 
-	cart, err := u.cartRepo.
-		GetWithItemsByCustomerID(ctx, u.executor, input.CustomerID)
+	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor,
+		input.CustomerID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load cart with items: %w", err)
 	}
 	if cart == nil {
 		return apperrors.NewNotFound(domain.ErrCartNotFound.Error())
+	}
+
+	if cart.FindItem(input.ProductID, input.ShopID) == nil {
+		return apperrors.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
 	cart.RemoveItem(input.ProductID, input.ShopID)

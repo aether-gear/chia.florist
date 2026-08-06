@@ -5,7 +5,8 @@ CREATE TYPE order_status
         'processing',
         'shipped',
         'delivered',
-        'cancelled'
+        'cancelled',
+        'expired'
     );
 
 CREATE TABLE orders (
@@ -21,8 +22,11 @@ CREATE TABLE orders (
     shipping_fee BIGINT NOT NULL,
     total BIGINT NOT NULL,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP,
+    confirmed_at TIMESTAMPTZ,
+    handling_expires_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
 
     CONSTRAINT fk_orders_customer_id
         FOREIGN KEY (customer_id)
@@ -39,5 +43,15 @@ CREATE TABLE orders (
         CHECK (shipping_fee >= 0),
 
     CONSTRAINT orders_total_check
-        CHECK (total >= 0)
+        CHECK (total >= 0),
+
+    CONSTRAINT check_orders_handling_sla_timestamps
+        CHECK (
+            (status NOT IN ('confirmed', 'processing')) OR
+            (confirmed_at IS NOT NULL AND handling_expires_at IS NOT NULL)
+        )
 );
+
+CREATE INDEX idx_orders_status_handling_expires_at
+    ON orders(status, handling_expires_at)
+    WHERE status IN ('confirmed', 'processing');

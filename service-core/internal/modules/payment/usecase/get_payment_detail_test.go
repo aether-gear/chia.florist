@@ -34,11 +34,20 @@ func (m *mockOrderDetailOrderRepo) GetByNumber(_ context.Context, _ transaction.
 func (m *mockOrderDetailOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ orderDomain.OrderStatus) error {
 	return nil
 }
+func (m *mockOrderDetailOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ orderDomain.OrderStatus, _ *time.Time, _ *time.Time) error {
+	return nil
+}
 func (m *mockOrderDetailOrderRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.Order) error {
 	return nil
 }
 func (m *mockOrderDetailOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
+}
+func (m *mockOrderDetailOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *mockOrderDetailOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
 }
 
 type mockOrderDetailInvoiceRepo struct {
@@ -86,6 +95,9 @@ func (m *mockOrderDetailPaymentRepo) ListPendingGateway(_ context.Context, _ tra
 	}
 	return nil, nil
 }
+func (m *mockOrderDetailPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 type mockOrderDetailPaymentMethodRepo struct {
 	method *paymentDomain.PaymentMethod
@@ -107,34 +119,7 @@ func (m *mockOrderDetailPaymentMethodRepo) ListAll(_ context.Context, _ transact
 	return nil, nil
 }
 
-type mockOrderDetailPaymentAccountRepo struct {
-	account *paymentDomain.PaymentAccount
-}
-
-func (m *mockOrderDetailPaymentAccountRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.PaymentAccount) error {
-	return nil
-}
-func (m *mockOrderDetailPaymentAccountRepo) GetByID(_ context.Context, _ transaction.Executor, id uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	if m.account != nil && m.account.ID == id {
-		return m.account, nil
-	}
-	return nil, nil
-}
-func (m *mockOrderDetailPaymentAccountRepo) RetrieveLeastLoaded(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *mockOrderDetailPaymentAccountRepo) IncrementLoad(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *mockOrderDetailPaymentAccountRepo) DecrementLoad(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *mockOrderDetailPaymentAccountRepo) ListByMethodID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *mockOrderDetailPaymentAccountRepo) ListAll(_ context.Context, _ transaction.Executor) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
+type mockOrderDetailPaymentAccountRepo struct{}
 
 type mockOrderDetailPaymentInstructionRepo struct {
 	instruction *paymentDomain.PaymentInstruction
@@ -226,7 +211,6 @@ func TestGetPaymentDetail_Gateway_Success(t *testing.T) {
 		&mockOrderDetailInvoiceRepo{invoice: invoice},
 		&mockOrderDetailPaymentRepo{payment: payment},
 		&mockOrderDetailPaymentMethodRepo{method: method},
-		&mockOrderDetailPaymentAccountRepo{},
 		&mockOrderDetailPaymentInstructionRepo{instruction: instruction},
 		&mockOrderDetailPaymentChannelDataRepo{channelData: channelData},
 	)
@@ -265,98 +249,7 @@ func TestGetPaymentDetail_Gateway_Success(t *testing.T) {
 	}
 }
 
-func TestGetPaymentDetail_Manual_Success(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	customerID := uuid.New()
-	methodID := uuid.New()
-	paymentID := uuid.New()
-	accountID := uuid.New()
 
-	order := &orderDomain.Order{
-		ID:         orderID,
-		CustomerID: customerID,
-		Number:     "ORD-54321",
-		Total:      250000,
-	}
-
-	invoice := &orderDomain.Invoice{
-		ID:      uuid.New(),
-		OrderID: orderID,
-		Number:  "INV-54321",
-	}
-
-	payment := &paymentDomain.Payment{
-		ID:               paymentID,
-		OrderID:          orderID,
-		MethodID:         methodID,
-		PaymentAccountID: &accountID,
-		Provider:         "manual",
-		Amount:           250000,
-		Status:           paymentDomain.PaymentStatusPending,
-		ExpiresAt:        pointer(time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)),
-	}
-
-	method := &paymentDomain.PaymentMethod{
-		ID:   methodID,
-		Name: "Bank Transfer BCA",
-		Type: paymentDomain.TypeBankTransfer,
-	}
-
-	accountNo := "9876543210"
-	account := &paymentDomain.PaymentAccount{
-		ID:            accountID,
-		MethodID:      methodID,
-		AccountName:   "Chias Florist",
-		AccountNumber: &accountNo,
-	}
-
-	instruction := &paymentDomain.PaymentInstruction{
-		ID:              uuid.New(),
-		PaymentMethodID: methodID,
-		Content:         "Manual transfer to {{va_number}} amount {{amount}} for {{invoice_number}}",
-	}
-
-	uc := NewGetPaymentDetailUsecase(
-		&mockExecutor{},
-		&mockOrderDetailOrderRepo{order: order},
-		&mockOrderDetailInvoiceRepo{invoice: invoice},
-		&mockOrderDetailPaymentRepo{payment: payment},
-		&mockOrderDetailPaymentMethodRepo{method: method},
-		&mockOrderDetailPaymentAccountRepo{account: account},
-		&mockOrderDetailPaymentInstructionRepo{instruction: instruction},
-		&mockOrderDetailPaymentChannelDataRepo{},
-	)
-
-	res, err := uc.Execute(ctx, GetPaymentDetailInput{
-		OrderID:    orderID,
-		CustomerID: &customerID,
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if res == nil {
-		t.Fatal("expected non-nil result")
-	}
-
-	if res.PaymentAccount == nil {
-		t.Fatal("expected non-nil payment account")
-	}
-
-	if *res.PaymentAccount.AccountNumber != "9876543210" {
-		t.Errorf("expected account number 9876543210, got %s", *res.PaymentAccount.AccountNumber)
-	}
-
-	if res.Instruction == nil {
-		t.Fatal("expected non-nil rendered instruction")
-	}
-
-	expectedInstruction := "Manual transfer to 9876543210 amount 250000 for INV-54321"
-	if *res.Instruction != expectedInstruction {
-		t.Errorf("rendered instruction mismatch:\nwant: %q\ngot:  %q", expectedInstruction, *res.Instruction)
-	}
-}
 
 func TestGetPaymentDetail_OrderNotFound(t *testing.T) {
 	ctx := context.Background()
@@ -369,7 +262,6 @@ func TestGetPaymentDetail_OrderNotFound(t *testing.T) {
 		&mockOrderDetailInvoiceRepo{},
 		&mockOrderDetailPaymentRepo{},
 		&mockOrderDetailPaymentMethodRepo{},
-		&mockOrderDetailPaymentAccountRepo{},
 		&mockOrderDetailPaymentInstructionRepo{},
 		&mockOrderDetailPaymentChannelDataRepo{},
 	)
@@ -410,7 +302,6 @@ func TestGetPaymentDetail_WrongCustomer(t *testing.T) {
 		&mockOrderDetailInvoiceRepo{},
 		&mockOrderDetailPaymentRepo{},
 		&mockOrderDetailPaymentMethodRepo{},
-		&mockOrderDetailPaymentAccountRepo{},
 		&mockOrderDetailPaymentInstructionRepo{},
 		&mockOrderDetailPaymentChannelDataRepo{},
 	)

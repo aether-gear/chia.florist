@@ -3,16 +3,275 @@ import { computed, watch } from 'vue'
 import { cartService } from '~/services/cartService'
 import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Global
 
+/* ─── Standardized Custom Design Payload Schema (v1.0.0) ───────────────── */
+
+export interface TypographySpec {
+  text: string | null
+  fontId: 'inter' | 'playfair' | 'dancing' | 'bebas' | 'merriweather' | 'pacifico'
+  fontSizePx: number
+  fontColorHex: string // 6-digit hex format: #RRGGBB
+  alignment: 'left' | 'center' | 'right'
+}
+
+export interface BoardSectionSpec {
+  bgColorHex: string
+  cornerStyle: 'none' | 'rounded' | 'cut' | 'ornate' | 'floral'
+  header: TypographySpec
+  body: TypographySpec
+}
+
+export interface BorderSpec {
+  style: 'none' | 'solid' | 'double' | 'dashed' | 'dotted' | 'groove' | 'ridge' | 'ornate'
+  colorHex: string
+  widthPx: number
+  showCenterDivider: boolean
+}
+
+export interface CrestSpec {
+  visible: boolean
+  variantId: 'classic' | 'modern' | 'grand'
+  primaryColorHex: string
+  secondaryColorHex: string
+  scalePercent: number
+}
+
+export interface BaseElement {
+  id: string
+  type: 'image' | 'brush'
+  transform: {
+    xPercent: number
+    yPercent: number
+    scalePercent: number
+    rotationDeg: number
+  }
+}
+
+export interface ImageElement extends BaseElement {
+  type: 'image'
+  src: string
+  frameStyle: 'none' | 'square' | 'circle'
+  crop: { xPercent: number; yPercent: number; zoom: number }
+}
+
+export interface BrushElement extends BaseElement {
+  type: 'brush'
+  brushType: 'flower' | 'rose'
+  colorHex: string
+}
+
+export type DesignElement = ImageElement | BrushElement
+
+export interface CustomDesignPayloadV1 {
+  metadata: {
+    version: '1.0.0'
+    editorVersion: string
+    platform: string
+    locale: string
+    createdAt: string
+    updatedAt: string
+    checksum: string
+  }
+  layout: {
+    physicalSizeId: 'small' | 'medium' | 'large'
+    upperHeightRatio: number
+    border: BorderSpec
+  }
+  sections: {
+    upper: BoardSectionSpec
+    lower: BoardSectionSpec
+  }
+  decorations: {
+    topCrest: CrestSpec
+    bottomCrest: CrestSpec
+  }
+  elements: DesignElement[]
+  assets: {
+    previewBase64: string | null
+    previewAssetId: string | null
+    previewUrl: string | null
+    bucketPath: string | null
+    storageProvider: 'supabase' | 's3' | 'local' | null
+  }
+}
+
+export type CustomDesignPayload = CustomDesignPayloadV1
+
+// Calculate SHA-256 / FNV-1a checksum for design deduplication
+export const calculateDesignChecksum = (payload: any): string => {
+  const copy = { ...payload }
+  if (copy.metadata) copy.metadata = { ...copy.metadata, checksum: '' }
+  const jsonStr = JSON.stringify(copy)
+  let hash = 0x811c9dc5
+  for (let i = 0; i < jsonStr.length; i++) {
+    hash ^= jsonStr.charCodeAt(i)
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+// Validate 6-digit hex color format (#RRGGBB)
+export const normalizeHexColor = (color: string | undefined, fallback = '#FFFFFF'): string => {
+  if (!color) return fallback
+  const trimmed = color.trim().toUpperCase()
+  if (/^#[0-9A-F]{6}$/.test(trimmed)) return trimmed
+  if (/^#[0-9A-F]{3}$/.test(trimmed)) {
+    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`
+  }
+  return fallback
+}
+
+// Migration utility to seamlessly upgrade legacy v1.0 flat payloads to v1.0.0
+export const migrateCustomDesignPayload = (raw: any): CustomDesignPayloadV1 => {
+  if (!raw) {
+    throw new Error('Empty custom design payload')
+  }
+
+  // Already v1.0.0 structured payload
+  if (raw.metadata && raw.metadata.version === '1.0.0' && raw.layout && raw.sections) {
+    const payload = raw as CustomDesignPayloadV1
+    if (!payload.metadata.checksum) {
+      payload.metadata.checksum = calculateDesignChecksum(payload)
+    }
+    return payload
+  }
+
+  // Legacy v1.0 flat format migration
+  const upper = raw.upper || {}
+  const lower = raw.lower || {}
+  const border = raw.border || {}
+  const topCrest = raw.topCrest || {}
+  const bottomCrest = raw.bottomCrest || {}
+
+  const payload: CustomDesignPayloadV1 = {
+    metadata: {
+      version: '1.0.0',
+      editorVersion: '1.0.0',
+      platform: 'web',
+      locale: 'id-ID',
+      createdAt: raw.generatedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      checksum: ''
+    },
+    layout: {
+      physicalSizeId: (raw.physicalSizeId || 'medium') as any,
+      upperHeightRatio: Math.max(0.25, Math.min(Number(raw.heightRatio || 0.58), 0.75)),
+      border: {
+        style: (border.style || 'solid') as any,
+        colorHex: normalizeHexColor(border.color, '#F5C842'),
+        widthPx: Number(border.width || 12),
+        showCenterDivider: Boolean(border.center ?? true)
+      }
+    },
+    sections: {
+      upper: {
+        bgColorHex: normalizeHexColor(upper.bgColor, '#C0392B'),
+        cornerStyle: (upper.cornerStyle || 'none') as any,
+        header: {
+          text: upper.headerText || null,
+          fontId: (upper.headerFont || 'playfair') as any,
+          fontSizePx: Number(upper.headerFontSize || 36),
+          fontColorHex: normalizeHexColor(upper.headerColor, '#FFD700'),
+          alignment: (upper.headerAlign || 'center') as any
+        },
+        body: {
+          text: upper.bodyText || null,
+          fontId: (upper.bodyFont || 'inter') as any,
+          fontSizePx: Number(upper.bodyFontSize || 20),
+          fontColorHex: normalizeHexColor(upper.bodyColor, '#FFFFFF'),
+          alignment: (upper.bodyAlign || 'center') as any
+        }
+      },
+      lower: {
+        bgColorHex: normalizeHexColor(lower.bgColor, '#1A3A5C'),
+        cornerStyle: (lower.cornerStyle || 'none') as any,
+        header: {
+          text: lower.headerText || null,
+          fontId: (lower.headerFont || 'bebas') as any,
+          fontSizePx: Number(lower.headerFontSize || 26),
+          fontColorHex: normalizeHexColor(lower.headerColor, '#FFFFFF'),
+          alignment: (lower.headerAlign || 'center') as any
+        },
+        body: {
+          text: lower.bodyText || null,
+          fontId: (lower.bodyFont || 'inter') as any,
+          fontSizePx: Number(lower.bodyFontSize || 22),
+          fontColorHex: normalizeHexColor(lower.bodyColor, '#FFFFFF'),
+          alignment: (lower.bodyAlign || 'center') as any
+        }
+      }
+    },
+    decorations: {
+      topCrest: {
+        visible: Boolean(topCrest.enabled),
+        variantId: (topCrest.style || 'classic') as any,
+        primaryColorHex: normalizeHexColor(topCrest.primary, '#E63946'),
+        secondaryColorHex: normalizeHexColor(topCrest.secondary, '#F1FAEE'),
+        scalePercent: Number(topCrest.size || 40)
+      },
+      bottomCrest: {
+        visible: Boolean(bottomCrest.enabled),
+        variantId: (bottomCrest.style || 'classic') as any,
+        primaryColorHex: normalizeHexColor(bottomCrest.primary, '#E63946'),
+        secondaryColorHex: normalizeHexColor(bottomCrest.secondary, '#F1FAEE'),
+        scalePercent: Number(bottomCrest.size || 40)
+      }
+    },
+    elements: Array.isArray(raw.elements) ? raw.elements.map((el: any) => {
+      if (el.type === 'image') {
+        return {
+          id: el.id || `elem-${Math.random()}`,
+          type: 'image' as const,
+          src: el.src || '',
+          frameStyle: (el.frame || 'square') as any,
+          crop: { xPercent: el.cropX ?? 50, yPercent: el.cropY ?? 50, zoom: el.zoom ?? 1 },
+          transform: {
+            xPercent: el.x ?? 15,
+            yPercent: el.y ?? 15,
+            scalePercent: el.width ?? 22,
+            rotationDeg: el.rotation ?? 0
+          }
+        }
+      }
+      return {
+        id: el.id || `elem-${Math.random()}`,
+        type: 'brush' as const,
+        brushType: (el.brushType || 'flower') as any,
+        colorHex: normalizeHexColor(el.color, '#E85D75'),
+        transform: {
+          xPercent: el.x ?? 50,
+          yPercent: el.y ?? 50,
+          scalePercent: el.size ?? 48,
+          rotationDeg: el.rotation ?? 0
+        }
+      }
+    }) : [],
+    assets: {
+      previewBase64: raw.previewBase64 || raw.assets?.previewBase64 || null,
+      previewAssetId: raw.previewAssetId || raw.assets?.previewAssetId || null,
+      previewUrl: raw.previewUrl || raw.assets?.previewUrl || null,
+      bucketPath: raw.bucketPath || raw.assets?.bucketPath || null,
+      storageProvider: raw.storageProvider || raw.assets?.storageProvider || 'supabase'
+    }
+  }
+
+  payload.metadata.checksum = calculateDesignChecksum(payload)
+  return payload
+}
+
 export interface CartItem {
   id: string
+  cartItemId?: string
   name: string
   price: number
+  subtotal?: number
   image: string
   quantity: number
   size?: string
   color?: string
   isCustom?: boolean
+  itemType?: 'standard' | 'custom'
   shopId?: string
+  customDesign?: CustomDesignPayloadV1  // only present for custom board orders
 }
 
 export interface Order {
@@ -230,26 +489,17 @@ export const useCart = () => {
     }
   ])
   const isLoggedIn = useCookie('is_logged_in')
+  const isLoadingCart = useState<boolean>('chia-florist-cart-loading', () => false)
 
   const loadCart = (force = false): Promise<void> => {
-    if (isLoggedIn.value !== 'true') return Promise.resolve()
-
-    if (!force && import.meta.client) {
-      const cached = localStorage.getItem('chia-florist-cart-cache')
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached)
-          const customItems = cart.value.filter(i => i.isCustom)
-          cart.value = [...parsed, ...customItems]
-          return Promise.resolve()
-        } catch (e) {
-          console.error('Failed to parse cart cache:', e)
-        }
-      }
+    if (isLoggedIn.value !== 'true') {
+      isLoadingCart.value = false
+      return Promise.resolve()
     }
 
     if (loadCartPromise) return loadCartPromise
 
+    isLoadingCart.value = true
     loadCartPromise = (async () => {
       try {
         const response = await cartService.getCart()
@@ -257,7 +507,28 @@ export const useCart = () => {
           const backendItems: CartItem[] = response.items.map((item: any) => {
             let size = '1.8m'
             let color = '#1b4332'
-            let price = Number(item.price)
+            let price = Number(item.price ?? item.unit_price ?? 0)
+            let subtotal = Number(item.subtotal ?? (price * Number(item.quantity || 1)))
+
+            if (item.product_variant_type === 'custom' || item.item_type === 'custom' || item.custom_design) {
+              const migratedDesign = item.custom_design ? migrateCustomDesignPayload(item.custom_design) : undefined
+              const cartItemId = item.cart_item_id || item.id || `custom-${Date.now()}`
+              return {
+                id: cartItemId,
+                cartItemId: cartItemId,
+                name: item.product_name || item.name || 'Custom Board',
+                price: price,
+                subtotal: subtotal,
+                image: migratedDesign?.assets?.previewUrl || migratedDesign?.assets?.previewBase64 || item.images?.thumbnail || '/images/custom-preview.png',
+                quantity: Number(item.quantity),
+                shopId: item.shop_id,
+                isCustom: true,
+                itemType: 'custom',
+                customDesign: migratedDesign,
+                size: migratedDesign?.layout?.physicalSizeId || size,
+                color: migratedDesign?.sections?.upper?.bgColorHex || color
+              }
+            }
 
             if (import.meta.client) {
               const savedAttr = localStorage.getItem(`cart_attr_${item.product_id}`)
@@ -281,13 +552,21 @@ export const useCart = () => {
               quantity: Number(item.quantity),
               shopId: item.shop_id,
               isCustom: false,
+              itemType: 'standard',
               size: size, 
               color: color
             }
           })
 
-          const customItems = cart.value.filter(i => i.isCustom)
-          cart.value = [...backendItems, ...customItems]
+          if (isLoggedIn.value === 'true') {
+            cart.value = backendItems
+          } else {
+            const customItems = cart.value.filter(localItem => 
+              localItem.isCustom && 
+              !backendItems.some(b => b.id === localItem.id || (b.isCustom && b.name === localItem.name && b.size === localItem.size))
+            )
+            cart.value = [...backendItems, ...customItems]
+          }
 
           if (import.meta.client) {
             localStorage.setItem('chia-florist-cart-cache', JSON.stringify(backendItems))
@@ -296,6 +575,7 @@ export const useCart = () => {
       } catch (err) {
         console.error('Failed to load cart from backend:', err)
       } finally {
+        isLoadingCart.value = false
         loadCartPromise = null
       }
     })()
@@ -305,10 +585,9 @@ export const useCart = () => {
 
   if (import.meta.client && !cartWatcherInitialized) {
     cartWatcherInitialized = true
-    watch(isLoggedIn, (newVal, oldVal) => {
+    watch(isLoggedIn, (newVal) => {
       if (newVal === 'true') {
-        const shouldForce = oldVal !== undefined && oldVal !== 'true'
-        loadCart(shouldForce)
+        loadCart(true)
       } else {
         cart.value = cart.value.filter(i => i.isCustom)
         localStorage.removeItem('chia-florist-cart-cache')
@@ -332,7 +611,7 @@ export const useCart = () => {
       }
     })
     await Promise.all(updatePromises)
-    await loadCart()
+    await loadCart(true)
   }
 
   const addToCart = async (item: Omit<CartItem, 'quantity'>, qty = 1) => {
@@ -345,13 +624,44 @@ export const useCart = () => {
     }
 
     if (item.isCustom) {
-      const existingItem = cart.value.find(
-        i => i.id === item.id || (i.isCustom && i.name === item.name && i.size === item.size && i.color === item.color)
-      )
-      if (existingItem) {
-        existingItem.quantity += qty
+      const designPayload = item.customDesign ? migrateCustomDesignPayload(item.customDesign) : undefined
+
+      if (isLoggedIn.value === 'true') {
+        try {
+          const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
+          await cartService.addItem({
+            product_variant_type: 'custom',
+            item_type: 'custom',
+            shop_id: shopId,
+            quantity: qty,
+            product_name: item.name,
+            physical_size_id: designPayload?.layout?.physicalSizeId || item.size || 'medium',
+            unit_price: item.price,
+            custom_design: designPayload
+          })
+          await loadCart(true)
+        } catch (err) {
+          console.error('Failed to add custom item to backend cart:', err)
+        }
       } else {
-        cart.value.push({ ...item, quantity: qty })
+        const existingItem = cart.value.find(
+          i => i.id === item.id || (i.isCustom && i.name === item.name && i.size === item.size && i.color === item.color)
+        )
+        if (existingItem) {
+          existingItem.quantity += qty
+          if (designPayload) existingItem.customDesign = designPayload
+        } else {
+          cart.value.push({ ...item, customDesign: designPayload, quantity: qty, itemType: 'custom' })
+        }
+      }
+      
+      if (import.meta.client && designPayload) {
+        try {
+          localStorage.setItem(`custom_design_${item.id}`, JSON.stringify(designPayload))
+          console.info('[Chia Florist] Custom Design Payload v1.0.0 (persisted):', designPayload)
+        } catch (e) {
+          console.warn('Could not persist custom design to localStorage:', e)
+        }
       }
       return
     }
@@ -361,6 +671,8 @@ export const useCart = () => {
         const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
         
         await cartService.addItem({ 
+          product_variant_type: 'standard',
+          item_type: 'standard',
           product_id: item.id, 
           shop_id: shopId, 
           quantity: qty
@@ -373,7 +685,7 @@ export const useCart = () => {
     } else {
       const existingItem = cart.value.find(i => i.id === item.id)
       if (existingItem) existingItem.quantity += qty
-      else cart.value.push({ ...item, quantity: qty })
+      else cart.value.push({ ...item, quantity: qty, itemType: 'standard' })
     }
   }
 
@@ -386,6 +698,14 @@ export const useCart = () => {
 
     if (item.isCustom) {
       cart.value = cart.value.filter(i => i.id !== id)
+      if (isLoggedIn.value === 'true') {
+        try {
+          await cartService.removeCustomItem(id)
+          await loadCart(true)
+        } catch (err) {
+          console.error('Failed to remove custom item from backend:', err)
+        }
+      }
       return
     }
 
@@ -406,15 +726,15 @@ export const useCart = () => {
     const item = cart.value.find(i => i.id === id)
     if (!item) return
 
-    const newQty = item.quantity + change
+    const MAX_CART_QTY = 80
+    const newQty = Math.min(item.quantity + change, MAX_CART_QTY)
     if (newQty <= 0) {
       await removeFromCart(id, size, color)
       return
     }
+    if (newQty === item.quantity) return  // already at cap — nothing to do
 
     item.quantity = newQty
-
-    if (item.isCustom) return
 
     if (isLoggedIn.value === 'true') {
       const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
@@ -428,7 +748,22 @@ export const useCart = () => {
         shopId,
         timeoutId: setTimeout(async () => {
           try {
-            await cartService.updateItem(shopId, id, newQty)
+            if (item.isCustom) {
+              await cartService.removeCustomItem(id)
+              const designPayload = item.customDesign ? migrateCustomDesignPayload(item.customDesign) : undefined
+              await cartService.addItem({
+                product_variant_type: 'custom',
+                item_type: 'custom',
+                shop_id: shopId,
+                quantity: newQty,
+                product_name: item.name,
+                physical_size_id: designPayload?.layout?.physicalSizeId || item.size || 'medium',
+                unit_price: item.price,
+                custom_design: designPayload
+              })
+            } else {
+              await cartService.updateItem(shopId, id, newQty)
+            }
             await loadCart(true)
           } catch (err) {
             console.error('Backend sync failed:', err)
@@ -512,6 +847,7 @@ export const useCart = () => {
   return {
     cart,
     orders,
+    isLoadingCart,
     loadCart,
     flushCart,
     addToCart,

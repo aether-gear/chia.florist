@@ -33,30 +33,6 @@ export function useOrderActionsViewModel() {
     }
   };
 
-  const confirmPayment = async (paymentId: string) => {
-    return handleAction(
-      `/payments/${paymentId}/action`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ action: 'confirm' }),
-      },
-      'Payment confirmed successfully.',
-      'Failed to confirm payment.'
-    );
-  };
-
-  const rejectPayment = async (paymentId: string) => {
-    return handleAction(
-      `/payments/${paymentId}/action`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ action: 'reject' }),
-      },
-      'Payment rejected successfully.',
-      'Failed to reject payment.'
-    );
-  };
-
   const updateOrderStatus = async (
     orderId: string,
     status: string,
@@ -107,8 +83,6 @@ export function useOrderActionsViewModel() {
 
   return {
     submitting,
-    confirmPayment,
-    rejectPayment,
     updateOrderStatus,
     updateShipmentStatus,
     updateShipmentDetails,

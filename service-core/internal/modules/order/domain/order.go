@@ -6,8 +6,12 @@ import (
 	"strings"
 	"time"
 
+	appclock "service-core/internal/common/clock"
+
 	"github.com/google/uuid"
 )
+
+const DefaultHandlingSLAWindow = 72 * time.Hour
 
 type OrderStatus string
 
@@ -18,22 +22,26 @@ const (
 	OrderStatusShipped    OrderStatus = "shipped"
 	OrderStatusDelivered  OrderStatus = "delivered"
 	OrderStatusCancelled  OrderStatus = "cancelled"
+	OrderStatusExpired    OrderStatus = "expired"
 )
 
 var allowedTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusPending: {
 		OrderStatusConfirmed,
 		OrderStatusCancelled,
+		OrderStatusExpired,
 	},
 
 	OrderStatusConfirmed: {
 		OrderStatusProcessing,
 		OrderStatusCancelled,
+		OrderStatusExpired,
 	},
 
 	OrderStatusProcessing: {
 		OrderStatusShipped,
 		OrderStatusCancelled,
+		OrderStatusExpired,
 	},
 
 	OrderStatusShipped: {
@@ -43,6 +51,8 @@ var allowedTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusDelivered: {},
 
 	OrderStatusCancelled: {},
+
+	OrderStatusExpired: {},
 }
 
 type Order struct {
@@ -58,13 +68,53 @@ type Order struct {
 	ShippingFee int64
 	Total       int64
 
+	ConfirmedAt       *time.Time
+	HandlingExpiresAt *time.Time
+
 	CreatedAt time.Time
 	UpdatedAt *time.Time
 }
 
+func (o Order) IsHandlingExpired(now time.Time) bool {
+	if o.HandlingExpiresAt == nil {
+		return false
+	}
+	return !now.Before(*o.HandlingExpiresAt)
+}
+
+// Confirm transitions the order to confirmed status and stamps SLA fields.
+func (o *Order) Confirm(confirmedAt time.Time, slaWindow time.Duration) error {
+	if slaWindow <= 0 {
+		slaWindow = DefaultHandlingSLAWindow
+	}
+	if !o.canTransitionTo(OrderStatusConfirmed) && o.Status != OrderStatusConfirmed {
+		return fmt.Errorf("invalid status transition: %s → %s", o.Status, OrderStatusConfirmed)
+	}
+
+	t := confirmedAt.UTC()
+	expiresAt := t.Add(slaWindow)
+
+	o.Status = OrderStatusConfirmed
+	o.ConfirmedAt = &t
+	o.HandlingExpiresAt = &expiresAt
+
+	return o.Validate()
+}
+
+// Validate checks domain invariants for Order aggregate.
+func (o Order) Validate() error {
+	if o.Status == OrderStatusConfirmed || o.Status == OrderStatusProcessing {
+		if o.ConfirmedAt == nil || o.HandlingExpiresAt == nil {
+			return ErrMissingSLAFields
+		}
+	}
+
+	return nil
+}
+
 func (o *Order) UpdateStatus(status OrderStatus) error {
 	if o.Status == status {
-		return nil
+		return o.Validate()
 	}
 
 	if !o.canTransitionTo(status) {
@@ -72,7 +122,17 @@ func (o *Order) UpdateStatus(status OrderStatus) error {
 	}
 
 	o.Status = status
-	return nil
+	if (status == OrderStatusConfirmed || status == OrderStatusProcessing) &&
+		o.ConfirmedAt == nil {
+
+		now := appclock.Now()
+		expiresAt := now.Add(DefaultHandlingSLAWindow)
+
+		o.ConfirmedAt = &now
+		o.HandlingExpiresAt = &expiresAt
+	}
+
+	return o.Validate()
 }
 
 func (o Order) NewInvoice() Invoice {
@@ -101,7 +161,7 @@ func (o *Order) canTransitionTo(next OrderStatus) bool {
 func NewOrderNumber() string {
 	return fmt.Sprintf(
 		"ORD-%s-%s",
-		time.Now().Format("20060102"),
+		appclock.Now().Format("20060102"),
 		strings.ToUpper(uuid.NewString()[:6]),
 	)
 }

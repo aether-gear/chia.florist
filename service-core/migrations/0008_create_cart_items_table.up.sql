@@ -1,11 +1,15 @@
+CREATE type product_variant_type as ENUM ('standard', 'custom');
+
 CREATE TABLE cart_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     cart_id UUID NOT NULL,
-    product_id UUID NOT NULL,
+    product_variant_type product_variant_type NOT NULL DEFAULT 'standard',
+    product_id UUID,
     shop_id UUID NOT NULL,
 
     quantity INTEGER NOT NULL CHECK (quantity > 0),
+    custom_design JSONB,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -24,12 +28,18 @@ CREATE TABLE cart_items (
     CONSTRAINT fk_cart_item_shop
         FOREIGN KEY(shop_id)
         REFERENCES shops(id)
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT check_cart_items_type
+        CHECK (
+            (product_variant_type = 'standard' AND product_id IS NOT NULL)
+            OR (product_variant_type = 'custom' AND product_id IS NULL AND custom_design IS NOT NULL)
+        )
 );
 
-CREATE UNIQUE INDEX unique_product_per_carts
+CREATE UNIQUE INDEX unique_standard_product_per_cart
 ON cart_items(cart_id, product_id)
-WHERE deleted_at IS NULL;
+WHERE deleted_at IS NULL AND product_variant_type = 'standard';
 
 CREATE INDEX idx_cart_items_cart_id
 ON cart_items(cart_id);

@@ -10,7 +10,9 @@ import (
 	addressDomain "service-core/internal/modules/address/domain"
 	addressRepo "service-core/internal/modules/address/repository"
 	cartDomain "service-core/internal/modules/cart/domain"
+	cartRepo "service-core/internal/modules/cart/repository"
 	courierRepo "service-core/internal/modules/courier/repository"
+	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	orderRepo "service-core/internal/modules/order/repository"
 	paymentRepo "service-core/internal/modules/payment/repository"
@@ -25,6 +27,7 @@ import (
 
 type pricingServiceImpl struct {
 	addressRepo       addressRepo.CustomerAddressRepository
+	cartRepo          cartRepo.CartRepository
 	courierShopRepo   courierRepo.ShopCourierRepository
 	inventoryRepo     inventoryRepo.InventoryRepository
 	paymentMethodRepo paymentRepo.PaymentMethodRepository
@@ -36,6 +39,7 @@ type pricingServiceImpl struct {
 
 func NewPricingService(
 	addressRepo addressRepo.CustomerAddressRepository,
+	cartRepo cartRepo.CartRepository,
 	courierShopRepo courierRepo.ShopCourierRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	paymentMethodRepo paymentRepo.PaymentMethodRepository,
@@ -46,6 +50,7 @@ func NewPricingService(
 ) orderRepo.PricingService {
 	return &pricingServiceImpl{
 		addressRepo:       addressRepo,
+		cartRepo:          cartRepo,
 		courierShopRepo:   courierShopRepo,
 		inventoryRepo:     inventoryRepo,
 		paymentMethodRepo: paymentMethodRepo,
@@ -67,24 +72,24 @@ func (s *pricingServiceImpl) Calculate(
 	// primary address unless a specific address is requested
 	var destAddress *addressDomain.CustomerAddress
 	if input.AddressID != nil {
-		addr, err := s.addressRepo.
-			GetByID(ctx, exec, *input.AddressID)
+		addr, err := s.addressRepo.GetByID(ctx, exec,
+			*input.AddressID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve destination address: %w", err)
 		}
-
 		if addr == nil {
 			return nil, apperrors.NewNotFound(addressDomain.ErrAddressNotFound.Error())
 		}
 
 		destAddress = addr
 	} else {
-		addr, err := s.addressRepo.
-			GetDefaultByCustomerID(ctx, exec, input.CustomerID)
+		addr, err := s.addressRepo.GetDefaultByCustomerID(ctx, exec,
+			input.CustomerID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve default destination address: %w", err)
 		}
-
 		if addr == nil {
 			return nil, apperrors.NewConflict(addressDomain.ErrNotFoundDefaultAddress.Error())
 		}
@@ -97,6 +102,38 @@ func (s *pricingServiceImpl) Calculate(
 		return nil, fmt.Errorf("invalid destination district id: %w", err)
 	}
 
+	// Hydrate stored cart item metadata (e.g. custom_design, product_id, is_custom)
+	// from the user's cart in PostgreSQL when cart_item_id is provided.
+	var cartItemMap map[uuid.UUID]cartDomain.CartItem
+	if input.CustomerID != uuid.Nil && s.cartRepo != nil {
+		if userCart, err := s.cartRepo.GetWithItemsByCustomerID(ctx, exec, input.CustomerID); err == nil && userCart != nil {
+			cartItemMap = make(map[uuid.UUID]cartDomain.CartItem, len(userCart.Items))
+			for _, ci := range userCart.Items {
+				cartItemMap[ci.ID] = ci
+			}
+		}
+	}
+
+	if cartItemMap != nil {
+		for i := range input.Shops {
+			for j := range input.Shops[i].Items {
+				item := &input.Shops[i].Items[j]
+				if item.CartItemID != nil {
+					if ci, ok := cartItemMap[*item.CartItemID]; ok {
+						if ci.ProductVariantType == cartDomain.ProductVariantTypeCustom || ci.ProductID == nil {
+							item.IsCustom = true
+							if len(item.CustomDesign) == 0 {
+								item.CustomDesign = ci.CustomDesign
+							}
+						} else if item.ProductID == nil {
+							item.ProductID = ci.ProductID
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Collect IDs upfront to avoid per-item database queries
 	//
 	// Products are loaded for inventory checks,
@@ -106,15 +143,20 @@ func (s *pricingServiceImpl) Calculate(
 	var shopIDs []uuid.UUID
 	for _, shopGroup := range input.Shops {
 		for _, item := range shopGroup.Items {
-			productIDs = append(productIDs, item.ProductID)
+			if !item.IsCustom && item.ProductID != nil {
+				productIDs = append(productIDs, *item.ProductID)
+			}
 		}
 		shopIDs = append(shopIDs, shopGroup.ShopID)
 	}
 
-	products, err := s.productRepo.
-		FindByIDs(ctx, exec, productIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load products: %w", err)
+	var products []productDomain.Product
+	if len(productIDs) > 0 {
+		var err error
+		products, err = s.productRepo.FindByIDs(ctx, exec, productIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load products: %w", err)
+		}
 	}
 
 	productMap := make(map[uuid.UUID]productDomain.Product, len(products))
@@ -122,26 +164,32 @@ func (s *pricingServiceImpl) Calculate(
 		productMap[p.ID] = p
 	}
 
-	inventoryMap, err := s.inventoryRepo.
-		ListByProductIDs(ctx, exec, productIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load inventory for products: %w", err)
+	var inventoryMap map[uuid.UUID][]inventoryDomain.Inventory
+	if len(productIDs) > 0 {
+		var err error
+		inventoryMap, err = s.inventoryRepo.ListByProductIDs(ctx, exec, productIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load inventory for products: %w", err)
+		}
 	}
 
-	courierShopMap, err := s.courierShopRepo.
-		ListsByShopIDs(ctx, exec, shopIDs)
+	courierShopMap, err := s.courierShopRepo.ListsByShopIDs(ctx, exec,
+		shopIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve shop courier configurations: %w", err)
 	}
 
-	originAddresses, err := s.shopAddressRepo.
-		GetDefaultsByShopIDs(ctx, exec, shopIDs)
+	originAddresses, err := s.shopAddressRepo.GetDefaultsByShopIDs(ctx, exec,
+		shopIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve origin addresses: %w", err)
 	}
 
-	shops, err := s.shopRepo.
-		FindByIDs(ctx, exec, shopIDs)
+	shops, err := s.shopRepo.FindByIDs(ctx, exec,
+		shopIDs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load shops: %w", err)
 	}
@@ -172,7 +220,47 @@ func (s *pricingServiceImpl) Calculate(
 		)
 
 		for _, shopItem := range shopGroup.Items {
-			shopInventories := inventoryMap[shopItem.ProductID]
+			if shopItem.IsCustom || shopItem.ProductID == nil {
+				var unitPrice int64 = productDomain.DEFAULT_SIZE_PRICE_MEDIUM
+				weight := 2500 // default medium board weight
+
+				if len(shopItem.CustomDesign) > 0 {
+					if parsedDesign, err := productDomain.ParseCustomDesignPayload(shopItem.CustomDesign); err == nil {
+						breakdown := productDomain.CalculateCustomProductPrice(
+							*parsedDesign,
+							productDomain.DefaultCustomPricingMatrix(),
+						)
+
+						unitPrice = breakdown.TotalPrice
+						if breakdown.PhysicalSizeID == "small" {
+							weight = 1500
+						} else if breakdown.PhysicalSizeID == "large" {
+							weight = 4000
+						}
+					}
+				}
+
+				itemSubtotal := unitPrice * int64(shopItem.Quantity)
+				shopSubtotal += itemSubtotal
+				totalSubtotal += itemSubtotal
+				itemWeight := weight * shopItem.Quantity
+				shopItemsWeight += itemWeight
+
+				pricingItems = append(pricingItems, orderRepo.PricingItemResult{
+					ProductID:   shopItem.ProductID,
+					CartItemID:  shopItem.CartItemID,
+					IsCustom:    true,
+					ProductName: "(Custom Flower Board)",
+					Quantity:    shopItem.Quantity,
+					UnitPrice:   unitPrice,
+					Subtotal:    itemSubtotal,
+					WeightGrams: itemWeight,
+				})
+				continue
+			}
+
+			pid := *shopItem.ProductID
+			shopInventories := inventoryMap[pid]
 			var available int
 			for _, inv := range shopInventories {
 				if inv.ShopID == shopGroup.ShopID {
@@ -182,11 +270,11 @@ func (s *pricingServiceImpl) Calculate(
 			}
 
 			if shopItem.Quantity > available {
-				productName := productMap[shopItem.ProductID].Name
+				productName := productMap[pid].Name
 				return nil, apperrors.NewConflict(fmt.Sprintf("%s is out of stock", productName))
 			}
 
-			product, ok := productMap[shopItem.ProductID]
+			product, ok := productMap[pid]
 			if !ok {
 				return nil, apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
 			}
@@ -203,8 +291,11 @@ func (s *pricingServiceImpl) Calculate(
 			itemWeight := weight * shopItem.Quantity
 			shopItemsWeight += itemWeight
 
+			pID := product.ID
 			pricingItems = append(pricingItems, orderRepo.PricingItemResult{
-				ProductID:   product.ID,
+				ProductID:   &pID,
+				CartItemID:  shopItem.CartItemID,
+				IsCustom:    false,
 				ProductName: product.Name,
 				Quantity:    shopItem.Quantity,
 				UnitPrice:   product.Price,
@@ -344,11 +435,12 @@ func (s *pricingServiceImpl) Calculate(
 	)
 
 	if input.PaymentMethodID != nil {
-		pm, err := s.paymentMethodRepo.GetByID(ctx, exec, *input.PaymentMethodID)
+		pm, err := s.paymentMethodRepo.GetByID(ctx, exec,
+			*input.PaymentMethodID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve payment method: %w", err)
 		}
-
 		if pm == nil {
 			return nil, apperrors.NewNotFound("selected payment method is not available")
 		}
@@ -364,12 +456,12 @@ func (s *pricingServiceImpl) Calculate(
 			Total:           totalAll + fee,
 		}
 	} else {
-		pms, err := s.paymentMethodRepo.
-			ListAll(ctx, exec, nil)
+		pms, err := s.paymentMethodRepo.ListAll(ctx, exec,
+			nil,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load payment methods: %w", err)
 		}
-
 		if len(pms) == 0 {
 			return nil, apperrors.NewNotFound("payment method is not available")
 		}

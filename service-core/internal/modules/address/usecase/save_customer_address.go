@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/address/domain"
 	"service-core/internal/modules/address/repository"
@@ -90,7 +90,7 @@ func (u *SaveCustomerAddressUsecase) Execute(
 			FullAddress: input.FullAddress,
 			PostalCode:  input.PostalCode,
 		},
-		CreatedAt: time.Now(),
+		CreatedAt: appclock.Now(),
 	}
 
 	err := u.transactor.WithinTransaction(

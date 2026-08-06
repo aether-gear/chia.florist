@@ -13,9 +13,9 @@ CREATE TABLE payment_channel_data (
     -- NULL when the gateway returns no instruction value.
     action_url TEXT,
 
-    expires_at TIMESTAMP,
+    expires_at TIMESTAMPTZ,
 
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_payment_channel_data_payment_id
         FOREIGN KEY (payment_id)

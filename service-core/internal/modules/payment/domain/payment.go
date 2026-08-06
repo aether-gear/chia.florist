@@ -9,27 +9,27 @@ import (
 type PaymentStatus string
 
 const (
-	PaymentStatusPending   PaymentStatus = "pending"
-	PaymentStatusPaid      PaymentStatus = "paid"
-	PaymentStatusFailed    PaymentStatus = "failed"
-	PaymentStatusExpired   PaymentStatus = "expired"
-	PaymentStatusCancelled PaymentStatus = "cancelled"
-	PaymentStatusRefunded  PaymentStatus = "refunded"
+	PaymentStatusPending       PaymentStatus = "pending"
+	PaymentStatusPaid          PaymentStatus = "paid"
+	PaymentStatusFailed        PaymentStatus = "failed"
+	PaymentStatusExpired       PaymentStatus = "expired"
+	PaymentStatusCancelled      PaymentStatus = "cancelled"
+	PaymentStatusRefunded      PaymentStatus = "refunded"
+	PaymentStatusRefundPending PaymentStatus = "refund_pending"
+	PaymentStatusRefundFailed  PaymentStatus = "refund_failed"
 )
 
 type PaymentProvider string
 
 const (
-	PaymentProviderManual  PaymentProvider = "manual"
 	PaymentProviderGateway PaymentProvider = "gateway"
 )
 
 type Payment struct {
 	ID uuid.UUID
 
-	OrderID          uuid.UUID
-	MethodID         uuid.UUID
-	PaymentAccountID *uuid.UUID
+	OrderID  uuid.UUID
+	MethodID uuid.UUID
 
 	Provider string
 
@@ -41,6 +41,7 @@ type Payment struct {
 	Status PaymentStatus
 
 	ExpiresAt *time.Time
+	PaidAt    *time.Time
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time

@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/audit/domain"
 	"service-core/internal/modules/audit/repository"
+	"strings"
 
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
@@ -38,7 +38,7 @@ func (r *auditLogRepositoryImpl) Save(
 		log.ID = uuid.New()
 	}
 	if log.CreatedAt.IsZero() {
-		log.CreatedAt = time.Now().UTC()
+		log.CreatedAt = appclock.Now()
 	}
 
 	queryStr := `

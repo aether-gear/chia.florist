@@ -168,36 +168,13 @@ func (m *coMockPaymentRepo) Save(_ context.Context, _ transaction.Executor, paym
 func (m *coMockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Executor, _ time.Time) ([]paymentDomain.Payment, error) {
 	return nil, nil
 }
+func (m *coMockPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 // --- payment account repo ---
 
-type coMockPaymentAccountRepo struct {
-	incremented        []uuid.UUID
-	leastLoadedAccount *paymentDomain.PaymentAccount
-}
-
-func (m *coMockPaymentAccountRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.PaymentAccount) error {
-	return nil
-}
-func (m *coMockPaymentAccountRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *coMockPaymentAccountRepo) RetrieveLeastLoaded(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return m.leastLoadedAccount, nil
-}
-func (m *coMockPaymentAccountRepo) IncrementLoad(_ context.Context, _ transaction.Executor, accountID uuid.UUID) error {
-	m.incremented = append(m.incremented, accountID)
-	return nil
-}
-func (m *coMockPaymentAccountRepo) DecrementLoad(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
-	return nil
-}
-func (m *coMockPaymentAccountRepo) ListByMethodID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *coMockPaymentAccountRepo) ListAll(_ context.Context, _ transaction.Executor) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
+type coMockPaymentAccountRepo struct{}
 
 // --- payment event repo ---
 
@@ -264,12 +241,30 @@ func (m *coMockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor
 	}
 	return nil
 }
+func (m *coMockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, confirmedAt *time.Time, expiresAt *time.Time) error {
+	if o, ok := m.orders[id]; ok {
+		o.Status = status
+		if confirmedAt != nil {
+			o.ConfirmedAt = confirmedAt
+		}
+		if expiresAt != nil {
+			o.HandlingExpiresAt = expiresAt
+		}
+	}
+	return nil
+}
 func (m *coMockOrderRepo) Save(_ context.Context, _ transaction.Executor, order orderDomain.Order) error {
 	m.orders[order.ID] = &order
 	return nil
 }
 func (m *coMockOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
+}
+func (m *coMockOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *coMockOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
 }
 
 // --- order item repo ---
@@ -343,6 +338,9 @@ func (m *coMockInventoryRepo) Release(_ context.Context, _ transaction.Executor,
 func (m *coMockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
 	return nil
 }
+func (m *coMockInventoryRepo) Restock(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
+	return nil
+}
 func (m *coMockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
 	return nil
 }
@@ -380,6 +378,8 @@ type coMockGateway struct {
 	cancelOrderID string
 }
 
+func (m *coMockGateway) Name() string                                                 { return "mock_gateway" }
+func (m *coMockGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (m *coMockGateway) Charge(_ context.Context, _ paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	return m.chargeResp, m.chargeErr
 }
@@ -390,6 +390,9 @@ func (m *coMockGateway) CancelTransaction(_ context.Context, gatewayOrderID stri
 	m.cancelCalled = true
 	m.cancelOrderID = gatewayOrderID
 	return nil
+}
+func (m *coMockGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
 }
 func (m *coMockGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
 	return nil, nil
@@ -404,6 +407,8 @@ type capturingGateway struct {
 	captured *paymentgateway.ChargeRequest
 }
 
+func (c *capturingGateway) Name() string                                                 { return "mock_gateway" }
+func (c *capturingGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (c *capturingGateway) Charge(_ context.Context, req paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	*c.captured = req
 	return c.resp, nil
@@ -412,6 +417,9 @@ func (c *capturingGateway) ParseNotification(_ context.Context, _ paymentgateway
 	return nil, nil
 }
 func (c *capturingGateway) CancelTransaction(_ context.Context, _ string) error { return nil }
+func (c *capturingGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
+}
 func (c *capturingGateway) GetTransactionStatus(_ context.Context, _ string) (*paymentgateway.NotificationResult, error) {
 	return nil, nil
 }
@@ -446,7 +454,7 @@ func coDefaultPricing(productID, shopID uuid.UUID) *orderRepo.PricingResult {
 				ShopID:   shopID,
 				ShopName: "Florist Kage",
 				Items: []orderRepo.PricingItemResult{
-					{ProductID: productID, ProductName: "Bouquet A", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
+					{ProductID: &productID, ProductName: "Bouquet A", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
 				},
 				SelectedCourier: orderRepo.SelectedCourierResult{Code: "jne", Service: "REG", Fee: 15000},
 			},
@@ -517,7 +525,6 @@ func buildUCWith(
 		&coMockInvoiceItemRepo{},
 		paymentStore,
 		paymentMethodRepo,
-		paymentAccRepo,
 		&coMockPaymentEventRepo{},
 		&coMockPaymentInstructionRepo{},
 		channelDataRepo,
@@ -535,12 +542,11 @@ func coInput(customerID, paymentMethodID uuid.UUID, isManual bool, productID, sh
 		CustomerID:      customerID,
 		AddressID:       uuid.New(),
 		PaymentMethodID: paymentMethodID,
-		IsManual:        isManual,
 		Shops: []OrderShopInput{
 			{
 				ShopID:   shopID,
 				ShopName: "Florist Kage",
-				Items:    []OrderItemInput{{ProductID: productID, ProductName: "Bouquet A", Quantity: 2}},
+				Items:    []OrderItemInput{{ProductID: &productID, ProductName: "Bouquet A", Quantity: 2}},
 			},
 		},
 	}
@@ -745,64 +751,6 @@ func TestCreateOrder_Gateway_ChannelDataPersisted(t *testing.T) {
 }
 
 // ===========================================================================
-// Happy-path: manual order
-// ===========================================================================
-
-func TestCreateOrder_Manual_Success(t *testing.T) {
-	ctx := context.Background()
-	customerID := uuid.New()
-	productID := uuid.New()
-	shopID := uuid.New()
-	methodID := uuid.New()
-	accountID := uuid.New()
-	accNumber := "1234567890"
-
-	user := coDefaultUser()
-	acc := coDefaultAccount(user.ID)
-	method := &paymentDomain.PaymentMethod{ID: methodID, Name: "mandiri", Code: "mandiri", Provider: "manual", Type: paymentDomain.TypeBankTransfer, IsActive: true}
-	pricing := coDefaultPricing(productID, shopID)
-
-	paRepo := &coMockPaymentAccountRepo{
-		leastLoadedAccount: &paymentDomain.PaymentAccount{
-			ID:            accountID,
-			AccountName:   "Mandiri Kage",
-			AccountNumber: &accNumber,
-		},
-	}
-
-	paymentStore := &coMockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{}}
-
-	uc := buildUC(nil, &coMockGateway{},
-		&coMockPricingService{result: pricing},
-		&coMockPaymentMethodRepo{method: method},
-		paRepo,
-		&coMockUserRepo{user: user},
-		&coMockAccountRepo{account: acc},
-		&coMockInventoryRepo{},
-		paymentStore,
-		&coMockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
-		nil,
-	)
-
-	result, err := uc.Execute(ctx, coInput(customerID, methodID, true, productID, shopID))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.PaymentAccount == nil {
-		t.Fatal("PaymentAccount should not be nil for manual payment")
-	}
-	if result.PaymentAccount.AccountName != "Mandiri Kage" {
-		t.Errorf("AccountName = %v, want Mandiri Kage", result.PaymentAccount.AccountName)
-	}
-	if result.PaymentAccount.AccountNumber == nil || *result.PaymentAccount.AccountNumber != accNumber {
-		t.Errorf("AccountNumber mismatch: %v", result.PaymentAccount.AccountNumber)
-	}
-	if len(paRepo.incremented) != 1 || paRepo.incremented[0] != accountID {
-		t.Errorf("expected IncrementLoad for %v, got %v", accountID, paRepo.incremented)
-	}
-}
-
-// ===========================================================================
 // Charge response instruction type mapping
 // ===========================================================================
 
@@ -925,7 +873,7 @@ func TestCreateOrder_InvariantAdjustmentItemAddedWhenSumDiffers(t *testing.T) {
 				ShopID:   shopID,
 				ShopName: "Kage",
 				Items: []orderRepo.PricingItemResult{
-					{ProductID: productID, ProductName: "Bouquet", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
+					{ProductID: &productID, ProductName: "Bouquet", Quantity: 2, UnitPrice: 50000, Subtotal: 100000},
 				},
 				SelectedCourier: orderRepo.SelectedCourierResult{Code: "jne", Service: "REG", Fee: 15000},
 			},
@@ -1075,7 +1023,7 @@ func TestCreateOrder_InvariantCartItemsRemovedAfterOrder(t *testing.T) {
 			ID:         uuid.New(),
 			CustomerID: customerID,
 			Items: []cartDomain.CartItem{
-				{ID: uuid.New(), ProductID: productID, ShopID: shopID, Quantity: 2},
+				{ID: uuid.New(), ProductID: &productID, ShopID: shopID, Quantity: 2},
 			},
 		},
 	}

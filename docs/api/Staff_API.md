@@ -58,6 +58,12 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
   - [X] Audit Logs
     - [X] Find Audit Logs
     - [X] Get Audit Log
+  - [ ] Analytics
+    - [ ] Get Order Metrics
+    - [ ] Get Payment Metrics
+    - [ ] Get Shipment Metrics
+    - [ ] Get Inventory Metrics
+    - [ ] Get Product Metrics
   - [ ] WAF Security Policy
     - [ ] WAF Rules
     - [ ] List Rules
@@ -2232,3 +2238,269 @@ Returns geolocation parameters mapped to standard IP2Location fields.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 | `500 Internal Server Error` | Geolocation provider connection failed. |
+
+## Analytics
+
+### Get Order Metrics
+
+- **Method**: `GET`
+- **Endpoint**: `/analytics/orders`
+- **Description**: Retrieve order performance summary KPI card data, time-series breakdown, top products, and top shops over a specified date range.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter     | Type   | Required | Description |
+|---------------|--------|----------|-------------|
+| `from`        | string | No       | Start date in RFC3339 (`2026-01-01T00:00:00Z`) or `YYYY-MM-DD` (`2026-01-01`). Defaults to 30 days ago. |
+| `to`          | string | No       | End date in RFC3339 (`2026-07-31T23:59:59Z`) or `YYYY-MM-DD` (`2026-07-31`). Defaults to current time. |
+| `granularity` | string | No       | Time-series grouping. Allowed values: `daily` (default), `weekly`, `monthly`. |
+| `shop_id`     | UUID   | No       | Filter metrics by specific shop ID. |
+| `top_n`       | int    | No       | Number of top products and shops to return. Defaults to `10`. |
+
+#### Response `200 OK`
+
+```json
+{
+  "summary": {
+    "total_orders": 150,
+    "total_gmv": 45000000,
+    "total_revenue": 42000000,
+    "total_shipping_fee": 3000000,
+    "aov": 300000,
+    "cancellation_rate": 0.0667,
+    "pending_count": 10,
+    "confirmed_count": 20,
+    "processing_count": 30,
+    "shipped_count": 40,
+    "delivered_count": 40,
+    "cancelled_count": 10
+  },
+  "time_series": [
+    {
+      "date": "2026-07-01T00:00:00Z",
+      "order_count": 5,
+      "gmv": 1500000,
+      "aov": 300000
+    }
+  ],
+  "top_products": [
+    {
+      "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+      "product_name": "Anniversary Bouquet",
+      "quantity": 25,
+      "revenue": 7500000
+    }
+  ],
+  "top_shops": [
+    {
+      "shop_id": "427db07b-dbad-43ee-9199-49a2849a4e30",
+      "shop_name": "Chia Bogor",
+      "revenue": 20000000,
+      "orders": 65
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid date format or invalid `shop_id` UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+### Get Payment Metrics
+
+- **Method**: `GET`
+- **Endpoint**: `/analytics/payments`
+- **Description**: Retrieve payment summary statistics (total paid, pending, expired, refunded, payment success rate, avg time to pay) and breakdown by payment method.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `from`    | string | No       | Start date in RFC3339 or `YYYY-MM-DD`. Defaults to 30 days ago. |
+| `to`      | string | No       | End date in RFC3339 or `YYYY-MM-DD`. Defaults to current time. |
+
+#### Response `200 OK`
+
+```json
+{
+  "summary": {
+    "total_paid": 42000000,
+    "total_pending": 2000000,
+    "total_expired": 1000000,
+    "total_refunded": 500000,
+    "payment_success_rate": 0.9333,
+    "avg_time_to_pay": 145.5
+  },
+  "breakdown": [
+    {
+      "method_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "method_name": "BCA Virtual Account",
+      "method_type": "bank_transfer",
+      "count": 100,
+      "amount": 30000000,
+      "success_rate": 0.95
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid date format. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+### Get Shipment Metrics
+
+- **Method**: `GET`
+- **Endpoint**: `/analytics/shipments`
+- **Description**: Retrieve shipment status summary (delivered, failed, returned, cancelled), overall delivery rate, average fulfillment duration in seconds, and breakdown by courier/service.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `from`    | string | No       | Start date in RFC3339 or `YYYY-MM-DD`. Defaults to 30 days ago. |
+| `to`      | string | No       | End date in RFC3339 or `YYYY-MM-DD`. Defaults to current time. |
+| `top_n`   | int    | No       | Number of top couriers to return. Defaults to `10`. |
+
+#### Response `200 OK`
+
+```json
+{
+  "summary": {
+    "total": 120,
+    "delivered": 110,
+    "failed": 3,
+    "returned": 2,
+    "cancelled": 5,
+    "delivery_rate": 0.9167,
+    "avg_fulfillment_sec": 7200.0
+  },
+  "couriers": [
+    {
+      "courier": "JNE",
+      "service": "REG",
+      "count": 80,
+      "delivery_rate": 0.9375,
+      "avg_cost": 25000
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid date format. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+### Get Inventory Metrics
+
+- **Method**: `GET`
+- **Endpoint**: `/analytics/inventory`
+- **Description**: Retrieve inventory performance summary across all products or a specific shop, including total stock, reserved, available, stockout count, and low-stock count.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter             | Type   | Required | Description |
+|-----------------------|--------|----------|-------------|
+| `shop_id`             | UUID   | No       | Filter inventory metrics by specific shop ID. |
+| `low_stock_threshold` | int    | No       | Threshold for low stock warning count. Defaults to `5`. |
+
+#### Response `200 OK`
+
+```json
+{
+  "total_products": 45,
+  "total_stock": 2500,
+  "total_reserved": 150,
+  "total_available": 2350,
+  "stockout_count": 2,
+  "low_stock_count": 4
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid `shop_id` UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+
+### Get Product Metrics
+
+- **Method**: `GET`
+- **Endpoint**: `/analytics/products`
+- **Description**: Retrieve top products ranked by revenue and units sold, along with gross margin %, 7-day and 30-day sales velocity, and overall invoice void rate.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `from`    | string | No       | Start date in RFC3339 or `YYYY-MM-DD`. Defaults to 30 days ago. |
+| `to`      | string | No       | End date in RFC3339 or `YYYY-MM-DD`. Defaults to current time. |
+| `top_n`   | int    | No       | Number of top products to return. Defaults to `10`. |
+
+#### Response `200 OK`
+
+```json
+{
+  "top_by_revenue": [
+    {
+      "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+      "product_name": "Grand Opening Stand",
+      "revenue": 15000000,
+      "units_sold": 100,
+      "conversion_rate": 0.0,
+      "return_rate": null,
+      "gross_margin_pct": 42.5,
+      "sales_velocity_7d": 25,
+      "sales_velocity_30d": 100
+    }
+  ],
+  "top_by_volume": [
+    {
+      "product_id": "2ceea56c-352f-4a48-a262-f60e9ee85b1c",
+      "product_name": "Single Red Rose",
+      "revenue": 5000000,
+      "units_sold": 200,
+      "conversion_rate": 0.0,
+      "return_rate": null,
+      "gross_margin_pct": 50.0,
+      "sales_velocity_7d": 50,
+      "sales_velocity_30d": 200
+    }
+  ],
+  "avg_conversion": 0.0,
+  "avg_return_rate": 0.0,
+  "invoice_void_rate": 0.015
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid date format. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |

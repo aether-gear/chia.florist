@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	authorDomain "service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/repository"
@@ -65,7 +65,7 @@ func (u *SaveShopUsecase) Execute(
 		Name:        input.Name,
 		Slug:        u.slugGen.Generate(input.Name),
 		Description: input.Description,
-		CreatedAt:   time.Now(),
+		CreatedAt:   appclock.Now(),
 	}
 	if canSetActive {
 		shop.IsActive = input.IsActive

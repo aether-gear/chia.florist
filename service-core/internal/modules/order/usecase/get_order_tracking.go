@@ -68,7 +68,9 @@ func (u *GetOrderTrackingUsecase) Execute(
 	ctx context.Context,
 	input GetOrderTrackingInput,
 ) (*GetOrderTrackingResult, error) {
-	order, err := u.orderRepo.GetByID(ctx, u.executor, input.OrderID)
+	order, err := u.orderRepo.GetByID(ctx, u.executor,
+		input.OrderID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
@@ -80,7 +82,9 @@ func (u *GetOrderTrackingUsecase) Execute(
 		return nil, apperrors.NewUnauthorized("not authorized")
 	}
 
-	shipment, err := u.shipmentRepo.GetByOrderID(ctx, u.executor, order.ID)
+	shipment, err := u.shipmentRepo.GetByOrderID(ctx, u.executor,
+		order.ID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shipment: %w", err)
 	}
@@ -88,8 +92,9 @@ func (u *GetOrderTrackingUsecase) Execute(
 		return nil, apperrors.NewNotFound("shipment not found")
 	}
 
-	internalEvents, err := u.shipmentEventRepo.
-		ListByShipmentID(ctx, u.executor, shipment.ID)
+	internalEvents, err := u.shipmentEventRepo.ListByShipmentID(ctx, u.executor,
+		shipment.ID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list internal shipment events: %w", err)
 	}
@@ -109,8 +114,9 @@ func (u *GetOrderTrackingUsecase) Execute(
 		u.logisticsProvider != nil {
 
 		var lastPhone *string
-		customerAddr, err := u.addressRepo.
-			GetByID(ctx, u.executor, order.AddressID)
+		customerAddr, err := u.addressRepo.GetByID(ctx, u.executor,
+			order.AddressID,
+		)
 		if err == nil &&
 			customerAddr != nil &&
 			customerAddr.Phone != nil {

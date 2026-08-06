@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	cartDomain "service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -27,6 +28,7 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 		SELECT
 			id,
 			order_id,
+			product_variant_type,
 			shop_id,
 			shop_name,
 			product_id,
@@ -54,6 +56,7 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
+			&item.ProductVariantType,
 			&item.ShopID,
 			&item.ShopName,
 			&item.ProductID,
@@ -83,6 +86,7 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 		INSERT INTO order_items (
 			id,
 			order_id,
+			product_variant_type,
 			shop_id,
 			shop_name,
 			product_id,
@@ -94,10 +98,11 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 			courier_service,
 			shipping_fee_total
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		ON CONFLICT (id)
 		DO UPDATE SET
 			order_id = EXCLUDED.order_id,
+			product_variant_type = EXCLUDED.product_variant_type,
 			shop_id = EXCLUDED.shop_id,
 			shop_name = EXCLUDED.shop_name,
 			product_id = EXCLUDED.product_id,
@@ -111,9 +116,19 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 	`
 
 	for _, item := range items {
+		variantType := item.ProductVariantType
+		if variantType == "" {
+			if item.ProductID == nil {
+				variantType = cartDomain.ProductVariantTypeCustom
+			} else {
+				variantType = cartDomain.ProductVariantTypeStandard
+			}
+		}
+
 		_, err := exec.Exec(ctx, query,
 			item.ID,
 			item.OrderID,
+			variantType,
 			item.ShopID,
 			item.ShopName,
 			item.ProductID,
@@ -146,6 +161,7 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 		SELECT
 			id,
 			order_id,
+			product_variant_type,
 			shop_id,
 			shop_name,
 			product_id,
@@ -178,6 +194,7 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
+			&item.ProductVariantType,
 			&item.ShopID,
 			&item.ShopName,
 			&item.ProductID,

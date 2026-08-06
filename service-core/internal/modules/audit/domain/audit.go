@@ -18,6 +18,7 @@ const (
 	AuditCategoryUserAction  AuditCategory = "user_action"
 	AuditCategoryWAFEvent    AuditCategory = "waf_event"
 	AuditCategoryThreatIntel AuditCategory = "threat_intel"
+	AuditCategorySystemJob   AuditCategory = "system_job"
 
 	AuditOutcomeSuccess AuditOutcome = "success"
 	AuditOutcomeFailure AuditOutcome = "failure"

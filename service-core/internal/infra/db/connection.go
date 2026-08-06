@@ -25,6 +25,10 @@ func NewConnection(cfg config.DatabaseConfig) (*Connection, error) {
 	}
 
 	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	poolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET timezone TO 'Asia/Jakarta'")
+		return err
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {

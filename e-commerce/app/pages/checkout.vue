@@ -32,7 +32,6 @@ const isProcessing = ref(false)
 // State Management untuk Payment Methods
 const paymentMethods = ref<PaymentMethod[]>([])
 const selectedPaymentMethodId = ref('')
-const isManualTransfer = ref(false)
 const openedCategories = ref<Record<string, boolean>>({})
 
 // Dynamic shop mapping and payment state
@@ -178,13 +177,16 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     merged = JSON.parse(JSON.stringify(res))
   }
 
-  // 1. Gabungkan atribut lokal (size, color, price) untuk produk reguler
+  // 1. Gabungkan atribut lokal (size, color, price) untuk produk reguler & kustom
   merged.shops.forEach(shop => {
     if (!shop.name) {
       shop.name = shopsMap.value[shop.shop_id] || 'Chia Florist'
     }
     shop.items.forEach(item => {
-      const localItem = checkoutItems.value.find(i => i.id === item.product_id)
+      const localItem = checkoutItems.value.find(i =>
+        i.id === item.product_id ||
+        (i.isCustom && ((item as any).product_variant_type === 'custom' || (item as any).item_type === 'custom'))
+      )
       if (localItem) {
         if (localItem.size) {
           (item as any).size = localItem.size
@@ -192,9 +194,8 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
         if (localItem.color) {
           (item as any).color = localItem.color
         }
-        if (localItem.price) {
-          item.price = localItem.price
-          item.subtotal = item.price * item.quantity
+        if (localItem.customDesign && !(item as any).custom_design) {
+          (item as any).custom_design = localItem.customDesign
         }
       }
     })
@@ -203,93 +204,6 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     shop.subtotal = shop.items.reduce((acc, i) => acc + i.subtotal, 0)
     const fee = shop.selected_courier ? shop.selected_courier.fee : 0
     shop.total = shop.subtotal + fee
-  })
-
-  // 2. Tambahkan papan kustom dari simulator
-  if (customItems.length === 0) {
-    merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
-    merged.total_shipping = merged.shops.reduce((acc, s) => acc + (s.selected_courier ? s.selected_courier.fee : 0), 0)
-    merged.total = merged.subtotal + merged.total_shipping
-    return merged
-  }
-
-  const customShopsMap: Record<string, typeof customItems> = {}
-  customItems.forEach(item => {
-    const sId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
-    if (!customShopsMap[sId]) {
-      customShopsMap[sId] = []
-    }
-    customShopsMap[sId].push(item)
-  })
-
-  Object.keys(customShopsMap).forEach(sId => {
-    const items = customShopsMap[sId] || []
-    const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
-    
-    let shopEntry = merged.shops.find(s => s.shop_id === sId)
-    if (shopEntry) {
-      const entry = shopEntry
-      items.forEach(item => {
-        if (entry.items && !entry.items.some(i => i.product_id === item.id)) {
-          entry.items.push({
-            product_id: item.id,
-            shop_id: sId,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            subtotal: item.price * item.quantity,
-            size: item.size,
-            color: item.color
-          } as any)
-        }
-      })
-      entry.subtotal = entry.items ? entry.items.reduce((acc, i) => acc + i.subtotal, 0) : 0
-      const fee = entry.selected_courier ? entry.selected_courier.fee : 0
-      entry.total = entry.subtotal + fee
-    } else {
-      const mockOptions = [
-        { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 },
-        { code: 'tiki', name: 'TIKI', service: 'REG', etd: '2-4 Days', fee: 18000 },
-        { code: 'pos', name: 'POS', service: 'REG', etd: '3-5 Days', fee: 15000 }
-      ]
-      
-      if (!courierOptionsMap.value[sId]) {
-        courierOptionsMap.value[sId] = mockOptions
-      }
-      
-      const selected = selectedCouriers.value[sId] || { code: 'jne', service: 'REG' }
-      if (!selectedCouriers.value[sId]) {
-        selectedCouriers.value[sId] = selected
-      }
-      
-      const defaultOption = { code: 'jne', name: 'JNE', service: 'REG', etd: '2-3 Days', fee: 20000 }
-      const matchedOption = mockOptions.find(o => o.code === selected.code && o.service === selected.service) || mockOptions[0] || defaultOption
-      
-      shopEntry = {
-        shop_id: sId,
-        name: shopsMap.value[sId] || 'Chia Florist',
-        subtotal: subtotal,
-        total: subtotal + matchedOption.fee,
-        selected_courier: {
-          code: matchedOption.code,
-          service: matchedOption.service,
-          fee: matchedOption.fee
-        },
-        items: items.map(item => ({
-          product_id: item.id,
-          shop_id: sId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          subtotal: item.price * item.quantity,
-          size: item.size,
-          color: item.color
-        })),
-        cost_couriers: mockOptions
-      }
-      merged.shops.push(shopEntry)
-      merged.total_shipping += matchedOption.fee
-    }
   })
 
   merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
@@ -334,17 +248,30 @@ onMounted(async () => {
       selectedAddressId.value = defaultAddr.address_id || ''
     }
 
-    const shopsMap: Record<string, { product_id: string; quantity: number }[]> = {}
+    const shopsMap: Record<string, any[]> = {}
     checkoutItems.value.forEach(item => {
-      if (item.isCustom) return
       const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
       if (!shopsMap[shopId]) {
         shopsMap[shopId] = []
       }
-      shopsMap[shopId].push({
-        product_id: item.id,
-        quantity: item.quantity
-      })
+      if (item.isCustom) {
+        shopsMap[shopId].push({
+          cart_item_id: item.cartItemId || item.id,
+          product_variant_type: 'custom',
+          item_type: 'custom',
+          product_name: item.name,
+          physical_size_id: item.customDesign?.layout?.physicalSizeId || item.size || 'medium',
+          unit_price: item.price,
+          quantity: item.quantity,
+          custom_design: item.customDesign
+        })
+      } else {
+        shopsMap[shopId].push({
+          item_type: 'standard',
+          product_id: item.id,
+          quantity: item.quantity
+        })
+      }
     })
 
     const shopsPayload = Object.keys(shopsMap).map(shopId => ({
@@ -423,39 +350,53 @@ const runCalculate = async () => {
     const backendShopsPayload: any[] = []
 
     checkoutData.value.shops.forEach(shop => {
-      const nonCustomItems = shop.items.filter(item => {
-        const localItem = checkoutItems.value.find(i => i.id === item.product_id)
-        return !localItem?.isCustom
-      })
+      const courier = selectedCouriers.value[shop.shop_id]
+      let courierPayload = courier || (shop.selected_courier ? {
+        code: shop.selected_courier.code,
+        service: shop.selected_courier.service
+      } : undefined)
 
-      if (nonCustomItems.length > 0) {
-        const courier = selectedCouriers.value[shop.shop_id]
-        let courierPayload = courier || (shop.selected_courier ? {
-          code: shop.selected_courier.code,
-          service: shop.selected_courier.service
-        } : undefined)
+      if (!courierPayload) {
+        const options = courierOptionsMap.value[shop.shop_id]
+        const firstOption = options && options[0]
+        if (firstOption) {
+          courierPayload = { code: firstOption.code, service: firstOption.service }
+          selectedCouriers.value[shop.shop_id] = { code: firstOption.code, service: firstOption.service }
+        } else {
+          courierPayload = { code: 'jne', service: 'REG' }
+          selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
+        }
+      }
 
-        if (!courierPayload) {
-          const options = courierOptionsMap.value[shop.shop_id]
-          const firstOption = options && options[0]
-          if (firstOption) {
-            courierPayload = { code: firstOption.code, service: firstOption.service }
-            selectedCouriers.value[shop.shop_id] = { code: firstOption.code, service: firstOption.service }
-          } else {
-            courierPayload = { code: 'jne', service: 'REG' }
-            selectedCouriers.value[shop.shop_id] = { code: 'jne', service: 'REG' }
+      const shopItemsPayload = shop.items.map(item => {
+        const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
+        if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
+          const design = localItem?.customDesign || item.custom_design
+          const cartItemId = item.cart_item_id || localItem?.cartItemId || localItem?.id || item.product_id
+          return {
+            cart_item_id: cartItemId,
+            product_variant_type: 'custom' as const,
+            item_type: 'custom' as const,
+            product_name: item.name,
+            physical_size_id: design?.layout?.physicalSizeId || 'medium',
+            unit_price: item.price,
+            quantity: item.quantity,
+            custom_design: design
           }
         }
+        return {
+          product_variant_type: 'standard' as const,
+          item_type: 'standard' as const,
+          product_id: item.product_id,
+          quantity: item.quantity
+        }
+      })
 
-        backendShopsPayload.push({
-          shop_id: shop.shop_id,
-          items: nonCustomItems.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity
-          })),
-          courier: courierPayload
-        })
-      }
+      backendShopsPayload.push({
+        shop_id: shop.shop_id,
+        items: shopItemsPayload,
+        courier: courierPayload
+      })
     })
 
     let res: CheckoutResponse | null = null
@@ -618,7 +559,6 @@ const liveShippingFee = computed(() => {
   return checkoutData.value ? checkoutData.value.total_shipping : 0
 })
 const livePaymentFee = computed(() => {
-  if (isManualTransfer.value) return 0
   if (checkoutData.value?.selected_payment_method?.id === selectedPaymentMethodId.value) {
     return checkoutData.value.selected_payment_method.fee
   }
@@ -667,19 +607,37 @@ const handlePlaceOrder = async () => {
           code: courier.code,
           service: courier.service
         },
-        items: shop.items.map(item => ({
-          product_id: item.product_id,
-          name: item.name,
-          quantity: item.quantity
-        }))
+        items: shop.items.map(item => {
+          const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
+          if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
+            const design = localItem?.customDesign || item.custom_design
+            const cartItemId = item.cart_item_id || localItem?.cartItemId || localItem?.id || item.product_id
+            return {
+              cart_item_id: cartItemId,
+              product_variant_type: 'custom' as const,
+              item_type: 'custom' as const,
+              name: item.name,
+              physical_size_id: design?.layout?.physicalSizeId || 'medium',
+              quantity: item.quantity,
+              unit_price: item.price,
+              custom_design: design
+            }
+          }
+          return {
+            product_variant_type: 'standard' as const,
+            item_type: 'standard' as const,
+            product_id: item.product_id,
+            name: item.name,
+            quantity: item.quantity
+          }
+        })
       }
     })
 
     const payload = {
       address_id: selectedAddressId.value,
       selected_payment: {
-        id: selectedPaymentMethodId.value,
-        is_manual: isManualTransfer.value
+        id: selectedPaymentMethodId.value
       },
       shops: shopsPayload
     }
@@ -689,7 +647,7 @@ const handlePlaceOrder = async () => {
     const paymentInfo = {
       orderId: result.order_id,
       instruction: result.instruction,
-      paymentAccount: result.payment_account,
+      channelData: result.channel_data,
       total: liveTotalPayment.value,
       status: 'pending'
     }
@@ -882,33 +840,8 @@ const handlePlaceOrder = async () => {
           <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
             <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">3. Payment Method</h3>
             
-            <!-- Manual Transfer Toggle Switch -->
-            <div 
-              class="flex items-center justify-between p-4 rounded-2xl border transition-all duration-300"
-              :class="[isManualTransfer ? 'border-[#1b4332] bg-emerald-50/10 shadow-sm font-semibold' : 'border-gray-100 bg-gray-50/30']"
-            >
-              <div class="flex items-center gap-3">
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    v-model="isManualTransfer" 
-                    class="sr-only peer"
-                    :disabled="isLoadingCalculate || isLoadingCheckout"
-                  />
-                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1b4332]"></div>
-                </label>
-                <div class="flex flex-col">
-                  <span class="font-bold text-gray-900 text-xs">Manual Bank Transfer</span>
-                  <span class="text-[10px] text-gray-400 mt-0.5">Pay manually via direct bank transfer</span>
-                </div>
-              </div>
-              <div class="text-right text-xs">
-                <span class="text-emerald-700 font-bold">Free Fee</span>
-              </div>
-            </div>
-
             <!-- Backend Payment Methods Selection (Always Visible) -->
-            <div class="space-y-4 border-t border-gray-100 pt-5 mt-5">
+            <div class="space-y-4">
               <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Select Payment Gateway Channel:</div>
               <div v-if="paymentMethods.length === 0" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4">
                 <p class="text-sm text-gray-500">No payment methods available.</p>
@@ -991,7 +924,7 @@ const handlePlaceOrder = async () => {
 
               <div class="flex justify-between items-center">
                 <span>Payment Fee</span>
-                <span class="text-gray-900 font-bold" :class="[isManualTransfer ? 'text-emerald-700 font-extrabold' : '']">
+                <span class="text-gray-900 font-bold">
                   {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
                 </span>
               </div>

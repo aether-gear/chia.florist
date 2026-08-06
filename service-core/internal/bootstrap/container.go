@@ -24,6 +24,7 @@ import (
 	threatIntelUsecase "service-core/internal/modules/threat_intel/usecase"
 
 	addressPersistence "service-core/internal/modules/address/infra/persistence"
+	analyticsPersistence "service-core/internal/modules/analytics/infra/persistence"
 	authenPersistence "service-core/internal/modules/authentication/infra/persistence"
 	authorPersistence "service-core/internal/modules/authorization/infra/persistence"
 	cartPersistence "service-core/internal/modules/cart/infra/persistence"
@@ -31,7 +32,6 @@ import (
 	customerPersistence "service-core/internal/modules/customer/infra/persistence"
 	inventoryPersistence "service-core/internal/modules/inventory/infra/persistence"
 	orderPersistence "service-core/internal/modules/order/infra/persistence"
-	paymentJob "service-core/internal/modules/payment/infra/job"
 	paymentPersistence "service-core/internal/modules/payment/infra/persistence"
 	productPersistence "service-core/internal/modules/product/infra/persistence"
 	shipmentPersistence "service-core/internal/modules/shipment/infra/persistence"
@@ -47,6 +47,7 @@ import (
 	orderSvc "service-core/internal/modules/order/infra/service"
 
 	addressUsecase "service-core/internal/modules/address/usecase"
+	analyticsUsecase "service-core/internal/modules/analytics/usecase"
 	authenUsecase "service-core/internal/modules/authentication/usecase"
 	cartUsecase "service-core/internal/modules/cart/usecase"
 	courierUsecase "service-core/internal/modules/courier/usecase"
@@ -60,6 +61,9 @@ import (
 	shopUsecase "service-core/internal/modules/shop/usecase"
 	staffUsecase "service-core/internal/modules/staff/usecase"
 	userUsecase "service-core/internal/modules/user/usecase"
+
+	paymentgateway "service-core/internal/infra/payment-gateway"
+	paymentRepo "service-core/internal/modules/payment/repository"
 )
 
 type Container struct {
@@ -71,6 +75,8 @@ type Container struct {
 	DBExecutor         transaction.Executor
 	DBTransactor       transaction.Transactor
 	GoogleOAuth        appconfig.GoogleOAuthConfig
+	paymentMethodRepo  paymentRepo.PaymentMethodRepository
+	paymentGateway     paymentgateway.Provider
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
@@ -99,11 +105,13 @@ type Container struct {
 	CreateStaff     staffUsecase.CreateStaffUsecase
 	AddStaffAccount staffUsecase.AddStaffAccountUsecase
 
-	GetCart    cartUsecase.GetCartUsecase
-	AddItem    cartUsecase.AddItemUsecase
-	UpdateItem cartUsecase.UpdateItemUsecase
-	RemoveItem cartUsecase.RemoveItemUsecase
-	Checkout   cartUsecase.CheckoutUsecase
+	GetCart          cartUsecase.GetCartUsecase
+	AddItem          cartUsecase.AddItemUsecase
+	AddCustomItem    cartUsecase.AddCustomItemUsecase
+	UpdateItem       cartUsecase.UpdateItemUsecase
+	RemoveItem       cartUsecase.RemoveItemUsecase
+	RemoveCustomItem cartUsecase.RemoveCustomItemUsecase
+	Checkout         cartUsecase.CheckoutUsecase
 
 	ListLocations locationUsecase.ListLocationUsecase
 
@@ -128,16 +136,16 @@ type Container struct {
 	GetShopCouriers  shopUsecase.GetShopCouriersUsecase
 	GetShopProducts  shopUsecase.GetShopProductsUsecase
 
-	CreatePaymentAccount   paymentUsecase.CreatePaymentAccountUsecase
-	ListPaymentAccount     paymentUsecase.ListPaymentAccountUsecase
 	SavePaymentMethod      paymentUsecase.SavePaymentMethodUsecase
 	ListPaymentMethod      paymentUsecase.ListPaymentMethodUsecase
 	ProcessPaymentWebhook  paymentUsecase.ProcessPaymentWebhookUsecase
-	ProcessManualPayment   paymentUsecase.ProcessManualPaymentUsecase
 	SavePaymentInstruction paymentUsecase.SavePaymentInstructionUsecase
 	GetPaymentDetail       paymentUsecase.GetPaymentDetailUsecase
 	CheckPaymentStatus     paymentUsecase.CheckPaymentStatusUsecase
 	SyncPendingPayments    paymentUsecase.SyncPendingPaymentsUsecase
+	ExpirePastDuePayments  paymentUsecase.ExpirePastDuePaymentsUsecase
+	SyncPaymentMethods     paymentUsecase.SyncPaymentMethodsUsecase
+	ProcessOrderRefund     paymentUsecase.ProcessOrderRefundUsecase
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
@@ -146,12 +154,12 @@ type Container struct {
 	UpdateShipmentStatus    shipmentUsecase.UpdateShipmentStatusUsecase
 	UpdateShipment          shipmentUsecase.UpdateShipmentUsecase
 
-	CreateOrder       orderUsecase.CreateOrderUsecase
-	FindOrders        orderUsecase.FindOrdersUsecase
-	GetOrder          orderUsecase.GetOrderUsecase
-	UpdateOrderStatus orderUsecase.UpdateOrderStatusUsecase
-	GetOrderTracking  orderUsecase.GetOrderTrackingUsecase
-
+	CreateOrder             orderUsecase.CreateOrderUsecase
+	FindOrders              orderUsecase.FindOrdersUsecase
+	GetOrder                orderUsecase.GetOrderUsecase
+	UpdateOrderStatus       orderUsecase.UpdateOrderStatusUsecase
+	GetOrderTracking        orderUsecase.GetOrderTrackingUsecase
+	ExpireUnfulfilledOrders orderUsecase.ExpireUnfulfilledOrdersUsecase
 
 	FindAuditLogs   auditUsecase.FindAuditLogsUsecase
 	GetAuditLog     auditUsecase.GetAuditLogUsecase
@@ -172,6 +180,12 @@ type Container struct {
 
 	AnalyzeIP threatIntelUsecase.AnalyzeIPUsecase
 	GetGeoIP  threatIntelUsecase.GetGeoIPUsecase
+
+	GetOrderMetrics     analyticsUsecase.GetOrderMetricsUsecase
+	GetPaymentMetrics   analyticsUsecase.GetPaymentMetricsUsecase
+	GetShipmentMetrics  analyticsUsecase.GetShipmentMetricsUsecase
+	GetInventoryMetrics analyticsUsecase.GetInventoryMetricsUsecase
+	GetProductMetrics   analyticsUsecase.GetProductMetricsUsecase
 }
 
 func NewContainer(cfg Config,
@@ -204,7 +218,6 @@ func NewContainer(cfg Config,
 		addressRepo             = addressPersistence.NewCustomerAddressRepositoryImpl()
 		addressShopRepo         = addressPersistence.NewShopAddressRepositoryImpl()
 		paymentRepo             = paymentPersistence.NewPaymentRepositoryImpl()
-		paymentAccRepo          = paymentPersistence.NewPaymentAccountRepository()
 		paymentMethodRepo       = paymentPersistence.NewPaymentMethodRepository()
 		paymentEventRepo        = paymentPersistence.NewPaymentEventRepositoryImpl()
 		paymentInstructionRepo  = paymentPersistence.NewPaymentInstructionRepositoryImpl()
@@ -224,6 +237,7 @@ func NewContainer(cfg Config,
 		shipmentRepo            = shipmentPersistence.NewShipmentRepositoryImpl()
 		shipmentEventRepo       = shipmentPersistence.NewShipmentEventRepositoryImpl()
 		threatIntelRepo         = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
+		analyticsRepo           = analyticsPersistence.NewAnalyticsRepositoryImpl()
 	)
 
 	var (
@@ -275,6 +289,7 @@ func NewContainer(cfg Config,
 
 		pricingService = orderSvc.NewPricingService(
 			addressRepo,
+			cartRepo,
 			shopCourierRepo,
 			inventoryRepo,
 			paymentMethodRepo,
@@ -288,7 +303,6 @@ func NewContainer(cfg Config,
 	processPaymentWebhook := *paymentUsecase.
 		NewProcessPaymentWebhookUsecase(
 			paymentRepo,
-			paymentAccRepo,
 			paymentEventRepo,
 			paymentWebhookEventRepo,
 			orderRepo,
@@ -309,6 +323,8 @@ func NewContainer(cfg Config,
 		DBExecutor:         infra.TransactionExecutor,
 		DBTransactor:       infra.TransactionProvider,
 		GoogleOAuth:        cfg.GoogleOAuth,
+		paymentMethodRepo:  paymentMethodRepo,
+		paymentGateway:     infra.PaymentGateway,
 
 		FindProducts: *productUsecase.
 			NewFindProductsUsecase(
@@ -331,9 +347,9 @@ func NewContainer(cfg Config,
 			),
 		SaveProduct: *productUsecase.
 			NewSaveProductUsecase(
+				infra.TransactionProvider,
 				productRepo,
 				slugGen,
-				infra.TransactionExecutor,
 				productPerformanceRepo,
 			),
 		GetProductStats: *productUsecase.
@@ -543,6 +559,12 @@ func NewContainer(cfg Config,
 				inventoryRepo,
 				productRepo,
 			),
+		AddCustomItem: *cartUsecase.
+			NewAddCustomItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
+			),
 		UpdateItem: *cartUsecase.
 			NewUpdateItemUsecase(
 				infra.TransactionExecutor,
@@ -553,6 +575,12 @@ func NewContainer(cfg Config,
 			),
 		RemoveItem: *cartUsecase.
 			NewRemoveItemUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
+			),
+		RemoveCustomItem: *cartUsecase.
+			NewRemoveCustomItemUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				cartRepo,
@@ -658,17 +686,6 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 
-		CreatePaymentAccount: *paymentUsecase.
-			NewCreatePaymentAccountUsecase(
-				paymentAccRepo,
-				paymentMethodRepo,
-				infra.TransactionExecutor,
-			),
-		ListPaymentAccount: *paymentUsecase.
-			NewListPaymentAccountUsecase(
-				paymentAccRepo,
-				infra.TransactionExecutor,
-			),
 		SavePaymentMethod: *paymentUsecase.
 			NewSavePaymentMethodUsecase(
 				paymentMethodRepo,
@@ -680,17 +697,6 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 			),
 		ProcessPaymentWebhook: processPaymentWebhook,
-		ProcessManualPayment: *paymentUsecase.
-			NewProcessManualPaymentUsecase(
-				paymentRepo,
-				paymentAccRepo,
-				paymentEventRepo,
-				orderRepo,
-				orderItemRepo,
-				inventoryRepo,
-				infra.TransactionProvider,
-				infra.TransactionExecutor,
-			),
 		SavePaymentInstruction: *paymentUsecase.
 			NewSavePaymentInstructionUsecase(
 				paymentMethodRepo,
@@ -704,7 +710,6 @@ func NewContainer(cfg Config,
 				invoiceRepo,
 				paymentRepo,
 				paymentMethodRepo,
-				paymentAccRepo,
 				paymentInstructionRepo,
 				paymentChannelDataRepo,
 			),
@@ -724,7 +729,37 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				log,
 				time.Duration(cfg.PaymentSync.LookbackHours)*time.Hour,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
+				inventoryRepo,
 			),
+		ExpirePastDuePayments: *paymentUsecase.
+			NewExpirePastDuePaymentsUsecase(
+				paymentRepo,
+				infra.PaymentGateway,
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
+				inventoryRepo,
+				log,
+				cfg.PaymentExpiry.BatchSize,
+				cfg.PaymentExpiry.Concurrency,
+			),
+		SyncPaymentMethods: *paymentUsecase.
+			NewSyncPaymentMethodsUsecase(
+				paymentMethodRepo,
+				infra.TransactionExecutor,
+				infra.PaymentGateway,
+			),
+		ProcessOrderRefund: *paymentUsecase.NewProcessOrderRefundUsecase(
+			paymentRepo,
+			infra.PaymentGateway,
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			log,
+		),
 
 		ListAllCouriers: *courierUsecase.NewListCouriersUsecase(
 			infra.TransactionExecutor,
@@ -770,7 +805,6 @@ func NewContainer(cfg Config,
 				invoiceItemRepo,
 				paymentRepo,
 				paymentMethodRepo,
-				paymentAccRepo,
 				paymentEventRepo,
 				paymentInstructionRepo,
 				paymentChannelDataRepo,
@@ -806,10 +840,14 @@ func NewContainer(cfg Config,
 				infra.TransactionProvider,
 				orderRepo,
 				orderItemRepo,
+				inventoryRepo,
+				paymentRepo,
+				productRepo,
 				shipmentRepo,
 				addressRepo,
 				addressShopRepo,
 				infra.LogisticsProvider,
+				auditLogger,
 			),
 		GetOrderTracking: *orderUsecase.
 			NewGetOrderTrackingUsecase(
@@ -820,7 +858,24 @@ func NewContainer(cfg Config,
 				infra.LogisticsProvider,
 				addressRepo,
 			),
-
+		ExpireUnfulfilledOrders: *orderUsecase.NewExpireUnfulfilledOrdersUsecase(
+			orderRepo,
+			orderItemRepo,
+			inventoryRepo,
+			paymentUsecase.NewProcessOrderRefundUsecase(
+				paymentRepo,
+				infra.PaymentGateway,
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				log,
+			),
+			infra.TransactionExecutor,
+			infra.TransactionProvider,
+			log,
+			auditLogger,
+			100,
+			5,
+		),
 
 		FindAuditLogs: *auditUsecase.NewFindAuditLogsUsecase(
 			infra.TransactionExecutor,
@@ -879,15 +934,13 @@ func NewContainer(cfg Config,
 		),
 		AnalyzeIP: *threatIntelUsecase.NewAnalyzeIPUsecase(threatIntelRepo),
 		GetGeoIP:  *threatIntelUsecase.NewGetGeoIPUsecase(threatIntelRepo),
-	}
 
-	// Populate the sync job on the infra struct so App.Run can start it.
-	interval := time.Duration(cfg.PaymentSync.IntervalMinutes) * time.Minute
-	infra.PaymentSyncJob = paymentJob.NewPaymentSyncJob(
-		&c.SyncPendingPayments,
-		interval,
-		log,
-	)
+		GetOrderMetrics:     *analyticsUsecase.NewGetOrderMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetPaymentMetrics:   *analyticsUsecase.NewGetPaymentMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetShipmentMetrics:  *analyticsUsecase.NewGetShipmentMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetInventoryMetrics: *analyticsUsecase.NewGetInventoryMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetProductMetrics:   *analyticsUsecase.NewGetProductMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+	}
 
 	return c
 }

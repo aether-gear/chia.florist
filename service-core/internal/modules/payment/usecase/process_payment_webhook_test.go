@@ -98,41 +98,12 @@ func (m *mockPaymentRepo) ListPendingGateway(_ context.Context, _ transaction.Ex
 	}
 	return result, nil
 }
+func (m *mockPaymentRepo) ListPastDuePending(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]paymentDomain.Payment, error) {
+	return nil, nil
+}
 
 // mockPaymentAccountRepo tracks increments, decrements and supports injecting errors.
-type mockPaymentAccountRepo struct {
-	decremented        []uuid.UUID
-	incremented        []uuid.UUID
-	leastLoadedAccount *paymentDomain.PaymentAccount
-	decrementErr       error
-}
-
-func (m *mockPaymentAccountRepo) Save(_ context.Context, _ transaction.Executor, _ paymentDomain.PaymentAccount) error {
-	return nil
-}
-func (m *mockPaymentAccountRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *mockPaymentAccountRepo) RetrieveLeastLoaded(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.PaymentAccount, error) {
-	return m.leastLoadedAccount, nil
-}
-func (m *mockPaymentAccountRepo) IncrementLoad(_ context.Context, _ transaction.Executor, accountID uuid.UUID) error {
-	m.incremented = append(m.incremented, accountID)
-	return nil
-}
-func (m *mockPaymentAccountRepo) DecrementLoad(_ context.Context, _ transaction.Executor, accountID uuid.UUID) error {
-	if m.decrementErr != nil {
-		return m.decrementErr
-	}
-	m.decremented = append(m.decremented, accountID)
-	return nil
-}
-func (m *mockPaymentAccountRepo) ListByMethodID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
-func (m *mockPaymentAccountRepo) ListAll(_ context.Context, _ transaction.Executor) ([]paymentDomain.PaymentAccount, error) {
-	return nil, nil
-}
+type mockPaymentAccountRepo struct{}
 
 // mockPaymentEventRepo tracks created events and supports injecting createErr.
 type mockPaymentEventRepo struct {
@@ -181,12 +152,34 @@ func (m *mockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor, 
 	}
 	return errors.New("not found")
 }
+func (m *mockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, confirmedAt *time.Time, expiresAt *time.Time) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	if o, ok := m.orders[id]; ok {
+		o.Status = status
+		if confirmedAt != nil {
+			o.ConfirmedAt = confirmedAt
+		}
+		if expiresAt != nil {
+			o.HandlingExpiresAt = expiresAt
+		}
+		return nil
+	}
+	return errors.New("not found")
+}
 func (m *mockOrderRepo) Save(_ context.Context, _ transaction.Executor, order orderDomain.Order) error {
 	m.orders[order.ID] = &order
 	return nil
 }
 func (m *mockOrderRepo) FindOrders(_ context.Context, _ transaction.Executor, _ orderRepo.FindOrderParams) ([]orderDomain.Order, int, error) {
 	return nil, 0, nil
+}
+func (m *mockOrderRepo) SetConfirmedAndExpiry(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time, _ time.Time) error {
+	return nil
+}
+func (m *mockOrderRepo) FindExpiredUnfulfilledOrders(_ context.Context, _ transaction.Executor, _ time.Time, _ int) ([]orderDomain.Order, error) {
+	return nil, nil
 }
 
 // mockOrderItemRepo supports configurable saveBulkErr.
@@ -248,6 +241,9 @@ func (m *mockInventoryRepo) Commit(_ context.Context, _ transaction.Executor, pr
 	m.commits = append(m.commits, fmt.Sprintf("%s-%s-%d", productID, shopID, qty))
 	return nil
 }
+func (m *mockInventoryRepo) Restock(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ uuid.UUID, _ int) error {
+	return nil
+}
 func (m *mockInventoryRepo) Update(_ context.Context, _ transaction.Executor, _ *inventoryDomain.Inventory) error {
 	return nil
 }
@@ -261,6 +257,8 @@ type mockPaymentGateway struct {
 	err    error
 }
 
+func (m *mockPaymentGateway) Name() string { return "mock_gateway" }
+func (m *mockPaymentGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (m *mockPaymentGateway) Charge(_ context.Context, _ paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	return nil, nil
 }
@@ -272,6 +270,9 @@ func (m *mockPaymentGateway) GetTransactionStatus(_ context.Context, _ string) (
 }
 func (m *mockPaymentGateway) CancelTransaction(_ context.Context, _ string) error {
 	return nil
+}
+func (m *mockPaymentGateway) RefundTransaction(_ context.Context, _ paymentgateway.RefundRequest) (*paymentgateway.RefundResponse, error) {
+	return nil, nil
 }
 func (m *mockPaymentGateway) Supports(_ string) bool {
 	return true
@@ -362,7 +363,7 @@ func newWebhookUsecase(
 		transactor = &mockTransactor{}
 	}
 	return NewProcessPaymentWebhookUsecase(
-		pRepo, paRepo, peRepo,
+		pRepo, peRepo,
 		newMockWebhookEventRepo(),
 		oRepo, oiRepo, iRepo,
 		gateway,
@@ -392,7 +393,7 @@ func TestProcessPaymentWebhook_Settlement(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 2}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 2}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	paRepo := &mockPaymentAccountRepo{}
@@ -447,7 +448,7 @@ func TestProcessPaymentWebhook_Expire(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 2}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 2}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	paRepo := &mockPaymentAccountRepo{}
@@ -472,8 +473,8 @@ func TestProcessPaymentWebhook_Expire(t *testing.T) {
 	if payment.Status != paymentDomain.PaymentStatusExpired {
 		t.Errorf("expected payment expired, got %v", payment.Status)
 	}
-	if order.Status != orderDomain.OrderStatusCancelled {
-		t.Errorf("expected order cancelled, got %v", order.Status)
+	if order.Status != orderDomain.OrderStatusExpired {
+		t.Errorf("expected order expired, got %v", order.Status)
 	}
 	expectedRelease := fmt.Sprintf("%s-%s-2", productID, shopID)
 	if len(iRepo.releases) != 1 || iRepo.releases[0] != expectedRelease {
@@ -493,7 +494,7 @@ func TestProcessPaymentWebhook_Cancel(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 1}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 1}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -532,7 +533,7 @@ func TestProcessPaymentWebhook_Deny(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 3}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 3}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -701,102 +702,7 @@ func TestProcessPaymentWebhook_Idempotent_AlreadyCancelled(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Aggregate invariants: payment account load tracking
-// ---------------------------------------------------------------------------
 
-func TestProcessPaymentWebhook_PaymentAccountLoadDecremented_OnSettle(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	paymentID := uuid.New()
-	accountID := uuid.New()
-
-	payment := &paymentDomain.Payment{
-		ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending,
-		Amount: 100000, Provider: "midtrans", PaymentAccountID: &accountID, CreatedAt: time.Now(),
-	}
-	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
-	paRepo := &mockPaymentAccountRepo{}
-	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
-	gateway := &mockPaymentGateway{
-		result: &paymentgateway.NotificationResult{
-			GatewayOrderID: orderID.String(),
-			Status:         paymentgateway.NotificationStatusSettlement,
-		},
-	}
-
-	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
-		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(paRepo.decremented) != 1 || paRepo.decremented[0] != accountID {
-		t.Errorf("expected DecrementLoad for %v on settle, got %v", accountID, paRepo.decremented)
-	}
-}
-
-func TestProcessPaymentWebhook_PaymentAccountLoadDecremented_OnExpire(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	paymentID := uuid.New()
-	accountID := uuid.New()
-
-	payment := &paymentDomain.Payment{
-		ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending,
-		Amount: 100000, Provider: "midtrans", PaymentAccountID: &accountID, CreatedAt: time.Now(),
-	}
-	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
-	paRepo := &mockPaymentAccountRepo{}
-	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
-	gateway := &mockPaymentGateway{
-		result: &paymentgateway.NotificationResult{
-			GatewayOrderID: orderID.String(),
-			Status:         paymentgateway.NotificationStatusExpire,
-		},
-	}
-
-	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
-		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "expire"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(paRepo.decremented) != 1 || paRepo.decremented[0] != accountID {
-		t.Errorf("expected DecrementLoad for %v on expire, got %v", accountID, paRepo.decremented)
-	}
-}
-
-func TestProcessPaymentWebhook_PaymentAccountLoadNotDecremented_WhenNotSet(t *testing.T) {
-	ctx := context.Background()
-	orderID := uuid.New()
-	paymentID := uuid.New()
-
-	// No PaymentAccountID set
-	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
-	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
-	paRepo := &mockPaymentAccountRepo{}
-	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
-	gateway := &mockPaymentGateway{
-		result: &paymentgateway.NotificationResult{
-			GatewayOrderID: orderID.String(),
-			Status:         paymentgateway.NotificationStatusSettlement,
-		},
-	}
-
-	err := newWebhookUsecase(pRepo, paRepo, &mockPaymentEventRepo{}, oRepo,
-		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
-		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(paRepo.decremented) != 0 {
-		t.Errorf("DecrementLoad should not be called when PaymentAccountID is nil, got %v", paRepo.decremented)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Coordination protocol / failure recovery
@@ -927,7 +833,7 @@ func TestProcessPaymentWebhook_InventoryCommitFails(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 1}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 1}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -956,7 +862,7 @@ func TestProcessPaymentWebhook_InventoryReleaseFails(t *testing.T) {
 
 	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
 	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusPending}
-	items := []orderDomain.OrderItem{{ProductID: productID, ShopID: shopID, Quantity: 1}}
+	items := []orderDomain.OrderItem{{ProductID: &productID, ShopID: shopID, Quantity: 1}}
 
 	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
 	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
@@ -998,5 +904,30 @@ func TestProcessPaymentWebhook_PaymentEventCreateFails(t *testing.T) {
 		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "settlement"}})
 	if err == nil {
 		t.Fatal("expected error when payment event creation fails")
+	}
+}
+
+func TestProcessPaymentWebhook_InvalidOrderStatusTransition(t *testing.T) {
+	ctx := context.Background()
+	orderID := uuid.New()
+	paymentID := uuid.New()
+
+	payment := &paymentDomain.Payment{ID: paymentID, OrderID: orderID, Status: paymentDomain.PaymentStatusPending, Amount: 100000, Provider: "midtrans", CreatedAt: time.Now()}
+	// Order is already delivered, so transition to cancelled is invalid
+	order := &orderDomain.Order{ID: orderID, Status: orderDomain.OrderStatusDelivered}
+	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
+	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
+	gateway := &mockPaymentGateway{
+		result: &paymentgateway.NotificationResult{
+			GatewayOrderID: orderID.String(),
+			Status:         paymentgateway.NotificationStatusCancel,
+		},
+	}
+
+	err := newWebhookUsecase(pRepo, &mockPaymentAccountRepo{}, &mockPaymentEventRepo{}, oRepo,
+		&mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}}, &mockInventoryRepo{}, gateway, nil).
+		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "cancel"}})
+	if err == nil {
+		t.Fatal("expected error for invalid order status transition via webhook, got nil")
 	}
 }

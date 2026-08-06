@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	applogger "service-core/internal/common/logger"
@@ -24,7 +25,7 @@ func Logging(log applogger.Logger) Middleware {
 
 			rw := newResponseRecorder(w)
 
-			start := time.Now()
+			start := appclock.Now()
 			err := next(rw, r)
 
 			// request_id and client_ip are already in ctx and prepended

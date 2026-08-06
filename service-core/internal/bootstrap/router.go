@@ -11,6 +11,7 @@ import (
 	authorzDomain "service-core/internal/modules/authorization/domain"
 
 	addressH "service-core/internal/modules/address/delivery/http"
+	analyticsH "service-core/internal/modules/analytics/delivery/http"
 	auditH "service-core/internal/modules/audit/delivery/http"
 	authH "service-core/internal/modules/authentication/delivery/http"
 	cartH "service-core/internal/modules/cart/delivery/http"
@@ -162,9 +163,11 @@ func NewRouter(c *Container) *chi.Mux {
 
 		cartHandler = cartH.NewCartHandler(
 			&c.AddItem,
+			&c.AddCustomItem,
 			&c.GetCart,
 			&c.UpdateItem,
 			&c.RemoveItem,
+			&c.RemoveCustomItem,
 			&c.Checkout,
 		)
 
@@ -187,12 +190,9 @@ func NewRouter(c *Container) *chi.Mux {
 		)
 
 		paymentHandler = paymentH.NewPaymentHandler(
-			&c.CreatePaymentAccount,
-			&c.ListPaymentAccount,
 			&c.SavePaymentMethod,
 			&c.ListPaymentMethod,
 			&c.ProcessPaymentWebhook,
-			&c.ProcessManualPayment,
 			&c.SavePaymentInstruction,
 			&c.GetPaymentDetail,
 			&c.CheckPaymentStatus,
@@ -247,6 +247,14 @@ func NewRouter(c *Container) *chi.Mux {
 		threatIntelHandler = threatIntelH.NewThreatIntelHandler(
 			&c.AnalyzeIP,
 			&c.GetGeoIP,
+		)
+
+		analyticsHandler = analyticsH.NewAnalyticsHandler(
+			&c.GetOrderMetrics,
+			&c.GetPaymentMetrics,
+			&c.GetShipmentMetrics,
+			&c.GetInventoryMetrics,
+			&c.GetProductMetrics,
 		)
 	)
 
@@ -320,6 +328,7 @@ func NewRouter(c *Container) *chi.Mux {
 				r.Post("/", chains.CustomerOnly(cartHandler.AddItem))
 				r.Put("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.UpdateItem))
 				r.Delete("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.RemoveItem))
+				r.Delete("/custom/{cartItemID}", chains.CustomerOnly(cartHandler.RemoveCustomItem))
 			})
 		})
 
@@ -394,16 +403,9 @@ func NewRouter(c *Container) *chi.Mux {
 		})
 
 		r.Route("/payments", func(r chi.Router) {
-			r.Post("/{id}/action", chains.StaffOnly(paymentHandler.ProcessManualPayment))
-
-			r.Route("/accounts", func(r chi.Router) {
-				r.Get("/", chains.StaffOnly(paymentHandler.ListPaymentAccount))
-				r.Post("/", chains.StaffAdminOnly(paymentHandler.CreatePaymentAccount))
-			})
-
 			r.Route("/methods", func(r chi.Router) {
 				r.Get("/", chains.StaffOnly(paymentHandler.ListPaymentMethod))
-				r.Post("/", chains.StaffAdminOnly(paymentHandler.SavePaymentMethod))
+				r.Patch("/{methodID}", chains.StaffAdminOnly(paymentHandler.UpdatePaymentMethodActive))
 				r.Post("/{methodID}/instruction", chains.StaffAdminOnly(paymentHandler.SavePaymentInstruction))
 			})
 		})
@@ -457,6 +459,14 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/api/geo", func(r chi.Router) {
 			r.Get("/{ip}", chains.StaffAdminOnly(threatIntelHandler.GetGeolocation))
+		})
+
+		r.Route("/analytics", func(r chi.Router) {
+			r.Get("/orders", chains.StaffAdminOnly(analyticsHandler.GetOrderMetrics))
+			r.Get("/payments", chains.StaffAdminOnly(analyticsHandler.GetPaymentMetrics))
+			r.Get("/shipments", chains.StaffAdminOnly(analyticsHandler.GetShipmentMetrics))
+			r.Get("/inventory", chains.StaffAdminOnly(analyticsHandler.GetInventoryMetrics))
+			r.Get("/products", chains.StaffAdminOnly(analyticsHandler.GetProductMetrics))
 		})
 	})
 

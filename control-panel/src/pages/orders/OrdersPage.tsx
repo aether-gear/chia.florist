@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   PackageOpen,
   ArrowUpDown,
@@ -13,12 +14,14 @@ import {
   Edit3,
   Activity,
   AlertCircle,
-  Sprout
+  Sprout,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useOrdersViewModel } from '../../viewmodels/useOrdersViewModel';
 import { useOrderActionsViewModel } from '../../viewmodels/useOrderActionsViewModel';
+import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
@@ -28,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../../components/ui/input';
 
 export default function OrdersPage() {
+  const { isAdmin } = useAuthMeViewModel();
   const {
     data,
     loading,
@@ -46,8 +50,6 @@ export default function OrdersPage() {
 
   const {
     submitting,
-    confirmPayment,
-    rejectPayment,
     updateOrderStatus,
     updateShipmentStatus,
     updateShipmentDetails
@@ -101,28 +103,6 @@ export default function OrdersPage() {
     const newDirection = currentDirection === 'desc' ? 'asc' : 'desc';
     setSort(`latest:${newDirection}`);
     setPage(1);
-  };
-
-  const handleConfirmPayment = async (paymentId: string) => {
-    if (confirm('Are you sure you want to confirm this payment manually? This will mark the order as Confirmed.')) {
-      try {
-        await confirmPayment(paymentId);
-        refresh();
-      } catch (err) {
-        // Error toast is handled in useOrderActionsViewModel
-      }
-    }
-  };
-
-  const handleRejectPayment = async (paymentId: string) => {
-    if (confirm('Are you sure you want to reject this payment? This will mark the order as Cancelled.')) {
-      try {
-        await rejectPayment(paymentId);
-        refresh();
-      } catch (err) {
-        // Error toast is handled in useOrderActionsViewModel
-      }
-    }
   };
 
   const handleStartProcessing = async (orderId: string) => {
@@ -193,11 +173,20 @@ export default function OrdersPage() {
       <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
 
         {/* Header */}
-        <div>
-          <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
-          <p className="text-muted-foreground text-sm">
-            Verify payments, fulfill shipments, and manage orders
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
+            <p className="text-muted-foreground text-sm">
+              Verify payments, fulfill shipments, and manage orders
+            </p>
+          </div>
+          {isAdmin && (
+            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5 self-start sm:self-auto">
+              <Link to="/admin/analytics?tab=orders">
+                <BarChart3 className="h-3.5 w-3.5" /> View Order Analytics →
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Order Workspace Section */}
@@ -442,42 +431,6 @@ export default function OrdersPage() {
                   {!submitting && (
                     <div className="animate-in fade-in duration-200">
 
-                      {/* CASE A: PENDING MANUAL PAYMENT */}
-                      {selectedOrder.status === 'pending' && selectedOrder.payment && selectedOrder.payment.provider === 'manual' && selectedOrder.payment.status === 'pending' && (
-                        <div className="border border-amber-200 dark:border-amber-950/40 bg-amber-50/30 dark:bg-amber-950/10 p-4 rounded-xl space-y-4">
-                          <div className="flex items-start gap-3">
-                            <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                            <div className="space-y-1">
-                              <h5 className="text-sm font-semibold text-foreground">Awaiting Bank Transfer Verification</h5>
-                              <p className="text-xs text-muted-foreground">
-                                Customer reported paying manual bank transfer. Please audit your merchant account before confirming.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="text-xs space-y-1.5 p-3 rounded-lg bg-background border border-border/40 font-medium">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Provider:</span> <span className="uppercase text-foreground">{selectedOrder.payment.provider}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Amount:</span> <span className="text-primary font-bold">{formatCurrency(selectedOrder.payment.amount)}</span></div>
-                          </div>
-
-                          <div className="flex gap-3 pt-1">
-                            <Button
-                              onClick={() => handleConfirmPayment(selectedOrder.payment!.id)}
-                              className="rounded-xl flex-1 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold h-9"
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-1.5" /> Confirm Payment
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleRejectPayment(selectedOrder.payment!.id)}
-                              className="rounded-xl flex-1 border-destructive text-destructive hover:bg-destructive/5 text-xs font-semibold h-9"
-                            >
-                              <XCircle className="h-4 w-4 mr-1.5" /> Reject Payment
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
                       {/* CASE B: CONFIRMED - READY TO PROCESS */}
                       {selectedOrder.status === 'confirmed' && (
                         <div className="border border-border/80 bg-background p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -690,7 +643,7 @@ export default function OrdersPage() {
                       )}
 
                       {/* CASE G: AUTOMATED PAYMENT PENDING (MIDTRANS ETC) */}
-                      {selectedOrder.status === 'pending' && selectedOrder.payment && selectedOrder.payment.provider !== 'manual' && (
+                      {selectedOrder.status === 'pending' && selectedOrder.payment && (
                         <div className="border border-blue-200 dark:border-blue-950/40 bg-blue-50/10 p-4 rounded-xl flex items-start gap-3">
                           <CreditCard className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                           <div className="space-y-1">

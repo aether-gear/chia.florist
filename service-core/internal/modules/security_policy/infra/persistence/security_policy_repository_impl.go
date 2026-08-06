@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/security_policy/domain"
 	"service-core/internal/modules/security_policy/repository"
 	"service-core/internal/shared/transaction"
@@ -117,7 +117,7 @@ func (r *securityPolicyRepositoryImpl) SaveRule(
 	exec transaction.Executor,
 	rule domain.WAFRule,
 ) error {
-	now := time.Now().UTC()
+	now := appclock.Now()
 	if rule.CreatedAt.IsZero() {
 		rule.CreatedAt = now
 	}
@@ -181,7 +181,7 @@ func (r *securityPolicyRepositoryImpl) UpdateRuleStatus(
 			id = $3
 	`
 
-	tag, err := exec.Exec(ctx, queryStr, enabled, time.Now().UTC(), id)
+	tag, err := exec.Exec(ctx, queryStr, enabled, appclock.Now(), id)
 	if err != nil {
 		return fmt.Errorf("security_policy: update waf rule status failed: %w", err)
 	}
@@ -274,7 +274,7 @@ func (r *securityPolicyRepositoryImpl) UpsertIPRecord(
 		record.IP,
 		string(record.Status),
 		record.Reason,
-		time.Now().UTC(),
+		appclock.Now(),
 	)
 	if err != nil {
 		return fmt.Errorf("security_policy: upsert ip record failed: %w", err)

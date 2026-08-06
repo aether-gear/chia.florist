@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"time"
 
+	appclock "service-core/internal/common/clock"
 	"service-core/internal/modules/security_policy/domain"
 	"service-core/internal/modules/security_policy/repository"
 	transaction "service-core/internal/shared/transaction"
@@ -51,7 +51,7 @@ func (u *CreateRuleUsecase) Execute(
 		tags = []string{}
 	}
 
-	now := time.Now().UTC()
+	now := appclock.Now()
 	rule := domain.WAFRule{
 		ID:          fmt.Sprintf("%d", len(rules)+1000),
 		Description: input.Description,

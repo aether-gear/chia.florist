@@ -182,5 +182,37 @@ export const supabaseService = {
       publicUrl,
       signedUrl
     }
+  },
+
+  async uploadCustomPreview(blob: Blob, filename?: string): Promise<{ publicUrl: string; bucketPath: string } | null> {
+    const { supabaseUrl, supabaseKey } = this.getCredentials()
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('Supabase credentials are not configured in environment.')
+      return null
+    }
+
+    const date = new Date()
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const fileId = filename || `order-board-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+    const bucketPath = `custom-previews/designs/${year}/${month}/${fileId}`
+
+    try {
+      await $fetch(`${supabaseUrl}/storage/v1/object/public-assets/${bucketPath}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
+          'Content-Type': 'image/png'
+        },
+        body: blob
+      })
+
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/public-assets/${bucketPath}`
+      return { publicUrl, bucketPath }
+    } catch (err: any) {
+      console.error('Failed to upload custom preview image to Supabase:', err)
+      return null
+    }
   }
 }
