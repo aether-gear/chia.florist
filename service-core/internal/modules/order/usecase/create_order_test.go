@@ -241,6 +241,18 @@ func (m *coMockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor
 	}
 	return nil
 }
+func (m *coMockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, confirmedAt *time.Time, expiresAt *time.Time) error {
+	if o, ok := m.orders[id]; ok {
+		o.Status = status
+		if confirmedAt != nil {
+			o.ConfirmedAt = confirmedAt
+		}
+		if expiresAt != nil {
+			o.HandlingExpiresAt = expiresAt
+		}
+	}
+	return nil
+}
 func (m *coMockOrderRepo) Save(_ context.Context, _ transaction.Executor, order orderDomain.Order) error {
 	m.orders[order.ID] = &order
 	return nil
@@ -366,7 +378,7 @@ type coMockGateway struct {
 	cancelOrderID string
 }
 
-func (m *coMockGateway) Name() string { return "mock_gateway" }
+func (m *coMockGateway) Name() string                                                 { return "mock_gateway" }
 func (m *coMockGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (m *coMockGateway) Charge(_ context.Context, _ paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	return m.chargeResp, m.chargeErr
@@ -395,7 +407,7 @@ type capturingGateway struct {
 	captured *paymentgateway.ChargeRequest
 }
 
-func (c *capturingGateway) Name() string { return "mock_gateway" }
+func (c *capturingGateway) Name() string                                                 { return "mock_gateway" }
 func (c *capturingGateway) AllowedPaymentMethods() []paymentgateway.AllowedPaymentMethod { return nil }
 func (c *capturingGateway) Charge(_ context.Context, req paymentgateway.ChargeRequest) (*paymentgateway.ChargeResponse, error) {
 	*c.captured = req
@@ -737,8 +749,6 @@ func TestCreateOrder_Gateway_ChannelDataPersisted(t *testing.T) {
 		t.Errorf("saved ActionURL mismatch: %v", cd.ActionURL)
 	}
 }
-
-
 
 // ===========================================================================
 // Charge response instruction type mapping

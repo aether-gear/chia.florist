@@ -117,6 +117,12 @@ func (m *mockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor, 
 	return m.updateErr
 }
 
+func (m *mockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, _ *time.Time, _ *time.Time) error {
+	m.updatedState.id = id
+	m.updatedState.status = status
+	return m.updateErr
+}
+
 func (m *mockOrderRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.Order) error {
 	return nil
 }

@@ -34,6 +34,9 @@ func (m *mockOrderDetailOrderRepo) GetByNumber(_ context.Context, _ transaction.
 func (m *mockOrderDetailOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ orderDomain.OrderStatus) error {
 	return nil
 }
+func (m *mockOrderDetailOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ orderDomain.OrderStatus, _ *time.Time, _ *time.Time) error {
+	return nil
+}
 func (m *mockOrderDetailOrderRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.Order) error {
 	return nil
 }

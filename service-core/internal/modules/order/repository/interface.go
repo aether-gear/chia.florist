@@ -38,6 +38,15 @@ type OrderRepository interface {
 		status domain.OrderStatus,
 	) error
 
+	UpdateStatusWithSLA(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+		status domain.OrderStatus,
+		confirmedAt *time.Time,
+		expiresAt *time.Time,
+	) error
+
 	Save(
 		ctx context.Context,
 		exec transaction.Executor,

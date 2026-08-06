@@ -177,13 +177,8 @@ func (u *UpdateOrderStatusUsecase) Execute(
 					return fmt.Errorf("failed to commit inventory for product %s: %w", item.ProductID, err)
 				}
 			}
-			if err := u.orderRepo.UpdateStatus(ctx, exec, order.ID, input.Status); err != nil {
-				return err
-			}
-			if order.ConfirmedAt != nil && order.HandlingExpiresAt != nil {
-				if err := u.orderRepo.SetConfirmedAndExpiry(ctx, exec, order.ID, *order.ConfirmedAt, *order.HandlingExpiresAt); err != nil {
-					return fmt.Errorf("failed to set confirmed and expiry timestamps: %w", err)
-				}
+			if err := u.orderRepo.UpdateStatusWithSLA(ctx, exec, order.ID, input.Status, order.ConfirmedAt, order.HandlingExpiresAt); err != nil {
+				return fmt.Errorf("failed to update order status: %w", err)
 			}
 			return nil
 		})

@@ -298,17 +298,13 @@ func (u *ProcessPaymentWebhookUsecase) process(
 			return fmt.Errorf("failed to update payment status: %w", err)
 		}
 
-		if err := u.orderRepo.UpdateStatus(ctx, exec,
+		if err := u.orderRepo.UpdateStatusWithSLA(ctx, exec,
 			payment.OrderID,
 			newOrderStatus,
+			order.ConfirmedAt,
+			order.HandlingExpiresAt,
 		); err != nil {
 			return fmt.Errorf("failed to update order status: %w", err)
-		}
-
-		if newOrderStatus == orderDomain.OrderStatusConfirmed && order.ConfirmedAt != nil && order.HandlingExpiresAt != nil {
-			if err := u.orderRepo.SetConfirmedAndExpiry(ctx, exec, payment.OrderID, *order.ConfirmedAt, *order.HandlingExpiresAt); err != nil {
-				return fmt.Errorf("failed to set order confirmed and expiry timestamp: %w", err)
-			}
 		}
 
 		if action == "commit" ||

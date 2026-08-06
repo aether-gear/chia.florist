@@ -149,6 +149,38 @@ func (r *orderRepositoryImpl) UpdateStatus(
 	return nil
 }
 
+func (r *orderRepositoryImpl) UpdateStatusWithSLA(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+	status domain.OrderStatus,
+	confirmedAt *time.Time,
+	expiresAt *time.Time,
+) error {
+	query := `
+		UPDATE orders
+		SET
+			status              = $2,
+			confirmed_at        = COALESCE($3, confirmed_at),
+			handling_expires_at = COALESCE($4, handling_expires_at),
+			updated_at          = NOW()
+		WHERE
+			id = $1
+	`
+
+	_, err := exec.Exec(ctx, query,
+		id,
+		status,
+		confirmedAt,
+		expiresAt,
+	)
+	if err != nil {
+		return fmt.Errorf("query to update status with SLA: %w", err)
+	}
+
+	return nil
+}
+
 func (r *orderRepositoryImpl) Save(
 	ctx context.Context,
 	exec transaction.Executor,

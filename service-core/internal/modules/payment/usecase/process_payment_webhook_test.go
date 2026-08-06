@@ -152,6 +152,22 @@ func (m *mockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executor, 
 	}
 	return errors.New("not found")
 }
+func (m *mockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, confirmedAt *time.Time, expiresAt *time.Time) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	if o, ok := m.orders[id]; ok {
+		o.Status = status
+		if confirmedAt != nil {
+			o.ConfirmedAt = confirmedAt
+		}
+		if expiresAt != nil {
+			o.HandlingExpiresAt = expiresAt
+		}
+		return nil
+	}
+	return errors.New("not found")
+}
 func (m *mockOrderRepo) Save(_ context.Context, _ transaction.Executor, order orderDomain.Order) error {
 	m.orders[order.ID] = &order
 	return nil

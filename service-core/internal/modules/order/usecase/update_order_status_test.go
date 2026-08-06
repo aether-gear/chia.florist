@@ -70,6 +70,12 @@ func (m *uosMockOrderRepo) UpdateStatus(_ context.Context, _ transaction.Executo
 	return nil
 }
 
+func (m *uosMockOrderRepo) UpdateStatusWithSLA(_ context.Context, _ transaction.Executor, id uuid.UUID, status orderDomain.OrderStatus, _ *time.Time, _ *time.Time) error {
+	m.updatedState.id = id
+	m.updatedState.status = status
+	return nil
+}
+
 func (m *uosMockOrderRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.Order) error {
 	return nil
 }
