@@ -197,7 +197,7 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
                   </div>
                 </div>
                 <div class="text-xl font-extrabold text-gray-900 flex-shrink-0">
-                  {{ formatRupiah(item.price * item.quantity) }}
+                  {{ formatRupiah(item.subtotal ?? (item.price * item.quantity)) }}
                 </div>
               </div>
 

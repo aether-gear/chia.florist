@@ -24,6 +24,7 @@ export interface SelectedCourier {
 
 export interface CheckoutItem {
   product_id?: string
+  cart_item_id?: string
   shop_id: string
   name: string
   price: number
@@ -75,12 +76,15 @@ export interface CheckoutShopItemInput {
   product_variant_type?: 'standard' | 'custom'
   item_type?: 'standard' | 'custom'
   product_id?: string
+  cart_item_id?: string
   product_name?: string
   physical_size_id?: string
   quantity: number
   unit_price?: number
   custom_design?: CustomDesignPayload
 }
+
+export type CheckoutItemInput = CheckoutShopItemInput
 
 export interface CheckoutShopInput {
   shop_id: string

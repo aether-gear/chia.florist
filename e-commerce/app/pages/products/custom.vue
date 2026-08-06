@@ -186,7 +186,59 @@ const selectedImg  = computed(() => (selectedEl.value?.type === 'image'  ? selec
 const selectedBrush = computed(() => (selectedEl.value?.type === 'brush' ? selectedEl.value : null) as BrushStroke | null)
 const imgElements  = computed(() => elements.value.filter(e => e.type === 'image') as CanvasImage[])
 const brushElements = computed(() => elements.value.filter(e => e.type === 'brush') as BrushStroke[])
-const totalPrice   = computed(() => SIZES.find(s => s.id === physicalSize.value)?.price ?? 200_000)
+
+/* ─── LIVE PRICE BREAKDOWN PREVIEW FORMULA ───────────────────────── */
+const baseSizePrice = computed(() => SIZES.find(s => s.id === physicalSize.value)?.price ?? 200_000)
+const brushFee     = computed(() => brushElements.value.length * 2000)
+
+const uniqueColors = computed(() => {
+  const set = new Set<string>()
+  const add = (c?: string) => {
+    if (c) set.add(normalizeHexColor(c, '#FFFFFF'))
+  }
+  add(upper.value.bgColor)
+  add(lower.value.bgColor)
+  add(upper.value.headerColor)
+  add(upper.value.bodyColor)
+  add(lower.value.headerColor)
+  add(lower.value.bodyColor)
+  if (border.value.style !== 'none' && border.value.width > 0) {
+    add(border.value.color)
+  }
+  if (topCrest.value.enabled) {
+    add(topCrest.value.primary)
+    add(topCrest.value.secondary)
+  }
+  if (bottomCrest.value.enabled) {
+    add(bottomCrest.value.primary)
+    add(bottomCrest.value.secondary)
+  }
+  brushElements.value.forEach(b => add(b.color))
+  return Array.from(set)
+})
+
+const colorFee = computed(() => Math.max(0, uniqueColors.value.length - 3) * 10_000)
+
+const borderFee = computed(() => {
+  if (border.value.style !== 'none' && border.value.width > 0) {
+    if (['double', 'groove', 'ridge', 'ornate'].includes(border.value.style)) {
+      return 15_000
+    }
+  }
+  return 0
+})
+
+const getCrestFee = (crest: FloralCrest) => {
+  if (!crest.enabled) return 0
+  if (crest.style === 'grand') return 45_000
+  if (crest.style === 'modern') return 30_000
+  return 25_000
+}
+
+const accessoriesFee = computed(() => borderFee.value + getCrestFee(topCrest.value) + getCrestFee(bottomCrest.value))
+const mediaFee       = computed(() => imgElements.value.length * 20_000)
+
+const totalPrice     = computed(() => baseSizePrice.value + brushFee.value + colorFee.value + accessoriesFee.value + mediaFee.value)
 
 // Sync sliders with selected brush
 watch(selectedBrush, (br) => {
@@ -1591,16 +1643,23 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- ── Specs ───────────────────────────────────────────── -->
+            <!-- ── Specs & Price Breakdown ─────────────────────────────── -->
             <div class="rm-specs">
               <div class="spec-row"><span class="sk">Upper Header</span><span class="sv">{{ upper.headerText || '—' }}</span></div>
               <div class="spec-row"><span class="sk">Upper Body</span><span class="sv">{{ upper.bodyText.replace(/\n/g,' / ') || '—' }}</span></div>
               <div class="spec-row"><span class="sk">Lower Body</span><span class="sv">{{ lower.bodyText.replace(/\n/g,' / ') || '—' }}</span></div>
-              <div class="spec-row"><span class="sk">Elements</span><span class="sv">{{ imgElements.length }} image{{ imgElements.length!==1?'s':'' }}, {{ brushElements.length }} brush stroke{{ brushElements.length!==1?'s':'' }}</span></div>
-              <div class="spec-row"><span class="sk">Size</span><span class="sv">{{ SIZES.find(s=>s.id===physicalSize)?.label }} — {{ SIZES.find(s=>s.id===physicalSize)?.desc }}</span></div>
+              
               <div class="spec-divider"/>
-              <div class="spec-row spec-total"><span class="sk">Total</span><span class="sv spec-price">{{ formatRupiah(totalPrice) }}</span></div>
-              <p class="spec-note">* Our team will review your design before production and contact you if adjustments are needed.</p>
+              <div class="sk" style="font-weight:700; font-size:0.75rem; color:#888; margin-bottom:0.25rem; letter-spacing:0.05em;">ESTIMATED PRICE BREAKDOWN</div>
+              <div class="spec-row"><span class="sk">Base Size ({{ SIZES.find(s=>s.id===physicalSize)?.label }})</span><span class="sv">{{ formatRupiah(baseSizePrice) }}</span></div>
+              <div v-if="brushElements.length" class="spec-row"><span class="sk">Brush Strokes ({{ brushElements.length }}× @ 2k)</span><span class="sv">{{ formatRupiah(brushFee) }}</span></div>
+              <div v-if="colorFee > 0" class="spec-row"><span class="sk">Color Palette ({{ uniqueColors.length }} colors)</span><span class="sv">{{ formatRupiah(colorFee) }}</span></div>
+              <div v-if="accessoriesFee > 0" class="spec-row"><span class="sk">Borders & Crests</span><span class="sv">{{ formatRupiah(accessoriesFee) }}</span></div>
+              <div v-if="mediaFee > 0" class="spec-row"><span class="sk">Custom Images ({{ imgElements.length }}× @ 20k)</span><span class="sv">{{ formatRupiah(mediaFee) }}</span></div>
+
+              <div class="spec-divider"/>
+              <div class="spec-row spec-total"><span class="sk">Total Preview</span><span class="sv spec-price">{{ formatRupiah(totalPrice) }}</span></div>
+              <p class="spec-note">* Note: Unit prices and totals are verified and controlled by the server during checkout.</p>
             </div>
           </div>
           <div class="rm-footer">

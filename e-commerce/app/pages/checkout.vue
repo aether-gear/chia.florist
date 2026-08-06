@@ -256,6 +256,8 @@ onMounted(async () => {
       }
       if (item.isCustom) {
         shopsMap[shopId].push({
+          cart_item_id: item.cartItemId || item.id,
+          product_variant_type: 'custom',
           item_type: 'custom',
           product_name: item.name,
           physical_size_id: item.customDesign?.layout?.physicalSizeId || item.size || 'medium',
@@ -370,7 +372,9 @@ const runCalculate = async () => {
         const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
         if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
           const design = localItem?.customDesign || item.custom_design
+          const cartItemId = item.cart_item_id || localItem?.cartItemId || localItem?.id || item.product_id
           return {
+            cart_item_id: cartItemId,
             product_variant_type: 'custom' as const,
             item_type: 'custom' as const,
             product_name: item.name,
@@ -607,7 +611,9 @@ const handlePlaceOrder = async () => {
           const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
           if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
             const design = localItem?.customDesign || item.custom_design
+            const cartItemId = item.cart_item_id || localItem?.cartItemId || localItem?.id || item.product_id
             return {
+              cart_item_id: cartItemId,
               product_variant_type: 'custom' as const,
               item_type: 'custom' as const,
               name: item.name,

@@ -260,8 +260,10 @@ export const migrateCustomDesignPayload = (raw: any): CustomDesignPayloadV1 => {
 
 export interface CartItem {
   id: string
+  cartItemId?: string
   name: string
   price: number
+  subtotal?: number
   image: string
   quantity: number
   size?: string
@@ -505,14 +507,18 @@ export const useCart = () => {
           const backendItems: CartItem[] = response.items.map((item: any) => {
             let size = '1.8m'
             let color = '#1b4332'
-            let price = Number(item.price || item.unit_price)
+            let price = Number(item.price ?? item.unit_price ?? 0)
+            let subtotal = Number(item.subtotal ?? (price * Number(item.quantity || 1)))
 
             if (item.product_variant_type === 'custom' || item.item_type === 'custom' || item.custom_design) {
               const migratedDesign = item.custom_design ? migrateCustomDesignPayload(item.custom_design) : undefined
+              const cartItemId = item.cart_item_id || item.id || `custom-${Date.now()}`
               return {
-                id: item.cart_item_id || item.id || `custom-${Date.now()}`,
+                id: cartItemId,
+                cartItemId: cartItemId,
                 name: item.product_name || item.name || 'Custom Board',
                 price: price,
+                subtotal: subtotal,
                 image: migratedDesign?.assets?.previewUrl || migratedDesign?.assets?.previewBase64 || item.images?.thumbnail || '/images/custom-preview.png',
                 quantity: Number(item.quantity),
                 shopId: item.shop_id,
