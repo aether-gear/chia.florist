@@ -2,14 +2,6 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
 // Removed Card imports since sections are now borderless and backgroundless
 import {
   DropdownMenu,
@@ -30,6 +22,7 @@ import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
 import Pagination from '../../components/Pagination';
+import { DataCard, DataCardGridHeader, DataCardList } from '../../components/DataCard';
 
 export default function ProductsPage() {
   const { isAdmin } = useAuthMeViewModel();
@@ -70,8 +63,6 @@ export default function ProductsPage() {
       setIsDeleting(false);
     }
   };
-
-
 
   return (
     <div className="flex-col md:flex">
@@ -119,166 +110,124 @@ export default function ProductsPage() {
 
         <div className="space-y-6">
           <div className="pb-4 border-b border-border/60">
-            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">All Products</h3>
-            <p className="text-muted-foreground text-sm">
-              You have {data?.total || 0} total products in your catalog.
-            </p>
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">All Products</h3>
+            <p className="text-muted-foreground text-sm">Manage product catalog, inventory levels, and pricing.</p>
           </div>
-          <div>
-            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              {/* Left Side: Filter and Search */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <SearchInput
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search products..."
-                />
-              </div>
 
-              {/* Right Side: Adding and Refresh */}
-              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  onClick={() => { refresh(); refreshStats(); }}
-                  disabled={loading || statsLoading}
-                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-                >
-                  <RefreshCw className={`h-4 w-4 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Product
-                </Button>
-              </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search products..."
+              className="relative flex-1 max-w-sm w-full"
+            />
+            <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => { refresh(); refreshStats(); }}
+                disabled={loading || statsLoading}
+                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+              >
+                <RefreshCw className={`h-4 w-4 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" /> Add Product
+              </Button>
             </div>
+          </div>
 
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">Image</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="w-[150px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={`skeleton-${i}`}>
-                        <TableCell><Skeleton className="h-10 w-10 rounded-md bg-muted animate-pulse" /></TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-32 animate-pulse bg-muted mb-1.5" />
-                          <Skeleton className="h-3.5 w-24 animate-pulse bg-muted" />
-                        </TableCell>
-                        <TableCell><Skeleton className="h-5 w-20 animate-pulse bg-muted" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-16 animate-pulse bg-muted" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24 animate-pulse bg-muted" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto animate-pulse bg-muted" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-8 rounded-xl ml-auto animate-pulse bg-muted" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="p-0">
-                        <EmptyState
-                          title="Failed to load products"
-                          description={error}
-                          actionLabel="Retry"
-                          onAction={() => refresh()}
-                          className="flex h-32 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent text-destructive"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="p-0">
-                        <EmptyState
-                          icon={<Package className="h-8 w-8 mb-2 mx-auto text-slate-400" />}
-                          title="No products found"
-                          description={searchQuery ? `No products match "${searchQuery}"` : "Try adding a new product to your catalog."}
-                          className="flex h-32 flex-col items-center justify-center text-center p-4 gap-1.5 border-0 bg-transparent"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="h-10 w-10 overflow-hidden rounded-md border">
-                            {product.banner?.thumbnail ? (
-                              <img
-                                src={product.banner.thumbnail}
-                                alt={product.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-muted">
-                                <Package className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {product.name}
-                          <div className="text-xs text-muted-foreground">
-                            {product.slug}
-                          </div>
-                        </TableCell>
-                        <TableCell>{product.sku}</TableCell>
-                        <TableCell>
-                          <StatusBadge status={product.status} />
-                        </TableCell>
-                        <TableCell>
-                          {new Intl.NumberFormat('id-ID', {
-                            style: 'currency',
-                            currency: 'IDR',
-                            minimumFractionDigits: 0,
-                          }).format(product.price)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={product.stock < 10 ? 'text-destructive font-medium' : ''}>
-                            {product.stock}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="min-w-[150px] p-1">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setActiveProductSlug(product.slug);
-                                  setIsProductSheetOpen(true);
-                                }}
-                                className="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-lg hover:bg-muted"
-                              >
-                                <Edit className="h-4 w-4 text-muted-foreground" />
-                                <span>Edit Product</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className="my-1" />
-                              <DropdownMenuItem
-                                onClick={() => setProductToDelete(product)}
-                                className="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-lg hover:bg-destructive/10 text-destructive focus:bg-destructive/10 focus:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                                <span>Delete Product</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+            <span>Found {filteredProducts.length} products</span>
+          </div>
+
+          {/* Content */}
+          <div className="flex flex-col gap-2">
+            <DataCardGridHeader>
+              <span className="col-span-4">Product</span>
+              <span className="col-span-2">SKU</span>
+              <span className="col-span-2">Status</span>
+              <span className="col-span-2">Price</span>
+              <span className="col-span-1">Stock</span>
+              <span className="col-span-1 text-right">Actions</span>
+            </DataCardGridHeader>
+
+            <DataCardList>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <DataCard key={`skeleton-${i}`}>
+                    <div className="col-span-4 flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 rounded-md bg-muted animate-pulse" />
+                      <Skeleton className="h-4 w-32 bg-muted animate-pulse" />
+                    </div>
+                    <div className="col-span-2"><Skeleton className="h-4 w-20 bg-muted animate-pulse" /></div>
+                    <div className="col-span-2"><Skeleton className="h-5 w-16 bg-muted animate-pulse rounded-full" /></div>
+                    <div className="col-span-2"><Skeleton className="h-4 w-24 bg-muted animate-pulse" /></div>
+                    <div className="col-span-1"><Skeleton className="h-4 w-8 bg-muted animate-pulse" /></div>
+                    <div className="col-span-1 text-right"><Skeleton className="h-8 w-8 ml-auto bg-muted animate-pulse rounded-xl" /></div>
+                  </DataCard>
+                ))
+              ) : error ? (
+                <EmptyState title="Failed to load products" description={error} className="py-12 border-0 bg-transparent text-destructive" />
+              ) : filteredProducts.length === 0 ? (
+                <EmptyState icon={<Package className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No products found" description="No products match your current search criteria." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
+              ) : (
+                filteredProducts.map((product) => (
+                  <DataCard key={product.id} onClick={() => { setActiveProductSlug(product.slug); setIsProductSheetOpen(true); }}>
+                    <div className="col-span-1 md:col-span-4 flex items-center gap-3">
+                      <div className="h-9 w-9 overflow-hidden rounded-md border shrink-0 bg-muted flex items-center justify-center">
+                        {product.banner?.thumbnail ? (
+                          <img src={product.banner.thumbnail} alt={product.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold font-display text-sm text-foreground truncate">{product.name}</h4>
+                        <p className="text-xs text-muted-foreground font-mono truncate">{product.slug}</p>
+                      </div>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 font-mono text-xs text-muted-foreground">
+                      <span className="md:hidden font-sans text-muted-foreground mr-1">SKU:</span>
+                      {product.sku || '-'}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2">
+                      <StatusBadge status={product.is_active ? 'active' : 'inactive'} className="scale-90 origin-left" />
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 font-bold text-primary">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.price)}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-1 text-xs">
+                      <span className="md:hidden font-sans text-muted-foreground mr-1">Stock:</span>
+                      <span className={product.stock < 10 ? "text-destructive font-bold" : "font-medium"}>{product.stock}</span>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-1 text-right" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                          <DropdownMenuItem onClick={() => { setActiveProductSlug(product.slug); setIsProductSheetOpen(true); }}>
+                            <Edit className="h-4 w-4 mr-2 text-muted-foreground" /> Edit Product
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="my-1" />
+                          <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive focus:text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete Product
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </DataCard>
+                ))
+              )}
+            </DataCardList>
 
             <Pagination
               currentPage={page}

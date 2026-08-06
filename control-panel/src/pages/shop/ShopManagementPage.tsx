@@ -5,14 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Checkbox } from '../../components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
+
 // Removed Card component imports since sections are now borderless and backgroundless
 import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
@@ -36,6 +29,7 @@ import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
 import Pagination from '../../components/Pagination';
 import SearchInput from '../../components/SearchInput';
+import { DataCard, DataCardGridHeader, DataCardList } from '../../components/DataCard';
 
 export default function ShopManagementPage() {
   const {
@@ -149,11 +143,10 @@ export default function ShopManagementPage() {
   const [districts, setDistricts] = useState<any[]>([]);
   const [villages, setVillages] = useState<any[]>([]);
 
-  const [provinceId, setProvinceId] = useState('');
-  const [cityId, setCityId] = useState('');
-  const [districtId, setDistrictId] = useState('');
-  const [villageId, setVillageId] = useState('');
-
+  const [provinceId, setProvinceId] = useState<string>('');
+  const [cityId, setCityId] = useState<string>('');
+  const [districtId, setDistrictId] = useState<string>('');
+  const [villageId, setVillageId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -196,7 +189,9 @@ export default function ShopManagementPage() {
       setSelectedProductId('');
       setInventoryStock('');
       // Re-fetch details of the active shop
-      selectShop(selectedShopInfo);
+      if (selectedShopInfo) {
+        selectShop(selectedShopInfo);
+      }
     } catch (err: any) {
       setInventoryError(err.message || 'Failed to add inventory');
     } finally {
@@ -210,12 +205,8 @@ export default function ShopManagementPage() {
       const loadProvinces = async () => {
         try {
           setFetchError(null);
-          const res = await fetchApi('/provinces');
-          if (res && res.provinces) {
-            setProvinces(res.provinces);
-          } else {
-            setFetchError('No provinces list found in response');
-          }
+          const res = await fetchApi('/locations/provinces');
+          setProvinces(res.provinces || res || []);
         } catch (err: any) {
           console.error('Failed to load provinces', err);
           setFetchError(err.message || 'Failed to load provinces');
@@ -236,8 +227,8 @@ export default function ShopManagementPage() {
     if (!provId) return;
     try {
       setFetchError(null);
-      const res = await fetchApi(`/provinces/${provId}/cities`);
-      setCities(res.cities || []);
+      const res = await fetchApi(`/locations/provinces/${provId}/cities`);
+      setCities(res.cities || res || []);
     } catch (err: any) {
       console.error(err);
       setFetchError(err.message || 'Failed to load cities');
@@ -253,8 +244,8 @@ export default function ShopManagementPage() {
     if (!cId) return;
     try {
       setFetchError(null);
-      const res = await fetchApi(`/cities/${cId}/districts`);
-      setDistricts(res.districts || []);
+      const res = await fetchApi(`/locations/cities/${cId}/districts`);
+      setDistricts(res.districts || res || []);
     } catch (err: any) {
       console.error(err);
       setFetchError(err.message || 'Failed to load districts');
@@ -268,15 +259,15 @@ export default function ShopManagementPage() {
     if (!distId) return;
     try {
       setFetchError(null);
-      const res = await fetchApi(`/districts/${distId}/villages`);
-      setVillages(res.villages || []);
+      const res = await fetchApi(`/locations/districts/${distId}/villages`);
+      setVillages(res.villages || res || []);
     } catch (err: any) {
       console.error(err);
       setFetchError(err.message || 'Failed to load villages');
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const success = await createAddress({
@@ -306,12 +297,12 @@ export default function ShopManagementPage() {
     }
   };
 
+  const handleSubmit = handleCreateAddress;
+
   const handleOpenDetails = (shop: any) => {
     selectShop(shop);
     setIsDetailsOpen(true);
   };
-
-
 
   return (
     <div className="flex-col md:flex">
@@ -324,126 +315,111 @@ export default function ShopManagementPage() {
             </p>
           </div>
         </div>
+
         <div className="space-y-6">
-          <div className="flex flex-row items-center justify-between pb-4 border-b border-border/60">
-            <div>
-              <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Store Locations</h3>
-              <p className="text-muted-foreground text-sm">
-                You have {total} shop locations registered.
-              </p>
+          <div className="pb-4 border-b border-border/60">
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Store Locations</h3>
+            <p className="text-muted-foreground text-sm">You have {total} shop locations registered.</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search shops by name..."
+              className="relative flex-1 max-w-sm w-full"
+            />
+            <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => refresh()}
+                disabled={loading}
+                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button
+                onClick={() => setIsAddShopOpen(true)}
+                className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+              >
+                <Plus className="h-4 w-4" />
+                Add Shop
+              </Button>
             </div>
           </div>
-          <div>
-            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              {/* Left Side: Filter and Search */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <SearchInput
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search shops by name..."
-                />
-              </div>
 
-              {/* Right Side: Adding and Refresh */}
-              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refresh()}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setIsAddShopOpen(true)}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Shop
-                </Button>
-              </div>
-            </div>
+          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+            <span>Found {filteredShops.length} shops</span>
+          </div>
 
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead>Shop Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={`skeleton-${i}`}>
-                        <TableCell><Skeleton className="h-5 w-40 animate-pulse bg-muted" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-60 animate-pulse bg-muted" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-16 animate-pulse bg-muted" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto animate-pulse bg-muted" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center h-24 text-destructive">
-                        {error}
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredShops.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
-                        {searchQuery ? `No shops match "${searchQuery}"` : "No shops found."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredShops.map((shop) => (
-                      <TableRow
-                        key={shop.id}
-                        className="hover:bg-muted/55 cursor-pointer transition-colors"
+          {/* Content */}
+          <div className="flex flex-col gap-2">
+            <DataCardGridHeader>
+              <span className="col-span-4">Shop Name</span>
+              <span className="col-span-4">Description</span>
+              <span className="col-span-2">Status</span>
+              <span className="col-span-2 text-right">Action</span>
+            </DataCardGridHeader>
+
+            <DataCardList>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <DataCard key={`skeleton-${i}`}>
+                    <div className="col-span-4"><Skeleton className="h-5 w-40 bg-muted animate-pulse" /></div>
+                    <div className="col-span-4"><Skeleton className="h-4 w-60 bg-muted animate-pulse" /></div>
+                    <div className="col-span-2"><Skeleton className="h-5 w-16 bg-muted animate-pulse rounded-full" /></div>
+                    <div className="col-span-2 text-right"><Skeleton className="h-8 w-24 ml-auto bg-muted animate-pulse rounded-lg" /></div>
+                  </DataCard>
+                ))
+              ) : error ? (
+                <div className="py-12 border-0 bg-transparent text-destructive text-center">Failed to load shops: {error}</div>
+              ) : filteredShops.length === 0 ? (
+                <div className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10 text-center text-muted-foreground">
+                  <MapPin className="h-8 w-8 text-slate-400 mb-2 mx-auto" />
+                  <p>No shops found</p>
+                  <p className="text-sm">No store locations match your search.</p>
+                </div>
+              ) : (
+                filteredShops.map((shop) => (
+                  <DataCard key={shop.id} onClick={() => handleOpenDetails(shop)}>
+                    <div className="col-span-1 md:col-span-4 min-w-0">
+                      <h4 className="font-semibold font-display text-sm text-foreground truncate">{shop.name}</h4>
+                      <p className="text-[10px] text-muted-foreground font-mono truncate">ID: {shop.id}</p>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-4 text-xs text-muted-foreground truncate">
+                      {shop.description || 'No description provided.'}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2">
+                      <Badge
+                        variant={shop.is_active ? 'default' : 'secondary'}
+                        className={
+                          shop.is_active
+                            ? 'bg-primary/10 text-primary hover:bg-primary/10 border-0 rounded-lg scale-90 origin-left'
+                            : 'bg-muted text-muted-foreground hover:bg-muted border-0 rounded-lg scale-90 origin-left'
+                        }
+                      >
+                        {shop.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary hover:text-primary/90 hover:bg-primary/5 rounded-lg text-xs"
                         onClick={() => handleOpenDetails(shop)}
                       >
-                        <TableCell className="font-semibold text-foreground">
-                          {shop.name}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-sm truncate">
-                          {shop.description || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={shop.is_active ? 'default' : 'secondary'}
-                            className={
-                              shop.is_active
-                                ? 'bg-primary/10 text-primary hover:bg-primary/10 border-0 rounded-lg'
-                                : 'bg-muted text-muted-foreground hover:bg-muted border-0 rounded-lg'
-                            }
-                          >
-                            {shop.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary hover:text-primary/90 hover:bg-primary/5 rounded-lg"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDetails(shop);
-                            }}
-                          >
-                            <Eye className="mr-1.5 h-4 w-4" />
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        View Details
+                      </Button>
+                    </div>
+                  </DataCard>
+                ))
+              )}
+            </DataCardList>
 
             <Pagination
               currentPage={page}
@@ -620,53 +596,47 @@ export default function ShopManagementPage() {
                       </SheetContent>
                     </Sheet>
                   </div>
-                  <div>
-                    <div className="rounded-md border border-slate-100 overflow-hidden">
-                      <Table>
-                        <TableHeader className="bg-slate-50/50">
-                          <TableRow>
-                            <TableHead>Product Name</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead className="text-right">Available Stock</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {products.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center h-24 text-slate-500">
-                                No products found for this shop.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            products.map((product) => (
-                              <TableRow key={product.id}>
-                                <TableCell className="font-medium text-slate-800">
-                                  {product.name}
-                                  <div className="text-xs text-slate-400 font-normal">{product.slug}</div>
-                                </TableCell>
-                                <TableCell className="text-slate-600">{product.sku}</TableCell>
-                                <TableCell className="text-slate-700">
-                                  {new Intl.NumberFormat('id-ID', {
-                                    style: 'currency',
-                                    currency: 'IDR',
-                                    minimumFractionDigits: 0,
-                                  }).format(product.price)}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <span className="font-bold text-slate-800">
-                                    {product.inventory.available}
-                                  </span>
-                                  <span className="text-xs text-slate-400 ml-2">
-                                    (Total: {product.inventory.total_stock})
-                                  </span>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+
+                  {/* Content */}
+                  <div className="flex flex-col gap-2">
+                    <DataCardGridHeader>
+                      <span className="col-span-4">Product Name</span>
+                      <span className="col-span-3">SKU</span>
+                      <span className="col-span-3">Price</span>
+                      <span className="col-span-2 text-right">Available Stock</span>
+                    </DataCardGridHeader>
+
+                    <DataCardList>
+                      {products.length === 0 ? (
+                        <div className="py-8 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10 text-center text-muted-foreground text-sm">
+                          No products found for this shop.
+                        </div>
+                      ) : (
+                        products.map((product) => (
+                          <DataCard key={product.id}>
+                            <div className="col-span-1 md:col-span-4 min-w-0">
+                              <h4 className="font-semibold text-sm text-foreground truncate">{product.name}</h4>
+                              <p className="text-xs text-muted-foreground font-mono truncate">{product.slug}</p>
+                            </div>
+                            <div className="col-span-1 md:col-span-3 text-xs font-mono text-muted-foreground">
+                              <span className="md:hidden font-sans mr-1">SKU:</span>
+                              {product.sku || '-'}
+                            </div>
+                            <div className="col-span-1 md:col-span-3 text-xs font-bold text-primary">
+                              {new Intl.NumberFormat('id-ID', {
+                                style: 'currency',
+                                currency: 'IDR',
+                                minimumFractionDigits: 0,
+                              }).format(product.price)}
+                            </div>
+                            <div className="col-span-1 md:col-span-2 text-right text-xs">
+                              <span className="font-bold text-foreground">{product.inventory.available}</span>
+                              <span className="text-[11px] text-muted-foreground ml-1.5">(Total: {product.inventory.total_stock})</span>
+                            </div>
+                          </DataCard>
+                        ))
+                      )}
+                    </DataCardList>
                   </div>
                 </div>
               </TabsContent>
@@ -834,46 +804,43 @@ export default function ShopManagementPage() {
                       </SheetContent>
                     </Sheet>
                   </div>
-                  <div>
-                    <div className="rounded-md border border-slate-100 overflow-hidden">
-                      <Table>
-                        <TableHeader className="bg-slate-50/50">
-                          <TableRow>
-                            <TableHead>Label</TableHead>
-                            <TableHead>Full Address</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {addresses.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center h-24 text-slate-500">No addresses found.</TableCell>
-                            </TableRow>
-                          ) : (
-                            addresses.map((addr) => (
-                              <TableRow key={addr.id}>
-                                <TableCell className="font-semibold text-slate-800">{addr.label}</TableCell>
-                                <TableCell className="max-w-xs truncate text-slate-600">{addr.full_address}</TableCell>
-                                <TableCell className="text-slate-600">{addr.phone || '-'}</TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={addr.is_active ? "default" : "secondary"}
-                                    className={
-                                      addr.is_active
-                                        ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-50 border-0"
-                                        : "bg-slate-100 text-slate-600 hover:bg-slate-100 border-0"
-                                    }
-                                  >
-                                    {addr.is_active ? 'Active' : 'Inactive'}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+
+                  {/* Content */}
+                  <div className="flex flex-col gap-2">
+                    <DataCardGridHeader>
+                      <span className="col-span-3">Label</span>
+                      <span className="col-span-5">Full Address</span>
+                      <span className="col-span-2">Phone</span>
+                      <span className="col-span-2 text-right">Status</span>
+                    </DataCardGridHeader>
+
+                    <DataCardList>
+                      {addresses.length === 0 ? (
+                        <div className="py-8 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10 text-center text-muted-foreground text-sm">
+                          No addresses found.
+                        </div>
+                      ) : (
+                        addresses.map((addr) => (
+                          <DataCard key={addr.id}>
+                            <div className="col-span-1 md:col-span-3 font-semibold text-foreground text-sm truncate">{addr.label}</div>
+                            <div className="col-span-1 md:col-span-5 text-xs text-muted-foreground truncate">{addr.full_address}</div>
+                            <div className="col-span-1 md:col-span-2 text-xs text-muted-foreground">{addr.phone || '-'}</div>
+                            <div className="col-span-1 md:col-span-2 text-right">
+                              <Badge
+                                variant={addr.is_active ? "default" : "secondary"}
+                                className={
+                                  addr.is_active
+                                    ? "bg-primary/10 text-primary border-0 scale-90 origin-right"
+                                    : "bg-muted text-muted-foreground border-0 scale-90 origin-right"
+                                }
+                              >
+                                {addr.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </div>
+                          </DataCard>
+                        ))
+                      )}
+                    </DataCardList>
                   </div>
                 </div>
               </TabsContent>
@@ -885,42 +852,39 @@ export default function ShopManagementPage() {
                     <h3 className="text-lg font-bold text-foreground">Configured Couriers</h3>
                     <p className="text-muted-foreground text-sm">Shipping providers configured for this branch.</p>
                   </div>
-                  <div>
-                    <div className="rounded-md border border-slate-100 overflow-hidden">
-                      <Table>
-                        <TableHeader className="bg-slate-50/50">
-                          <TableRow>
-                            <TableHead>Courier Code</TableHead>
-                            <TableHead className="text-right">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {couriers.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={2} className="text-center h-24 text-slate-500">No couriers found.</TableCell>
-                            </TableRow>
-                          ) : (
-                            couriers.map((courier) => (
-                              <TableRow key={courier.code}>
-                                <TableCell className="font-semibold uppercase text-slate-800">{courier.code}</TableCell>
-                                <TableCell className="text-right">
-                                  <Badge
-                                    variant={courier.active ? "default" : "secondary"}
-                                    className={
-                                      courier.active
-                                        ? "bg-emerald-100 text-emerald-800 border-0"
-                                        : "bg-slate-100 text-slate-600 border-0"
-                                    }
-                                  >
-                                    {courier.active ? 'Active' : 'Disabled'}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+
+                  {/* Content */}
+                  <div className="flex flex-col gap-2">
+                    <DataCardGridHeader>
+                      <span className="col-span-8">Courier Code</span>
+                      <span className="col-span-4 text-right">Status</span>
+                    </DataCardGridHeader>
+
+                    <DataCardList>
+                      {couriers.length === 0 ? (
+                        <div className="py-8 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10 text-center text-muted-foreground text-sm">
+                          No couriers found.
+                        </div>
+                      ) : (
+                        couriers.map((courier) => (
+                          <DataCard key={courier.code}>
+                            <div className="col-span-1 md:col-span-8 font-semibold uppercase text-foreground text-sm">{courier.code}</div>
+                            <div className="col-span-1 md:col-span-4 text-right">
+                              <Badge
+                                variant={courier.active ? "default" : "secondary"}
+                                className={
+                                  courier.active
+                                    ? "bg-primary/10 text-primary border-0 scale-90 origin-right"
+                                    : "bg-muted text-muted-foreground border-0 scale-90 origin-right"
+                                }
+                              >
+                                {courier.active ? 'Active' : 'Disabled'}
+                              </Badge>
+                            </div>
+                          </DataCard>
+                        ))
+                      )}
+                    </DataCardList>
                   </div>
                 </div>
               </TabsContent>

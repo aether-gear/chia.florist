@@ -4,15 +4,6 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
-// Removed Card component imports since sections are now borderless and backgroundless
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { useAuditLogsViewModel } from '../../viewmodels/useAuditLogsViewModel';
 import type { AuditLog } from '../../models/AuditLog';
@@ -21,6 +12,7 @@ import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
 import Pagination from '../../components/Pagination';
 import { Skeleton } from '../../components/ui/skeleton';
+import { DataCard, DataCardGridHeader, DataCardList } from '../../components/DataCard';
 
 export default function AuditLogsPage() {
   const {
@@ -83,193 +75,155 @@ export default function AuditLogsPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="pb-4 border-b border-border/60 mb-6">
-            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">All Audit Logs</h3>
-            <p className="text-muted-foreground text-sm">
-              View system audit trails and security activity logs.
-            </p>
+          <div className="pb-4 border-b border-border/60">
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">All Audit Logs</h3>
+            <p className="text-muted-foreground text-sm">View system audit trails and security activity logs.</p>
           </div>
-          <div>
-            <div className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
-              {/* Left Side: Filter and Search */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1 w-full md:w-auto">
-                <div className="space-y-1.5">
-                  <Label htmlFor="action-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Action Name</Label>
-                  <SearchInput
-                    id="action-filter"
-                    placeholder="e.g. signin, save_shop"
-                    className="relative w-full text-foreground"
-                    value={actionFilter}
-                    onChange={(val) => {
-                      setActionFilter(val);
-                      setPage(1);
-                    }}
-                  />
-                </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="user-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">User / Actor ID</Label>
-                  <SearchInput
-                    id="user-filter"
-                    placeholder="UUID of the actor"
-                    className="relative w-full text-foreground"
-                    value={userIdFilter}
-                    onChange={(val) => {
-                      setUserIdFilter(val);
-                      setPage(1);
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    className="text-sm rounded-xl border border-border bg-background text-foreground"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      setPage(1);
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End Date</Label>
-                  <Input
-                    id="end-date"
-                    type="date"
-                    className="text-sm rounded-xl border border-border bg-background text-foreground"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      setPage(1);
-                    }}
-                  />
-                </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="action-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Action Name</Label>
+                <SearchInput
+                  id="action-filter"
+                  placeholder="e.g. signin, save_shop"
+                  className="relative w-full text-foreground"
+                  value={actionFilter}
+                  onChange={(val) => {
+                    setActionFilter(val);
+                    setPage(1);
+                  }}
+                />
               </div>
 
-              {/* Right Side: Refresh */}
-              <div className="flex items-center gap-2 justify-end w-full md:w-auto pb-0.5">
-                <Button
-                  variant="outline"
-                  onClick={() => refresh()}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
+              <div className="space-y-1.5">
+                <Label htmlFor="user-filter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">User / Actor ID</Label>
+                <SearchInput
+                  id="user-filter"
+                  placeholder="UUID of actor"
+                  className="relative w-full text-foreground"
+                  value={userIdFilter}
+                  onChange={(val) => {
+                    setUserIdFilter(val);
+                    setPage(1);
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  className="text-sm rounded-xl border border-border bg-background text-foreground"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  className="text-sm rounded-xl border border-border bg-background text-foreground"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setPage(1);
+                  }}
+                />
               </div>
             </div>
 
-            {error ? (
-              <EmptyState
-                title="Failed to load audit logs"
-                description={error}
-                actionLabel="Retry"
-                onAction={() => refresh()}
-                className="flex h-48 flex-col items-center justify-center text-center p-4 gap-2 border-0 bg-transparent text-destructive"
-              />
-            ) : (
-              <div className="rounded-2xl border border-border overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead
-                        className="cursor-pointer hover:bg-muted/70 transition-colors text-foreground"
-                        onClick={() => handleSort('date')}
+            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+              <span>Found {total} audit logs</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refresh()}
+                disabled={loading}
+                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex flex-col gap-2">
+            <DataCardGridHeader>
+              <span className="col-span-3">
+                <button className="flex items-center gap-1 hover:text-primary" onClick={() => handleSort('created_at')}>
+                  Timestamp <ArrowUpDown className="h-3 w-3" />
+                </button>
+              </span>
+              <span className="col-span-3">
+                <button className="flex items-center gap-1 hover:text-primary" onClick={() => handleSort('action')}>
+                  Action <ArrowUpDown className="h-3 w-3" />
+                </button>
+              </span>
+              <span className="col-span-3">Actor / User ID</span>
+              <span className="col-span-2">Outcome</span>
+              <span className="col-span-1 text-right">Details</span>
+            </DataCardGridHeader>
+
+            <DataCardList>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <DataCard key={`skeleton-${i}`}>
+                    <div className="col-span-3"><Skeleton className="h-4 w-28 bg-muted animate-pulse" /></div>
+                    <div className="col-span-3"><Skeleton className="h-5 w-24 bg-muted animate-pulse" /></div>
+                    <div className="col-span-3"><Skeleton className="h-4 w-32 bg-muted animate-pulse" /></div>
+                    <div className="col-span-2"><Skeleton className="h-5 w-16 bg-muted animate-pulse rounded-full" /></div>
+                    <div className="col-span-1 text-right"><Skeleton className="h-8 w-8 ml-auto bg-muted animate-pulse rounded-lg" /></div>
+                  </DataCard>
+                ))
+              ) : error ? (
+                <EmptyState title="Failed to load audit logs" description={error} className="py-12 border-0 bg-transparent text-destructive" />
+              ) : logs.length === 0 ? (
+                <EmptyState icon={<History className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No audit logs found" description="No activity logs match the current search filters." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
+              ) : (
+                logs.map((log) => (
+                  <DataCard key={log.id} onClick={() => setSelectedLog(log)}>
+                    <div className="col-span-1 md:col-span-3 text-xs text-muted-foreground">
+                      <span className="md:hidden font-sans text-muted-foreground mr-1">Time:</span>
+                      {formatDate(log.created_at)}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-3">
+                      <Badge variant="outline" className="font-mono text-xs font-semibold bg-muted/40 text-foreground border-border/80">
+                        {log.action}
+                      </Badge>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-3 font-mono text-xs text-muted-foreground truncate">
+                      <span className="md:hidden font-sans text-muted-foreground mr-1">Actor:</span>
+                      {log.actor_id ? log.actor_id : <span className="italic opacity-60">System</span>}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2">
+                      <StatusBadge status={log.outcome} className="scale-90 origin-left" />
+                    </div>
+
+                    <div className="col-span-1 md:col-span-1 text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg"
+                        onClick={() => setSelectedLog(log)}
                       >
-                        <div className="flex items-center gap-1.5 font-semibold">
-                          Date & Time
-                          <ArrowUpDown className="h-3.5 w-3.5" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-muted/70 transition-colors text-foreground"
-                        onClick={() => handleSort('action')}
-                      >
-                        <div className="flex items-center gap-1.5 font-semibold">
-                          Action
-                          <ArrowUpDown className="h-3.5 w-3.5" />
-                        </div>
-                      </TableHead>
-                      <TableHead className="font-semibold text-foreground">Category / Resource</TableHead>
-                      <TableHead className="font-semibold text-foreground">Actor ID</TableHead>
-                      <TableHead className="font-semibold text-foreground text-center">Outcome</TableHead>
-                      <TableHead className="font-semibold text-foreground">Client IP</TableHead>
-                      <TableHead className="text-right font-semibold text-foreground">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={`skeleton-${i}`}>
-                          <TableCell><Skeleton className="h-5 w-32 animate-pulse bg-muted" /></TableCell>
-                          <TableCell><Skeleton className="h-5 w-20 animate-pulse bg-muted" /></TableCell>
-                          <TableCell><Skeleton className="h-5 w-40 animate-pulse bg-muted" /></TableCell>
-                          <TableCell><Skeleton className="h-5 w-28 animate-pulse bg-muted" /></TableCell>
-                          <TableCell className="text-center"><Skeleton className="h-5 w-16 mx-auto animate-pulse bg-muted" /></TableCell>
-                          <TableCell><Skeleton className="h-5 w-24 animate-pulse bg-muted" /></TableCell>
-                          <TableCell className="text-right"><Skeleton className="h-5 w-8 ml-auto animate-pulse bg-muted" /></TableCell>
-                        </TableRow>
-                      ))
-                    ) : logs.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="p-0">
-                          <EmptyState
-                            icon={<History className="h-8 w-8 mb-2 mx-auto text-muted-foreground" />}
-                            title="No audit logs found"
-                            description="No audit logs found matching your criteria."
-                            className="flex h-48 flex-col items-center justify-center text-center p-4 gap-1.5 border-0 bg-transparent"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      logs.map((log) => (
-                        <TableRow
-                          key={log.id}
-                          className="hover:bg-muted/55 cursor-pointer transition-colors"
-                          onClick={() => setSelectedLog(log)}
-                        >
-                          <TableCell className="font-medium text-foreground text-sm">
-                            {formatDate(log.created_at)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className="bg-muted text-muted-foreground border-0 font-semibold uppercase text-xs rounded-lg">
-                              {log.action}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-xs font-mono">
-                            {log.category} / {log.resource}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-xs max-w-[120px] truncate" title={log.actor_id}>
-                            {log.actor_id}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <StatusBadge status={log.outcome} />
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-xs font-mono">
-                            {log.client_ip}
-                          </TableCell>
-                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-primary hover:bg-primary/5"
-                              onClick={() => setSelectedLog(log)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </DataCard>
+                ))
+              )}
+            </DataCardList>
 
             <Pagination
               currentPage={page}
@@ -278,7 +232,6 @@ export default function AuditLogsPage() {
               limit={limit}
               onPageChange={setPage}
               itemNamePlural="logs"
-              className="flex items-center justify-between border-t border-border p-4"
             />
           </div>
         </div>
