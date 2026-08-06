@@ -17,6 +17,8 @@ interface ProductFormSheetProps {
   onOpenChange: (open: boolean) => void;
   productSlug?: string;
   onSuccess: () => void;
+  inline?: boolean;
+  onClose?: () => void;
 }
 
 export default function ProductFormSheet({
@@ -24,6 +26,8 @@ export default function ProductFormSheet({
   onOpenChange,
   productSlug,
   onSuccess,
+  inline = false,
+  onClose,
 }: ProductFormSheetProps) {
   const isEdit = !!productSlug;
   const {
@@ -55,6 +59,10 @@ export default function ProductFormSheet({
   const [selectedShopId, setSelectedShopId] = useState('');
   const [createMore, setCreateMore] = useState(false);
 
+  // Pending image for product creation
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+
   // Shops list
   const [shops, setShops] = useState<any[]>([]);
 
@@ -69,7 +77,7 @@ export default function ProductFormSheet({
       }
     };
 
-    if (open) {
+    if (open || inline) {
       loadShops();
       if (isEdit && productSlug) {
         loadProduct(productSlug);
@@ -86,9 +94,11 @@ export default function ProductFormSheet({
         });
         setLocalInventories([]);
         setSelectedShopId('');
+        setPendingImageFile(null);
+        setPendingImagePreview(null);
       }
     }
-  }, [open, isEdit, productSlug, loadProduct, clearProduct]);
+  }, [open, inline, isEdit, productSlug, loadProduct, clearProduct]);
 
   // Sync form values on edit
   useEffect(() => {
@@ -209,9 +219,11 @@ export default function ProductFormSheet({
       weight: formData.weight !== '' ? Number(formData.weight) : null,
     };
 
-    const saved = await saveProduct(saveValues, localInventories);
+    const saved = await saveProduct(saveValues, localInventories, pendingImageFile);
 
     if (saved) {
+      setPendingImageFile(null);
+      setPendingImagePreview(null);
       onSuccess();
       if (!isEdit && createMore) {
         setFormData({
@@ -231,11 +243,12 @@ export default function ProductFormSheet({
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      await uploadImage(file);
-      onSuccess();
+      setPendingImageFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setPendingImagePreview(objectUrl);
     }
   };
 
@@ -244,375 +257,338 @@ export default function ProductFormSheet({
     s => !localInventories.some(item => item.shopId === s.id && !item.isDeleted)
   );
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full border-l bg-white shadow-2xl">
-        {/* Header */}
-        <div className="px-6 py-5 border-b flex items-center justify-between shrink-0">
-          <div>
-            <SheetTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="h-5 w-5 text-indigo-600" />
-              {isEdit ? 'Update product' : 'Add new product'}
-            </SheetTitle>
-            <SheetDescription className="text-xs text-slate-500 mt-1">
-              {isEdit
-                ? `Modify product database details and manage stock levels.`
-                : 'Insert a new row to the products database.'}
-            </SheetDescription>
-          </div>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="rounded-md p-1.5 text-slate-400 hover:text-slate-500 hover:bg-slate-100 transition-colors"
+  const formContent = (
+    <>
+      {/* Header */}
+      <div className={inline ? "pb-4 border-b border-border/60 flex items-center justify-between" : "px-6 py-5 border-b flex items-center justify-between shrink-0"}>
+        <div>
+          <h3 className="text-xl font-bold font-display text-foreground flex items-center gap-2">
+            <Layers className="h-5 w-5 text-primary" />
+            {isEdit ? 'Update product' : 'Add new product'}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            {isEdit
+              ? `Modify product database details and manage stock levels.`
+              : 'Insert a new row to the products database.'}
+          </p>
+        </div>
+        {inline && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+            onClick={() => (onClose ? onClose() : onOpenChange(false))}
           >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 pb-24">
-          {error && (
-            <div className="flex items-start gap-2 p-3 text-xs text-red-600 bg-red-50 rounded-lg border border-red-100">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
-              <span>{error}</span>
+      {/* Scrollable Body */}
+      <div className={inline ? "space-y-6" : "flex-1 overflow-y-auto px-6 py-6 space-y-6 pb-24"}>
+        {error && (
+          <div className="flex items-start gap-2 p-3 text-xs text-destructive bg-destructive/10 rounded-xl border border-destructive/20">
+            <AlertCircle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {success && !isEdit && (
+          <div className="flex items-start gap-2 p-3 text-xs text-primary bg-primary/10 rounded-xl border border-primary/20">
+            <Layers className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+            <span>Product created successfully!</span>
+          </div>
+        )}
+
+        {/* Basic Details Section */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Basic Info</h3>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="sku" className="text-xs font-semibold text-foreground">SKU / Item Code *</Label>
+              <Input
+                id="sku"
+                name="sku"
+                placeholder="e.g. ROSE-RED-01"
+                value={formData.sku}
+                onChange={handleChange}
+                className="mt-1 text-xs rounded-xl"
+                required
+              />
             </div>
-          )}
-
-          {success && !isEdit && (
-            <div className="p-3 text-xs text-emerald-600 bg-emerald-50 rounded-lg border border-emerald-100">
-              Product successfully created.
+            <div>
+              <Label htmlFor="name" className="text-xs font-semibold text-foreground">Product Name *</Label>
+              <Input
+                id="name"
+                name="name"
+                placeholder="e.g. Red Rose Bouquet"
+                value={formData.name}
+                onChange={handleChange}
+                className="mt-1 text-xs rounded-xl"
+                required
+              />
             </div>
-          )}
+          </div>
 
-          {loading ? (
-            <div className="flex h-48 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <div>
+            <Label htmlFor="description" className="text-xs font-semibold text-foreground">Description</Label>
+            <textarea
+              id="description"
+              name="description"
+              rows={3}
+              placeholder="Detailed description of the product..."
+              value={formData.description}
+              onChange={handleChange}
+              className="mt-1 w-full rounded-xl border border-border bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="price" className="text-xs font-semibold text-foreground">Price (IDR) *</Label>
+              <Input
+                id="price"
+                name="price"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={formData.price}
+                onChange={handleChange}
+                className="mt-1 text-xs rounded-xl"
+                required
+              />
             </div>
-          ) : (
-            <form onSubmit={handleSave} className="space-y-4 division-y">
-              {/* SKU */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="sku" className="text-sm font-bold text-slate-800">SKU</Label>
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    id="sku"
-                    name="sku"
-                    placeholder="e.g. PRO-ROSE-01"
-                    value={formData.sku}
-                    onChange={handleChange}
-                    required
-                    className="border-slate-200 focus-visible:ring-indigo-500"
-                  />
-                </div>
-              </div>
+            <div>
+              <Label htmlFor="weight" className="text-xs font-semibold text-foreground">Weight (grams)</Label>
+              <Input
+                id="weight"
+                name="weight"
+                type="number"
+                min="0"
+                placeholder="e.g. 500"
+                value={formData.weight}
+                onChange={handleChange}
+                className="mt-1 text-xs rounded-xl"
+              />
+            </div>
+          </div>
 
-              {/* NAME */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="name" className="text-sm font-bold text-slate-800">Name</Label>
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    id="name"
-                    name="name"
-                    placeholder="e.g. Red Rose Bouquet"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="border-slate-200 focus-visible:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* DESCRIPTION */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="description" className="text-sm font-bold text-slate-800">Description</Label>
-                </div>
-                <div className="col-span-2">
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={3}
-                    placeholder="NULL (optional description...)"
-                    value={formData.description}
-                    onChange={handleChange}
-                    className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* PRICE */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="price" className="text-sm font-bold text-slate-800">Price</Label>
-                </div>
-                <div className="col-span-2">
-                  <div className="relative flex items-center">
-                    <span className="absolute left-3 text-sm text-slate-400 font-semibold select-none">Rp.</span>
-                    <Input
-                      id="price"
-                      name="price"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={formData.price}
-                      onChange={handleChange}
-                      required
-                      className="pl-9 pr-9 border-slate-200 focus-visible:ring-indigo-500"
-                    />
-                    <span className="absolute right-3 text-sm text-slate-400 font-semibold select-none">,00</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* WEIGHT */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="weight" className="text-sm font-bold text-slate-800">Weight</Label>
-                </div>
-                <div className="col-span-2">
-                  <div className="relative flex items-center">
-                    <Input
-                      id="weight"
-                      name="weight"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="NULL"
-                      value={formData.weight}
-                      onChange={handleChange}
-                      className="pr-14 border-slate-200 focus-visible:ring-indigo-500"
-                    />
-                    <span className="absolute right-3 text-xs text-slate-400 font-medium select-none">grams</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* STATUS */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="status" className="text-sm font-bold text-slate-800">Status</Label>
-                </div>
-                <div className="col-span-2">
-                  <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* IS AVAILABLE */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label htmlFor="is_available" className="text-sm font-bold text-slate-800">Available for sale</Label>
-                </div>
-                <div className="col-span-2 flex items-center h-10">
-                  <input
-                    type="checkbox"
-                    id="is_available"
-                    name="is_available"
-                    checked={formData.is_available}
-                    onChange={handleChange}
-                    className="h-4 w-4 rounded border-slate-200 text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* IMAGE MANAGER (Edit Mode Only) */}
-              {isEdit && product && (
-                <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                  <div className="col-span-1">
-                    <Label className="text-sm font-bold text-slate-800">Banner image</Label>
-                  </div>
-                  <div className="col-span-2 space-y-4">
-                    {/* Image display */}
-                    <div className="relative aspect-video w-full rounded-lg border bg-slate-50 overflow-hidden flex items-center justify-center">
-                      {product.banner?.thumbnail ? (
-                        <img
-                          src={product.banner.thumbnail}
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xs text-slate-400">No image uploaded</span>
-                      )}
-                    </div>
-
-                    {/* Gallery strip */}
-                    {product.gallery && product.gallery.length > 0 && (
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {product.gallery.map((img, idx) => (
-                          <div key={idx} className="h-12 w-12 rounded border overflow-hidden shrink-0">
-                            <img
-                              src={img.thumbnail || img.preview || img.detail || ''}
-                              alt="gallery"
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Upload button */}
-                    <div>
-                      <input
-                        type="file"
-                        id="sheet-image-upload"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                        disabled={uploading}
-                      />
-                      <Label
-                        htmlFor="sheet-image-upload"
-                        className="flex flex-col items-center justify-center w-full h-20 border border-dashed border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 hover:border-indigo-400 transition-colors"
-                      >
-                        {uploading ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-slate-400">
-                            <UploadCloud className="h-5 w-5 mb-0.5 text-slate-300" />
-                            <span className="text-[10px] font-semibold">Upload product image</span>
-                          </div>
-                        )}
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* INVENTORY SECTION */}
-              <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-slate-100">
-                <div className="col-span-1">
-                  <Label className="text-sm font-bold text-slate-800">Inventory Stock</Label>
-                </div>
-                <div className="col-span-2 space-y-4">
-                  {/* Local Inventory List */}
-                  <div className="space-y-3">
-                    {localInventories.filter(item => !item.isDeleted).length > 0 ? (
-                      <div className="space-y-2">
-                        {localInventories
-                          .filter(item => !item.isDeleted)
-                          .map((item) => (
-                            <div
-                              key={item.shopId}
-                              className="flex items-center justify-between p-2.5 bg-slate-50 border rounded-lg hover:border-indigo-200 transition-colors gap-2"
-                            >
-                              <div className="flex-1 min-w-0">
-                                <span className="text-xs font-semibold text-slate-700 block truncate" title={item.shopName}>
-                                  {item.shopName}
-                                </span>
-                                {item.isNew && (
-                                  <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">New</span>
-                                )}
-                                {!item.isNew && item.isModified && (
-                                  <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider">Modified</span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-[10px] text-slate-400 select-none">Qty:</span>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={item.stock}
-                                  onChange={(e) => handleStockChange(item.shopId, e.target.value)}
-                                  className="h-8 w-20 text-xs px-2 text-right border-slate-200 focus-visible:ring-indigo-500 font-semibold"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveShop(item.shopId)}
-                                  className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-400 italic py-2">
-                        No inventories assigned to shops yet.
-                      </div>
-                    )}
-
-                    {/* Add shop selector */}
-                    {availableShops.length > 0 && (
-                      <div className="flex items-center gap-2 pt-1 border-t border-dashed border-slate-100">
-                        <select
-                          value={selectedShopId}
-                          onChange={(e) => {
-                            setSelectedShopId(e.target.value);
-                            handleAddShopToInventory(e.target.value);
-                          }}
-                          className="flex h-8 flex-1 rounded border border-slate-200 bg-white px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-                        >
-                          <option value="">+ Assign shop location...</option>
-                          {availableShops.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </form>
-          )}
-        </div>
-
-        {/* Sticky Footer */}
-        <div className="absolute bottom-0 left-0 right-0 h-16 border-t bg-white px-6 flex items-center justify-between shrink-0 z-10">
-          <div className="flex items-center gap-2">
-            {!isEdit && (
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-500 hover:text-slate-600 select-none">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="status" className="text-xs font-semibold text-foreground">Catalog Status</Label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl border border-border bg-background p-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div className="flex items-center pt-5">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-foreground">
                 <input
                   type="checkbox"
-                  checked={createMore}
-                  onChange={(e) => setCreateMore(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                  id="is_available"
+                  name="is_available"
+                  checked={formData.is_available}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-border text-primary accent-primary"
                 />
-                <span>Create more</span>
+                Available for Purchase
               </label>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs h-8 px-3 border-slate-200 hover:bg-slate-50 text-slate-600"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              className="text-xs h-8 px-3 font-medium flex items-center gap-1.5"
-              onClick={handleSave}
-              disabled={saving || loading}
-            >
-              {saving ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              {isEdit ? 'Save Product' : 'Create Product'}
-            </Button>
+            </div>
           </div>
         </div>
+
+        {/* Media / Banner Upload Section */}
+        <div className="space-y-3 pt-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Product Image</h3>
+          <div className="border border-dashed border-border/80 rounded-2xl p-4 bg-muted/20 text-center">
+            {isEdit && product?.banner?.thumbnail ? (
+              <div className="relative inline-block">
+                <img
+                  src={product.banner.thumbnail}
+                  alt={formData.name}
+                  className="h-32 w-32 object-cover rounded-xl border border-border"
+                />
+                <label className="absolute bottom-1 right-1 bg-background hover:bg-muted p-1.5 rounded-lg border shadow-sm cursor-pointer">
+                  <UploadCloud className="h-3.5 w-3.5 text-foreground" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                  />
+                </label>
+              </div>
+            ) : pendingImagePreview ? (
+              <div className="relative inline-block">
+                <img
+                  src={pendingImagePreview}
+                  alt="Pending Product Preview"
+                  className="h-32 w-32 object-cover rounded-xl border border-border"
+                />
+                <div className="absolute -top-2 -right-2 flex gap-1">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="h-6 w-6 rounded-full"
+                    onClick={() => {
+                      setPendingImageFile(null);
+                      setPendingImagePreview(null);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                <label className="absolute bottom-1 right-1 bg-background hover:bg-muted p-1.5 rounded-lg border shadow-sm cursor-pointer">
+                  <UploadCloud className="h-3.5 w-3.5 text-foreground" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center cursor-pointer py-4">
+                <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
+                <span className="text-xs font-medium text-foreground">Click to upload product image</span>
+                <span className="text-[10px] text-muted-foreground">PNG, JPG up to 5MB</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                />
+              </label>
+            )}
+            {uploading && <p className="text-xs text-primary mt-2">Uploading image...</p>}
+          </div>
+        </div>
+
+        {/* Inventory Stock Assignment */}
+        <div className="space-y-4 pt-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Shop Inventories</h3>
+
+          {availableShops.length > 0 && (
+            <div className="flex gap-2">
+              <select
+                value={selectedShopId}
+                onChange={(e) => {
+                  setSelectedShopId(e.target.value);
+                  handleAddShopToInventory(e.target.value);
+                }}
+                className="flex-1 rounded-xl border border-border bg-background p-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+              >
+                <option value="">+ Assign shop location...</option>
+                {availableShops.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {localInventories.filter(i => !i.isDeleted).length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">No stock assigned to any shop branch.</p>
+            ) : (
+              localInventories
+                .filter(i => !i.isDeleted)
+                .map((item) => (
+                  <div key={item.shopId} className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-border bg-muted/20">
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-foreground truncate block">{item.shopName}</span>
+                      {item.isNew && <span className="text-[9px] text-emerald-600 font-bold uppercase">New</span>}
+                      {!item.isNew && item.isModified && <span className="text-[9px] text-amber-600 font-bold uppercase">Modified</span>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.stock}
+                        onChange={(e) => handleStockChange(item.shopId, e.target.value)}
+                        className="w-20 h-8 text-xs rounded-lg text-right"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveShop(item.shopId)}
+                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Footer */}
+      <div className={inline ? "pt-4 border-t border-border/60 flex items-center justify-between" : "px-6 py-4 border-t bg-muted/10 flex items-center justify-between shrink-0"}>
+        <div className="flex items-center gap-2">
+          {!isEdit && (
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
+              <input
+                type="checkbox"
+                checked={createMore}
+                onChange={(e) => setCreateMore(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-border text-primary accent-primary"
+              />
+              <span>Create more</span>
+            </label>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs rounded-xl"
+            onClick={() => (onClose ? onClose() : onOpenChange(false))}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            className="text-xs rounded-xl font-medium flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
+            onClick={handleSave}
+            disabled={saving || loading}
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {isEdit ? 'Save Product' : 'Create Product'}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="border border-border/60 rounded-2xl p-6 bg-background space-y-6 shadow-none animate-in fade-in slide-in-from-right-2 duration-200">
+        {formContent}
+      </div>
+    );
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-none md:w-[45vw] md:min-w-[45vw] p-0 flex flex-col h-full border-l border-border/60 bg-background shadow-2xl">
+        {formContent}
       </SheetContent>
     </Sheet>
   );

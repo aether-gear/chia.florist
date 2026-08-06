@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Plus, Loader2, RefreshCw, MoreHorizontal, Edit, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -16,6 +16,7 @@ import { useProductStatsViewModel } from '../../viewmodels/useProductStatsViewMo
 import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import { fetchApi } from '../../lib/api';
 import ProductFormSheet from '../../components/products/ProductFormSheet';
+import ProductDetailsView from '../../components/products/ProductDetailsView';
 import ProductPerformanceCharts from '../../components/products/ProductPerformanceCharts';
 import { Skeleton } from '../../components/ui/skeleton';
 import EmptyState from '../../components/EmptyState';
@@ -33,15 +34,25 @@ export default function ProductsPage() {
 
   // Product Form Sheet states
   const [isProductSheetOpen, setIsProductSheetOpen] = useState(false);
+  const [editingProductSlug, setEditingProductSlug] = useState<string | undefined>(undefined);
   const [activeProductSlug, setActiveProductSlug] = useState<string | undefined>(undefined);
+  const isDetailOpen = Boolean(activeProductSlug);
 
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const detailSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (activeProductSlug && detailSectionRef.current) {
+      detailSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [activeProductSlug]);
+
   const filteredProducts = useMemo(() => {
     if (!data?.products) return [];
     return data.products.filter(product =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.name && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (product.slug && product.slug.toLowerCase().includes(searchQuery.toLowerCase()))
     );
@@ -74,13 +85,15 @@ export default function ProductsPage() {
               Manage your product catalog and inventory
             </p>
           </div>
-          {isAdmin && (
-            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5 self-start sm:self-auto">
-              <Link to="/admin/analytics?tab=products">
-                <BarChart3 className="h-3.5 w-3.5" /> View Inventory Analytics →
-              </Link>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button asChild variant="outline" size="sm" className="rounded-xl text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5 self-start sm:self-auto">
+                <Link to="/admin/analytics?tab=products">
+                  <BarChart3 className="h-3.5 w-3.5" /> View Inventory Analytics →
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Performance Analytics Section */}
@@ -103,150 +116,225 @@ export default function ProductsPage() {
             <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-xl border border-destructive/20 font-sans">
               Failed to load performance metrics: {statsError}
             </div>
-          ) : (
-            statsData?.stats && <ProductPerformanceCharts stats={statsData.stats} />
-          )}
+          ) : statsData?.stats ? (
+            <ProductPerformanceCharts stats={statsData.stats} />
+          ) : null}
         </div>
 
         <div className="space-y-6">
           <div className="pb-4 border-b border-border/60">
-            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">All Products</h3>
-            <p className="text-muted-foreground text-sm">Manage product catalog, inventory levels, and pricing.</p>
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Catalog Database</h3>
+            <p className="text-muted-foreground text-sm">Total {data?.total || 0} items registered.</p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search products..."
+              placeholder="Search products by name or SKU..."
               className="relative flex-1 max-w-sm w-full"
             />
             <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
               <Button
                 variant="outline"
-                onClick={() => { refresh(); refreshStats(); }}
-                disabled={loading || statsLoading}
+                onClick={() => refresh()}
+                disabled={loading}
                 className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
               >
-                <RefreshCw className={`h-4 w-4 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl" onClick={() => { setActiveProductSlug(undefined); setIsProductSheetOpen(true); }}>
-                <Plus className="mr-2 h-4 w-4" /> Add Product
+              <Button
+                onClick={() => {
+                  setEditingProductSlug(undefined);
+                  setIsProductSheetOpen(true);
+                }}
+                className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+              >
+                <Plus className="h-4 w-4" />
+                Add Product
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-            <span>Found {filteredProducts.length} products</span>
-          </div>
+          {/* Master-Detail Grid Container */}
+          <div className="grid grid-cols-12 gap-6 items-start">
+            {/* Left Master List Column */}
+            <div className={isDetailOpen ? "col-span-12 lg:col-span-4 space-y-4" : "col-span-12 space-y-4"}>
+              <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+                <span>Found {filteredProducts.length} products</span>
+              </div>
 
-          {/* Content */}
-          <div className="flex flex-col gap-2">
-            <DataCardGridHeader>
-              <span className="col-span-4">Product</span>
-              <span className="col-span-2">SKU</span>
-              <span className="col-span-2">Status</span>
-              <span className="col-span-2">Price</span>
-              <span className="col-span-1">Stock</span>
-              <span className="col-span-1 text-right">Actions</span>
-            </DataCardGridHeader>
+              <div className="flex flex-col gap-2">
+                <DataCardGridHeader>
+                  {isDetailOpen ? (
+                    <>
+                      <span className="col-span-8">Product Name</span>
+                      <span className="col-span-4 text-right">Price</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="col-span-4">Product</span>
+                      <span className="col-span-2">SKU</span>
+                      <span className="col-span-2">Status</span>
+                      <span className="col-span-2">Price</span>
+                      <span className="col-span-1">Stock</span>
+                      <span className="col-span-1 text-right"></span>
+                    </>
+                  )}
+                </DataCardGridHeader>
 
-            <DataCardList>
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <DataCard key={`skeleton-${i}`}>
-                    <div className="col-span-4 flex items-center gap-3">
-                      <Skeleton className="h-9 w-9 rounded-md bg-muted animate-pulse" />
-                      <Skeleton className="h-4 w-32 bg-muted animate-pulse" />
-                    </div>
-                    <div className="col-span-2"><Skeleton className="h-4 w-20 bg-muted animate-pulse" /></div>
-                    <div className="col-span-2"><Skeleton className="h-5 w-16 bg-muted animate-pulse rounded-full" /></div>
-                    <div className="col-span-2"><Skeleton className="h-4 w-24 bg-muted animate-pulse" /></div>
-                    <div className="col-span-1"><Skeleton className="h-4 w-8 bg-muted animate-pulse" /></div>
-                    <div className="col-span-1 text-right"><Skeleton className="h-8 w-8 ml-auto bg-muted animate-pulse rounded-xl" /></div>
-                  </DataCard>
-                ))
-              ) : error ? (
-                <EmptyState title="Failed to load products" description={error} className="py-12 border-0 bg-transparent text-destructive" />
-              ) : filteredProducts.length === 0 ? (
-                <EmptyState icon={<Package className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No products found" description="No products match your current search criteria." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
-              ) : (
-                filteredProducts.map((product) => (
-                  <DataCard key={product.id} onClick={() => { setActiveProductSlug(product.slug); setIsProductSheetOpen(true); }}>
-                    <div className="col-span-1 md:col-span-4 flex items-center gap-3">
-                      <div className="h-9 w-9 overflow-hidden rounded-md border shrink-0 bg-muted flex items-center justify-center">
-                        {product.banner?.thumbnail ? (
-                          <img src={product.banner.thumbnail} alt={product.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                        )}
+                <DataCardList>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <DataCard key={`skeleton-${i}`}>
+                      <div className="col-span-12 flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 rounded-md bg-muted animate-pulse" />
+                        <Skeleton className="h-4 w-32 bg-muted animate-pulse" />
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="font-semibold font-display text-sm text-foreground truncate">{product.name}</h4>
-                        <p className="text-xs text-muted-foreground font-mono truncate">{product.slug}</p>
-                      </div>
-                    </div>
+                    </DataCard>
+                  ))
+                ) : error ? (
+                  <EmptyState title="Failed to load products" description={error} className="py-12 border-0 bg-transparent text-destructive" />
+                ) : filteredProducts.length === 0 ? (
+                  <EmptyState icon={<Package className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No products found" description="No products match your current search criteria." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
+                ) : (
+                  filteredProducts.map((product) => (
+                    <DataCard
+                      key={product.id}
+                      selected={activeProductSlug === product.slug}
+                      onClick={() => setActiveProductSlug(product.slug)}
+                    >
+                      {isDetailOpen ? (
+                        /* Shrunken Compact Row (Thumbnail + Name + Price) */
+                        <div className="col-span-1 md:col-span-12 flex items-center justify-between gap-2 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-8 w-8 overflow-hidden rounded-md border shrink-0 bg-muted flex items-center justify-center">
+                              {product.banner?.thumbnail ? (
+                                <img src={product.banner.thumbnail} alt={product.name} className="h-full w-full object-cover" />
+                              ) : (
+                                <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-semibold font-display text-sm text-foreground truncate">{product.name}</h4>
+                              <p className="text-[10px] text-muted-foreground font-mono truncate">{product.slug}</p>
+                            </div>
+                          </div>
+                          <div className="text-xs font-bold text-primary shrink-0">
+                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.price || 0)}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Full Expanded 12-Column Row */
+                        <>
+                          <div className="col-span-1 md:col-span-4 flex items-center gap-3">
+                            <div className="h-9 w-9 overflow-hidden rounded-md border shrink-0 bg-muted flex items-center justify-center">
+                              {product.banner?.thumbnail ? (
+                                <img src={product.banner.thumbnail} alt={product.name} className="h-full w-full object-cover" />
+                              ) : (
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-semibold font-display text-sm text-foreground truncate">{product.name}</h4>
+                              <p className="text-xs text-muted-foreground font-mono truncate">{product.slug}</p>
+                            </div>
+                          </div>
 
-                    <div className="col-span-1 md:col-span-2 font-mono text-xs text-muted-foreground">
-                      <span className="md:hidden font-sans text-muted-foreground mr-1">SKU:</span>
-                      {product.sku || '-'}
-                    </div>
+                          <div className="col-span-1 md:col-span-2 font-mono text-xs text-muted-foreground">
+                            <span className="md:hidden font-sans text-muted-foreground mr-1">SKU:</span>
+                            {product.sku || '-'}
+                          </div>
 
-                    <div className="col-span-1 md:col-span-2">
-                      <StatusBadge status={product.is_active ? 'active' : 'inactive'} className="scale-90 origin-left" />
-                    </div>
+                          <div className="col-span-1 md:col-span-2">
+                            <StatusBadge status={product.status || (product.is_available ? 'active' : 'inactive')} className="scale-90 origin-left" />
+                          </div>
 
-                    <div className="col-span-1 md:col-span-2 font-bold text-primary">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.price)}
-                    </div>
+                          <div className="col-span-1 md:col-span-2 font-bold text-primary">
+                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.price || 0)}
+                          </div>
 
-                    <div className="col-span-1 md:col-span-1 text-xs">
-                      <span className="md:hidden font-sans text-muted-foreground mr-1">Stock:</span>
-                      <span className={product.stock < 10 ? "text-destructive font-bold" : "font-medium"}>{product.stock}</span>
-                    </div>
+                          <div className="col-span-1 md:col-span-1 text-xs">
+                            <span className="md:hidden font-sans text-muted-foreground mr-1">Stock:</span>
+                            <span className={(product.stock ?? 0) < 10 ? "text-destructive font-bold" : "font-medium"}>{product.stock ?? 0}</span>
+                          </div>
 
-                    <div className="col-span-1 md:col-span-1 text-right" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                          <DropdownMenuItem onClick={() => { setActiveProductSlug(product.slug); setIsProductSheetOpen(true); }}>
-                            <Edit className="h-4 w-4 mr-2 text-muted-foreground" /> Edit Product
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="my-1" />
-                          <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive focus:text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete Product
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </DataCard>
-                ))
-              )}
-            </DataCardList>
+                          <div className="col-span-1 md:col-span-1 text-right" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                                <DropdownMenuItem onClick={() => {
+                                  setEditingProductSlug(product.slug);
+                                  setIsProductSheetOpen(true);
+                                }}>
+                                  <Edit className="h-4 w-4 mr-2 text-muted-foreground" /> Edit Product
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="my-1" />
+                                <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive focus:text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete Product
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </>
+                      )}
+                    </DataCard>
+                  ))
+                )}
+              </DataCardList>
+              </div>
 
-            <Pagination
-              currentPage={page}
-              totalPages={Math.ceil((data?.total || 0) / limit)}
-              totalItems={data?.total || 0}
-              limit={limit}
-              onPageChange={setPage}
-              itemNamePlural="products"
-            />
+              <Pagination
+                currentPage={page}
+                totalPages={Math.ceil((data?.total || 0) / limit)}
+                totalItems={data?.total || 0}
+                limit={limit}
+                onPageChange={setPage}
+                itemNamePlural="products"
+              />
+            </div>
+
+            {/* Right Expanded Display-Only Detail Section */}
+            {isDetailOpen && activeProductSlug && (
+              <div ref={detailSectionRef} className="col-span-12 lg:col-span-8">
+                <ProductDetailsView
+                  productSlug={activeProductSlug}
+                  onClose={() => setActiveProductSlug(undefined)}
+                  onEditProduct={(slug) => {
+                    setEditingProductSlug(slug);
+                    setIsProductSheetOpen(true);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Product Form Sheet (Add / Edit) */}
+      {/* Add/Edit Product Overlay Right-Panel Sheet */}
       <ProductFormSheet
         open={isProductSheetOpen}
-        onOpenChange={setIsProductSheetOpen}
-        productSlug={activeProductSlug}
-        onSuccess={() => { refresh(); refreshStats(); }}
+        inline={false}
+        onOpenChange={(open) => {
+          setIsProductSheetOpen(open);
+          if (!open) setEditingProductSlug(undefined);
+        }}
+        onClose={() => {
+          setIsProductSheetOpen(false);
+          setEditingProductSlug(undefined);
+        }}
+        productSlug={editingProductSlug}
+        onSuccess={() => {
+          refresh();
+          refreshStats();
+          setIsProductSheetOpen(false);
+          setEditingProductSlug(undefined);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}
