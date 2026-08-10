@@ -73,6 +73,14 @@ export const useCustomDesign = () => {
   const snapshotDataUrl = ref<string>('')
   const snapshotLoading = ref(false)
 
+  /* ─── 3D VIEW STATE ───────────────────────────────────────────────── */
+  const is3DMode = ref(false)
+  const rotateX = ref(0)   // vertical tilt  (clamped ±35°)
+  const rotateY = ref(0)   // horizontal spin (clamped ±45°)
+  let _3dDragging = false
+  let _3dLastX = 0
+  let _3dLastY = 0
+
   /* ─── CONSTANTS & HELPERS ─────────────────────────────────────────── */
   const boardW = computed(() => 800)
   const boardH = computed(() => {
@@ -312,6 +320,7 @@ export const useCustomDesign = () => {
   let _divStartY = 0, _divStartR = 0
 
   const startDragEl = (e: MouseEvent, id: string) => {
+    if (is3DMode.value) return
     e.stopPropagation(); e.preventDefault()
     bringToFront(id)
     const board = boardRef.value; if (!board) return
@@ -323,6 +332,7 @@ export const useCustomDesign = () => {
   }
 
   const startDragDiv = (e: MouseEvent) => {
+    if (is3DMode.value) return
     e.stopPropagation(); e.preventDefault()
     const board = boardRef.value; if (!board) return
     _rect = board.getBoundingClientRect(); _draggingDiv = true
@@ -330,6 +340,16 @@ export const useCustomDesign = () => {
   }
 
   const onMouseMove = (e: MouseEvent) => {
+    // 3D orbit drag
+    if (_3dDragging && is3DMode.value) {
+      const dx = e.clientX - _3dLastX
+      const dy = e.clientY - _3dLastY
+      _3dLastX = e.clientX
+      _3dLastY = e.clientY
+      rotateY.value = Math.max(-15, Math.min(rotateY.value + dx * 0.35, 15))
+      rotateX.value = Math.max(-15, Math.min(rotateX.value - dy * 0.35, 15))
+      return
+    }
     if (_draggingEl) {
       const el = elements.value.find(ev => ev.id === _dragElId)
       if (el) {
@@ -342,7 +362,45 @@ export const useCustomDesign = () => {
     }
   }
 
-  const onMouseUp = () => { _draggingEl = false; _draggingDiv = false }
+  const onMouseUp = () => {
+    _draggingEl = false
+    _draggingDiv = false
+    _3dDragging = false
+  }
+
+  /* ─── 3D VIEW ACTIONS ────────────────────────────────────────────── */
+  const toggle3DMode = () => {
+    is3DMode.value = !is3DMode.value
+    if (!is3DMode.value) {
+      // Reset rotation when exiting 3D mode
+      rotateX.value = 0
+      rotateY.value = 0
+    } else {
+      // Deselect any element when entering 3D mode
+      selectedId.value = null
+    }
+  }
+
+  const start3DDrag = (e: MouseEvent) => {
+    if (!is3DMode.value) return
+    e.preventDefault()
+    _3dDragging = true
+    _3dLastX = e.clientX
+    _3dLastY = e.clientY
+  }
+
+  // Computed: dynamic shading based on rotation angles
+  const board3dShadingStyle = computed((): Record<string, string> => {
+    if (!is3DMode.value) return { display: 'none' }
+    // Map rotateY to gradient center X (-15 → 10%, +15 → 90%)
+    const cx = 50 + (rotateY.value / 15) * 40
+    // Map rotateX to gradient center Y (-15 → 20%, +15 → 80%)
+    const cy = 50 - (rotateX.value / 15) * 30
+    const intensity = Math.min(0.45, (Math.abs(rotateX.value) / 15 + Math.abs(rotateY.value) / 15) * 0.3)
+    return {
+      background: `radial-gradient(circle at ${cx}% ${cy}%, transparent 25%, rgba(0,0,0,${intensity.toFixed(2)}) 100%)`,
+    }
+  })
 
   /* ─── SNAPSHOT & PAYLOAD (v3.0.0) ─────────────────────────────────── */
   const generateBoardSnapshot = (): Promise<string> => {
@@ -743,6 +801,8 @@ export const useCustomDesign = () => {
     updateScale, randomizeDesign, bringToFront, deleteSelected,
     handleDrop, handleFileInput, handleBrushMousedown, handleBoardClick,
     startDragEl, startDragDiv, onMouseMove, onMouseUp, onKeyDown,
-    generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign
+    generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign,
+    // 3D view
+    is3DMode, rotateX, rotateY, toggle3DMode, start3DDrag, board3dShadingStyle
   })
 }

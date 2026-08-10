@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { CanvasImage, BrushStroke } from '../types'
 import { useCart } from '~/composables/useCart'
 
@@ -7,14 +8,60 @@ const props = defineProps<{
 }>()
 
 const { formatRupiah } = useCart()
+
+// 3D transform style for board-scaler
+const scalerTransform = computed(() => {
+  if (props.design.is3DMode) {
+    // No scale() here — board-scaler width/height already encodes boardScale.
+    // Pivot is center center (set via CSS .board-scaler--3d), so rotation
+    // happens around the visual middle of the board.
+    return `perspective(1200px) rotateX(${props.design.rotateX}deg) rotateY(${props.design.rotateY}deg)`
+  }
+  return undefined
+})
+
+// Cursor for chess-bg in 3D mode
+const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
 </script>
 
 <template>
-  <div class="dr-canvas-area" ref="design.containerRef">
-    <div class="chess-bg" @dragover.prevent>
+  <div class="dr-canvas-area" :ref="(el) => { (design as any).containerRef = el }">
+    <div
+      class="chess-bg"
+      :class="{ 'chess-bg--3d': design.is3DMode }"
+      :style="chessCursor ? { cursor: chessCursor } : {}"
+      @dragover.prevent
+      @mousedown="design.is3DMode ? design.start3DDrag($event) : undefined"
+    >
+      <!-- ⬡ 3D TOGGLE BUTTON -->
+      <button
+        class="btn-3d-toggle"
+        :class="design.is3DMode ? 'mode-3d' : 'mode-flat'"
+        @click="design.toggle3DMode()"
+        :title="design.is3DMode ? 'Exit 3D preview' : 'Enter 3D preview'"
+      >
+        <svg v-if="!design.is3DMode" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+        <svg v-else viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        {{ design.is3DMode ? 'Edit Mode' : '3D Preview' }}
+      </button>
+
+      <!-- 🔒 3D MODE BADGE -->
+      <div v-if="design.is3DMode" class="badge-3d-mode">
+        🎲 Drag to rotate · Front view only · Click "Edit Mode" to resume editing
+      </div>
+
       <!-- Board scaler: sized to match scale -->
-      <div class="board-scaler"
-        :style="{ width: Math.round(design.boardW * design.boardScale) + 'px', height: Math.round(design.boardH * design.boardScale) + 'px' }">
+      <div
+        class="board-scaler"
+        :class="{ 'board-scaler--3d': design.is3DMode }"
+        :style="scalerTransform
+          ? { width: Math.round(design.boardW * design.boardScale) + 'px', height: Math.round(design.boardH * design.boardScale) + 'px', transform: scalerTransform }
+          : { width: Math.round(design.boardW * design.boardScale) + 'px', height: Math.round(design.boardH * design.boardScale) + 'px' }"
+      >
         <svg width="0" height="0" style="position:absolute">
           <defs>
             <g id="fw">
@@ -140,12 +187,12 @@ const { formatRupiah } = useCart()
           :style="{
             width: design.boardW + 'px', height: design.boardH + 'px',
             transform: `scale(${design.boardScale})`, transformOrigin: 'top left',
-            cursor: design.isBrushMode ? 'crosshair' : 'default',
+            cursor: design.is3DMode ? 'inherit' : (design.isBrushMode ? 'crosshair' : 'default'),
             ...design.boardBorderStyle,
           }"
-          @click="design.handleBoardClick"
+          @click="!design.is3DMode && design.handleBoardClick($event)"
           @dragover.prevent
-          @drop="design.handleDrop"
+          @drop="!design.is3DMode && design.handleDrop($event)"
         >
           <!-- ▲ UPPER SECTION -->
           <div class="board-section"
@@ -168,7 +215,7 @@ const { formatRupiah } = useCart()
 
           <!-- ── SECTION DIVIDER (drag to resize) ── -->
           <div class="section-divider" :style="{ top: design.upperH + 'px', '--dc': design.border.color || '#ccc' }"
-            @mousedown.stop="design.startDragDiv" @click.stop>
+            @mousedown.stop="!design.is3DMode && design.startDragDiv($event)" @click.stop>
             <div class="div-track" :style="!design.border.center ? { opacity: 0.6 } : { display: 'none' }"/>
             <div v-if="design.border.center" :style="{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }">
               <div :style="design.centerBorderStyle"></div>
@@ -206,15 +253,15 @@ const { formatRupiah } = useCart()
 
             <!-- Image element -->
             <div v-if="el.type === 'image'" class="canvas-el"
-              :class="{ 'el-selected': design.selectedId === el.id }"
+              :class="{ 'el-selected': !design.is3DMode && design.selectedId === el.id }"
               :style="{
                 left: (el as CanvasImage).x + '%', top: (el as CanvasImage).y + '%',
                 width: (el as CanvasImage).width + '%', aspectRatio: '1/1',
                 zIndex: (el as CanvasImage).zIndex ?? (idx + 10), overflow: 'hidden',
                 borderRadius: (el as CanvasImage).frame === 'circle' ? '50%' : (el as CanvasImage).frame === 'square' ? '4px' : '0',
-                pointerEvents: design.isBrushMode ? 'none' : 'auto', cursor: 'grab',
+                pointerEvents: design.is3DMode ? 'none' : (design.isBrushMode ? 'none' : 'auto'), cursor: 'grab',
               }"
-              @mousedown.stop="design.startDragEl($event, el.id)">
+              @mousedown.stop="!design.is3DMode && design.startDragEl($event, el.id)">
               <img :src="(el as CanvasImage).src" draggable="false"
                 :style="{
                   width: '100%', height: '100%', objectFit: 'cover', display: 'block',
@@ -222,20 +269,20 @@ const { formatRupiah } = useCart()
                   transform: 'scale(' + (el as CanvasImage).zoom + ')',
                   transformOrigin: (el as CanvasImage).cropX + '% ' + (el as CanvasImage).cropY + '%',
                 }"/>
-              <div v-if="design.selectedId === el.id && !design.isBrushMode" class="el-del" @click.stop="design.deleteSelected" title="Remove">×</div>
+              <div v-if="!design.is3DMode && design.selectedId === el.id && !design.isBrushMode" class="el-del" @click.stop="design.deleteSelected" title="Remove">×</div>
             </div>
 
             <!-- Brush stroke element -->
             <div v-else-if="el.type === 'brush'" class="canvas-el"
-              :class="{ 'el-selected': design.selectedId === el.id }"
+              :class="{ 'el-selected': !design.is3DMode && design.selectedId === el.id }"
               :style="{
                 left: (el as BrushStroke).x + '%', top: (el as BrushStroke).y + '%',
                 width: (el as BrushStroke).size + 'px', height: (el as BrushStroke).size + 'px',
                 transform: `translate(-50%,-50%) rotate(${(el as BrushStroke).rotation}deg)`,
                 zIndex: (el as BrushStroke).zIndex ?? (idx + 10), color: (el as BrushStroke).color,
-                pointerEvents: 'auto', cursor: design.isBrushMode ? 'crosshair' : 'pointer',
+                pointerEvents: design.is3DMode ? 'none' : 'auto', cursor: design.isBrushMode ? 'crosshair' : 'pointer',
               }"
-              @mousedown.stop="design.handleBrushMousedown($event, el.id)">
+              @mousedown.stop="!design.is3DMode && design.handleBrushMousedown($event, el.id)">
               <!-- Flower SVG -->
               <svg v-if="(el as BrushStroke).brushType === 'flower'" viewBox="-20 -20 40 40" width="100%" height="100%">
                 <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(0,0,0)"/>
@@ -252,20 +299,24 @@ const { formatRupiah } = useCart()
                 <path d="M0,-9 C4,-6 8,-1 6,3 C9,0 11,5 8,8 C5,11 1,11 0,9 C-1,11 -5,11 -8,8 C-11,5 -9,0 -6,3 C-8,-1 -4,-6 0,-9Z" fill="currentColor" opacity="0.55"/>
                 <circle cx="0" cy="2" r="3" fill="#ffe066" opacity="0.75"/>
               </svg>
-              <div v-if="design.selectedId === el.id" class="el-del" @click.stop="design.deleteSelected" title="Remove">×</div>
+              <div v-if="!design.is3DMode && design.selectedId === el.id" class="el-del" @click.stop="design.deleteSelected" title="Remove">×</div>
             </div>
           </template>
+
+          <!-- 3D shading overlay — sits on top of all board content -->
+          <div class="board-3d-shading" :style="design.board3dShadingStyle"></div>
         </div><!-- /board-frame -->
       </div><!-- /board-scaler -->
     </div><!-- /chess-bg -->
 
     <!-- Canvas info bar -->
     <div class="canvas-info">
-      <span>{{ design.elements.length }} element{{ design.elements.length !== 1 ? 's' : '' }}</span>
-      <span v-if="design.selectedId" class="ci-sel"> · 1 selected</span>
-      <button v-if="design.selectedId" class="ci-desel" @click="design.selectedId = null">Deselect</button>
-      <span v-if="design.isBrushMode" class="ci-hint">Click canvas to place brush stroke · Del to remove selected</span>
-      <span v-else-if="!design.isBrushMode && design.selectedId" class="ci-hint">Drag to move · Del to remove</span>
+      <span v-if="!design.is3DMode">{{ design.elements.length }} element{{ design.elements.length !== 1 ? 's' : '' }}</span>
+      <span v-if="!design.is3DMode && design.selectedId" class="ci-sel"> · 1 selected</span>
+      <button v-if="!design.is3DMode && design.selectedId" class="ci-desel" @click="design.selectedId = null">Deselect</button>
+      <span v-if="!design.is3DMode && design.isBrushMode" class="ci-hint">Click canvas to place brush stroke · Del to remove selected</span>
+      <span v-else-if="!design.is3DMode && !design.isBrushMode && design.selectedId" class="ci-hint">Drag to move · Del to remove</span>
+      <span v-if="design.is3DMode" class="ci-hint" style="color: #7c3aed; font-weight: 700;">⬡ 3D Preview Mode — Horizontal: {{ Math.round(design.rotateY) }}° · Vertical: {{ Math.round(design.rotateX) }}°</span>
     </div>
   </div>
 </template>
