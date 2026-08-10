@@ -114,12 +114,12 @@ onUnmounted(() => {
             View Products
           </NuxtLink>
 
-          <!-- <NuxtLink 
-            to="/catalog" 
+          <NuxtLink 
+            to="/products/custom" 
             class="border-2 border-white hover:bg-white/10 text-white font-bold py-3 px-8 rounded-xl transition text-sm text-center flex items-center justify-center gap-2"
           >
-            <span>View Products</span>
-          </NuxtLink> -->
+            <span>Design Custom Board 🌸</span>
+          </NuxtLink>
         </div>
       </div>
 
@@ -189,12 +189,12 @@ onUnmounted(() => {
       <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">What We Offer To You</h2>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
         
-        <div v-for="(item, idx) in productOfferings" :key="idx" class="bg-white-base rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition">
+        <div v-for="(item, idx) in productOfferings" :key="idx" class="bg-white-base rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col justify-between cursor-pointer" @click="navigateTo(item.id === 'custom' || item.slug === 'custom' ? '/products/custom' : `/products/${item.slug || item.id}`)">
           <div class="h-64 relative bg-gray-50">
-            <div v-if="item.id === 'custom'" class="w-full h-full bg-[#1b4332] flex items-center justify-center">
-              <span class="text-white-base text-4xl font-bold">?</span>
-            </div>
-            <img v-else :src="item.image" :alt="item.name" class="w-full h-full object-cover" />
+            <img :src="item.image || '/images/custom-preview.png'" :alt="item.name" class="w-full h-full object-cover" />
+            <span v-if="item.id === 'custom'" class="absolute top-3 left-3 bg-[#1b4332] text-white text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-lg border border-[#143326] shadow-sm z-20">
+              Interactive
+            </span>
             <span v-if="!item.isAvailable" class="absolute top-3 right-3 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-lg border border-red-200 shadow-sm z-20">
               Sold Out
             </span>
@@ -208,10 +208,11 @@ onUnmounted(() => {
               </div>
               <NuxtLink 
                 v-if="item.isAvailable" 
-                :to="`/products/${item.slug || item.id}`" 
-                class="bg-accent text-white-base text-xs px-3 py-1.5 rounded hover:bg-accent/90 transition"
+                :to="item.id === 'custom' || item.slug === 'custom' ? '/products/custom' : `/products/${item.slug || item.id}`" 
+                class="bg-accent text-white-base text-xs px-3 py-1.5 rounded hover:bg-accent/90 transition font-bold"
+                @click.stop
               >
-                Buy
+                {{ item.id === 'custom' || item.slug === 'custom' ? 'Design Now' : 'Buy' }}
               </NuxtLink>
               <button 
                 v-else 

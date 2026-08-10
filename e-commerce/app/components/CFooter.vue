@@ -12,7 +12,7 @@
           <ul class="space-y-2 font-medium text-sm md:text-base">
             <li><NuxtLink to="/" class="hover:opacity-70 transition">Home</NuxtLink></li>
             <li><NuxtLink to="/blog" class="hover:opacity-70 transition">Blog</NuxtLink></li>
-            <li><NuxtLink to="/products" class="hover:opacity-70 transition">Products</NuxtLink></li>
+            <li><NuxtLink to="/catalog" class="hover:opacity-70 transition">Products</NuxtLink></li>
             <li><NuxtLink to="/delivery" class="hover:opacity-70 transition">Delivery</NuxtLink></li>
           </ul>
         </div>

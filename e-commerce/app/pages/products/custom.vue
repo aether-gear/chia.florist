@@ -11,7 +11,7 @@ import {
 } from '~/features/custom-product'
 import '~/features/custom-product/custom-product.css'
 
-definePageMeta({ layout: false, middleware: ['auth'] })
+definePageMeta({ layout: false })
 useHead({
   title: 'Chia Florist — Board Designer (v3.0)',
   meta: [{ name: 'description', content: 'Design your custom flower board with our interactive canvas designer.' }]
@@ -86,27 +86,38 @@ onUnmounted(() => {
       </div>
     </nav>
 
-    <!-- ═══ BODY ══════════════════════════════════════════════════════ -->
-    <div class="dr-body">
-      <CanvasBoard :design="design" />
-      <ToolPanel :design="design" @finalize="handleFinalize" />
-    </div>
+    <!-- ═══ BODY (Client Only for Interactive Board Designer) ════════ -->
+    <ClientOnly>
+      <div class="dr-body">
+        <CanvasBoard :design="design" />
+        <ToolPanel :design="design" @finalize="handleFinalize" />
+      </div>
 
-    <!-- ═══ MODALS & OVERLAYS ═════════════════════════════════════════ -->
-    <FinalizeChoiceOverlay
-      :show="design.showFinalizeChoice.value"
-      @close="design.showFinalizeChoice.value = false"
-      @review="handleOpenReview"
-    />
-    <ReviewModal
-      :design="design"
-      :is-adding="isAdding"
-      @close="design.showReview.value = false"
-      @add-to-cart="handleAddToCart"
-    />
-    <ThankYouOverlay
-      :show="design.showThankYou.value"
-      @new-design="handleNewDesign"
-    />
+      <!-- ═══ MODALS & OVERLAYS ═════════════════════════════════════════ -->
+      <FinalizeChoiceOverlay
+        :show="design.showFinalizeChoice.value"
+        @close="design.showFinalizeChoice.value = false"
+        @review="handleOpenReview"
+      />
+      <ReviewModal
+        :design="design"
+        :is-adding="isAdding"
+        @close="design.showReview.value = false"
+        @add-to-cart="handleAddToCart"
+      />
+      <ThankYouOverlay
+        :show="design.showThankYou.value"
+        @new-design="handleNewDesign"
+      />
+
+      <template #fallback>
+        <div class="dr-body flex items-center justify-center min-h-[400px]">
+          <div class="flex flex-col items-center gap-3">
+            <div class="dr-spinner"></div>
+            <p class="text-xs text-gray-500 font-semibold">Loading Board Designer v3.0…</p>
+          </div>
+        </div>
+      </template>
+    </ClientOnly>
   </div>
 </template>

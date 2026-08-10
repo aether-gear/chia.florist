@@ -24,6 +24,10 @@ onUnmounted(() => {
 const { currentProduct, isLoading, error, fetchProductById } = useProductViewModel()
 
 watch(productId, (newId) => {
+  if (newId === 'custom') {
+    navigateTo('/products/custom', { replace: true })
+    return
+  }
   if (newId) {
     fetchProductById(newId)
   }

@@ -1,6 +1,6 @@
 // app/features/custom-product/useCustomDesign.ts
 
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, reactive } from 'vue'
 import type {
   BoardSection, BoardBorder, FloralCrest, CanvasElement,
   CanvasImage, BrushStroke, BrushType, CustomDesignPayloadV3,
@@ -378,7 +378,7 @@ export const useCustomDesign = () => {
         ctx.fillStyle = upper.value.bodyColor
         ctx.textAlign = upper.value.bodyAlign as CanvasTextAlign
         ctx.textBaseline = 'middle'
-        const lines = upper.value.bodyText.split('\n')
+        const lines = (upper.value.bodyText || '').split('\n')
         const tX = upper.value.bodyAlign === 'left' ? 32 : upper.value.bodyAlign === 'right' ? W - 32 : W / 2
         lines.forEach((line, i) => {
           ctx.fillText(line, tX, uH * 0.68 + i * (sz + 8), W - 64)
@@ -731,7 +731,7 @@ export const useCustomDesign = () => {
     }
   })
 
-  return {
+  return reactive({
     upper, lower, heightRatio, border, topCrest, bottomCrest, elements,
     activeTab, activeSection, selectedId, physicalSize, showReview, showFinalizeChoice, showThankYou,
     brushType, brushColor, brushSize, brushRotation, isBrushMode,
@@ -744,5 +744,5 @@ export const useCustomDesign = () => {
     handleDrop, handleFileInput, handleBrushMousedown, handleBoardClick,
     startDragEl, startDragDiv, onMouseMove, onMouseUp, onKeyDown,
     generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign
-  }
+  })
 }
