@@ -46,12 +46,17 @@ export default defineEventHandler(async (event) => {
           }
         }
 
+        const thirtyDays = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+        const cookieExpires = rememberMe
+          ? (expires && expires.getTime() > thirtyDays.getTime() ? expires : thirtyDays)
+          : undefined
+
         setCookie(event, name, value, {
           path,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite,
-          expires: rememberMe ? expires : undefined
+          expires: cookieExpires
         })
       }
     }

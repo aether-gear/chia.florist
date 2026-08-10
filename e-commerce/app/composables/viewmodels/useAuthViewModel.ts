@@ -155,20 +155,28 @@ export const useAuthViewModel = () => {
         }
 
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        userProfile.value = {
-          id: currentUser.value?.id || 'temp-id',
-          name: credentials.email.split('@')[0],
-          username: credentials.email.split('@')[0],
-          email: credentials.email,
-          phone: '',
-          last_login_at: new Date().toISOString()
-        }
-        
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
-        
-        currentUser.value = userProfile.value as UserMe
-        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || userProfile.value.name || 'Customer'}!`)
+
+        if (currentUser.value) {
+          userProfile.value = {
+            ...currentUser.value,
+            email: credentials.email
+          }
+          currentUser.value = { ...userProfile.value as UserMe }
+        } else {
+          userProfile.value = {
+            id: 'temp-id',
+            name: credentials.email.split('@')[0],
+            username: credentials.email.split('@')[0],
+            email: credentials.email,
+            phone: '',
+            last_login_at: new Date().toISOString()
+          }
+          currentUser.value = { ...userProfile.value as UserMe }
+        }
+
+        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
       }
       return false
@@ -205,22 +213,14 @@ export const useAuthViewModel = () => {
         }
 
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        // In fetchCurrentUser it should have been updated by getProfile, 
-        // but just in case we provide a default state:
-        userProfile.value = {
-          id: currentUser.value?.id || 'temp-id',
-          name: currentUser.value?.name || 'Google User',
-          username: currentUser.value?.username || 'googleuser',
-          email: currentUser.value?.email || '',
-          phone: currentUser.value?.phone || '',
-          last_login_at: new Date().toISOString()
-        }
-        
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
+
+        if (currentUser.value) {
+          userProfile.value = { ...currentUser.value }
+        }
         
-        currentUser.value = userProfile.value as UserMe
-        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || userProfile.value.name || 'Customer'}!`)
+        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
       }
       return false

@@ -752,6 +752,7 @@ const addToCartHandler = async () => {
 }
 
 const resetCanvasAndCreateNew = () => {
+  clearDraft()
   showThankYou.value = false
   elements.value = []
   selectedId.value = null
@@ -800,9 +801,62 @@ watch(showReview, async (open) => {
   }
 })
 
+/* ─── DRAFT AUTO-SAVE & RESTORE ────────────────────────────────────── */
+const DRAFT_KEY = 'chia-florist-custom-draft'
+
+const saveDraft = () => {
+  if (!import.meta.client) return
+  try {
+    const draft = {
+      upper: upper.value,
+      lower: lower.value,
+      border: border.value,
+      topCrest: topCrest.value,
+      bottomCrest: bottomCrest.value,
+      elements: elements.value,
+      physicalSize: physicalSize.value,
+      heightRatio: heightRatio.value
+    }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch (err) {
+    console.warn('Failed to auto-save custom board draft:', err)
+  }
+}
+
+const loadDraft = () => {
+  if (!import.meta.client) return
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+    const draft = JSON.parse(raw)
+    if (draft.upper) upper.value = draft.upper
+    if (draft.lower) lower.value = draft.lower
+    if (draft.border) border.value = draft.border
+    if (draft.topCrest) topCrest.value = draft.topCrest
+    if (draft.bottomCrest) bottomCrest.value = draft.bottomCrest
+    if (draft.elements) elements.value = draft.elements
+    if (draft.physicalSize) physicalSize.value = draft.physicalSize
+    if (draft.heightRatio) heightRatio.value = draft.heightRatio
+  } catch (err) {
+    console.warn('Failed to load custom board draft:', err)
+  }
+}
+
+const clearDraft = () => {
+  if (!import.meta.client) return
+  localStorage.removeItem(DRAFT_KEY)
+}
+
+watch(
+  [upper, lower, border, topCrest, bottomCrest, elements, physicalSize, heightRatio],
+  () => { saveDraft() },
+  { deep: true }
+)
+
 /* ─── LIFECYCLE ───────────────────────────────────────────────────── */
 let ro: ResizeObserver | null = null
 onMounted(() => {
+  loadDraft()
   updateScale()
   ro = new ResizeObserver(updateScale)
   if (containerRef.value) ro.observe(containerRef.value)
