@@ -38,7 +38,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
     if not os.path.exists(config_path):
         print(f"Error: Configuration file not found at '{config_path}'")
         sys.exit(1)
-        
+
     with open(config_path, "r") as f:
         try:
             return yaml.safe_load(f)
@@ -49,27 +49,27 @@ def load_config(config_path: str) -> Dict[str, Any]:
 def main() -> None:
     # 1. Parse CLI arguments
     args = parse_args()
-    
+
     # 2. Load configuration
     config = load_config(args.config)
-    
+
     # 3. Setup logging
     setup_logging()
     import logging
     logger = logging.getLogger("train_entry")
     logger.info(f"Loaded config from '{args.config}'")
-    
+
     # 4. Set reproducibility seeds
     set_seed(config.get("seed", 42))
-    
+
     # 5. Resolve hardware device
     device_pref = args.device or config.get("device", "cuda")
     device = get_device(device_pref)
-    
+
     # 6. Initialize DataLoaders
     logger.info("Initializing Datasets and DataLoaders...")
     train_loader, val_loader = get_dataloaders(config)
-    
+
     # 7. Initialize Model
     model_cfg = config.get("model", {})
     logger.info(
@@ -83,7 +83,7 @@ def main() -> None:
         output_dim=model_cfg.get("output_dim", 10),
         dropout=model_cfg.get("dropout", 0.0)
     )
-    
+
     # 8. Initialize Trainer
     trainer = Trainer(
         model=model,
@@ -92,7 +92,7 @@ def main() -> None:
         config=config,
         device=device
     )
-    
+
     # 9. Run Dry-Run or Full Training
     if args.dry_run:
         success = trainer.dry_run()
