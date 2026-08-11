@@ -183,9 +183,10 @@ func (r *shopRepositoryImpl) GetByID(
 			description,
 			is_active,
 			created_at,
-			updated_at
+			updated_at,
+			deleted_at
 		FROM shops
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -198,6 +199,7 @@ func (r *shopRepositoryImpl) GetByID(
 		&s.IsActive,
 		&s.CreatedAt,
 		&s.UpdatedAt,
+		&s.DeletedAt,
 	)
 
 	if err != nil {
@@ -227,9 +229,10 @@ func (r *shopRepositoryImpl) FindByIDs(
 			s.description,
 			s.is_active,
 			s.created_at,
-			s.updated_at
+			s.updated_at,
+			s.deleted_at
 		FROM shops s
-		WHERE s.id = ANY($1::uuid[])
+		WHERE s.id = ANY($1::uuid[]) AND s.deleted_at IS NULL
 	`
 
 	shopIDStrings := make([]string, len(ids))
@@ -254,6 +257,7 @@ func (r *shopRepositoryImpl) FindByIDs(
 			&s.IsActive,
 			&s.CreatedAt,
 			&s.UpdatedAt,
+			&s.DeletedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("mapping shop model to domain failed: %w", err)
@@ -305,5 +309,28 @@ func (r *shopRepositoryImpl) Save(
 	if err != nil {
 		return fmt.Errorf("insert shop failed: %w", err)
 	}
+	return nil
+}
+
+func (r *shopRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
+	query := `
+		UPDATE shops
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete shop failed: %w", err)
+	}
+
 	return nil
 }

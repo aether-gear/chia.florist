@@ -321,3 +321,94 @@ func (r *shopAddressRepositoryImpl) Create(
 
 	return nil
 }
+
+func (r *shopAddressRepositoryImpl) Update(
+	ctx context.Context,
+	exec transaction.Executor,
+	address domain.ShopAddress,
+) error {
+	query := `
+		UPDATE shop_addresses
+		SET
+			label = $1,
+			phone = $2,
+			is_active = $3,
+			province = $4,
+			city = $5,
+			district = $6,
+			village = $7,
+			full_address = $8,
+			postal_code = $9,
+			updated_at = NOW()
+		WHERE
+			id = $10
+			AND shop_id = $11
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query,
+		address.Label,
+		address.Phone,
+		address.IsActive,
+		address.Detail.ProvinceID,
+		address.Detail.CityID,
+		address.Detail.DistrictID,
+		address.Detail.VillageID,
+		address.Detail.FullAddress,
+		address.Detail.PostalCode,
+		address.ID,
+		address.ShopID,
+	)
+	if err != nil {
+		return fmt.Errorf("update address failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *shopAddressRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	addressID uuid.UUID,
+) error {
+	query := `
+		UPDATE shop_addresses
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, addressID)
+	if err != nil {
+		return fmt.Errorf("delete address failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *shopAddressRepositoryImpl) UnsetActiveByShopID(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID uuid.UUID,
+) error {
+	query := `
+		UPDATE shop_addresses
+		SET
+			is_active = false,
+			updated_at = NOW()
+		WHERE
+			shop_id = $1
+			AND is_active = true
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, shopID)
+	if err != nil {
+		return fmt.Errorf("unset active shop addresses failed: %w", err)
+	}
+
+	return nil
+}

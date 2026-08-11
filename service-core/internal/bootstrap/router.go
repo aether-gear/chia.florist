@@ -187,6 +187,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.DeleteUserAddress,
 			&c.ListShopAddresses,
 			&c.SaveShopAddress,
+			&c.UpdateShopAddress,
+			&c.DeleteShopAddress,
 		)
 
 		paymentHandler = paymentH.NewPaymentHandler(
@@ -202,6 +204,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.FindShops,
 			&c.GetShop,
 			&c.SaveShop,
+			&c.DeleteShop,
 			&c.GetShopAddresses,
 			&c.GetShopCouriers,
 			&c.GetShopProducts,
@@ -371,14 +374,17 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/shops", func(r chi.Router) {
 			r.Get("/", chains.Core(shopHandler.FindShops))
-			r.Post("/", chains.Core(shopHandler.SaveShop))
+			r.Post("/", chains.StaffOnly(shopHandler.SaveShop))
 
 			r.Route("/{shopID}", func(r chi.Router) {
 				r.Get("/", chains.Core(shopHandler.GetShopByID))
+				r.Delete("/", chains.StaffAdminOnly(shopHandler.DeleteShop))
 
 				r.Route("/addresses", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopAddresses))
 					r.Post("/", chains.StaffOnly(addressHandler.CreateShopAddress))
+					r.Put("/{addressID}", chains.StaffOnly(addressHandler.UpdateShopAddress))
+					r.Delete("/{addressID}", chains.StaffOnly(addressHandler.DeleteShopAddress))
 				})
 
 				r.Route("/couriers", func(r chi.Router) {
@@ -388,12 +394,9 @@ func NewRouter(c *Container) *chi.Mux {
 
 				r.Route("/products", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopProducts))
-					r.Post("/{productID}/inventories",
-						chains.StaffOnly(inventoryHandler.AddInventory))
-					r.Put("/{productID}/inventories",
-						chains.StaffOnly(inventoryHandler.UpdateInventory))
-					r.Delete("/{productID}/inventories",
-						chains.StaffOnly(inventoryHandler.RemoveInventory))
+					r.Post("/{productID}/inventories", chains.StaffOnly(inventoryHandler.AddInventory))
+					r.Put("/{productID}/inventories", chains.StaffOnly(inventoryHandler.UpdateInventory))
+					r.Delete("/{productID}/inventories", chains.StaffOnly(inventoryHandler.RemoveInventory))
 				})
 			})
 		})

@@ -300,6 +300,18 @@ func (m *uosMockShopAddressRepo) Create(_ context.Context, _ transaction.Executo
 	return nil
 }
 
+func (m *uosMockShopAddressRepo) Update(_ context.Context, _ transaction.Executor, _ addressDomain.ShopAddress) error {
+	return nil
+}
+
+func (m *uosMockShopAddressRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *uosMockShopAddressRepo) UnsetActiveByShopID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
+
 type uosMockProductRepo struct {
 	products map[uuid.UUID]productDomain.Product
 	err      error

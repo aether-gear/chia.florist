@@ -16,6 +16,7 @@ type ShopHandler struct {
 	findShops        *usecase.FindShopsUsecase
 	getShop          *usecase.GetShopUsecase
 	createShop       *usecase.SaveShopUsecase
+	deleteShop       *usecase.DeleteShopUsecase
 	getShopAddresses *usecase.GetShopAddressesUsecase
 	getShopCouriers  *usecase.GetShopCouriersUsecase
 	getShopProducts  *usecase.GetShopProductsUsecase
@@ -25,6 +26,7 @@ func NewShopHandler(
 	findShops *usecase.FindShopsUsecase,
 	getShop *usecase.GetShopUsecase,
 	createShop *usecase.SaveShopUsecase,
+	deleteShop *usecase.DeleteShopUsecase,
 	getShopAddresses *usecase.GetShopAddressesUsecase,
 	getShopCouriers *usecase.GetShopCouriersUsecase,
 	getShopProducts *usecase.GetShopProductsUsecase,
@@ -33,6 +35,7 @@ func NewShopHandler(
 		findShops:        findShops,
 		getShop:          getShop,
 		createShop:       createShop,
+		deleteShop:       deleteShop,
 		getShopAddresses: getShopAddresses,
 		getShopCouriers:  getShopCouriers,
 		getShopProducts:  getShopProducts,
@@ -276,5 +279,28 @@ func (h *ShopHandler) GetShopProducts(w http.ResponseWriter, r *http.Request) er
 		"shop_id":  shopID,
 		"products": products,
 	})
+	return nil
+}
+
+func (h *ShopHandler) DeleteShop(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	if err := h.deleteShop.Execute(r.Context(), *actor, shopID); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "shop successfully deleted",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
