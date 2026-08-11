@@ -23,6 +23,13 @@ export interface BoardSection {
   bodyColor: string
   cornerStyle: CornerStyle
   opacityPercent?: number
+  // Text section borders (decorative horizontal rule under header / above body)
+  headerBorder?: boolean
+  headerBorderColor?: string
+  headerBorderWidth?: number
+  bodyBorder?: boolean
+  bodyBorderColor?: string
+  bodyBorderWidth?: number
 }
 
 export interface CanvasImage {

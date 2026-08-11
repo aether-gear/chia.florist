@@ -22,6 +22,7 @@ const scalerTransform = computed(() => {
 
 // Cursor for chess-bg in 3D mode
 const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
+
 </script>
 
 <template>
@@ -33,6 +34,12 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
       @dragover.prevent
       @mousedown="design.is3DMode ? design.start3DDrag($event) : undefined"
     >
+      <!-- 📦 FLOATING ELEMENT COUNT CHIP (Top-Left) -->
+      <div class="canvas-info-chip">
+        <span v-if="!design.is3DMode">{{ design.elements.length }} element{{ design.elements.length !== 1 ? 's' : '' }}</span>
+        <span v-if="design.is3DMode" class="ci-hint" style="color: #7c3aed; font-weight: 700;">⬡ 3D Preview Mode</span>
+      </div>
+
       <!-- ⬡ 3D TOGGLE BUTTON -->
       <button
         class="btn-3d-toggle"
@@ -182,18 +189,20 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
 
         <!-- ╔══ THE BOARD ══╗ -->
         <div
-          ref="design.boardRef"
+          :ref="(el) => { (design as any).boardRef = el }"
           class="board-frame"
           :style="{
             width: design.boardW + 'px', height: design.boardH + 'px',
             transform: `scale(${design.boardScale})`, transformOrigin: 'top left',
             cursor: design.is3DMode ? 'inherit' : (design.isBrushMode ? 'crosshair' : 'default'),
             ...design.boardBorderStyle,
+            ...design.boardCornerStyle,
           }"
           @click="!design.is3DMode && design.handleBoardClick($event)"
           @dragover.prevent
           @drop="!design.is3DMode && design.handleDrop($event)"
         >
+
           <!-- ▲ UPPER SECTION -->
           <div class="board-section"
             :style="{ top: 0, left: 0, right: 0, height: design.upperH + 'px', backgroundColor: design.upper.bgColor, ...design.upperCornerStyle }">
@@ -205,6 +214,14 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
               <div v-if="design.upper.headerText" class="sec-text sec-header"
                 :style="{ fontSize: design.upper.headerFontSize + 'px', fontFamily: design.getFont(design.upper.headerFont), color: design.upper.headerColor, textAlign: design.upper.headerAlign }">
                 {{ design.upper.headerText }}
+              </div>
+              <!-- Header border rule -->
+              <div v-if="design.upper.headerBorder" class="sec-text-border"
+                :style="{ borderTopWidth: (design.upper.headerBorderWidth ?? 2) + 'px', borderTopStyle: 'solid', borderTopColor: design.upper.headerBorderColor ?? design.upper.headerColor }">
+              </div>
+              <!-- Body border rule -->
+              <div v-if="design.upper.bodyBorder" class="sec-text-border"
+                :style="{ borderTopWidth: (design.upper.bodyBorderWidth ?? 2) + 'px', borderTopStyle: 'solid', borderTopColor: design.upper.bodyBorderColor ?? design.upper.bodyColor }">
               </div>
               <div class="sec-text sec-body"
                 :style="{ fontSize: design.upper.bodyFontSize + 'px', fontFamily: design.getFont(design.upper.bodyFont), color: design.upper.bodyColor, textAlign: design.upper.bodyAlign }">
@@ -240,6 +257,14 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
               <div v-if="design.lower.headerText" class="sec-text sec-header"
                 :style="{ fontSize: design.lower.headerFontSize + 'px', fontFamily: design.getFont(design.lower.headerFont), color: design.lower.headerColor, textAlign: design.lower.headerAlign }">
                 {{ design.lower.headerText }}
+              </div>
+              <!-- Header border rule -->
+              <div v-if="design.lower.headerBorder" class="sec-text-border"
+                :style="{ borderTopWidth: (design.lower.headerBorderWidth ?? 2) + 'px', borderTopStyle: 'solid', borderTopColor: design.lower.headerBorderColor ?? design.lower.headerColor }">
+              </div>
+              <!-- Body border rule -->
+              <div v-if="design.lower.bodyBorder" class="sec-text-border"
+                :style="{ borderTopWidth: (design.lower.bodyBorderWidth ?? 2) + 'px', borderTopStyle: 'solid', borderTopColor: design.lower.bodyBorderColor ?? design.lower.bodyColor }">
               </div>
               <div class="sec-text sec-body"
                 :style="{ fontSize: design.lower.bodyFontSize + 'px', fontFamily: design.getFont(design.lower.bodyFont), color: design.lower.bodyColor, textAlign: design.lower.bodyAlign }">
@@ -308,15 +333,5 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
         </div><!-- /board-frame -->
       </div><!-- /board-scaler -->
     </div><!-- /chess-bg -->
-
-    <!-- Canvas info bar -->
-    <div class="canvas-info">
-      <span v-if="!design.is3DMode">{{ design.elements.length }} element{{ design.elements.length !== 1 ? 's' : '' }}</span>
-      <span v-if="!design.is3DMode && design.selectedId" class="ci-sel"> · 1 selected</span>
-      <button v-if="!design.is3DMode && design.selectedId" class="ci-desel" @click="design.selectedId = null">Deselect</button>
-      <span v-if="!design.is3DMode && design.isBrushMode" class="ci-hint">Click canvas to place brush stroke · Del to remove selected</span>
-      <span v-else-if="!design.is3DMode && !design.isBrushMode && design.selectedId" class="ci-hint">Drag to move · Del to remove</span>
-      <span v-if="design.is3DMode" class="ci-hint" style="color: #7c3aed; font-weight: 700;">⬡ 3D Preview Mode — Horizontal: {{ Math.round(design.rotateY) }}° · Vertical: {{ Math.round(design.rotateX) }}°</span>
-    </div>
   </div>
 </template>

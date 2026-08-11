@@ -15,44 +15,44 @@ import { normalizeHexColor, calculateDesignChecksum } from './migrate'
 export const useCustomDesign = () => {
   /* ─── STATE ───────────────────────────────────────────────────────── */
   const upper = ref<BoardSection>({
-    headerText: 'Selamat & Sukses',
-    bodyText: 'Atas Pelantikan Saudara/i\nNama Lengkap Anda',
+    headerText: '',
+    bodyText: '',
     headerFontSize: 36,
     bodyFontSize: 20,
     headerFont: 'playfair',
     bodyFont: 'inter',
     headerAlign: 'center',
     bodyAlign: 'center',
-    bgColor: '#c0392b',
-    headerColor: '#ffd700',
-    bodyColor: '#ffffff',
+    bgColor: '#ffffff',
+    headerColor: '#1c1813',
+    bodyColor: '#4a4a4a',
     cornerStyle: 'none',
     opacityPercent: 100
   })
 
   const lower = ref<BoardSection>({
     headerText: '',
-    bodyText: 'Nama Pengirim\nNama Instansi / Perusahaan',
+    bodyText: '',
     headerFontSize: 26,
     bodyFontSize: 22,
     headerFont: 'bebas',
     bodyFont: 'inter',
     headerAlign: 'center',
     bodyAlign: 'center',
-    bgColor: '#1a3a5c',
-    headerColor: '#ffffff',
-    bodyColor: '#ffffff',
+    bgColor: '#ffffff',
+    headerColor: '#1c1813',
+    bodyColor: '#4a4a4a',
     cornerStyle: 'none',
     opacityPercent: 100
   })
 
   const heightRatio = ref(0.58)
-  const border = ref<BoardBorder>({ style: 'solid', color: '#f5c842', width: 12, center: true })
-  const topCrest = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 })
-  const bottomCrest = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 })
+  const border = ref<BoardBorder>({ style: 'solid', color: '#10b981', width: 8, center: true })
+  const topCrest = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#10b981', secondary: '#ecfdf5', size: 40 })
+  const bottomCrest = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#10b981', secondary: '#ecfdf5', size: 40 })
   const elements = ref<CanvasElement[]>([])
 
-  const activeTab = ref<ToolTab>('text')
+  const activeTab = ref<ToolTab | null>(null)
   const activeSection = ref<SectionKey>('upper')
   const selectedId = ref<string | null>(null)
   const physicalSize = ref('medium')
@@ -97,7 +97,11 @@ export const useCustomDesign = () => {
   const boardBorderStyle = computed((): Record<string, string> => {
     const { style, color, width } = border.value
     if (style === 'none' || width === 0) return {}
-    if (style === 'ornate') return { border: `${width}px solid ${color}`, outline: `${Math.max(2, Math.round(width * 0.35))}px solid ${color}`, outlineOffset: '5px' }
+    // Use inset box-shadow for ornate so it respects border-radius & clip-path
+    if (style === 'ornate') return {
+      border: `${width}px solid ${color}`,
+      boxShadow: `inset 0 0 0 ${Math.max(2, Math.round(width * 0.35))}px ${color}`,
+    }
     return { border: `${width}px ${style} ${color}` }
   })
 
@@ -114,19 +118,54 @@ export const useCustomDesign = () => {
     }
   })
 
+  const boardCornerStyle = computed((): Record<string, string> => {
+    const topStyle = upper.value.cornerStyle
+    const bottomStyle = lower.value.cornerStyle
+
+    let tl = '0px', tr = '0px', bl = '0px', br = '0px'
+
+    if (topStyle === 'rounded') { tl = '16px'; tr = '16px' }
+    else if (topStyle === 'ornate') { tl = '6px 20px'; tr = '6px 20px' }
+
+    if (bottomStyle === 'rounded') { bl = '16px'; br = '16px' }
+    else if (bottomStyle === 'ornate') { bl = '6px 20px'; br = '6px 20px' }
+
+    const styles: Record<string, string> = {
+      borderTopLeftRadius: tl,
+      borderTopRightRadius: tr,
+      borderBottomLeftRadius: bl,
+      borderBottomRightRadius: br,
+    }
+
+    if (topStyle === 'cut' || bottomStyle === 'cut') {
+      const tlCut = topStyle === 'cut' ? '14px 0%' : '0% 0%'
+      const trCut = topStyle === 'cut' ? 'calc(100% - 14px) 0%' : '100% 0%'
+      const trCut2 = topStyle === 'cut' ? '100% 14px' : '100% 0%'
+      const brCut = bottomStyle === 'cut' ? '100% calc(100% - 14px)' : '100% 100%'
+      const brCut2 = bottomStyle === 'cut' ? 'calc(100% - 14px) 100%' : '100% 100%'
+      const blCut = bottomStyle === 'cut' ? '14px 100%' : '0% 100%'
+      const blCut2 = bottomStyle === 'cut' ? '0% calc(100% - 14px)' : '0% 100%'
+      const tlCut2 = topStyle === 'cut' ? '0% 14px' : '0% 0%'
+
+      styles.clipPath = `polygon(${tlCut}, ${trCut}, ${trCut2}, ${brCut}, ${brCut2}, ${blCut}, ${blCut2}, ${tlCut2})`
+    }
+
+    return styles
+  })
+
   const upperCornerStyle = computed((): Record<string, string> => {
     const s = upper.value.cornerStyle
-    if (s === 'rounded') return { borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }
+    if (s === 'rounded') return { borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }
     if (s === 'cut') return { clipPath: 'polygon(14px 0%,calc(100% - 14px) 0%,100% 14px,100% 100%,0% 100%,0% 14px)' }
-    if (s === 'ornate') return { borderTopLeftRadius: '4px 18px', borderTopRightRadius: '4px 18px' }
+    if (s === 'ornate') return { borderTopLeftRadius: '6px 20px', borderTopRightRadius: '6px 20px' }
     return {}
   })
 
   const lowerCornerStyle = computed((): Record<string, string> => {
     const s = lower.value.cornerStyle
-    if (s === 'rounded') return { borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }
+    if (s === 'rounded') return { borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }
     if (s === 'cut') return { clipPath: 'polygon(0% 0%,100% 0%,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0% calc(100% - 14px))' }
-    if (s === 'ornate') return { borderBottomLeftRadius: '4px 18px', borderBottomRightRadius: '4px 18px' }
+    if (s === 'ornate') return { borderBottomLeftRadius: '6px 20px', borderBottomRightRadius: '6px 20px' }
     return {}
   })
 
@@ -204,11 +243,29 @@ export const useCustomDesign = () => {
   watch(brushColor, (v) => { if (selectedBrush.value) selectedBrush.value.color = v })
 
   /* ─── SCALE & ACTIONS ─────────────────────────────────────────────── */
+  let _manualZoom = false
+
   const updateScale = () => {
-    const el = containerRef.value
+    if (_manualZoom) return
+    const el = containerRef.value as HTMLElement | null
     if (!el) return
     const pad = 64
     boardScale.value = Math.max(0.25, Math.min((el.offsetWidth - pad) / boardW.value, (el.offsetHeight - pad) / boardH.value, 1.1))
+  }
+
+  const zoomIn = () => {
+    _manualZoom = true
+    boardScale.value = Math.min(1.5, Math.round((boardScale.value + 0.05) * 100) / 100)
+  }
+
+  const zoomOut = () => {
+    _manualZoom = true
+    boardScale.value = Math.max(0.2, Math.round((boardScale.value - 0.05) * 100) / 100)
+  }
+
+  const resetZoom = () => {
+    _manualZoom = false
+    updateScale()
   }
 
   const randomizeDesign = () => {
@@ -235,9 +292,6 @@ export const useCustomDesign = () => {
     bottomCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
     bottomCrest.value.primary = rand(BG_PRESETS)
     bottomCrest.value.secondary = rand(BG_PRESETS)
-
-    boardScale.value = boardScale.value * 0.95
-    setTimeout(updateScale, 150)
   }
 
   watch(physicalSize, () => updateScale())
@@ -273,11 +327,18 @@ export const useCustomDesign = () => {
     reader.readAsDataURL(file)
   }
 
+  const getBoardEl = (): HTMLElement | null => {
+    const b = boardRef as any
+    if (b?.getBoundingClientRect) return b
+    if (b?.value?.getBoundingClientRect) return b.value
+    return null
+  }
+
   const handleDrop = (e: DragEvent) => {
     e.preventDefault()
     const file = e.dataTransfer?.files[0]
     if (!file?.type.startsWith('image/')) return
-    const board = boardRef.value; if (!board) return
+    const board = getBoardEl(); if (!board) return
     const r = board.getBoundingClientRect()
     readFile(file, Math.max(2, Math.min(((e.clientX - r.left) / r.width) * 100 - 11, 76)), Math.max(2, Math.min(((e.clientY - r.top) / r.height) * 100 - 11, 76)))
   }
@@ -298,7 +359,9 @@ export const useCustomDesign = () => {
   const handleBoardClick = (e: MouseEvent) => {
     if (_suppressBrushPlace) { _suppressBrushPlace = false; return }
     if (isBrushMode.value) {
-      const r = boardRef.value!.getBoundingClientRect()
+      const board = getBoardEl()
+      if (!board) return
+      const r = board.getBoundingClientRect()
       const stroke: BrushStroke = {
         id: 'br-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         type: 'brush', brushType: brushType.value,
@@ -323,7 +386,7 @@ export const useCustomDesign = () => {
     if (is3DMode.value) return
     e.stopPropagation(); e.preventDefault()
     bringToFront(id)
-    const board = boardRef.value; if (!board) return
+    const board = getBoardEl(); if (!board) return
     _rect = board.getBoundingClientRect(); _draggingEl = true; _dragElId = id
     _dragBX = (e.clientX - _rect.left) / _rect.width * 100
     _dragBY = (e.clientY - _rect.top) / _rect.height * 100
@@ -334,7 +397,7 @@ export const useCustomDesign = () => {
   const startDragDiv = (e: MouseEvent) => {
     if (is3DMode.value) return
     e.stopPropagation(); e.preventDefault()
-    const board = boardRef.value; if (!board) return
+    const board = getBoardEl(); if (!board) return
     _rect = board.getBoundingClientRect(); _draggingDiv = true
     _divStartY = e.clientY; _divStartR = heightRatio.value
   }
@@ -690,7 +753,24 @@ export const useCustomDesign = () => {
     return payload
   }
 
-  /* ─── DRAFT PERSISTENCE ──────────────────────────────────────────── */
+  /* ─── DRAFT PERSISTENCE (MANUAL ONLY) ───────────────────────────── */
+  const isDirty = ref(false)
+  const draftSavedNotice = ref(false)
+  const saveToastNotice = ref(false)
+  const saveToastMessage = ref('')
+  const showMoreMenu = ref(false)
+  const showLeaveConfirm = ref(false)
+
+  const triggerToast = (msg: string) => {
+    saveToastMessage.value = msg
+    saveToastNotice.value = true
+    draftSavedNotice.value = true
+    setTimeout(() => {
+      saveToastNotice.value = false
+      draftSavedNotice.value = false
+    }, 3000)
+  }
+
   const saveDraft = () => {
     if (!import.meta.client) return
     try {
@@ -705,8 +785,11 @@ export const useCustomDesign = () => {
         heightRatio: heightRatio.value
       }
       localStorage.setItem(DEFAULT_DRAFT_KEY, JSON.stringify(draft))
+      isDirty.value = false
+      showMoreMenu.value = false
+      triggerToast('Progress saved successfully! ✅')
     } catch (err) {
-      console.warn('Failed to auto-save custom board draft:', err)
+      console.warn('Failed to save custom board draft:', err)
     }
   }
 
@@ -724,6 +807,7 @@ export const useCustomDesign = () => {
       if (draft.elements) elements.value = draft.elements
       if (draft.physicalSize) physicalSize.value = draft.physicalSize
       if (draft.heightRatio) heightRatio.value = draft.heightRatio
+      isDirty.value = false
     } catch (err) {
       console.warn('Failed to load custom board draft:', err)
     }
@@ -734,35 +818,39 @@ export const useCustomDesign = () => {
     localStorage.removeItem(DEFAULT_DRAFT_KEY)
   }
 
-  watch(
-    [upper, lower, border, topCrest, bottomCrest, elements, physicalSize, heightRatio],
-    () => { saveDraft() },
-    { deep: true }
-  )
-
   const resetDesign = () => {
     clearDraft()
     elements.value = []
     selectedId.value = null
     snapshotDataUrl.value = ''
     upper.value = {
-      headerText: 'Selamat & Sukses', bodyText: 'Atas Pelantikan Saudara/i\nNama Lengkap Anda',
+      headerText: '', bodyText: '',
       headerFontSize: 36, bodyFontSize: 20, headerFont: 'playfair', bodyFont: 'inter',
       headerAlign: 'center', bodyAlign: 'center',
-      bgColor: '#c0392b', headerColor: '#ffd700', bodyColor: '#ffffff', cornerStyle: 'none', opacityPercent: 100
+      bgColor: '#ffffff', headerColor: '#1c1813', bodyColor: '#4a4a4a', cornerStyle: 'none', opacityPercent: 100
     }
     lower.value = {
-      headerText: '', bodyText: 'Nama Pengirim\nNama Instansi / Perusahaan',
+      headerText: '', bodyText: '',
       headerFontSize: 26, bodyFontSize: 22, headerFont: 'bebas', bodyFont: 'inter',
       headerAlign: 'center', bodyAlign: 'center',
-      bgColor: '#1a3a5c', headerColor: '#ffffff', bodyColor: '#ffffff', cornerStyle: 'none', opacityPercent: 100
+      bgColor: '#ffffff', headerColor: '#1c1813', bodyColor: '#4a4a4a', cornerStyle: 'none', opacityPercent: 100
     }
-    border.value = { style: 'solid', color: '#f5c842', width: 12, center: true }
-    topCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
-    bottomCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
+    border.value = { style: 'solid', color: '#10b981', width: 8, center: true }
+    topCrest.value = { enabled: false, style: 'classic', primary: '#10b981', secondary: '#ecfdf5', size: 40 }
+    bottomCrest.value = { enabled: false, style: 'classic', primary: '#10b981', secondary: '#ecfdf5', size: 40 }
     physicalSize.value = 'medium'
     heightRatio.value = 0.58
+    isDirty.value = false
+    showMoreMenu.value = false
+    triggerToast('Board reset to default blank canvas! 🧹')
   }
+
+  // Track changes to trigger unsaved warning
+  watch(
+    [upper, lower, border, topCrest, bottomCrest, elements, physicalSize, heightRatio],
+    () => { isDirty.value = true },
+    { deep: true }
+  )
 
   // Keyboard shortcut listener
   const onKeyDown = (e: KeyboardEvent) => {
@@ -770,6 +858,12 @@ export const useCustomDesign = () => {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return
     if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected()
     if (e.key === 'Escape') selectedId.value = null
+    // Zoom shortcuts: Ctrl+= (zoom in), Ctrl+- (zoom out), Ctrl+0 (reset)
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn() }
+      if (e.key === '-') { e.preventDefault(); zoomOut() }
+      if (e.key === '0') { e.preventDefault(); resetZoom() }
+    }
   }
 
   // Review modal snapshot trigger
@@ -795,13 +889,14 @@ export const useCustomDesign = () => {
     brushType, brushColor, brushSize, brushRotation, isBrushMode,
     containerRef, boardRef, boardScale, snapshotDataUrl, snapshotLoading,
     boardW, boardH, getFont, sec, upperH, lowerH,
-    boardBorderStyle, centerBorderStyle, upperCornerStyle, lowerCornerStyle, floralSec,
+    boardBorderStyle, boardCornerStyle, centerBorderStyle, upperCornerStyle, lowerCornerStyle, floralSec,
     selectedEl, selectedImg, selectedBrush, imgElements, brushElements,
     baseSizePrice, brushFee, uniqueColors, colorFee, borderFee, accessoriesFee, mediaFee, totalPrice,
-    updateScale, randomizeDesign, bringToFront, deleteSelected,
+    updateScale, zoomIn, zoomOut, resetZoom, randomizeDesign, bringToFront, deleteSelected,
     handleDrop, handleFileInput, handleBrushMousedown, handleBoardClick,
     startDragEl, startDragDiv, onMouseMove, onMouseUp, onKeyDown,
     generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign,
+    isDirty, draftSavedNotice, saveToastNotice, saveToastMessage, showMoreMenu, showLeaveConfirm, triggerToast,
     // 3D view
     is3DMode, rotateX, rotateY, toggle3DMode, start3DDrag, board3dShadingStyle
   })

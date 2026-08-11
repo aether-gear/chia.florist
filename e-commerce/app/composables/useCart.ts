@@ -35,7 +35,7 @@ export interface CartItem {
   isCustom?: boolean
   itemType?: 'standard' | 'custom'
   shopId?: string
-  customDesign?: CustomDesignPayloadV1  // only present for custom board orders
+  customDesign?: CustomDesignPayload  // only present for custom board orders
 }
 
 export interface Order {

@@ -7,44 +7,13 @@ const props = defineProps<{
   design: ReturnType<typeof import('../useCustomDesign').useCustomDesign>
 }>()
 
-const emit = defineEmits<{
-  (e: 'finalize'): void
-}>()
+// finalize button has been moved to the top navbar
 
 const { formatRupiah } = useCart()
 </script>
 
 <template>
   <aside class="dr-panel">
-
-    <!-- Tab bar -->
-    <div class="tab-bar" role="tablist">
-      <button v-for="tab in TOOL_TABS" :key="tab.id"
-        class="tab-btn" :class="{ 'tab-active': design.activeTab === tab.id }"
-        @click="design.activeTab = tab.id" role="tab" :aria-selected="design.activeTab === tab.id"
-        :id="'tab-' + tab.id">
-        <svg v-if="tab.id === 'text'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
-        </svg>
-        <svg v-else-if="tab.id === 'image'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-        </svg>
-        <svg v-else-if="tab.id === 'brush'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/>
-          <path d="M9 8c-2 2.5-2 5-2 5"/>
-        </svg>
-        <svg v-else-if="tab.id === 'border'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="2" width="20" height="20" rx="2"/>
-        </svg>
-        <svg v-else-if="tab.id === 'corner'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <path d="M3 9V5a2 2 0 012-2h4"/><path d="M3 15v4a2 2 0 002 2h4"/>
-        </svg>
-        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22C12 22 20 18 20 12C20 6 12 2 12 2C12 2 4 6 4 12C4 18 12 22 12 22Z"/><circle cx="12" cy="12" r="3"/>
-        </svg>
-        <span>{{ tab.label }}</span>
-      </button>
-    </div>
 
     <!-- Tab content area -->
     <div class="tab-body">
@@ -65,7 +34,7 @@ const { formatRupiah } = useCart()
           </div>
           <div class="dot-row">
             <button v-for="c in BG_PRESETS" :key="c" class="pdot"
-              :style="{ background: c, outline: design.sec.bgColor === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : 'none' }"
+              :style="{ background: c, outline: design.sec.bgColor === c ? '2px solid #10b981' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : 'none' }"
               @click="design.sec.bgColor = c"/>
           </div>
         </div>
@@ -99,6 +68,26 @@ const { formatRupiah } = useCart()
             <input type="color" v-model="design.sec.headerColor" class="csi"/>
             <span class="cval">{{ design.sec.headerColor }}</span>
           </div>
+          <!-- Header text border -->
+          <div class="tg-sub">
+            <label class="tg-sub-label">
+              <input type="checkbox" v-model="design.sec.headerBorder" style="accent-color:#10b981;"/>
+              Underline Border
+            </label>
+            <template v-if="design.sec.headerBorder">
+              <div class="cr" style="margin-top:0.35rem;">
+                <label class="clabel">Width</label>
+                <input type="range" min="1" max="12" class="dr-range" v-model.number="design.sec.headerBorderWidth"/>
+                <span class="cval">{{ design.sec.headerBorderWidth ?? 2 }}px</span>
+              </div>
+              <div class="color-row">
+                <label class="clabel">Color</label>
+                <input type="color" :value="design.sec.headerBorderColor ?? design.sec.headerColor"
+                  @input="(e) => design.sec.headerBorderColor = (e.target as HTMLInputElement).value" class="csi"/>
+                <span class="cval">{{ design.sec.headerBorderColor ?? design.sec.headerColor }}</span>
+              </div>
+            </template>
+          </div>
         </div>
 
         <!-- Body -->
@@ -128,6 +117,26 @@ const { formatRupiah } = useCart()
             <label class="clabel">Color</label>
             <input type="color" v-model="design.sec.bodyColor" class="csi"/>
             <span class="cval">{{ design.sec.bodyColor }}</span>
+          </div>
+          <!-- Body text border -->
+          <div class="tg-sub">
+            <label class="tg-sub-label">
+              <input type="checkbox" v-model="design.sec.bodyBorder" style="accent-color:#10b981;"/>
+              Above-Body Border
+            </label>
+            <template v-if="design.sec.bodyBorder">
+              <div class="cr" style="margin-top:0.35rem;">
+                <label class="clabel">Width</label>
+                <input type="range" min="1" max="12" class="dr-range" v-model.number="design.sec.bodyBorderWidth"/>
+                <span class="cval">{{ design.sec.bodyBorderWidth ?? 2 }}px</span>
+              </div>
+              <div class="color-row">
+                <label class="clabel">Color</label>
+                <input type="color" :value="design.sec.bodyBorderColor ?? design.sec.bodyColor"
+                  @input="(e) => design.sec.bodyBorderColor = (e.target as HTMLInputElement).value" class="csi"/>
+                <span class="cval">{{ design.sec.bodyBorderColor ?? design.sec.bodyColor }}</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -262,7 +271,7 @@ const { formatRupiah } = useCart()
           <div class="tg-label">COLOR</div>
           <div class="dot-row">
             <button v-for="c in BRUSH_COLORS" :key="c" class="pdot"
-              :style="{ background: c, outline: design.brushColor === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : 'none' }"
+              :style="{ background: c, outline: design.brushColor === c ? '2px solid #10b981' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : 'none' }"
               @click="design.brushColor = c"/>
           </div>
           <div class="color-row" style="margin-top:0.35rem">
@@ -352,7 +361,7 @@ const { formatRupiah } = useCart()
           <div class="tg-label">COLOR</div>
           <div class="dot-row">
             <button v-for="c in BORDER_COLORS" :key="c" class="pdot"
-              :style="{ background: c, outline: design.border.color === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#f1faee' ? 'inset 0 0 0 1px #ccc' : 'none' }"
+              :style="{ background: c, outline: design.border.color === c ? '2px solid #10b981' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#f1faee' ? 'inset 0 0 0 1px #ccc' : 'none' }"
               @click="design.border.color = c"/>
           </div>
           <div class="color-row" style="margin-top:0.35rem">
@@ -372,7 +381,7 @@ const { formatRupiah } = useCart()
 
         <div class="tg" style="margin-top: 1rem;">
           <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing: 0.05em;">
-            <input type="checkbox" v-model="design.border.center" style="width:16px;height:16px;accent-color:#c4703e;"/>
+            <input type="checkbox" v-model="design.border.center" style="width:16px;height:16px;accent-color:#10b981;"/>
             SHOW CENTER BORDER
           </label>
         </div>
@@ -422,7 +431,7 @@ const { formatRupiah } = useCart()
 
         <div class="tg" style="margin-top: 1rem;">
           <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing:0.05em;">
-            <input type="checkbox" v-model="design.floralSec.enabled" style="width:16px;height:16px;accent-color:#c4703e;"/>
+            <input type="checkbox" v-model="design.floralSec.enabled" style="width:16px;height:16px;accent-color:#10b981;"/>
             ENABLE FLORAL DECOR
           </label>
         </div>
@@ -451,7 +460,7 @@ const { formatRupiah } = useCart()
             <div class="tg-label">PRIMARY FLOWER COLOR</div>
             <div class="dot-row">
               <button v-for="c in BG_PRESETS" :key="c" class="pdot"
-                :style="{ background: c, outline: design.floralSec.primary === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px' }"
+                :style="{ background: c, outline: design.floralSec.primary === c ? '2px solid #10b981' : '2px solid transparent', outlineOffset: '2px' }"
                 @click="design.floralSec.primary = c"/>
             </div>
             <div class="color-row" style="margin-top:0.35rem">
@@ -465,7 +474,7 @@ const { formatRupiah } = useCart()
             <div class="tg-label">SECONDARY FLOWER COLOR</div>
             <div class="dot-row">
               <button v-for="c in BG_PRESETS" :key="c" class="pdot"
-                :style="{ background: c, outline: design.floralSec.secondary === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px' }"
+                :style="{ background: c, outline: design.floralSec.secondary === c ? '2px solid #10b981' : '2px solid transparent', outlineOffset: '2px' }"
                 @click="design.floralSec.secondary = c"/>
             </div>
             <div class="color-row" style="margin-top:0.35rem">
@@ -524,10 +533,6 @@ const { formatRupiah } = useCart()
         </div>
       </div>
 
-      <button class="primary-btn finalize-btn" @click="emit('finalize')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg>
-        Finalize &amp; Order
-      </button>
     </div>
 
   </aside>
