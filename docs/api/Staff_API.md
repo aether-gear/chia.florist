@@ -23,6 +23,10 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] Reset Password
   - [x] Shops
     - [x] Save Shop
+    - [x] Delete Shop
+    - [x] Create Shop Address
+    - [x] Update Shop Address
+    - [x] Delete Shop Address
   - [x] Inventory
     - [x] Add Inventory
     - [x] Update Inventory
@@ -607,6 +611,154 @@ Authentication is handled via a session cookie set at sign-in.
 | `400 Bad Request`  | `name` is empty, `id` is not a valid UUID, or `is_active` cannot be parsed as a boolean. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not hold a staff role. |
+
+### Delete Shop
+
+- **Method**: `DELETE`
+- **Endpoint**: `/shops/{shopID}`
+- **Description**: Soft delete a shop by ID. The shop record is marked as deleted (`deleted_at` timestamp set) and will no longer be accessible in shop queries.
+- **Authentication**: Staff Admin (`RoleStaffAdmin`)
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `shopID`  | string (UUID) | Yes      | The unique ID of the shop to delete. |
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "shop successfully deleted"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `shopID` path parameter is missing or not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not hold the staff admin role (`RoleStaffAdmin`). |
+| `404 Not Found`    | Shop with the given `shopID` does not exist or is already soft-deleted. |
+
+### Create Shop Address
+
+- **Method**: `POST`
+- **Endpoint**: `/shops/{shopID}/addresses`
+- **Description**: Add a new address to a specific shop.
+- **Authentication**: Staff (any role)
+- **Request Body**:
+
+  ```json
+  {
+    "label":        "string (required, e.g. \"Warehouse\")",
+    "phone":        "string (optional)",
+    "is_active":    "string (required, e.g. \"true\" or \"false\")",
+    "province_id":  "string (required)",
+    "city_id":      "string (required)",
+    "district_id":  "string (required)",
+    "village_id":   "string (required)",
+    "full_address": "string (required)",
+    "postal_code":  "string (required)"
+  }
+  ```
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "address successfully created"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid request body or missing required location fields. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not hold a staff role. |
+
+### Update Shop Address
+
+- **Method**: `PUT`
+- **Endpoint**: `/shops/{shopID}/addresses/{addressID}`
+- **Description**: Update an existing shop address by ID. Setting `is_active = true` will automatically unset active status on other addresses for the shop.
+- **Authentication**: Staff (any role)
+- **Request Body**:
+
+  ```json
+  {
+    "label":        "string (required)",
+    "phone":        "string (optional)",
+    "is_active":    "string (required, e.g. \"true\" or \"false\")",
+    "province_id":  "string (required)",
+    "city_id":      "string (required)",
+    "district_id":  "string (required)",
+    "village_id":   "string (required)",
+    "full_address": "string (required)",
+    "postal_code":  "string (required)"
+  }
+  ```
+
+#### Path Parameters
+
+| Parameter   | Type          | Required | Description |
+|-------------|---------------|----------|-------------|
+| `shopID`    | string (UUID) | Yes      | The unique ID of the shop. |
+| `addressID` | string (UUID) | Yes      | The unique ID of the shop address to update. |
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "address successfully updated"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `shopID` / `addressID` path parameter is not a valid UUID or missing required fields. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not hold a staff role. |
+| `404 Not Found`    | Shop address with the given `addressID` does not exist for the shop or is soft-deleted. |
+
+### Delete Shop Address
+
+- **Method**: `DELETE`
+- **Endpoint**: `/shops/{shopID}/addresses/{addressID}`
+- **Description**: Soft delete a shop address by ID. Active (`is_active = true`) shop addresses cannot be deleted directly without making another address active first.
+- **Authentication**: Staff (any role)
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter   | Type          | Required | Description |
+|-------------|---------------|----------|-------------|
+| `shopID`    | string (UUID) | Yes      | The unique ID of the shop. |
+| `addressID` | string (UUID) | Yes      | The unique ID of the shop address to delete. |
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "address successfully deleted"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `shopID` or `addressID` path parameter is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not hold a staff role. |
+| `404 Not Found`    | Shop address with the given `addressID` does not exist for the shop or is soft-deleted. |
+| `409 Conflict`     | Cannot delete active shop address (`is_active = true`). |
 
 ## Inventory
 
