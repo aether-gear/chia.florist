@@ -1,0 +1,25 @@
+# Stockout Risk Classifier Configuration (Phase 2.2)
+experiment_name: "stockout_risk_v1"
+seed: 42
+
+data:
+  processed_csv: "data/processed/stockout_risk_features.csv"
+  target_column: "target_label"
+  train_val_split: 0.8
+  use_smote: true
+
+model:
+  n_estimators: 300
+  max_depth: 4
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  scale_pos_weight: 14
+  early_stopping_rounds: 20
+  eval_metric: "logloss"
+
+output:
+  model_dir: "models"
+  model_name: "stockout_risk.json"
+  evaluation_report_name: "stockout_risk_eval.json"
+  feature_importance_name: "stockout_risk_importance.png"
