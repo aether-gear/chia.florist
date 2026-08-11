@@ -1,0 +1,31 @@
+# Operational Anomaly Detection Model Configuration (Phase 2.3)
+experiment_name: "anomaly_detection_v1"
+seed: 42
+
+data:
+  processed_csv: "data/processed/anomaly_detection_features.csv"
+  target_column: "target_label"
+  train_val_split: 0.8
+  use_smote: true
+
+isolation_forest:
+  n_estimators: 200
+  contamination: 0.06 # ~5.8% anomaly rate in dataset
+  max_samples: "auto"
+
+xgb_classifier:
+  n_estimators: 300
+  max_depth: 4
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  scale_pos_weight: 17
+  early_stopping_rounds: 20
+  eval_metric: "logloss"
+
+output:
+  model_dir: "models/anomaly_detector"
+  isolation_forest_name: "isolation_forest.pkl"
+  xgb_classifier_name: "xgb_classifier.json"
+  evaluation_report_name: "anomaly_eval.json"
+  feature_importance_name: "anomaly_importance.png"
