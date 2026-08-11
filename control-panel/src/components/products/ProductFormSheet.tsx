@@ -6,8 +6,6 @@ import { Label } from '../ui/label';
 import {
   Sheet,
   SheetContent,
-  SheetTitle,
-  SheetDescription,
 } from '../ui/sheet';
 import { useProductFormViewModel, type InventorySyncItem } from '../../viewmodels/useProductFormViewModel';
 import { fetchApi } from '../../lib/api';

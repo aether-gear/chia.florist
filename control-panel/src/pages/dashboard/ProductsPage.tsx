@@ -58,6 +58,20 @@ export default function ProductsPage() {
     );
   }, [data, searchQuery]);
 
+  const renderDetailView = () => {
+    if (!activeProductSlug) return null;
+    return (
+      <ProductDetailsView
+        productSlug={activeProductSlug}
+        onClose={() => setActiveProductSlug(undefined)}
+        onEditProduct={(slug) => {
+          setEditingProductSlug(slug);
+          setIsProductSheetOpen(true);
+        }}
+      />
+    );
+  };
+
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
     setIsDeleting(true);
@@ -165,43 +179,24 @@ export default function ProductsPage() {
                 <span>Found {filteredProducts.length} products</span>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <DataCardGridHeader>
-                  {isDetailOpen ? (
-                    <>
-                      <span className="col-span-8">Product Name</span>
-                      <span className="col-span-4 text-right">Price</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="col-span-4">Product</span>
-                      <span className="col-span-2">SKU</span>
-                      <span className="col-span-2">Status</span>
-                      <span className="col-span-2">Price</span>
-                      <span className="col-span-1">Stock</span>
-                      <span className="col-span-1 text-right"></span>
-                    </>
-                  )}
-                </DataCardGridHeader>
-
-                <DataCardList>
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <DataCard key={`skeleton-${i}`}>
-                      <div className="col-span-12 flex items-center gap-3">
-                        <Skeleton className="h-9 w-9 rounded-md bg-muted animate-pulse" />
-                        <Skeleton className="h-4 w-32 bg-muted animate-pulse" />
-                      </div>
-                    </DataCard>
-                  ))
-                ) : error ? (
-                  <EmptyState title="Failed to load products" description={error} className="py-12 border-0 bg-transparent text-destructive" />
-                ) : filteredProducts.length === 0 ? (
-                  <EmptyState icon={<Package className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No products found" description="No products match your current search criteria." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
-                ) : (
-                  filteredProducts.map((product) => (
+              <DataCardList>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <DataCard key={`skeleton-${i}`}>
+                    <div className="col-span-12 flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 rounded-md bg-muted animate-pulse" />
+                      <Skeleton className="h-4 w-32 bg-muted animate-pulse" />
+                    </div>
+                  </DataCard>
+                ))
+              ) : error ? (
+                <EmptyState title="Failed to load products" description={error} className="py-12 border-0 bg-transparent text-destructive" />
+              ) : filteredProducts.length === 0 ? (
+                <EmptyState icon={<Package className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No products found" description="No products match your current search criteria." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
+              ) : (
+                filteredProducts.map((product) => (
+                  <div key={product.id}>
                     <DataCard
-                      key={product.id}
                       selected={activeProductSlug === product.slug}
                       onClick={() => setActiveProductSlug(product.slug)}
                     >
@@ -217,7 +212,7 @@ export default function ProductsPage() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <h4 className="font-semibold font-display text-sm text-foreground truncate">{product.name}</h4>
+                              <h4 className="font-semibold font-display text-sm text-foreground line-clamp-2 leading-tight">{product.name}</h4>
                               <p className="text-[10px] text-muted-foreground font-mono truncate">{product.slug}</p>
                             </div>
                           </div>
@@ -237,7 +232,7 @@ export default function ProductsPage() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <h4 className="font-semibold font-display text-sm text-foreground truncate">{product.name}</h4>
+                              <h4 className="font-semibold font-display text-sm text-foreground line-clamp-2 leading-tight">{product.name}</h4>
                               <p className="text-xs text-muted-foreground font-mono truncate">{product.slug}</p>
                             </div>
                           </div>
@@ -275,8 +270,11 @@ export default function ProductsPage() {
                                   <Edit className="h-4 w-4 mr-2 text-muted-foreground" /> Edit Product
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator className="my-1" />
-                                <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive focus:text-destructive">
-                                  <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete Product
+                                  <DropdownMenuItem
+                                    onClick={() => setProductToDelete(product)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete Product
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -284,10 +282,17 @@ export default function ProductsPage() {
                         </>
                       )}
                     </DataCard>
-                  ))
-                )}
+
+                    {/* Mobile Accordion Detail View directly below the selected row */}
+                    {activeProductSlug === product.slug && (
+                      <div className="block lg:hidden my-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        {renderDetailView()}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
               </DataCardList>
-              </div>
 
               <Pagination
                 currentPage={page}
@@ -299,17 +304,10 @@ export default function ProductsPage() {
               />
             </div>
 
-            {/* Right Expanded Display-Only Detail Section */}
+            {/* Right Expanded Display-Only Detail Section (Desktop Only) */}
             {isDetailOpen && activeProductSlug && (
-              <div ref={detailSectionRef} className="col-span-12 lg:col-span-8">
-                <ProductDetailsView
-                  productSlug={activeProductSlug}
-                  onClose={() => setActiveProductSlug(undefined)}
-                  onEditProduct={(slug) => {
-                    setEditingProductSlug(slug);
-                    setIsProductSheetOpen(true);
-                  }}
-                />
+              <div ref={detailSectionRef} className="hidden lg:block lg:col-span-8">
+                {renderDetailView()}
               </div>
             )}
           </div>

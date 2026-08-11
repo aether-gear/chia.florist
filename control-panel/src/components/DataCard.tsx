@@ -13,7 +13,7 @@ export function DataCard({ children, className, onClick, selected, ...props }: D
     <div
       onClick={onClick}
       className={cn(
-        "grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 py-3 rounded-xl border bg-background text-sm shadow-none transition-all select-none",
+        "grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 py-3 rounded-xl border bg-background text-sm shadow-none transition-all select-none overflow-hidden",
         onClick ? "cursor-pointer hover:border-primary/50" : "",
         selected
           ? "border-primary/60 bg-primary/5 ring-1 ring-primary/45"
@@ -36,7 +36,7 @@ export function DataCardGridHeader({ children, className, ...props }: DataCardGr
   return (
     <div
       className={cn(
-        "hidden md:grid grid-cols-12 gap-4 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none",
+        "grid grid-cols-12 gap-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none",
         className
       )}
       {...props}

@@ -60,7 +60,7 @@ export default function ProductDetailsView({
       {/* Header Bar */}
       <div className="flex items-start justify-between pb-4 border-b border-border/60 gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className="text-2xl font-bold font-display tracking-tight text-foreground truncate">
+          <h3 className="text-2xl font-bold font-display tracking-tight text-foreground line-clamp-2 leading-tight">
             {product.name}
           </h3>
           <p className="text-xs text-muted-foreground font-mono mt-0.5">SKU: {product.sku || 'N/A'}</p>
@@ -180,13 +180,17 @@ export default function ProductDetailsView({
             {product.availability.map((avail, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-muted/20"
+                className="
+                  flex flex-col gap-2
+                  p-3 rounded-xl border border-border/60 bg-muted/20
+                  lg:justify-between xl:flex-row xl:gap-0
+                "
               >
                 <div className="min-w-0 pr-2">
                   <p className="font-semibold text-xs text-foreground truncate">{avail.slug || avail.name}</p>
                   <p className="text-[10px] text-muted-foreground font-mono">Store Branch</p>
                 </div>
-                <Badge variant="secondary" className="font-mono text-xs shrink-0 rounded-lg bg-background text-primary border border-border/60">
+                <Badge variant="secondary" className="font-mono text-xs shrink-0 w-fit rounded-lg bg-background text-primary border border-border/60">
                   {avail.stock} in stock
                 </Badge>
               </div>
