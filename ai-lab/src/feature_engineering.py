@@ -206,6 +206,63 @@ class OperationalAnomalyFeatureBuilder:
         return feature_names, X, y
 
 
+class CourierSLAFeatureBuilder:
+    """
+    Builds Courier SLA & Delivery Duration feature dataset (Phase 2.4).
+    Target: delivery_duration_hours (continuous float).
+    Features: courier one-hot encodings, shipping_cost, dispatch_day_of_week, dispatch_hour, dispatch_is_weekend.
+    """
+    def build_features(self, raw_data: Dict[str, Any]) -> Tuple[List[str], np.ndarray, np.ndarray]:
+        logger.info("Building Courier SLA & Delivery Duration features...")
+        shipments = raw_data.get("shipments", [])
+
+        feature_names = [
+            "courier_jne",
+            "courier_jnt",
+            "courier_sicepat",
+            "shipping_cost",
+            "dispatch_day_of_week",
+            "dispatch_hour",
+            "dispatch_is_weekend"
+        ]
+
+        feature_rows = []
+        target_rows = []
+
+        for shp in shipments:
+            courier = shp.get("courier_name", "JNE").upper()
+            cost = float(shp.get("shipping_cost", 15000.0))
+            created_str = shp.get("created_at")
+            delivered_str = shp.get("delivered_at")
+
+            if not created_str or not delivered_str:
+                continue
+
+            created_dt = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+            delivered_dt = datetime.strptime(delivered_str, "%Y-%m-%d %H:%M:%S")
+
+            duration_hours = (delivered_dt - created_dt).total_seconds() / 3600.0
+            if duration_hours < 0:
+                continue
+
+            is_jne = 1.0 if courier == "JNE" else 0.0
+            is_jnt = 1.0 if courier == "JNT" else 0.0
+            is_sicepat = 1.0 if courier == "SICEPAT" else 0.0
+            dow = float(created_dt.weekday())
+            hour = float(created_dt.hour)
+            is_weekend = 1.0 if dow >= 5 else 0.0
+
+            row = [is_jne, is_jnt, is_sicepat, cost, dow, hour, is_weekend]
+            feature_rows.append(row)
+            target_rows.append(duration_hours)
+
+        X = np.array(feature_rows, dtype=np.float32) if feature_rows else np.empty((0, len(feature_names)), dtype=np.float32)
+        y = np.array(target_rows, dtype=np.float32) if target_rows else np.empty((0,), dtype=np.float32)
+
+        logger.info(f"Generated Courier SLA dataset: X.shape={X.shape}, y.shape={y.shape}")
+        return feature_names, X, y
+
+
 class StandardScaler:
     """Standardize features by removing the mean and scaling to unit variance."""
     def __init__(self):
@@ -223,3 +280,4 @@ class StandardScaler:
         if self.mean is None or self.std is None:
             raise ValueError("StandardScaler must be fitted before calling transform.")
         return (X - self.mean) / self.std
+

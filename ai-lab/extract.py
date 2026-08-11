@@ -13,8 +13,10 @@ from src.feature_engineering import (
     TimeSeriesFeatureBuilder,
     InventoryStockoutFeatureBuilder,
     OperationalAnomalyFeatureBuilder,
+    CourierSLAFeatureBuilder,
     StandardScaler
 )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -102,7 +104,12 @@ def main():
     anomaly_builder = OperationalAnomalyFeatureBuilder()
     anomaly_headers, anomaly_X, anomaly_y = anomaly_builder.build_features(raw_data)
 
-    # 5. Scale features
+    # 5. Build Courier SLA Features (Phase 2.4 Extension)
+    logger.info("Engineering Courier SLA & Delivery Duration feature matrix...")
+    courier_builder = CourierSLAFeatureBuilder()
+    courier_headers, courier_X, courier_y = courier_builder.build_features(raw_data)
+
+    # 6. Scale features
     scaler = StandardScaler()
     scaled_demand_X = scaler.fit_transform(demand_X)
     scaled_stock_X = scaler.fit_transform(stock_X)
@@ -112,12 +119,13 @@ def main():
     logger.info(f"  • Demand Forecasting Dataset: {demand_X.shape[0]} samples, {demand_X.shape[1]} features")
     logger.info(f"  • Stockout Risk Dataset:      {stock_X.shape[0]} samples, {stock_X.shape[1]} features")
     logger.info(f"  • Operational Anomaly Dataset: {anomaly_X.shape[0]} samples, {anomaly_X.shape[1]} features")
+    logger.info(f"  • Courier SLA Dataset:        {courier_X.shape[0]} samples, {courier_X.shape[1]} features")
 
     if args.dry_run:
         logger.info("Dry-run flag specified. Skipping disk artifact serialization.")
         return
 
-    # 6. Save datasets to disk
+    # 7. Save datasets to disk
     logger.info(f"Serializing processed datasets to '{processed_dir}'...")
 
     save_csv(os.path.join(processed_dir, "demand_forecasting_features.csv"), demand_headers, scaled_demand_X, demand_y)
@@ -129,7 +137,11 @@ def main():
     save_csv(os.path.join(processed_dir, "anomaly_detection_features.csv"), anomaly_headers, scaled_anomaly_X, anomaly_y)
     save_pt(os.path.join(processed_dir, "anomaly_detection_features.pt"), scaled_anomaly_X, anomaly_y)
 
+    save_csv(os.path.join(processed_dir, "courier_sla_features.csv"), courier_headers, courier_X, courier_y)
+    save_pt(os.path.join(processed_dir, "courier_sla_features.pt"), courier_X, courier_y)
+
     logger.info("Phase 1 Feature Extraction Pipeline executed successfully! All artifacts generated.")
+
 
 if __name__ == "__main__":
     main()
