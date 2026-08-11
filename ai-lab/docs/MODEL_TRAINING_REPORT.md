@@ -90,31 +90,39 @@ The `service-core` PostgreSQL database provides high-quality transactional table
 
 ---
 
-## 3. Custom Trained Models vs. External LLM / Cloud APIs
+## 3. Classical Machine Learning vs. Deep Learning vs. External AI APIs
 
-A critical architectural decision is choosing when to **train custom ML models** versus calling **external LLM/Cloud APIs**. The evaluation matrix below highlights why custom training is superior for core operational objectives, and why a hybrid approach is optimal.
+Selecting the right AI architecture requires evaluating trade-offs across **Classical Machine Learning (ML)**, **Deep Learning (DL)**, and **External AI APIs (LLMs)**. The comprehensive comparison matrix below details why a hybrid approach using Classical ML for math + AI APIs for narration is optimal for `chia.florist`.
 
 ### Comprehensive Comparison Matrix
 
-| Dimension | Custom Trained ML Models (Prophet / XGBoost / PyTorch) | External LLM APIs (GPT-4o-mini / Gemini Flash) | Standard Cloud AutoML APIs |
+| Dimension | Classical Machine Learning (XGBoost, Prophet, Isolation Forest) | Deep Learning (PyTorch MLP, LSTM, Autoencoder) | External AI APIs / LLMs (Gemini Flash, Claude, GPT-4o-mini) |
 |---|---|---|---|
-| **Mathematical & Numerical Accuracy** | 🟢 **100% Deterministic & Exact**. Computes exact quantities, probabilities, and statistical boundaries without hallucination. | 🔴 **Unreliable for Math**. LLMs hallucinate numbers, struggle with precise time-series math, and cannot do matrix operations. | 🟡 High accuracy, but limited flexibility for custom domain features. |
-| **Operational Cost** | 🟢 **Near Zero ($0 / mo)**. Runs locally on existing backend servers or free CPU instances (Hugging Face Spaces / Render). | 🟡 **Pay-per-Token**. Low at small volume (~$1–$5/mo), but scales linearly with database rows and frequent polling. | 🔴 **High Recurring Cost**. Expensive minimum instance fees ($50–$200+/mo). |
-| **Inference Latency** | 🟢 **Ultra-Fast (< 5ms - 20ms)**. Instant local execution in Python/Go runtime. | 🔴 **Slow (1,000ms - 3,000ms)**. Network roundtrips + token generation delays. | 🟡 Medium (100ms - 300ms). Network API overhead. |
-| **Data Privacy & Security** | 🟢 **100% In-House Data Control**. Customer order history, product margins, and cost prices never leave local infrastructure. | 🔴 **Third-Party Data Exposure**. Sending proprietary margins and order logs to public cloud APIs. | 🟡 Third-party enterprise agreement required. |
-| **Offline Capability** | 🟢 **Full Offline Support**. Models run locally inside the `ai-lab` service without internet dependency. | 🔴 **Requires Internet & API Uptime**. Fails if third-party API is degraded or rate-limited. | 🔴 Internet dependent. |
-| **Natural Language Summarization** | 🔴 **None**. Produces only vectors, numbers, class labels, and probabilities. | 🟢 **World-Class**. Excellent at converting complex data into clear human-readable narrative explanations. | 🔴 Requires manual output formatting. |
+| **Data Efficiency (Small Sample Fit)** | 🟢 **Superior on Small/Medium Tabular Data** (100–10,000 samples). Excellent generalization without overfitting. | 🔴 **Requires Large Datasets** (>100,000+ samples) to beat GBDTs on tabular data. Prone to severe overfitting on small tables. | 🟢 **Zero-shot / Few-shot**. Works on any text input without domain dataset training. |
+| **Mathematical Accuracy & Determinism** | 🟢 **100% Deterministic & Exact**. Computes exact quantities, thresholds, and probabilities with zero hallucination. | 🟢 **Deterministic**. High precision once converged, but requires careful normalization & architecture tuning. | 🔴 **Unreliable for Math**. LLMs hallucinate numbers, struggle with exact time-series arithmetic, and lack matrix bounds. |
+| **Inference Latency & HW Specs** | 🟢 **Sub-millisecond (< 1ms – 5ms)**. Runs instantly on standard CPU with near-zero memory footprint. | 🟡 **Medium (10ms – 50ms)**. Requires PyTorch/TensorFlow runtime overhead; benefits from GPU acceleration. | 🔴 **Slow (1,000ms – 3,000ms)**. Network API roundtrips and token-by-token generation delays. |
+| **Operational Cost** | 🟢 **$0 / month**. Runs locally on existing backend CPU server. | 🟡 **Low to Medium**. Free on CPU for small networks, but requires GPU instances ($30–$150/mo) for scaling. | 🟡 **Pay-per-Token**. Low at small volume (~$1–$5/mo), but scales linearly with DB rows and polling frequency. |
+| **Explainability & Transparency** | 🟢 **High**. Native SHAP feature importance, decision tree paths, and feature gain rankings. | 🔴 **Low (Black Box)**. Millions of neural weights make feature attribution difficult for non-technical staff. | 🟢 **High Narrative Reasoning**. Explains *why* decisions matter in human language, but cannot expose underlying math weights. |
+| **Data Privacy & Security** | 🟢 **100% In-House**. Margin, cost, and order data never leave local infrastructure. | 🟢 **100% In-House**. Neural weights trained and hosted locally. | 🔴 **Third-Party Exposure**. Sends proprietary sales metrics and order histories to cloud API providers. |
+| **Natural Language Summarization** | 🔴 **None**. Produces only numbers, vectors, class labels, and probabilities. | 🔴 **None / Limited**. Requires specialized language head (Seq2Seq / Transformers). | 🟢 **World-Class**. Unmatched capability to summarize complex metrics into staff action guides. |
 
 ---
 
-### Why Custom Trained Models Win for Analytics & Anomaly Detection
+### Detailed Architectural Analysis
 
-1. **Precision Over Hallucination**:
-   Store staff cannot rely on an LLM guessing sales inventory numbers. Time-series algorithms (Prophet) and decision trees (XGBoost) calculate actual standard deviations, moving averages, and exact numerical probabilities.
-2. **Tabular Anomaly Detection Efficiency**:
-   Algorithms like **Isolation Forest** evaluate thousands of transactional rows (`payments`, `shipments`, `audit_logs`) in milliseconds to detect spatial and temporal outliers. Feeding raw database tables into an LLM context window is cost-prohibitive and slow.
-3. **Data Protection & Business Secrecy**:
-   `product_performance.gross_margin_pct` and `cost_price` contain sensitive financial strategy data. Training local models keeps sensitive profit margins fully protected inside internal systems.
+#### 1. Why Classical Machine Learning Wins for Tabular Operations (Phases 2.1–2.4)
+- **Tabular Superiority**: Benchmark studies (e.g., Grinsztajn et al., 2022) consistently show gradient boosted decision trees (XGBoost, LightGBM) outperform Deep Neural Networks on tabular datasets under 100,000 samples.
+- **Explainability for Staff**: Store managers need to know *why* a SKU is flagged for stockout or *why* a delivery estimate is 24 hours. XGBoost native feature gain ranking gives explicit answers (`reorder_urgency_ratio: 42%`, `supplier_lead_time: 28%`).
+- **Zero Infrastructure Footprint**: Models train in < 1 second on a standard CPU and serialize to lightweight native `.json` files (~100KB–250KB).
+
+#### 2. Where Deep Learning (PyTorch) Fits in `ai-lab`
+- **Autoencoders for Unsupervised Anomaly Detection**: While XGBoost is used for tabular risk classification, PyTorch autoencoders ([src/model.py](file:///d:/__Projects/kage/chia.florist/ai-lab/src/model.py)) compress high-dimensional telemetry streams to reconstruct normal states and flag reconstruction error spikes.
+- **Future Scale**: As `service-core` accumulates multi-year order sequences (100,000+ records), PyTorch LSTMs / Temporal Fusion Transformers will complement XGBoost for long-horizon seasonal forecasting.
+
+#### 3. Why External AI APIs / LLMs Complete the Hybrid Strategy
+- Neither Classical ML nor Deep Learning can write a conversational daily operational briefing for shop staff in natural Indonesian/English.
+- The LLM API (Gemini / Claude) is restricted to the **Explanation & Summarization Layer**: it receives the deterministic outputs of Models 1–4 and translates them into actionable staff instructions (e.g., *"Procure 120 Red Roses by Wednesday — XGBoost predicts stockout in 3 days due to Valentine's demand spike"*).
+
 
 ---
 
