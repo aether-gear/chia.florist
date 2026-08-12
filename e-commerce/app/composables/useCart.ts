@@ -34,7 +34,11 @@ export interface CartItem {
   color?: string
   isCustom?: boolean
   itemType?: 'standard' | 'custom'
+  productVariantType?: 'standard' | 'custom'
+  slug?: string
   shopId?: string
+  shopName?: string
+  shopSlug?: string
   customDesign?: CustomDesignPayload  // only present for custom board orders
 }
 
@@ -261,7 +265,7 @@ export const useCart = () => {
       return Promise.resolve()
     }
 
-    if (loadCartPromise) return loadCartPromise
+    if (!force && loadCartPromise) return loadCartPromise
 
     isLoadingCart.value = true
     loadCartPromise = (async () => {
@@ -273,21 +277,24 @@ export const useCart = () => {
             let color = '#1b4332'
             let price = Number(item.price ?? item.unit_price ?? 0)
             let subtotal = Number(item.subtotal ?? (price * Number(item.quantity || 1)))
+            const cartItemId = item.cart_item_id || item.id || `item-${Date.now()}`
 
             if (item.product_variant_type === 'custom' || item.item_type === 'custom' || item.custom_design) {
               const migratedDesign = item.custom_design ? migrateCustomDesignPayload(item.custom_design) : undefined
-              const cartItemId = item.cart_item_id || item.id || `custom-${Date.now()}`
               return {
                 id: cartItemId,
                 cartItemId: cartItemId,
-                name: item.product_name || item.name || 'Custom Board',
+                name: item.name || item.product_name || 'Custom Board',
                 price: price,
                 subtotal: subtotal,
                 image: migratedDesign?.assets?.previewUrl || migratedDesign?.assets?.previewBase64 || item.images?.thumbnail || '/images/custom-preview.png',
                 quantity: Number(item.quantity),
                 shopId: item.shop_id,
+                shopName: item.shop_name,
+                shopSlug: item.shop_slug,
                 isCustom: true,
                 itemType: 'custom',
+                productVariantType: 'custom',
                 customDesign: migratedDesign,
                 size: migratedDesign?.layout?.physicalSizeId || size,
                 color: migratedDesign?.sections?.upper?.bgColorHex || color
@@ -309,14 +316,20 @@ export const useCart = () => {
             }
 
             return {
-              id: item.product_id,
+              id: item.product_id || cartItemId,
+              cartItemId: cartItemId,
               name: item.name,
               price: price,
+              subtotal: subtotal,
               image: item.images?.thumbnail || '',
               quantity: Number(item.quantity),
+              slug: item.slug || item.product_slug,
               shopId: item.shop_id,
+              shopName: item.shop_name,
+              shopSlug: item.shop_slug,
               isCustom: false,
               itemType: 'standard',
+              productVariantType: 'standard',
               size: size, 
               color: color
             }
@@ -346,6 +359,7 @@ export const useCart = () => {
 
     return loadCartPromise
   }
+
 
   if (import.meta.client && !cartWatcherInitialized) {
     cartWatcherInitialized = true
@@ -464,7 +478,8 @@ export const useCart = () => {
       cart.value = cart.value.filter(i => i.id !== id)
       if (isLoggedIn.value === 'true') {
         try {
-          await cartService.removeCustomItem(id)
+          const cartItemId = item.cartItemId || id
+          await cartService.removeCustomItem(cartItemId)
           await loadCart(true)
         } catch (err) {
           console.error('Failed to remove custom item from backend:', err)
@@ -608,6 +623,36 @@ export const useCart = () => {
     }
   }
 
+  const changeCartItemShop = async (cartItemId: string, shopId: string) => {
+    const item = cart.value.find(i => (i as any).cartItemId === cartItemId || i.id === cartItemId)
+    if (!item) return
+
+    const storeSelection = useStoreSelection()
+    const targetShop = storeSelection.activeShops.value.find(s => s.id === shopId)
+
+    if (isLoggedIn.value === 'true') {
+      try {
+        const idToTransfer = (item as any).cartItemId || item.id
+        await cartService.updateCartItemShop(idToTransfer, shopId)
+        item.shopId = shopId
+        if (targetShop) {
+          item.shopName = targetShop.name
+          item.shopSlug = targetShop.slug
+        }
+        await loadCart(true)
+      } catch (err) {
+        console.error('Failed to update cart item shop:', err)
+        throw err
+      }
+    } else {
+      item.shopId = shopId
+      if (targetShop) {
+        item.shopName = targetShop.name
+        item.shopSlug = targetShop.slug
+      }
+    }
+  }
+
   return {
     cart,
     orders,
@@ -617,6 +662,7 @@ export const useCart = () => {
     addToCart,
     removeFromCart,
     updateQuantity,
+    changeCartItemShop,
     cartSubtotal,
     cartSubtotalFormatted,
     cartCount,

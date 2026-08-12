@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useCart } from '~/composables/useCart' // Import useCart untuk mengambil formatRupiah global
 import { useProductViewModel } from '~/composables/viewmodels/useProductViewModel'
+import { bootstrapConfig } from '~/utils/bootstrap'
 
 useHead({
   title: 'Our Collection - Chia Florist',
@@ -14,10 +15,12 @@ useHead({
 const { formatRupiah } = useCart()
 
 // Initialize product ViewModel (MVVM Architecture)
-const { catalogProducts, isLoading, error, fetchCatalogProducts } = useProductViewModel()
+const { catalogProducts, isLoading, error, fetchCatalogProducts, page, limit, total, totalPages } = useProductViewModel()
 
 const searchQuery = ref('')
 const selectedSort = ref('date:desc')
+const selectedShop = ref('')
+const shops = ref<{ id: string; name: string; slug: string }[]>([])
 
 const sortOptions = [
   { value: 'date:desc', label: 'Newest First' },
@@ -32,18 +35,54 @@ const sortOptions = [
   { value: 'weight:asc', label: 'Weight (Low to High)' }
 ]
 
+import { useStoreSelection } from '~/composables/useStoreSelection'
+
+const storeSelection = useStoreSelection()
+
+const fetchShopsList = async () => {
+  try {
+    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string; slug: string }[] }>('/shops?active=true')
+    if (res && Array.isArray(res.shops)) {
+      shops.value = res.shops
+    }
+  } catch (e) {
+    console.error('Failed to fetch shops list:', e)
+  }
+}
+
 const loadProducts = () => {
+  const activeShop = storeSelection.selectedShop.value
   fetchCatalogProducts({
     name: searchQuery.value || undefined,
-    sort: selectedSort.value
+    sort: selectedSort.value,
+    shop_id: activeShop?.id || undefined,
+    shop_slug: activeShop?.slug || undefined
   })
 }
 
+const handleShopDropdownChange = (slug: string) => {
+  if (!slug) {
+    storeSelection.selectShop(null)
+  } else {
+    const matched = shops.value.find(s => s.slug === slug)
+    if (matched) {
+      storeSelection.selectShop(matched)
+    }
+  }
+}
+
 onMounted(() => {
+  fetchShopsList()
   loadProducts()
 })
 
-// Reload when sort changes
+// Sync local dropdown with global store selection
+watch(storeSelection.selectedShop, (newShop) => {
+  selectedShop.value = newShop?.slug || ''
+  loadProducts()
+}, { immediate: true })
+
+// Reload products when sort selection changes
 watch(selectedSort, () => {
   loadProducts()
 })
@@ -120,17 +159,47 @@ const navigateToProduct = (item: any) => {
           />
         </div>
 
-        <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-          <label class="text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sort By</label>
-          <select 
-            v-model="selectedSort" 
-            class="bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-emerald-700 transition-all font-semibold text-gray-700 cursor-pointer"
-          >
-            <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+          <div v-if="shops.length > 0" class="flex items-center gap-2">
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Store</label>
+            <select 
+              v-model="selectedShop" 
+              @change="handleShopDropdownChange(($event.target as HTMLSelectElement).value)"
+              class="bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-emerald-700 transition-all font-semibold text-gray-700 cursor-pointer"
+            >
+              <option value="">All Stores</option>
+              <option v-for="shop in shops" :key="shop.id" :value="shop.slug">
+                {{ shop.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sort By</label>
+            <select 
+              v-model="selectedSort" 
+              class="bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-emerald-700 transition-all font-semibold text-gray-700 cursor-pointer"
+            >
+              <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
         </div>
+      </div>
+
+      <!-- Active Store Pill Indicator Banner -->
+      <div v-if="storeSelection.selectedShop.value" class="mb-8 p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between shadow-2xs">
+        <div class="flex items-center gap-2.5 text-emerald-900 text-xs md:text-sm font-bold">
+          <span class="text-base">📍</span>
+          <span>Showing collection available at <span class="underline decoration-emerald-400 font-extrabold">{{ storeSelection.selectedShop.value.name }}</span></span>
+        </div>
+        <button 
+          @click="storeSelection.selectShop(null)" 
+          class="text-xs font-extrabold text-emerald-700 hover:text-emerald-900 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs transition cursor-pointer"
+        >
+          View All Stores
+        </button>
       </div>
 
       <div v-if="isLoading" class="flex flex-col items-center justify-center min-h-[300px] space-y-4">
@@ -219,16 +288,24 @@ const navigateToProduct = (item: any) => {
               <span class="absolute top-4 left-4 bg-white/90 backdrop-blur-md text-[#1b4332] text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
                 {{ item.tag || (item.name ? item.name.split(' ')[0] : 'Florist') }}
               </span>
-              <span v-if="!item.isAvailable" class="absolute top-4 right-4 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-red-200 shadow-sm z-20">
+              <span v-if="!item.isAvailable || item.stock === 0" class="absolute top-4 right-4 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-red-200 shadow-sm z-20">
                 Sold Out
+              </span>
+              <span v-else-if="item.stock !== undefined" class="absolute top-4 right-4 bg-emerald-100/90 text-emerald-900 text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-xl border border-emerald-200 shadow-sm z-20 flex items-center gap-1">
+                <span>📦</span> {{ item.stock }} in stock
               </span>
             </div>
 
             <div class="p-6 space-y-3">
-              <div class="flex items-center gap-2 text-xs text-yellow-500 font-bold">
-                <span>⭐ {{ item.rating ? item.rating.toFixed(1) : '4.8' }}</span>
-                <span class="text-gray-300">|</span>
-                <span class="text-gray-400 font-medium">({{ item.reviews || 150 }} reviews)</span>
+              <div class="flex items-center justify-between text-xs font-bold">
+                <div class="flex items-center gap-1.5 text-yellow-500">
+                  <span>⭐ {{ item.rating ? item.rating.toFixed(1) : '4.8' }}</span>
+                  <span class="text-gray-300">|</span>
+                  <span class="text-gray-400 font-medium">({{ item.reviews || 150 }} reviews)</span>
+                </div>
+                <span v-if="item.stock !== undefined" class="text-[11px] font-semibold text-emerald-700">
+                  {{ item.stock > 0 ? `${item.stock} left` : 'Out of stock' }}
+                </span>
               </div>
               
               <h3 class="text-lg font-bold text-gray-900 group-hover:text-[#1b4332] transition-colors leading-snug">

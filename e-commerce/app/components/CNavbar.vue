@@ -4,8 +4,27 @@ import { productService } from '~/services/productService'
 import { formatRupiah } from '~/utils/formatter'
 import type { CatalogProduct } from '~/types/product'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { useStoreSelection, type Shop } from '~/composables/useStoreSelection'
 
 const authVm = useAuthViewModel()
+const { selectedShop, activeShops, isLoadingShops, fetchActiveShops, selectShop } = useStoreSelection()
+
+// --- STATE STORE PICKER ---
+const isStoreModalOpen = ref(false)
+
+const openStoreModal = async () => {
+  isStoreModalOpen.value = true
+  await fetchActiveShops()
+}
+
+const closeStoreModal = () => {
+  isStoreModalOpen.value = false
+}
+
+const handleSelectShop = (shop: Shop | null) => {
+  selectShop(shop)
+  closeStoreModal()
+}
 
 // --- STATE PENCARIAN ---
 const isSearchOpen = ref(false)
@@ -47,7 +66,10 @@ watch(searchQuery, (newQuery) => {
   debounceTimeout = setTimeout(async () => {
     try {
       // Fetch matching products from Go API backend
-      const apiResults = await productService.getCatalogProducts({ name: query })
+      const apiResults = await productService.getCatalogProducts({
+        name: query,
+        shop_id: selectedShop.value?.id
+      })
 
       // Check if user search matches our custom board simulator
       const matchesCustom = customSimulatorCard.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -86,21 +108,49 @@ const closeSearch = () => {
   searchQuery.value = ''
   searchResults.value = []
 }
+
+const route = useRoute()
 </script>
 
 <template>
-  <header class="w-full bg-white border-b border-gray-100 px-8 py-3 flex items-center justify-between z-50 sticky top-0 font-sans">
+  <header class="w-full bg-white border-b border-gray-100 px-6 sm:px-8 py-3 flex items-center justify-between z-50 sticky top-0 font-sans">
     
-    <div class="flex-1 flex justify-start items-center">
+    <div class="flex-1 flex justify-start items-center gap-4">
       <NuxtLink to="/" class="flex items-center">
-        <img src="/images/logo.png" alt="Chia Florist Logo" class="h-14 w-auto object-contain" />
+        <img src="/images/logo.png" alt="Chia Florist Logo" class="h-12 sm:h-14 w-auto object-contain" />
       </NuxtLink>
+
+      <!-- Store Picker Pill Button (Hidden on /cart page) -->
+      <button 
+        v-if="route.path !== '/cart'"
+        @click="openStoreModal"
+        class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-bold transition-all duration-300 shadow-2xs group cursor-pointer"
+        title="Change Store Location"
+      >
+        <span class="text-sm">📍</span>
+        <span class="max-w-[140px] truncate">
+          {{ selectedShop ? selectedShop.name : 'All Stores' }}
+        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-emerald-600 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
     </div>
 
     <div class="hidden md:block flex-1"></div>
 
     <div class="flex-1 flex justify-end items-center gap-2 sm:gap-4">
       
+      <!-- Mobile Store Picker Button (Hidden on /cart page) -->
+      <button 
+        v-if="route.path !== '/cart'"
+        @click="openStoreModal"
+        class="sm:hidden p-2 text-emerald-700 hover:bg-emerald-50 rounded-full transition-all duration-300"
+        title="Change Store"
+      >
+        <span class="text-base">📍</span>
+      </button>
+
       <button 
         @click="openSearch"
         class="p-2 text-gray-500 hover:text-[#1b4332] hover:bg-gray-50 rounded-full transition-all duration-300"
@@ -165,6 +215,76 @@ const closeSearch = () => {
       </div>
     </div>
 
+    <!-- Store Picker Modal Teleport -->
+    <Teleport to="body">
+      <div v-if="isStoreModalOpen" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <Transition name="fade">
+          <div v-if="isStoreModalOpen" @click="closeStoreModal" class="absolute inset-0 bg-black/50 backdrop-blur-xs"></div>
+        </Transition>
+
+        <Transition name="slide">
+          <div v-if="isStoreModalOpen" class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 z-10">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-emerald-50/50">
+              <div>
+                <h3 class="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                  <span>📍</span> Select Store Location
+                </h3>
+                <p class="text-xs text-gray-500 mt-0.5">Browse flower boards available at your nearest store.</p>
+              </div>
+              <button @click="closeStoreModal" class="p-2 text-gray-400 hover:text-gray-700 rounded-full transition-colors cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <div class="p-6 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+              <!-- Option 1: All Stores -->
+              <div 
+                @click="handleSelectShop(null)"
+                :class="[!selectedShop ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-600/20' : 'border-gray-200 hover:border-emerald-300 bg-white']"
+                class="p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group"
+              >
+                <div>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-emerald-700 transition-colors">All Stores</h4>
+                  <p class="text-xs text-gray-500">Show catalog products across all active stores</p>
+                </div>
+                <span v-if="!selectedShop" class="text-emerald-600 font-bold text-sm">✓ Selected</span>
+              </div>
+
+              <div v-if="isLoadingShops" class="py-8 text-center text-xs text-gray-400 font-medium animate-pulse">
+                Loading active stores...
+              </div>
+
+              <!-- Option 2+: Active Stores -->
+              <div 
+                v-else
+                v-for="shop in activeShops" 
+                :key="shop.id"
+                @click="handleSelectShop(shop)"
+                :class="[selectedShop?.id === shop.id ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-600/20' : 'border-gray-200 hover:border-emerald-300 bg-white']"
+                class="p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group"
+              >
+                <div>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-emerald-700 transition-colors">{{ shop.name }}</h4>
+                  <p class="text-xs text-gray-500 mt-0.5">{{ shop.description || `Branch: ${shop.slug}` }}</p>
+                </div>
+                <span v-if="selectedShop?.id === shop.id" class="text-emerald-600 font-bold text-sm">✓ Selected</span>
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 border-t border-gray-100 text-center">
+              <button 
+                @click="closeStoreModal"
+                class="w-full py-3 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Teleport>
+
+    <!-- Search Teleport -->
     <Teleport to="body">
       <div v-if="isSearchOpen" class="fixed inset-0 z-[100] flex justify-end">
         

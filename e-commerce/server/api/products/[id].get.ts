@@ -24,7 +24,20 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // 2. Fetch full product details strictly from backend by slug
+  // 2. If parameter is a UUID string, resolve it to slug via GET /products?id={uuid}
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+  if (isUuid) {
+    try {
+      const listRes: any = await $fetch(`${backendBaseUrl}/products?id=${slug}`)
+      if (listRes && Array.isArray(listRes.products) && listRes.products.length > 0 && listRes.products[0].slug) {
+        slug = listRes.products[0].slug
+      }
+    } catch (lookupErr) {
+      console.error(`Failed to resolve product slug for UUID ${slug}:`, lookupErr)
+    }
+  }
+
+  // 3. Fetch full product details strictly from backend by slug
   let product: any = null
   try {
     product = await $fetch(`${backendBaseUrl}/products/${slug}`)
