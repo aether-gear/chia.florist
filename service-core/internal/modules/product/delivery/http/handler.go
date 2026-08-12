@@ -53,6 +53,12 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 	name := apphttp.Query(r, "name")
 	id := apphttp.Query(r, "id")
 	sort := apphttp.Query(r, "sort")
+	shopID := apphttp.Query(r, "shop_id")
+	shopSlug := apphttp.Query(r, "shop_slug")
+
+	if shopID == "" && shopSlug == "" {
+		shopID = r.Header.Get("X-Shop-ID")
+	}
 
 	input := usecase.FindProductsInput{
 		Page:  page,
@@ -64,6 +70,12 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 	}
 	if id != "" {
 		input.ID = &id
+	}
+	if shopID != "" {
+		input.ShopID = &shopID
+	}
+	if shopSlug != "" {
+		input.ShopSlug = &shopSlug
 	}
 
 	products, total, err := h.findProducts.Execute(r.Context(), input)

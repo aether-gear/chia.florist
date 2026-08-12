@@ -55,6 +55,7 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 	name := apphttp.Query(r, "name")
 	id := apphttp.Query(r, "id")
 	sort := apphttp.Query(r, "sort")
+	activeParam := apphttp.Query(r, "active")
 
 	input := usecase.FindShopsInput{
 		Page:  page,
@@ -66,6 +67,11 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 	}
 	if id != "" {
 		input.ID = &id
+	}
+	if activeParam != "" {
+		if activeBool, err := strconv.ParseBool(activeParam); err == nil {
+			input.IsActive = &activeBool
+		}
 	}
 
 	shops, total, err := h.findShops.Execute(r.Context(), input)

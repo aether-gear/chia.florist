@@ -11,6 +11,8 @@ import (
 	inventoryRepo "service-core/internal/modules/inventory/repository"
 	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
+	shopDomain "service-core/internal/modules/shop/domain"
+	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -21,6 +23,7 @@ type GetCartUsecase struct {
 	inventoryRepo  inventoryRepo.InventoryRepository
 	productRepo    productRepo.ProductRepository
 	productImgRepo productRepo.ProductImageRepository
+	shopRepo       shopRepo.ShopRepository
 	fileStore      storage.Provider
 	executor       transaction.Executor
 }
@@ -30,6 +33,7 @@ func NewGetCartUsecase(
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productRepo productRepo.ProductRepository,
 	productImgRepo productRepo.ProductImageRepository,
+	shopRepo shopRepo.ShopRepository,
 	fileStore storage.Provider,
 	executor transaction.Executor,
 ) *GetCartUsecase {
@@ -38,6 +42,7 @@ func NewGetCartUsecase(
 		inventoryRepo:  inventoryRepo,
 		productRepo:    productRepo,
 		productImgRepo: productImgRepo,
+		shopRepo:       shopRepo,
 		fileStore:      fileStore,
 		executor:       executor,
 	}
@@ -58,6 +63,7 @@ type ProductCartResponse struct {
 type GetCartResult struct {
 	Cart     *domain.Cart
 	Products map[uuid.UUID]ProductCartResponse
+	Shops    map[uuid.UUID]shopDomain.Shop
 }
 
 func (u *GetCartUsecase) Execute(
@@ -159,9 +165,32 @@ func (u *GetCartUsecase) Execute(
 	}
 	cart.Items = activeItems
 
+	shopIDsMap := make(map[uuid.UUID]bool)
+	for _, item := range cart.Items {
+		if item.ShopID != uuid.Nil {
+			shopIDsMap[item.ShopID] = true
+		}
+	}
+
+	shopIDs := make([]uuid.UUID, 0, len(shopIDsMap))
+	for id := range shopIDsMap {
+		shopIDs = append(shopIDs, id)
+	}
+
+	shopsMap := make(map[uuid.UUID]shopDomain.Shop)
+	if u.shopRepo != nil && len(shopIDs) > 0 {
+		shops, err := u.shopRepo.FindByIDs(ctx, u.executor, shopIDs)
+		if err == nil {
+			for _, s := range shops {
+				shopsMap[s.ID] = s
+			}
+		}
+	}
+
 	result := GetCartResult{
 		Cart:     cart,
 		Products: productMap,
+		Shops:    shopsMap,
 	}
 
 	return &result, nil

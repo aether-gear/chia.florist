@@ -28,11 +28,12 @@ func NewFindShopsUsecase(
 }
 
 type FindShopsInput struct {
-	Page  int
-	Limit int
-	ID    *string
-	Name  *string
-	Sort  string
+	Page     int
+	Limit    int
+	ID       *string
+	Name     *string
+	IsActive *bool
+	Sort     string
 }
 
 func (u *FindShopsUsecase) Execute(
@@ -86,8 +87,9 @@ func (u *FindShopsUsecase) Execute(
 	}
 
 	params := repository.FindShopsParams{
-		ID:   input.ID,
-		Name: input.Name,
+		ID:       input.ID,
+		Name:     input.Name,
+		IsActive: input.IsActive,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,

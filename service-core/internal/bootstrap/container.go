@@ -111,6 +111,7 @@ type Container struct {
 	UpdateItem       cartUsecase.UpdateItemUsecase
 	RemoveItem       cartUsecase.RemoveItemUsecase
 	RemoveCustomItem cartUsecase.RemoveCustomItemUsecase
+	ChangeItemShop   cartUsecase.ChangeItemShopUsecase
 	Checkout         cartUsecase.CheckoutUsecase
 
 	ListLocations locationUsecase.ListLocationUsecase
@@ -551,6 +552,7 @@ func NewContainer(cfg Config,
 				inventoryRepo,
 				productRepo,
 				productImageRepo,
+				shopRepo,
 				infra.StorageProvider,
 				infra.TransactionExecutor,
 			),
@@ -587,6 +589,14 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				cartRepo,
+			),
+		ChangeItemShop: *cartUsecase.
+			NewChangeItemShopUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
+				shopRepo,
+				inventoryRepo,
 			),
 		Checkout: *cartUsecase.
 			NewCheckoutUsecase(

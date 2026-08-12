@@ -182,3 +182,51 @@ func (c *Cart) HasProductInAnotherShop(productID uuid.UUID, shopID uuid.UUID) bo
 
 	return false
 }
+
+// ChangeItemShop updates the fulfillment shop for a cart item identified by cartItemID.
+// For standard products, if an item with the same product ID already exists in newShopID,
+// their quantities are merged and the original item is soft-deleted.
+func (c *Cart) ChangeItemShop(cartItemID uuid.UUID, newShopID uuid.UUID) bool {
+	var targetIdx = -1
+	for i := range c.Items {
+		if c.Items[i].ID == cartItemID && c.Items[i].DeletedAt == nil {
+			targetIdx = i
+			break
+		}
+	}
+
+	if targetIdx == -1 {
+		return false
+	}
+
+	item := &c.Items[targetIdx]
+	if item.ShopID == newShopID {
+		return true
+	}
+
+	// Custom items have no product ID deduplication; directly update shop_id
+	if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+		item.ShopID = newShopID
+		return true
+	}
+
+	// Standard product item: check if product already exists in newShopID
+	productID := *item.ProductID
+	for i := range c.Items {
+		if i != targetIdx && c.Items[i].DeletedAt == nil &&
+			c.Items[i].ProductVariantType != ProductVariantTypeCustom &&
+			c.Items[i].ProductID != nil &&
+			*c.Items[i].ProductID == productID &&
+			c.Items[i].ShopID == newShopID {
+
+			// Merge quantity into existing item for newShopID and soft-delete target item
+			c.Items[i].Quantity += item.Quantity
+			now := appclock.Now()
+			item.DeletedAt = &now
+			return true
+		}
+	}
+
+	item.ShopID = newShopID
+	return true
+}

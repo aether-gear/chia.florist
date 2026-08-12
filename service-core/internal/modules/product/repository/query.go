@@ -35,8 +35,10 @@ type GetProductStatsParams struct {
 }
 
 type FindProductParams struct {
-	ID   *string
-	Name *string
+	ID       *string
+	Name     *string
+	ShopID   *uuid.UUID
+	ShopSlug *string
 
 	query.Pagination
 	query.Sorts

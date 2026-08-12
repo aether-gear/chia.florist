@@ -66,6 +66,12 @@ func (r *shopRepositoryImpl) FindByParams(
 		argPos++
 	}
 
+	if params.IsActive != nil {
+		conditions = append(conditions, fmt.Sprintf("s.is_active = $%d", argPos))
+		args = append(args, *params.IsActive)
+		argPos++
+	}
+
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}

@@ -59,6 +59,24 @@ func (r *productRepositoryImpl) FindProducts(
 
 	conditions = append(conditions, notDeletedCondition)
 
+	if params.ShopID != nil {
+		baseQuery += " INNER JOIN inventory i ON p.id = i.product_id AND i.deleted_at IS NULL"
+		conditions = append(
+			conditions,
+			fmt.Sprintf("i.shop_id = $%d", argPos),
+		)
+		args = append(args, *params.ShopID)
+		argPos++
+	} else if params.ShopSlug != nil {
+		baseQuery += " INNER JOIN inventory i ON p.id = i.product_id AND i.deleted_at IS NULL"
+		conditions = append(
+			conditions,
+			fmt.Sprintf("i.shop_id IN (SELECT id FROM shops WHERE slug = $%d AND deleted_at IS NULL)", argPos),
+		)
+		args = append(args, *params.ShopSlug)
+		argPos++
+	}
+
 	if params.ID != nil {
 		conditions = append(
 			conditions,
@@ -240,6 +258,24 @@ func (r *productRepositoryImpl) FindProductsWithInventory(
 	)
 
 	conditions = append(conditions, notDeletedCondition)
+
+	if params.ShopID != nil {
+		shopIDCondition := fmt.Sprintf("i.shop_id = $%d", argPos)
+		conditions = append(
+			conditions,
+			shopIDCondition,
+		)
+		args = append(args, *params.ShopID)
+		argPos++
+	} else if params.ShopSlug != nil {
+		shopSlugCondition := fmt.Sprintf("i.shop_id IN (SELECT id FROM shops WHERE slug = $%d AND deleted_at IS NULL)", argPos)
+		conditions = append(
+			conditions,
+			shopSlugCondition,
+		)
+		args = append(args, *params.ShopSlug)
+		argPos++
+	}
 
 	if params.ID != nil {
 		conditions = append(

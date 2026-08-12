@@ -20,6 +20,10 @@ type updateItemRequest struct {
 	Quantity int `json:"quantity"`
 }
 
+type changeItemShopRequest struct {
+	ShopID string `json:"shop_id"`
+}
+
 type cartResponse struct {
 	CartID uuid.UUID      `json:"cart_id"`
 	Items  []cartItemView `json:"items"`
@@ -37,6 +41,8 @@ type cartItemView struct {
 	ProductVariantType string               `json:"product_variant_type"`
 	ProductID          *uuid.UUID           `json:"product_id,omitempty"`
 	ShopID             uuid.UUID            `json:"shop_id"`
+	ShopName           string               `json:"shop_name,omitempty"`
+	ShopSlug           string               `json:"shop_slug,omitempty"`
 	Name               string               `json:"name"`
 	Price              int64                `json:"price"`
 	Subtotal           int64                `json:"subtotal"`
