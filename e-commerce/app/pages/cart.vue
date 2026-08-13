@@ -191,7 +191,7 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
 
 <template>
   <div class="min-h-screen bg-gray-50/50 py-16 font-sans">
-    <div class="max-w-7xl mx-auto px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-8 sm:px-10">
       
       <div class="mb-10">
         <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Shopping Cart</h1>

@@ -41,7 +41,7 @@
       </svg>
     </div>
 
-    <div class="max-w-7xl mx-auto space-y-12 flex flex-col pt-12 pb-8">
+    <div class="max-w-7xl mx-auto px-8 sm:px-10 space-y-12 flex flex-col pt-12 pb-8">
 
       <div class="space-y-3">
         <img src="/images/logo.png" class="h-14 w-auto object-contain" alt="Chia Florist" />
@@ -127,7 +127,7 @@
 
         </div>
 
-      </div>
+    </div>
 
       <!-- Copyright Bottom Bar -->
       <div class="pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-medium text-gray-400">

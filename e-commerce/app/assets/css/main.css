@@ -126,4 +126,19 @@ body {
   color: var(--color-accent);
 }
 
-/* Layout helpers can live here later when we settle on shared spacing and container rules. */
+/* Layout helpers - Standard container horizontal padding across application */
+.container-standard {
+  max-width: 80rem; /* max-w-7xl */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 2rem; /* px-8 */
+  padding-right: 2rem;
+}
+
+@media (min-width: 640px) {
+  .container-standard {
+    padding-left: 2.5rem; /* sm:px-10 */
+    padding-right: 2.5rem;
+  }
+}
+

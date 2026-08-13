@@ -567,7 +567,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
 <template>
   <div class="min-h-screen bg-gray-50/50 py-12 font-sans">
-    <div class="max-w-7xl mx-auto px-8">
+    <div class="max-w-7xl mx-auto px-8 sm:px-10">
       
       <nav class="flex text-sm text-gray-400 mb-8 gap-2">
         <NuxtLink to="/" class="hover:text-[#1b4332]">Home</NuxtLink>

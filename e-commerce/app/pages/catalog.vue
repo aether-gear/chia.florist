@@ -129,7 +129,7 @@ const navigateToProduct = (item: any) => {
 
 <template>
   <div class="min-h-screen bg-gray-50/50 py-16 font-sans">
-    <div class="max-w-7xl mx-auto px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-8 sm:px-10">
       
       <div class="text-center max-w-2xl mx-auto mb-16 space-y-3">
         <span class="text-xs font-black text-emerald-700 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
