@@ -8,13 +8,17 @@ export default defineEventHandler(async (event) => {
   try {
     await $fetch(backendUrl, {
       method: 'POST',
-      headers: cookies ? { cookie: cookies } : {}
+      headers: {
+        'X-Account-Type': 'customer',
+        ...(cookies ? { cookie: cookies } : {})
+      }
     })
   } catch (err: any) {
     console.error('Backend logout failed:', err.data?.message || err.message)
   }
 
-  // Clear cookie locally
+  // Clear customer cookies locally
   deleteCookie(event, 'chast')
+  deleteCookie(event, 'malkist')
   return { message: 'logout success' }
 })

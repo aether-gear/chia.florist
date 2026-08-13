@@ -11,7 +11,10 @@ export default defineEventHandler(async (event) => {
   try {
     const response = await $fetch.raw(backendUrl, {
       method: 'GET',
-      headers: cookies ? { cookie: cookies } : {}
+      headers: {
+        'X-Account-Type': 'customer',
+        ...(cookies ? { cookie: cookies } : {})
+      }
     })
 
     const data = response._data

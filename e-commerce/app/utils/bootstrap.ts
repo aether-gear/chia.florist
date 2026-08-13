@@ -34,6 +34,10 @@ export const bootstrapConfig = {
     try {
       return await $fetch<T>(url, {
         credentials: 'include',
+        headers: {
+          'X-Account-Type': 'customer',
+          ...(options?.headers || {})
+        },
         ...options
       })
     } catch (err: any) {

@@ -4,8 +4,9 @@ export default defineNuxtRouteMiddleware(async (_to, _from) => {
   if (import.meta.server) return   // SSR: skip — auth state is client-only
 
   const authVm = useAuthViewModel()
+  const isLoggedIn = useCookie('is_logged_in')
 
-  if (!authVm.isInitialized.value) {
+  if (!authVm.isInitialized.value && isLoggedIn.value === 'true') {
     try {
       await authVm.fetchCurrentUser()
     } catch (err) {
@@ -13,8 +14,7 @@ export default defineNuxtRouteMiddleware(async (_to, _from) => {
     }
   }
 
-  const isLoggedIn = useCookie('is_logged_in')
-  if (!authVm.isAuthenticated.value && isLoggedIn.value !== 'true') {
+  if (!authVm.isAuthenticated.value) {
     return navigateTo('/login')
   }
 })

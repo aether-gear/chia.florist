@@ -6,14 +6,7 @@ import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest } from '~/type
 import { triggerAuthAlert } from '~/composables/useSessionState'
 
 export const useAuthViewModel = () => {
-  const currentUser = useState<UserMe | null>('auth_currentUser', () => {
-    const isLoggedIn = useCookie('is_logged_in')
-    const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
-    if (isLoggedIn.value === 'true' && userProfile.value) {
-      return userProfile.value as UserMe
-    }
-    return null
-  })
+  const currentUser = useState<UserMe | null>('auth_currentUser', () => null)
   const challengeId = useState<string | null>('auth_challengeId', () => null)
   const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
   const isInitialized = useState<boolean>('auth_isInitialized', () => false)
@@ -39,7 +32,7 @@ export const useAuthViewModel = () => {
     error.value = null
     try {
       const response = await authService.getMe(cookieHeader)
-      if (response && response.is_authenticated) {
+      if (response && response.is_authenticated && response.account_type === 'customer') {
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         
@@ -97,21 +90,15 @@ export const useAuthViewModel = () => {
         
         currentUser.value = { ...(userProfile.value as UserMe) }
       } else {
+        clearLocalSession()
         currentUser.value = null
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-        userProfile.value = null
-        isLoggedIn.value = null
         if (response && response.message) {
           error.value = response.message
         }
       }
     } catch (err: any) {
+      clearLocalSession()
       currentUser.value = null
-      const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-      const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-      userProfile.value = null
-      isLoggedIn.value = null
       error.value = err.data?.message || err.message || 'Failed to fetch user state'
       console.warn('Failed to fetch user state:', err)
     } finally {
