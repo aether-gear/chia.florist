@@ -113,15 +113,19 @@ const route = useRoute()
 </script>
 
 <template>
-  <header class="w-full bg-white border-b border-gray-100 px-6 sm:px-8 py-3 flex items-center justify-between z-50 sticky top-0 font-sans">
-    
+  <header class="
+    w-full bg-white border-b border-gray-100 px-6
+    py-3 flex items-center justify-between z-50 sticky top-0 font-sans
+    md:px-8
+  ">
+
     <div class="flex-1 flex justify-start items-center gap-4">
-      <NuxtLink to="/" class="flex items-center">
-        <img src="/images/logo.png" alt="Chia Florist Logo" class="h-12 sm:h-14 w-auto object-contain" />
+      <NuxtLink to="/" class="flex">
+        <img src="/images/logo.png" alt="Chia Florist" class="h-6 md:h-6.75 lg:h-7.25 xl:h-8" />
       </NuxtLink>
 
       <!-- Store Picker Pill Button (Hidden on /cart page) -->
-      <button 
+      <button
         v-if="route.path !== '/cart'"
         @click="openStoreModal"
         class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-bold transition-all duration-300 shadow-2xs group cursor-pointer"
@@ -137,12 +141,12 @@ const route = useRoute()
       </button>
     </div>
 
-    <div class="hidden md:block flex-1"></div>
+    <div class="hidden lg:block flex-1"></div>
 
     <div class="flex-1 flex justify-end items-center gap-2 sm:gap-4">
-      
+
       <!-- Mobile Store Picker Button (Hidden on /cart page) -->
-      <button 
+      <button
         v-if="route.path !== '/cart'"
         @click="openStoreModal"
         class="sm:hidden p-2 text-emerald-700 hover:bg-emerald-50 rounded-full transition-all duration-300"
@@ -151,7 +155,7 @@ const route = useRoute()
         <span class="text-base">📍</span>
       </button>
 
-      <button 
+      <button
         @click="openSearch"
         class="p-2 text-gray-500 hover:text-[#1b4332] hover:bg-gray-50 rounded-full transition-all duration-300"
         title="Search"
@@ -161,8 +165,8 @@ const route = useRoute()
         </svg>
       </button>
 
-      <NuxtLink 
-        to="/cart" 
+      <NuxtLink
+        to="/cart"
         class="p-2 text-gray-500 hover:text-[#1b4332] hover:bg-gray-50 rounded-full transition-all duration-300"
         title="Cart"
       >
@@ -170,12 +174,12 @@ const route = useRoute()
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.25M16.5 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm3 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
         </svg>
       </NuxtLink>
-      
+
       <!-- Profile & Auth status indicator -->
       <div class="flex items-center gap-1 sm:gap-2 border-l border-gray-100 pl-2 sm:pl-4">
         <template v-if="authVm.isAuthenticated.value">
-          <NuxtLink 
-            to="/profile" 
+          <NuxtLink
+            to="/profile"
             class="flex items-center gap-2 py-1 px-2.5 hover:bg-gray-50 rounded-full transition-all duration-300 group"
             title="Profile Settings"
           >
@@ -191,9 +195,9 @@ const route = useRoute()
               {{ authVm.currentUser.value?.name || 'Customer' }}
             </span>
           </NuxtLink>
-          
-          <button 
-            @click="authVm.logout" 
+
+          <button
+            @click="authVm.logout"
             class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-300 cursor-pointer"
             title="Sign Out"
           >
@@ -204,8 +208,8 @@ const route = useRoute()
         </template>
 
         <template v-else>
-          <NuxtLink 
-            to="/login" 
+          <NuxtLink
+            to="/login"
             class="flex items-center gap-1.5 py-1.5 px-4 bg-[#1b4332] hover:bg-[#143326] text-white rounded-full text-xs font-bold transition-all duration-300 shadow-sm hover:shadow cursor-pointer"
             title="Sign In"
           >
@@ -238,7 +242,7 @@ const route = useRoute()
 
             <div class="p-6 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
               <!-- Option 1: All Stores -->
-              <div 
+              <div
                 @click="handleSelectShop(null)"
                 :class="[!selectedShop ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-600/20' : 'border-gray-200 hover:border-emerald-300 bg-white']"
                 class="p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group"
@@ -255,9 +259,9 @@ const route = useRoute()
               </div>
 
               <!-- Option 2+: Active Stores -->
-              <div 
+              <div
                 v-else
-                v-for="shop in activeShops" 
+                v-for="shop in activeShops"
                 :key="shop.id"
                 @click="handleSelectShop(shop)"
                 :class="[selectedShop?.id === shop.id ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-600/20' : 'border-gray-200 hover:border-emerald-300 bg-white']"
@@ -272,7 +276,7 @@ const route = useRoute()
             </div>
 
             <div class="p-4 bg-gray-50 border-t border-gray-100 text-center">
-              <button 
+              <button
                 @click="closeStoreModal"
                 class="w-full py-3 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl transition cursor-pointer"
               >
@@ -287,14 +291,14 @@ const route = useRoute()
     <!-- Search Teleport -->
     <Teleport to="body">
       <div v-if="isSearchOpen" class="fixed inset-0 z-[100] flex justify-end">
-        
+
         <Transition name="fade">
           <div v-if="isSearchOpen" @click="closeSearch" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
         </Transition>
 
         <Transition name="slide">
           <div v-if="isSearchOpen" class="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden">
-            
+
             <div class="p-6 flex items-center justify-between border-b border-gray-50">
               <span class="text-xs font-black text-gray-400 uppercase tracking-widest">Search Catalog</span>
               <button @click="closeSearch" class="p-2 text-gray-400 hover:text-black transition-colors">
@@ -306,11 +310,11 @@ const route = useRoute()
 
             <div class="p-6">
               <div class="relative">
-                <input 
+                <input
                   ref="searchInput"
                   v-model="searchQuery"
-                  type="text" 
-                  placeholder="Type to search flowers..." 
+                  type="text"
+                  placeholder="Type to search flowers..."
                   class="w-full bg-surface text-sm text-gray-800 px-6 py-4 pr-12 rounded-full outline-none border border-transparent focus:border-accent focus:bg-white transition-all shadow-inner"
                 />
               </div>
@@ -327,9 +331,9 @@ const route = useRoute()
                   <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Found Products</span>
                   <span class="text-[10px] font-mono text-gray-400 uppercase">{{ searchResults.length }} results</span>
                 </div>
-                
-                <NuxtLink 
-                  v-for="product in searchResults" 
+
+                <NuxtLink
+                  v-for="product in searchResults"
                   :key="product.id"
                   :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.slug || product.id}`"
                   @click="closeSearch"
