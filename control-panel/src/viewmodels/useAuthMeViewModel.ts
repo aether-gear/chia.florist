@@ -34,7 +34,7 @@ export function useAuthMeViewModel() {
       try {
         setLoading(true);
         setError(null);
-        const result = await fetchApi('/auth/me');
+        const result = await fetchApi('/auth/staff/me');
         setData(result);
       } catch (err: any) {
         console.error('Backend /auth/me failed', err);

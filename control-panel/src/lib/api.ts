@@ -3,7 +3,9 @@ export const API_BASE_URL = '/api/core';
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    'X-Account-Type': 'staff',
+  };
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }

@@ -71,7 +71,7 @@ export default function DashboardLayout() {
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     try {
-      await fetchApi('/auth/logout', { method: 'POST' });
+      await fetchApi('/auth/staff/logout', { method: 'POST' });
     } catch (err) {
       console.error(err);
     } finally {
