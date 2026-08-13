@@ -33,9 +33,57 @@ func (s *authorizer) RequireAccountType(
 ) appmiddleware.Middleware {
 	return func(next apphttp.AppHandler) apphttp.AppHandler {
 		return func(w http.ResponseWriter, r *http.Request) error {
+			if multiCtxs, ok := authendomain.GetMultiAuthContext(r.Context()); ok && len(multiCtxs) > 1 {
+				headerHint := apphttp.GetAccountTypeHeader(r)
+
+				var chosenCandidate *authendomain.AuthContext
+				if headerHint != "" {
+					for _, candidate := range multiCtxs {
+						candidateType := authendomain.AccountTypeCustomer
+						if candidate.StaffID != nil {
+							candidateType = authendomain.AccountTypeStaff
+						}
+						if string(candidateType) == headerHint && slices.Contains(allowedTypes, candidateType) {
+							chosenCandidate = candidate
+							break
+						}
+					}
+				}
+
+				if chosenCandidate == nil {
+					for _, candidate := range multiCtxs {
+						candidateType := authendomain.AccountTypeCustomer
+						if candidate.StaffID != nil {
+							candidateType = authendomain.AccountTypeStaff
+						}
+						if slices.Contains(allowedTypes, candidateType) {
+							chosenCandidate = candidate
+							break
+						}
+					}
+				}
+
+				if chosenCandidate != nil {
+					r = r.WithContext(authendomain.WithAuthContext(r.Context(), chosenCandidate))
+				}
+			}
+
 			actor, ok := GetActor(r.Context())
 			if !ok {
-				return apperrors.NewUnauthorized("actor unauthorized")
+				authCtx, authOk := authendomain.GetAuthContext(r.Context())
+				if !authOk {
+					return apperrors.NewUnauthorized("authentication required")
+				}
+
+				accType := authendomain.AccountTypeCustomer
+				if authCtx.StaffID != nil {
+					accType = authendomain.AccountTypeStaff
+				}
+				if slices.Contains(allowedTypes, accType) {
+					return next(w, r)
+				}
+
+				return apperrors.NewForbidden("insufficient account type")
 			}
 
 			if slices.Contains(allowedTypes, actor.Type) {
@@ -56,7 +104,6 @@ func (s *authorizer) RequireStaffRole(
 			if !ok {
 				return apperrors.NewUnauthorized("authentication required")
 			}
-
 			if actor.Type != authendomain.AccountTypeStaff {
 				return apperrors.NewForbidden(domain.ErrStaffRequired.Error())
 			}

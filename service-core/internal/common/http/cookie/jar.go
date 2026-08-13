@@ -18,7 +18,7 @@ const (
 	// This cookie represents the user's refresh token
 	// and is used to authenticate the user for
 	// API requests
-	CookieAccess CookieName = "chast"
+	CookieCustomer CookieName = "chast"
 
 	// This cookie represents the user's refresh token
 	// and is used to obtain a new access token when the
@@ -105,6 +105,17 @@ func Clear(
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
 	})
+}
+
+// ClearAll removes all authentication cookies from the client.
+//
+// This is used during logout to ensure no stale cookies remain
+// from any application context.
+func ClearAll(w http.ResponseWriter) {
+	Clear(w, CookieCustomer)
+	Clear(w, CookieCustomerRefresh)
+	Clear(w, CookieStaff)
+	Clear(w, CookieStaffRefresh)
 }
 
 // Exists checks whether a cookie with the

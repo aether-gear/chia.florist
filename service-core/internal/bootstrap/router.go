@@ -73,17 +73,17 @@ func NewRouteChains(c *Container) *RouteChains {
 	return &RouteChains{
 		Core: buildChain(),
 		CoreAuth: buildChain(
-			c.Authenticator.RequireAnyAuth(
+			c.Authenticator.RequireMultiAuth(
 				c.DBExecutor,
 				c.DBTransactor,
-				appcookie.CookieAccess,
+				appcookie.CookieCustomer,
 				appcookie.CookieStaff,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(
 				authendomain.AccountTypeStaff,
 				authendomain.AccountTypeCustomer,
 			),
+			c.Authorizer.LoadActor(c.DBExecutor),
 		),
 		StaffOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -91,8 +91,8 @@ func NewRouteChains(c *Container) *RouteChains {
 				c.DBTransactor,
 				appcookie.CookieStaff,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
+			c.Authorizer.LoadActor(c.DBExecutor),
 		),
 		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -100,18 +100,18 @@ func NewRouteChains(c *Container) *RouteChains {
 				c.DBTransactor,
 				appcookie.CookieStaff,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
 			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaffAdmin),
+			c.Authorizer.LoadActor(c.DBExecutor),
 		),
 		CustomerOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
 				c.DBTransactor,
-				appcookie.CookieAccess,
+				appcookie.CookieCustomer,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
+			c.Authorizer.LoadActor(c.DBExecutor),
 		),
 	}
 }
@@ -295,8 +295,10 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Post("/forgot-password/verify", chains.Core(authHandler.VerifyPasswordReset))
 			r.Post("/forgot-password/reset", chains.Core(authHandler.ResetPassword))
 
-			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
-			r.Get("/me", chains.CoreAuth(authHandler.Me))
+			r.Post("/logout", chains.CustomerOnly(authHandler.Logout))
+			r.Post("/staff/logout", chains.StaffOnly(authHandler.LogoutStaff))
+			r.Get("/me", chains.CustomerOnly(authHandler.Me))
+			r.Get("/staff/me", chains.StaffOnly(authHandler.Me))
 
 			r.Get("/google/login", chains.Core(authHandler.GoogleLogin))
 			r.Get("/google/callback", chains.Core(authHandler.GoogleCallback))
@@ -317,6 +319,8 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/profile", func(r chi.Router) {
 			r.Get("/", chains.CoreAuth(userHandler.GetCurrentProfile))
 			r.Put("/", chains.CoreAuth(userHandler.UpdateCurrentProfile))
+			r.Get("/staff", chains.StaffOnly(userHandler.GetCurrentProfile))
+			r.Put("/staff", chains.StaffOnly(userHandler.UpdateCurrentProfile))
 			r.Delete("/", chains.CustomerOnly(authHandler.DeleteAccount))
 		})
 
