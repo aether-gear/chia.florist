@@ -19,7 +19,7 @@ This rule establishes the design principles and UI/UX philosophy for all AI agen
   - Body Text: Charcoal Gray (`text-gray-600` / `text-gray-900`)
 
 ### 3. Container Padding Rules
-- **No Extra Horizontal Padding on Footer Container**: Do not add horizontal padding (`px-*`) to the main inner footer container. Keep layout margins controlled naturally by `max-w-7xl mx-auto`.
+- **No Extra Horizontal Padding on Footer Container**: Use horizontal padding only `px-8 sm:px-10` to the main content. Keep layout margins controlled naturally by `max-w-7xl mx-auto`.
 
 ### 4. Pragmatic & Truthful Content Strategy
 - **No Non-Existent Placeholders**: Never include placeholder navigation links, categories, or pages that do not yet exist in the codebase (e.g., do not add blogs, collections, or fake shipping pages if the routes are not implemented).
