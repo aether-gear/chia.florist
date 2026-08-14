@@ -10,9 +10,9 @@ This rule establishes the design principles, UI standards, and component guideli
 - **Uniform Padding**: All form inputs, primary action buttons, secondary back buttons, and alert notifications MUST enforce a uniform vertical padding of `py-3` (with `px-4`).
 - **Visual Rhythm**: Ensures balanced element heights across forms and cards.
 
-### 2. Standardized Corner Radius (`rounded-lg`)
-- **Consistent Radius**: All interactive controls (inputs, primary buttons, secondary outline buttons, alert boxes, cards) MUST use `rounded-lg` (`8px`).
-- Do NOT mix `rounded-xl`, `rounded-2xl`, or heavy pill shapes on standard form controls.
+### 2. Standardized Corner Radius (`rounded-xl`)
+- **Consistent Radius**: All interactive controls (inputs, primary buttons, secondary outline buttons, alert boxes, cards) MUST use `rounded-xl` (`12px`).
+- Do NOT mix `rounded-lg`, `rounded-2xl`, or heavy pill shapes on standard form controls.
 
 ### 3. Button Typography & Font Consistency (`text-sm`)
 - **Equal Font Size**: Primary filled buttons and secondary outline buttons (e.g. "Back", "Cancel") MUST share the exact same font size (`text-sm`) and line-height.
