@@ -313,13 +313,14 @@ watch(() => route.path, () => {
 
           <!-- UNAUTHENTICATED SIGN IN -->
           <template v-else>
-            <NuxtLink
+            <CButton
               to="/login"
-              class="inline-flex items-center gap-1.5 py-1.5 px-4 bg-[#1b4332] hover:bg-[#143326] text-white rounded-full text-xs font-bold transition-all duration-200 shadow-xs hover:shadow active:scale-95 cursor-pointer"
+              variant="secondary"
+              size="pill"
               title="Sign In"
             >
-              <span>Sign In</span>
-            </NuxtLink>
+              Sign In
+            </CButton>
           </template>
         </div>
 
@@ -439,13 +440,15 @@ watch(() => route.path, () => {
           </template>
 
           <template v-else>
-            <NuxtLink
+            <CButton
               to="/login"
               @click="closeMobileMenu"
-              class="w-full flex items-center justify-center gap-2 py-2.5 bg-[#1b4332] hover:bg-[#143326] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              variant="secondary"
+              size="lg"
+              full-width
             >
-              <span>Sign In</span>
-            </NuxtLink>
+              Sign In
+            </CButton>
           </template>
         </div>
       </div>

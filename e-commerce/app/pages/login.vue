@@ -213,11 +213,13 @@ const switchToForgot = () => {
           </div>
 
           <!-- Primary Action: Continue with Google (Full Wordmark Logo) -->
-          <button
+          <CButton
             type="button"
             @click="handleGoogleLogin"
-            class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 px-4 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="authVm.isLoading.value"
+            variant="primary"
+            size="lg"
+            full-width
+            :loading="authVm.isLoading.value"
           >
             <span class="flex items-center gap-1">
               <span class="pb-1">Continue with</span>
@@ -227,7 +229,7 @@ const switchToForgot = () => {
                 alt="Google"
               />
             </span>
-          </button>
+          </CButton>
 
           <!-- Horizontal Divider: OR -->
           <div class="relative flex py-1 items-center">
@@ -357,25 +359,26 @@ const switchToForgot = () => {
 
             <!-- Action Buttons -->
             <div class="pt-2 space-y-3">
-              <button
+              <CButton
                 type="submit"
-                class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="authVm.isLoading.value"
+                variant="primary"
+                size="lg"
+                full-width
+                :loading="authVm.isLoading.value"
               >
-                <span v-if="authVm.isLoading.value" class="animate-pulse">Logging in...</span>
-                <span v-else class="flex items-center gap-2">
-                  Sign In
-                </span>
-              </button>
+                Sign In
+              </CButton>
 
-              <button
+              <CButton
                 type="button"
                 @click="loginStep = 'initial'"
-                class="w-full border border-gray-200 text-gray-700 py-3 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+                variant="outline"
+                size="lg"
+                full-width
                 :disabled="authVm.isLoading.value"
               >
                 Back
-              </button>
+              </CButton>
             </div>
           </form>
 
