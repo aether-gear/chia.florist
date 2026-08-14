@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+
+definePageMeta({
+  layout: 'auth'
+})
 
 useHead({ 
   title: 'Sign In - Chia Florist',
@@ -10,6 +14,11 @@ useHead({
 })
 
 const authVm = useAuthViewModel()
+
+// 2-Step Login Flow: 'initial' (Choose Google or Enter Email) -> 'credentials' (Password Form without Google)
+const loginStep = ref<'initial' | 'credentials'>('initial')
+const emailInputRef = ref<HTMLInputElement | null>(null)
+const passwordInputRef = ref<HTMLInputElement | null>(null)
 
 const email = ref('')
 const password = ref('')
@@ -26,21 +35,48 @@ const forgotChallengeId = ref('')
 const newPassword = ref('')
 const showNewPassword = ref(false)
 
+onMounted(() => {
+  nextTick(() => {
+    emailInputRef.value?.focus()
+  })
+})
+
+const focusPasswordInput = () => {
+  nextTick(() => {
+    passwordInputRef.value?.focus()
+    passwordInputRef.value?.select()
+  })
+  // Secondary backup for transition timing
+  setTimeout(() => {
+    passwordInputRef.value?.focus()
+  }, 150)
+}
+
+const handleInitialEmailSubmit = () => {
+  if (!email.value) {
+    errorMessage.value = 'Please enter your email address.'
+    return
+  }
+  errorMessage.value = ''
+  loginStep.value = 'credentials'
+  focusPasswordInput()
+}
+
 const handleLogin = async () => {
   if (!email.value || !password.value) {
-    errorMessage.value = 'Please fill in all fields.'
+    errorMessage.value = 'Please fill in all required fields.'
     return
   }
 
   errorMessage.value = ''
   successMessage.value = ''
-  
+
   try {
     const success = await authVm.login({
       email: email.value,
       password: password.value
     }, rememberMe.value)
-    
+
     if (success) {
       navigateTo('/')
     }
@@ -63,21 +99,21 @@ const handleLogin = async () => {
 const handleGoogleLogin = () => {
   const rememberMeCookie = useCookie('remember_me')
   rememberMeCookie.value = rememberMe.value ? 'true' : 'false'
-  
+
   sessionStorage.setItem('google_auth_pending', '1')
   window.location.href = '/api/auth/google'
 }
 
 const handleForgotPasswordRequest = async () => {
   if (!forgotEmail.value) {
-    errorMessage.value = 'Please enter your email.'
+    errorMessage.value = 'Please enter your email address.'
     return
   }
   errorMessage.value = ''
   successMessage.value = ''
   try {
     const res = await authVm.requestForgotPassword(forgotEmail.value)
-    successMessage.value = res.message || 'OTP sent to your email.'
+    successMessage.value = res.message || 'Verification code sent to your email.'
     if (res.challenge_id) {
       forgotChallengeId.value = res.challenge_id
     }
@@ -89,20 +125,20 @@ const handleForgotPasswordRequest = async () => {
 
 const handleForgotPasswordVerify = async () => {
   if (!forgotOtp.value) {
-    errorMessage.value = 'Please enter the OTP.'
+    errorMessage.value = 'Please enter the verification code.'
     return
   }
   errorMessage.value = ''
   successMessage.value = ''
   try {
     const res = await authVm.verifyForgotPasswordOtp(forgotChallengeId.value, forgotOtp.value)
-    successMessage.value = res.message || 'OTP verified.'
+    successMessage.value = res.message || 'Code verified successfully.'
     if (res.challenge_id) {
       forgotChallengeId.value = res.challenge_id
     }
     viewMode.value = 'forgot_reset'
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'OTP verification failed.'
+    errorMessage.value = err.data?.message || err.message || 'Verification failed.'
   }
 }
 
@@ -117,11 +153,13 @@ const handleForgotPasswordReset = async () => {
     const res = await authVm.resetPassword(forgotChallengeId.value, newPassword.value)
     successMessage.value = res.message || 'Password reset successful. You can now log in.'
     viewMode.value = 'login'
+    loginStep.value = 'credentials'
     email.value = forgotEmail.value
     forgotEmail.value = ''
     forgotOtp.value = ''
     forgotChallengeId.value = ''
     newPassword.value = ''
+    focusPasswordInput()
   } catch (err: any) {
     errorMessage.value = err.data?.message || err.message || 'Failed to reset password.'
   }
@@ -142,246 +180,368 @@ const switchToForgot = () => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-8 py-20 mt-10 min-h-[80vh] flex flex-col items-center gap-10">
-    <div>
-      <img src="/images/logo.png" class="h-20 mx-auto mb-4" alt="Chia Florist Logo" />
+  <div class="w-full space-y-6">
+
+    <!-- Error & Success Alerts -->
+    <div
+      v-if="errorMessage"
+      class="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 animate-shake shadow-xs"
+    >
+      <span>⚠️</span>
+      <p class="flex-1 leading-normal">{{ errorMessage }}</p>
     </div>
-    
-    <div class="max-w-md w-full mx-auto relative py-4">
-      
-      <!-- Alerts -->
-      <div 
-        v-if="errorMessage" 
-        class="mb-6 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-4 py-3 rounded-xl flex items-center gap-2 animate-shake"
-      >
-        <span>⚠️</span>
-        <p class="flex-1 leading-normal">{{ errorMessage }}</p>
-      </div>
 
-      <div 
-        v-if="successMessage" 
-        class="mb-6 bg-green-50 border border-green-100 text-green-600 text-xs font-semibold px-4 py-3 rounded-xl flex items-center gap-2"
-      >
-        <span>✅</span>
-        <p class="flex-1 leading-normal">{{ successMessage }}</p>
-      </div>
+    <div
+      v-if="successMessage"
+      class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 shadow-xs"
+    >
+      <span>✅</span>
+      <p class="flex-1 leading-normal">{{ successMessage }}</p>
+    </div>
 
-      <!-- Login View -->
-      <div v-if="viewMode === 'login'" class="space-y-8">
-        <div>
-          <h1 class="text-4xl font-medium tracking-tight mb-2">Sign in</h1>
-          <p class="text-gray-600">Enter your details below</p>
-        </div>
+    <!-- MAIN VIEW: LOGIN -->
+    <div v-if="viewMode === 'login'">
+      <Transition name="fade-slide" mode="out-in" @after-enter="focusPasswordInput">
 
-        <form @submit.prevent="handleLogin" class="space-y-6">
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
-            <input 
-              type="email" 
-              v-model="email"
-              placeholder="Email" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
-              :disabled="authVm.isLoading.value"
-              required
-            />
+        <!-- STEP 1: INITIAL METHOD SELECTION (Google or Enter Email) -->
+        <div v-if="loginStep === 'initial'" key="step-initial" class="space-y-6">
+
+          <!-- Heading -->
+          <div class="text-left">
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-1">Sign in</h1>
+            <p class="text-sm text-gray-500">Sign in or create an account</p>
           </div>
 
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors flex items-center justify-between">
-            <input 
-              :type="showPassword ? 'text' : 'password'" 
-              v-model="password"
-              placeholder="Password" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
-              :disabled="authVm.isLoading.value"
-              required
-            />
-            <button 
-              type="button" 
-              @click="showPassword = !showPassword" 
-              class="text-sm font-medium text-gray-500 hover:text-black focus:outline-none ml-2"
-              tabindex="-1"
-            >
-              {{ showPassword ? 'Hide' : 'Show' }}
-            </button>
-          </div>
-          
-          <div class="flex items-center justify-between text-sm">
-            <label class="flex items-center gap-2 text-gray-500 hover:text-black cursor-pointer select-none transition-colors">
-              <input 
-                type="checkbox" 
-                v-model="rememberMe"
-                class="w-4 h-4 rounded border-gray-300 text-[#1b4332] focus:ring-[#1b4332] accent-[#1b4332]"
-                :disabled="authVm.isLoading.value"
+          <!-- Primary Action: Continue with Google (Full Wordmark Logo) -->
+          <button
+            type="button"
+            @click="handleGoogleLogin"
+            class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 px-4 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="authVm.isLoading.value"
+          >
+            <span class="flex items-center gap-1">
+              <span class="pb-1">Continue with</span>
+              <img
+                src="/images/google-logo.svg"
+                class="h-4.5 w-auto"
+                alt="Google"
               />
-              Remember me
-            </label>
-            <button type="button" @click="switchToForgot" class="text-gray-500 hover:text-black transition-colors focus:outline-none">
-              Forgot Password?
-            </button>
+            </span>
+          </button>
+
+          <!-- Horizontal Divider: OR -->
+          <div class="relative flex py-1 items-center">
+            <div class="flex-grow border-t border-gray-200"></div>
+            <span class="flex-shrink mx-4 text-xs font-medium text-gray-400 tracking-wide">or</span>
+            <div class="flex-grow border-t border-gray-200"></div>
           </div>
 
-          <div class="pt-2 space-y-4">
-            <button
-              type="submit"
-              class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] disabled:bg-gray-300 transition-all shadow-md cursor-pointer flex items-center justify-center"
-              :disabled="authVm.isLoading.value"
-            >
-              <span v-if="authVm.isLoading.value" class="animate-pulse">Logging in...</span>
-              <span v-else>Login</span>
-            </button>
+          <!-- Initial Email Entry Form -->
+          <form @submit.prevent="handleInitialEmailSubmit" class="space-y-4">
+            <div class="relative flex items-center">
+              <input
+                ref="emailInputRef"
+                type="email"
+                v-model="email"
+                placeholder="Email"
+                class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-12"
+                :disabled="authVm.isLoading.value"
+                required
+                autofocus
+              />
+              <button
+                type="submit"
+                class="absolute right-2 p-2 bg-[#4ade80] hover:bg-[#34d399] text-[#245842] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                title="Continue with Email"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </div>
+          </form>
 
-            <button 
-              type="button"
-              @click="handleGoogleLogin"
-              class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all cursor-pointer"
-              :disabled="authVm.isLoading.value"
-            >
-              <img src="/images/google.png" class="w-5 h-5" alt="Google Icon" />
-              Login with Google
-            </button>
+          <!-- Terms & Legal Disclaimer -->
+          <p class="text-center text-xs text-gray-400 leading-relaxed pt-1">
+            By continuing, you agree to our
+            <NuxtLink to="/terms" class="underline hover:text-gray-700 transition-colors">Terms of service</NuxtLink>.
+          </p>
+
+          <!-- Account Switch -->
+          <div class="text-center pt-2 text-xs text-gray-500">
+            Don't have an account?
+            <NuxtLink to="/register" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+              Create an account
+            </NuxtLink>
           </div>
-        </form>
 
-        <div class="text-center pt-4 text-gray-600">
-          Not registered yet? 
-          <NuxtLink to="/register" class="font-medium text-black border-b border-gray-500 pb-0.5 ml-2 hover:text-[#1b4332] transition-colors">
-            Sign up
-          </NuxtLink>
         </div>
+
+        <!-- STEP 2: CREDENTIALS FORM (NO GOOGLE BUTTON, AUTO-FOCUSED & SELECTED PASSWORD) -->
+        <div v-else-if="loginStep === 'credentials'" key="step-credentials" class="space-y-6">
+
+          <!-- Heading -->
+          <div class="text-left space-y-1">
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Sign in</h1>
+            <p class="text-sm text-gray-500">
+              Signing in as <span class="font-medium text-gray-900">{{ email }}</span>
+              <button
+                type="button"
+                @click="loginStep = 'initial'"
+                class="text-xs font-semibold text-[#245842] hover:underline ml-1 focus:outline-none"
+              >
+                (Change)
+              </button>
+            </p>
+          </div>
+
+          <!-- App Password Form -->
+          <form @submit.prevent="handleLogin" class="space-y-4">
+
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-gray-700 block">Email</label>
+              <input
+                type="email"
+                v-model="email"
+                placeholder="Email"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all text-gray-700"
+                :disabled="authVm.isLoading.value"
+                required
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-medium text-gray-700 block">Password</label>
+                <button
+                  type="button"
+                  @click="switchToForgot"
+                  class="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors focus:outline-none"
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <div class="relative flex items-center">
+                <input
+                  ref="passwordInputRef"
+                  :type="showPassword ? 'text' : 'password'"
+                  v-model="password"
+                  placeholder="Enter your password"
+                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-14"
+                  :disabled="authVm.isLoading.value"
+                  required
+                />
+                <button
+                  type="button"
+                  @click="showPassword = !showPassword"
+                  class="absolute right-4 text-xs font-semibold text-gray-500 hover:text-gray-900 focus:outline-none"
+                  tabindex="-1"
+                >
+                  {{ showPassword ? 'Hide' : 'Show' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Remember me Checkbox Option -->
+            <div class="pt-1 flex items-center justify-between">
+              <label class="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 cursor-pointer select-none transition-colors">
+                <input
+                  type="checkbox"
+                  v-model="rememberMe"
+                  class="w-4 h-4 rounded border-gray-300 text-[#245842] focus:ring-[#4ade80] accent-[#4ade80]"
+                  :disabled="authVm.isLoading.value"
+                />
+                Remember me
+              </label>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="pt-2 space-y-3">
+              <button
+                type="submit"
+                class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="authVm.isLoading.value"
+              >
+                <span v-if="authVm.isLoading.value" class="animate-pulse">Logging in...</span>
+                <span v-else class="flex items-center gap-2">
+                  Sign In
+                </span>
+              </button>
+
+              <button
+                type="button"
+                @click="loginStep = 'initial'"
+                class="w-full border border-gray-200 text-gray-700 py-3 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+                :disabled="authVm.isLoading.value"
+              >
+                Back
+              </button>
+            </div>
+          </form>
+
+          <!-- Account Switch -->
+          <div class="text-center pt-2 text-xs text-gray-500">
+            Don't have an account?
+            <NuxtLink to="/register" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+              Create an account
+            </NuxtLink>
+          </div>
+
+        </div>
+
+      </Transition>
+    </div>
+
+    <!-- FORGOT PASSWORD: REQUEST -->
+    <div v-else-if="viewMode === 'forgot_request'" class="space-y-6">
+      <div class="text-left">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-1">Reset password</h1>
+        <p class="text-sm text-gray-500">Enter your email address to receive a reset code</p>
       </div>
 
-      <!-- Forgot Password - Request View -->
-      <div v-else-if="viewMode === 'forgot_request'" class="space-y-8">
-        <div>
-          <h1 class="text-4xl font-medium tracking-tight mb-2">Reset Password</h1>
-          <p class="text-gray-600">Enter your email to receive an OTP</p>
+      <form @submit.prevent="handleForgotPasswordRequest" class="space-y-4">
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-gray-700 block">Email</label>
+          <input
+            type="email"
+            v-model="forgotEmail"
+            placeholder="Enter your email"
+            class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
+            :disabled="authVm.isLoading.value"
+            required
+          />
         </div>
 
-        <form @submit.prevent="handleForgotPasswordRequest" class="space-y-6">
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
-            <input 
-              type="email" 
-              v-model="forgotEmail"
-              placeholder="Email" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
-              :disabled="authVm.isLoading.value"
-              required
-            />
-          </div>
+        <div class="pt-2 space-y-3">
+          <button
+            type="submit"
+            class="w-full bg-[#4ade80] hover:bg-[#34d399] text-[#245842] py-3 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+            :disabled="authVm.isLoading.value"
+          >
+            <span v-if="authVm.isLoading.value" class="animate-pulse">Sending code...</span>
+            <span v-else>Send Reset Code</span>
+          </button>
 
-          <div class="pt-4 space-y-4">
-            <button
-              type="submit"
-              class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] disabled:bg-gray-300 transition-all shadow-md cursor-pointer flex items-center justify-center"
-              :disabled="authVm.isLoading.value"
-            >
-              <span v-if="authVm.isLoading.value" class="animate-pulse">Sending...</span>
-              <span v-else>Send Reset Code</span>
-            </button>
+          <button
+            type="button"
+            @click="switchToLogin"
+            class="w-full border border-gray-200 text-gray-700 py-3 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+            :disabled="authVm.isLoading.value"
+          >
+            Back to Sign in
+          </button>
+        </div>
+      </form>
+    </div>
 
-            <button 
-              type="button"
-              @click="switchToLogin"
-              class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all cursor-pointer"
-              :disabled="authVm.isLoading.value"
-            >
-              Back to Login
-            </button>
-          </div>
-        </form>
+    <!-- FORGOT PASSWORD: VERIFY OTP -->
+    <div v-else-if="viewMode === 'forgot_verify'" class="space-y-6">
+      <div class="text-left">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-1">Verify code</h1>
+        <p class="text-sm text-gray-500">Enter the verification code sent to your email</p>
       </div>
 
-      <!-- Forgot Password - Verify OTP View -->
-      <div v-else-if="viewMode === 'forgot_verify'" class="space-y-8">
-        <div>
-          <h1 class="text-4xl font-medium tracking-tight mb-2">Verify OTP</h1>
-          <p class="text-gray-600">Enter the OTP sent to your email</p>
+      <form @submit.prevent="handleForgotPasswordVerify" class="space-y-4">
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-gray-700 block text-center">Verification Code</label>
+          <input
+            type="text"
+            v-model="forgotOtp"
+            placeholder="000000"
+            maxlength="6"
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-center text-xl font-mono tracking-[0.5em] indent-[0.25em] outline-none focus:bg-white focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all"
+            :disabled="authVm.isLoading.value"
+            required
+          />
         </div>
 
-        <form @submit.prevent="handleForgotPasswordVerify" class="space-y-6">
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors">
-            <input 
-              type="text" 
-              v-model="forgotOtp"
-              placeholder="Enter OTP" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400 tracking-widest"
-              :disabled="authVm.isLoading.value"
-              required
-            />
-          </div>
+        <div class="pt-2 space-y-3">
+          <button
+            type="submit"
+            class="w-full bg-[#4ade80] hover:bg-[#34d399] text-[#245842] py-3 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+            :disabled="authVm.isLoading.value"
+          >
+            <span v-if="authVm.isLoading.value" class="animate-pulse">Verifying...</span>
+            <span v-else>Verify Code</span>
+          </button>
 
-          <div class="pt-4 space-y-4">
-            <button
-              type="submit"
-              class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] disabled:bg-gray-300 transition-all shadow-md cursor-pointer flex items-center justify-center"
-              :disabled="authVm.isLoading.value"
-            >
-              <span v-if="authVm.isLoading.value" class="animate-pulse">Verifying...</span>
-              <span v-else>Verify Code</span>
-            </button>
+          <button
+            type="button"
+            @click="switchToLogin"
+            class="w-full border border-gray-200 text-gray-700 py-3 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+            :disabled="authVm.isLoading.value"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
 
-            <button 
-              type="button"
-              @click="switchToLogin"
-              class="w-full border border-gray-300 py-4 rounded-md font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition-all cursor-pointer"
-              :disabled="authVm.isLoading.value"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+    <!-- FORGOT PASSWORD: RESET -->
+    <div v-else-if="viewMode === 'forgot_reset'" class="space-y-6">
+      <div class="text-left">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-1">Set new password</h1>
+        <p class="text-sm text-gray-500">Create a new password for your account</p>
       </div>
 
-      <!-- Forgot Password - Reset Password View -->
-      <div v-else-if="viewMode === 'forgot_reset'" class="space-y-8">
-        <div>
-          <h1 class="text-4xl font-medium tracking-tight mb-2">New Password</h1>
-          <p class="text-gray-600">Create a new password for your account</p>
-        </div>
-
-        <form @submit.prevent="handleForgotPasswordReset" class="space-y-6">
-          <div class="border-b border-gray-300 py-2 focus-within:border-black transition-colors flex items-center justify-between">
-            <input 
-              :type="showNewPassword ? 'text' : 'password'" 
+      <form @submit.prevent="handleForgotPasswordReset" class="space-y-4">
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-gray-700 block">New Password</label>
+          <div class="relative flex items-center">
+            <input
+              :type="showNewPassword ? 'text' : 'password'"
               v-model="newPassword"
-              placeholder="New Password" 
-              class="w-full outline-none bg-transparent text-lg placeholder:text-gray-400"
+              placeholder="Enter new password"
+              class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-14"
               :disabled="authVm.isLoading.value"
               required
             />
-            <button 
-              type="button" 
-              @click="showNewPassword = !showNewPassword" 
-              class="text-sm font-medium text-gray-500 hover:text-black focus:outline-none ml-2"
+            <button
+              type="button"
+              @click="showNewPassword = !showNewPassword"
+              class="absolute right-4 text-xs font-semibold text-gray-500 hover:text-gray-900 focus:outline-none"
               tabindex="-1"
             >
               {{ showNewPassword ? 'Hide' : 'Show' }}
             </button>
           </div>
+        </div>
 
-          <div class="pt-4 space-y-4">
-            <button
-              type="submit"
-              class="w-full bg-[#1b4332] text-white py-4 rounded-md font-medium hover:bg-[#143326] disabled:bg-gray-300 transition-all shadow-md cursor-pointer flex items-center justify-center"
-              :disabled="authVm.isLoading.value"
-            >
-              <span v-if="authVm.isLoading.value" class="animate-pulse">Saving...</span>
-              <span v-else>Reset Password</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
+        <div class="pt-2">
+          <button
+            type="submit"
+            class="w-full bg-[#4ade80] hover:bg-[#34d399] text-[#245842] py-3 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+            :disabled="authVm.isLoading.value"
+          >
+            <span v-if="authVm.isLoading.value" class="animate-pulse">Saving new password...</span>
+            <span v-else>Reset Password</span>
+          </button>
+        </div>
+      </form>
     </div>
+
   </div>
 </template>
 
-
 <style scoped>
-/* Shake animation for errors */
 .animate-shake { animation: shake 0.3s ease-in-out; }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }
   75% { transform: translateX(4px); }
+}
+
+/* Step transition animation */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(12px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
 }
 </style>

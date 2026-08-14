@@ -143,7 +143,7 @@ watch(() => route.path, () => {
 
 <template>
   <header class="w-full bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 font-brand transition-all">
-    <div class="max-w-7xl mx-auto ` py-3.5 flex items-center justify-between gap-4">
+    <div class="max-w-7xl mx-auto px-8 sm:px-10 py-3.5 flex items-center justify-between gap-4">
 
       <!-- BRAND LOGO -->
       <div class="flex items-center">
