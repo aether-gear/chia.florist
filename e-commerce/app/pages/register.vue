@@ -138,7 +138,7 @@ const handleBackToRegister = () => {
     <!-- Error Alert -->
     <div
       v-if="errorMessage"
-      class="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 animate-shake shadow-xs"
+      class="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl flex items-center gap-2 animate-shake shadow-xs"
     >
       <span>⚠️</span>
       <p class="flex-1 leading-normal">{{ errorMessage }}</p>
@@ -161,7 +161,7 @@ const handleBackToRegister = () => {
           <button
             type="button"
             @click="handleGoogleLogin"
-            class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 px-4 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 px-4 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="authVm.isLoading.value"
           >
             <span class="flex items-center gap-1">
@@ -189,14 +189,14 @@ const handleBackToRegister = () => {
                 type="email"
                 v-model="email"
                 placeholder="Email"
-                class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-12"
+                class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-12"
                 :disabled="authVm.isLoading.value"
                 required
                 autofocus
               />
               <button
                 type="submit"
-                class="absolute right-2 p-2 bg-[#4ade80] hover:bg-[#34d399] text-[#245842] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                class="absolute right-2 p-2 bg-[#4ade80] hover:bg-[#34d399] text-[#245842] font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
                 title="Continue with Email"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +251,7 @@ const handleBackToRegister = () => {
                   type="text"
                   v-model="name"
                   placeholder="Name"
-                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
+                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
                   :disabled="authVm.isLoading.value"
                   required
                 />
@@ -263,7 +263,7 @@ const handleBackToRegister = () => {
                   type="text"
                   v-model="username"
                   placeholder="Username"
-                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
+                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
                   :disabled="authVm.isLoading.value"
                   required
                 />
@@ -276,7 +276,7 @@ const handleBackToRegister = () => {
                 type="email"
                 v-model="email"
                 placeholder="Email"
-                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all text-gray-700"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all text-gray-700"
                 :disabled="authVm.isLoading.value"
                 required
               />
@@ -289,7 +289,7 @@ const handleBackToRegister = () => {
                   :type="showPassword ? 'text' : 'password'"
                   v-model="password"
                   placeholder="Create a password"
-                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-14"
+                  class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400 pr-14"
                   :disabled="authVm.isLoading.value"
                   required
                 />
@@ -310,7 +310,7 @@ const handleBackToRegister = () => {
                 type="tel"
                 v-model="phone"
                 placeholder="Phone number"
-                class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
+                class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all placeholder:text-gray-400"
                 :disabled="authVm.isLoading.value"
               />
             </div>
@@ -319,7 +319,7 @@ const handleBackToRegister = () => {
             <div class="pt-2 space-y-3">
               <button
                 type="submit"
-                class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 rounded-lg text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full bg-[#4ade80] hover:bg-[#34d399] active:scale-[0.99] text-[#245842] py-3 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="authVm.isLoading.value"
               >
                 <span v-if="authVm.isLoading.value" class="animate-pulse">Creating Account...</span>
@@ -331,7 +331,7 @@ const handleBackToRegister = () => {
               <button
                 type="button"
                 @click="registerStep = 'initial'"
-                class="w-full border border-gray-200 text-gray-700 py-3 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+                class="w-full border border-gray-200 text-gray-700 py-3 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
                 :disabled="authVm.isLoading.value"
               >
                 Back
@@ -369,7 +369,7 @@ const handleBackToRegister = () => {
             v-model="otpCode"
             placeholder="000000"
             maxlength="6"
-            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-center text-xl font-mono tracking-[0.5em] indent-[0.25em] outline-none focus:bg-white focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all"
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-center text-xl font-mono tracking-[0.5em] indent-[0.25em] outline-none focus:bg-white focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all"
             :disabled="authVm.isLoading.value"
             required
           />
@@ -379,7 +379,7 @@ const handleBackToRegister = () => {
           <button
             type="button"
             @click="handleBackToRegister"
-            class="w-full border border-gray-200 text-gray-700 py-3 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+            class="w-full border border-gray-200 text-gray-700 py-3 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer"
             :disabled="authVm.isLoading.value"
           >
             Back
@@ -387,7 +387,7 @@ const handleBackToRegister = () => {
 
           <button
             type="submit"
-            class="w-full bg-[#4ade80] hover:bg-[#34d399] text-[#245842] font-bold py-3 rounded-lg text-sm shadow-sm transition-all cursor-pointer flex items-center justify-center"
+            class="w-full bg-[#4ade80] hover:bg-[#34d399] text-[#245842] font-bold py-3 rounded-xl text-sm shadow-sm transition-all cursor-pointer flex items-center justify-center"
             :disabled="authVm.isLoading.value"
           >
             <span v-if="authVm.isLoading.value" class="animate-pulse">Confirming...</span>
