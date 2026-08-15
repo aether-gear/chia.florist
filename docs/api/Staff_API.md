@@ -44,8 +44,12 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
       - [x] Delete Product
   - [x] Staff Management
     - [x] Create Staff
-    - [x] Add Staff Account
     - [x] Find Staff
+    - [x] Update Staff
+    - [x] Delete Staff
+    - [x] List Staff Accounts
+    - [x] Add Staff Account
+    - [x] Remove Staff Account
   - [x] Customer Management
     - [x] Find Customers
   - [x] Payment
@@ -1153,44 +1157,6 @@ Empty body.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 
-### Add Staff Account
-
-- **Method**: `POST`
-- **Endpoint**: `/staff/{staffID}/accounts`
-- **Description**: Register and assign a new account to a staff. The actor must be an admin of the target staff.
-- **Authentication**: Staff Admin
-- **Request Body**:
-
-  ```json
-  {
-    "email":    "string (required)",
-    "name":     "string (required)",
-    "username": "string (required)",
-    "password": "string (required)",
-    "phone":    "string (optional)"
-  }
-  ```
-
-#### Path Parameters
-
-| Parameter    | Type          | Description                    |
-|--------------|---------------|--------------------------------|
-| `staffID` | UUID (string) | The ID of the target staff. |
-
-#### Response `201 Created`
-
-```json
-{ "message": "verify success" }
-```
-
-#### Error Responses
-
-| Status             | Condition |
-|--------------------|-----------|
-| `400 Bad Request`  | `staffID` is not a valid UUID, or `email`, `name`, or `username` is empty. |
-| `401 Unauthorized` | Missing or invalid session. |
-| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
-
 ### Find Staff
 
 - **Method**: `GET`
@@ -1253,6 +1219,199 @@ Empty body.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 | `404 Not Found`    | No staff match the given filters. |
+
+### Update Staff
+
+- **Method**: `PUT`
+- **Endpoint**: `/staff/{staffID}`
+- **Description**: Updates the metadata (name, description, logo, banner) of a staff entity and its associated root user record.
+- **Authentication**: Staff Admin
+- **Request Body**:
+
+  ```json
+  {
+    "name":        "string (required)",
+    "description": "string (optional)",
+    "logo_url":    "string (optional)",
+    "banner_url":  "string (optional)"
+  }
+  ```
+
+#### Path Parameters
+
+| Parameter | Type          | Required | Description                 |
+|-----------|---------------|----------|-----------------------------|
+| `staffID` | UUID (string) | Yes      | The ID of the target staff. |
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "staff successfully updated"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `staffID` is not a valid UUID, or `name` is empty. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No staff entity found with the given `staffID`. |
+
+### Delete Staff
+
+- **Method**: `DELETE`
+- **Endpoint**: `/staff/{staffID}`
+- **Description**: Soft-deletes a staff entity (`deleted_at = NOW()`) and cascade removes all associated staff memberships.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Required | Description                 |
+|-----------|---------------|----------|-----------------------------|
+| `staffID` | UUID (string) | Yes      | The ID of the target staff. |
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "staff successfully deleted"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `staffID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No staff entity found with the given `staffID`. |
+
+### List Staff Accounts
+
+- **Method**: `GET`
+- **Endpoint**: `/staff/{staffID}/accounts`
+- **Description**: Retrieve all user accounts bound to the specified staff entity through staff memberships.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter | Type          | Required | Description                 |
+|-----------|---------------|----------|-----------------------------|
+| `staffID` | UUID (string) | Yes      | The ID of the target staff. |
+
+#### Response `200 OK`
+
+```json
+{
+  "staff_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
+  "total": 2,
+  "accounts": [
+    {
+      "account_id": "a1b2c3d4-087b-48e7-b00a-d79dd092e8d4",
+      "user_id": "56d88b08-ad99-4c91-9571-15b5bae95591",
+      "email": "jane@chia.florist",
+      "name": "Jane Doe",
+      "username": "janedoe",
+      "phone": "+628123456789",
+      "avatar_url": "https://example.com/avatar.png",
+      "role": {
+        "id": "e0b8529e-2495-46aa-b2b7-a36c92fcbe09",
+        "code": "staff_admin",
+        "name": "Staff Admin"
+      },
+      "last_login_at": "2026-08-15T15:10:00Z",
+      "created_at": "2026-06-26T19:47:28Z"
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `staffID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No staff entity found with the given `staffID`. |
+
+### Add Staff Account
+
+- **Method**: `POST`
+- **Endpoint**: `/staff/{staffID}/accounts`
+- **Description**: Register and assign a new account to a staff. The actor must be an admin of the target staff.
+- **Authentication**: Staff Admin
+- **Request Body**:
+
+  ```json
+  {
+    "email":    "string (required)",
+    "name":     "string (required)",
+    "username": "string (required)",
+    "password": "string (required)",
+    "phone":    "string (optional)"
+  }
+  ```
+
+#### Path Parameters
+
+| Parameter | Type          | Required | Description                 |
+|-----------|---------------|----------|-----------------------------|
+| `staffID` | UUID (string) | Yes      | The ID of the target staff. |
+
+#### Response `201 Created`
+
+```json
+{ "message": "verify success" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `staffID` is not a valid UUID, or `email`, `name`, or `username` is empty. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `409 Conflict`     | An account with this email already exists. |
+
+### Remove Staff Account
+
+- **Method**: `DELETE`
+- **Endpoint**: `/staff/{staffID}/accounts/{accountID}`
+- **Description**: Unbind and remove a specific user account from a staff unit. Prevents self-removal and primary staff owner removal.
+- **Authentication**: Staff Admin
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter   | Type          | Required | Description                    |
+|-------------|---------------|----------|--------------------------------|
+| `staffID`   | UUID (string) | Yes      | The ID of the target staff.    |
+| `accountID` | UUID (string) | Yes      | The ID of the account to unbind. |
+
+#### Response `200 OK`
+
+```json
+{
+  "message": "staff account successfully removed"
+}
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `staffID` or `accountID` is not a valid UUID, or actor is attempting self-removal. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `403 Forbidden`    | Authenticated user does not have the staff admin role, or attempting to remove primary staff owner. |
+| `404 Not Found`    | No staff entity or account membership found. |
+
 
 ## Customer Management
 
