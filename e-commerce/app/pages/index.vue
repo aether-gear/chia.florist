@@ -342,7 +342,13 @@ onUnmounted(() => {
               </span>
 
               <span 
-                v-if="!item.isAvailable" 
+                v-if="item.status === 'inactive'" 
+                class="absolute top-2.5 right-2.5 bg-amber-100 text-amber-900 text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-lg border border-amber-200 shadow-2xs z-10"
+              >
+                Preview Only
+              </span>
+              <span 
+                v-else-if="!item.isAvailable" 
                 class="absolute top-2.5 right-2.5 bg-red-100 text-red-800 text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-lg border border-red-200 shadow-2xs z-10"
               >
                 Sold Out
@@ -376,7 +382,7 @@ onUnmounted(() => {
           <!-- Action Button -->
           <div class="p-3.5 sm:p-4 pt-0">
             <CButton
-              v-if="item.isAvailable"
+              v-if="item.isAvailable && item.status !== 'inactive'"
               :to="item.id === 'custom' || item.isCustomRoute ? '/products/custom' : `/products/${item.slug || item.id}`"
               :variant="item.id === 'custom' || item.isCustomRoute ? 'primary' : 'secondary'"
               size="sm"
@@ -384,6 +390,17 @@ onUnmounted(() => {
               @click.stop
             >
               {{ item.id === 'custom' || item.isCustomRoute ? 'Desain Sekarang' : 'Lihat Detail' }}
+            </CButton>
+
+            <CButton
+              v-else-if="item.status === 'inactive'"
+              :to="`/products/${item.slug || item.id}`"
+              variant="outline"
+              size="sm"
+              class="w-full text-amber-800 border-amber-300 hover:bg-amber-50"
+              @click.stop
+            >
+              Lihat Preview
             </CButton>
 
             <CButton

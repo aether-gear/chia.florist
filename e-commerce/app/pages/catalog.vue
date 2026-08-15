@@ -288,7 +288,10 @@ const navigateToProduct = (item: any) => {
               <span class="absolute top-4 left-4 bg-white/90 backdrop-blur-md text-[#1b4332] text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
                 {{ item.tag || (item.name ? item.name.split(' ')[0] : 'Florist') }}
               </span>
-              <span v-if="!item.isAvailable || item.stock === 0" class="absolute top-4 right-4 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-red-200 shadow-sm z-20">
+              <span v-if="item.status === 'inactive'" class="absolute top-4 right-4 bg-amber-100 text-amber-900 text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-amber-200 shadow-sm z-20">
+                Not Available for Sale
+              </span>
+              <span v-else-if="!item.isAvailable || item.stock === 0" class="absolute top-4 right-4 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-red-200 shadow-sm z-20">
                 Sold Out
               </span>
               <span v-else-if="item.stock !== undefined" class="absolute top-4 right-4 bg-emerald-100/90 text-emerald-900 text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-xl border border-emerald-200 shadow-sm z-20 flex items-center gap-1">

@@ -220,6 +220,15 @@ useHead({
       </button>
     </div>
 
+    <div v-else-if="product && product.status === 'archived'" class="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center animate-fade-in">
+      <span class="text-4xl">📦</span>
+      <h3 class="text-lg font-bold text-gray-800">Product No Longer Available</h3>
+      <p class="text-gray-500 text-sm max-w-md">This item has been archived and is no longer listed in our store catalog.</p>
+      <NuxtLink to="/catalog" class="bg-[#1b4332] text-white px-5 py-2.5 rounded-xl hover:bg-[#143326] transition font-semibold text-xs inline-block">
+        Back to Catalog
+      </NuxtLink>
+    </div>
+
     <div v-else-if="product" class="animate-fade-in">
       <nav class="text-sm text-gray-500 mb-12 flex gap-2">
         <NuxtLink to="/" class="hover:text-black transition">Home</NuxtLink>
@@ -253,7 +262,10 @@ useHead({
             <div class="flex items-center gap-3 mt-2 flex-wrap">
               <span class="text-sm text-gray-400">⭐ 4.8 ({{ product.reviews || 150 }} Reviews)</span>
               <span class="text-gray-200">|</span>
-              <span v-if="selectedShopSlug && selectedBranchStock > 0" class="text-emerald-700 font-extrabold text-xs bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+              <span v-if="product.status === 'inactive'" class="text-amber-800 font-extrabold text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                Preview Only — Not For Sale
+              </span>
+              <span v-else-if="selectedShopSlug && selectedBranchStock > 0" class="text-emerald-700 font-extrabold text-xs bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
                 <span>📦</span> In Stock ({{ selectedBranchStock }} available)
               </span>
               <span v-else-if="selectedShopSlug && selectedBranchStock <= 0" class="text-red-700 font-extrabold text-xs bg-red-50 px-3 py-1 rounded-full border border-red-200">
@@ -269,6 +281,12 @@ useHead({
             {{ formatRupiah(displayPrice) }}
           </div>
           <p class="text-gray-600 text-sm leading-relaxed border-b border-gray-100 pb-6">{{ product.description }}</p>
+
+          <!-- Inactive Product Notice Banner -->
+          <div v-if="product.status === 'inactive'" class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-800 flex items-center gap-2">
+            <span class="text-base">ℹ️</span>
+            <span>This product is currently available for preview only and cannot be ordered online at this time.</span>
+          </div>
 
           <div class="space-y-3">
             <label class="text-sm font-semibold text-gray-800">Colours:</label>
@@ -298,7 +316,7 @@ useHead({
           </div>
 
           <!-- Store / Branch Availability Selection (In-Stock Branches Only) -->
-          <div v-if="inStockBranches.length > 0" class="space-y-3 pt-2">
+          <div v-if="inStockBranches.length > 0 && product.status !== 'inactive'" class="space-y-3 pt-2">
             <label class="text-sm font-semibold text-gray-800 flex items-center justify-between">
               <span>Fulfilling Branch:</span>
               <span class="text-xs font-normal text-gray-500">Available in-stock stores</span>
@@ -338,34 +356,34 @@ useHead({
           </div>
 
           <!-- Out of Stock Message if no branches have inventory -->
-          <div v-else-if="product && (product.available === false || inStockBranches.length === 0)" class="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-700 flex items-center gap-2">
+          <div v-else-if="product && product.status !== 'inactive' && (product.available === false || inStockBranches.length === 0)" class="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-700 flex items-center gap-2">
             <span class="text-base">🚫</span>
             <span>This product is currently out of stock across all store branches.</span>
           </div>
 
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-100">
             <div class="flex border border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 justify-between items-center w-full sm:w-auto">
-              <button @click="quantity > 1 ? quantity-- : null" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">-</button>
+              <button @click="quantity > 1 ? quantity-- : null" :disabled="product.status === 'inactive'" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50">-</button>
               <span class="px-4 py-2.5 font-semibold text-gray-800 text-sm select-none">{{ quantity }}</span>
-              <button @click="quantity++" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">+</button>
+              <button @click="quantity++" :disabled="product.status === 'inactive'" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50">+</button>
             </div>
 
             <div class="flex-1 flex gap-3 w-full">
               <button 
-                :disabled="!product.available || (!!selectedShopSlug && selectedBranchStock <= 0)"
+                :disabled="!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)"
                 @click="handleAddToCart()" 
-                :class="[(!product.available || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 bg-gray-50' : 'border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 cursor-pointer']"
+                :class="[(!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 bg-gray-50' : 'border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 cursor-pointer']"
                 class="flex-1 font-bold py-3 rounded-xl transition text-sm"
               >
-                {{ (selectedShopSlug && selectedBranchStock <= 0) ? 'Out of Stock' : 'Add to Cart' }}
+                {{ product.status === 'inactive' ? 'Not For Sale' : (selectedShopSlug && selectedBranchStock <= 0) ? 'Out of Stock' : 'Add to Cart' }}
               </button>
               <button 
-                :disabled="!product.available || (!!selectedShopSlug && selectedBranchStock <= 0)"
+                :disabled="!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)"
                 @click="handleBuyNow()" 
-                :class="[(!product.available || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'bg-[#1b4332] hover:bg-[#143326] text-white cursor-pointer']"
+                :class="[(!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'bg-[#1b4332] hover:bg-[#143326] text-white cursor-pointer']"
                 class="flex-1 font-bold py-3 rounded-xl transition shadow-sm text-sm"
               >
-                Buy Now
+                {{ product.status === 'inactive' ? 'Preview Only' : 'Buy Now' }}
               </button>
             </div>
           </div>

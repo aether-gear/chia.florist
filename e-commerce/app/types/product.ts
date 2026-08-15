@@ -124,6 +124,7 @@ export interface Product {
   sizes: string[]
   sku?: string
   slug?: string
+  status?: string
   weight?: number
   stock?: number
   shopId?: string
