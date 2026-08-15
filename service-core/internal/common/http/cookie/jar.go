@@ -3,8 +3,17 @@ package appcookie
 import (
 	"errors"
 	"net/http"
+	"os"
 	"time"
 )
+
+func isSecureCookie() bool {
+	env := os.Getenv("APP_ENV")
+	if env == "production" || env == "staging" || os.Getenv("COOKIE_SECURE") == "true" {
+		return true
+	}
+	return false
+}
 
 var (
 	// ErrNoCookie is returned when
@@ -43,7 +52,7 @@ const (
 // Bind sets an HTTP cookie on the response writer
 // with the given name, value, and expiration time
 //
-// The cookie is configured as HttpOnly, Secure,
+// The cookie is configured as HttpOnly, Secure (in production),
 // and uses SameSiteLaxMode by default
 func Bind(
 	w http.ResponseWriter,
@@ -56,7 +65,7 @@ func Bind(
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureCookie(),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  exp,
 	})
@@ -100,7 +109,7 @@ func Clear(
 		Name:     string(name),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureCookie(),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),

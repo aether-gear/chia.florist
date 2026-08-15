@@ -93,6 +93,7 @@ func NewRouteChains(c *Container) *RouteChains {
 			),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
 			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaff),
 		),
 		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -101,8 +102,8 @@ func NewRouteChains(c *Container) *RouteChains {
 				appcookie.CookieStaff,
 			),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
-			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaffAdmin),
 			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaffAdmin),
 		),
 		CustomerOnly: buildChain(
 			c.Authenticator.RequireAuth(
