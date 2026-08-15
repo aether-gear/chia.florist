@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCart } from '~/composables/useCart'
-import { useToast } from '~/composables/useToast'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { formatRupiah } from '~/utils/formatter'
 import { orderService } from '~/services/orderService'
 
@@ -26,7 +26,7 @@ interface PaymentInfo {
 const paymentInfoState = useState<PaymentInfo | null>('last-payment-info', () => null)
 const isLoading = ref(false)
 const errorMsg = ref<string | null>(null)
-const toast = useToast()
+const globalAlert = useGlobalAlert()
 
 const route = useRoute()
 
@@ -68,9 +68,16 @@ const startPolling = () => {
         paymentInfoState.value.status = res.status
         stopPolling()
         if (res.status === 'paid') {
-          toast.success('Payment Verified!', 'Your payment has been received and confirmed.')
+          globalAlert.showSuccess(
+            'Payment Verified!',
+            'Your payment has been received and confirmed.',
+            [
+              { label: 'View Order', onClick: () => navigateTo('/profile') },
+              { label: 'Got it' }
+            ]
+          )
         } else if (res.status === 'expired' || res.status === 'cancelled') {
-          toast.error('Order ' + res.status, 'The payment status for this order is now ' + res.status + '.')
+          globalAlert.showWarning('Order ' + res.status, 'The payment status for this order is now ' + res.status + '.')
         }
       }
     } catch (e) {
@@ -96,7 +103,14 @@ const handleTimerZero = async () => {
   } else if (paymentInfoState.value) {
     paymentInfoState.value.status = 'expired'
   }
-  toast.error('Payment Window Expired', 'The time allocated for completing your payment has lapsed.')
+  globalAlert.showWarning(
+    'Payment Window Expired',
+    'The time allocated for completing your payment has lapsed.',
+    [
+      { label: 'Browse Catalog', onClick: () => navigateTo('/catalog') },
+      { label: 'My Orders', onClick: () => navigateTo('/profile') }
+    ]
+  )
 }
 
 onMounted(async () => {
@@ -257,20 +271,27 @@ const handleCheckPayment = async () => {
           }
         }
       }
-      toast.success('Payment Verified!', 'Thank you! Your payment has been received and confirmed.')
+      globalAlert.showSuccess(
+        'Payment Verified!',
+        'Thank you! Your payment has been received and confirmed.',
+        [
+          { label: 'View Order', onClick: () => navigateTo('/profile') },
+          { label: 'Got it' }
+        ]
+      )
     } else if (res.status === 'expired' || res.status === 'cancelled') {
       if (paymentInfoState.value) {
         paymentInfoState.value.status = res.status
       }
       stopPolling()
-      toast.error('Order ' + res.status, `Your payment status is currently ${res.status}.`)
+      globalAlert.showWarning('Order ' + res.status, `Your payment status is currently ${res.status}.`)
     } else {
-      toast.info('Payment Pending', 'Payment status is still pending. If you just transferred, please allow a moment for confirmation.')
+      globalAlert.showInfo('Payment Pending', 'Payment status is still pending. If you just transferred, please allow a moment for confirmation.')
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
     checkError.value = err.data?.message || err.message || 'Verification failed. Please try again.'
-    toast.error('Verification Error', checkError.value || 'Failed to check status')
+    globalAlert.showError('Verification Error', checkError.value || 'Failed to check status')
   } finally {
     isChecking.value = false
   }

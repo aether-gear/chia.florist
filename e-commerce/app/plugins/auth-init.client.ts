@@ -1,10 +1,12 @@
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useCart } from '~/composables/useCart'
-import { triggerSessionExpired, triggerAuthAlert } from '~/composables/useSessionState'
+import { triggerSessionExpired } from '~/composables/useSessionState'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const authVm = useAuthViewModel()
   const cartVm = useCart()
+  const { showError, showSuccess } = useGlobalAlert()
 
   if (import.meta.client) {
     const isLoggedIn = useCookie('is_logged_in')
@@ -20,15 +22,37 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         await authVm.fetchCurrentUser()
 
         if (authVm.isAuthenticated.value) {
-          triggerAuthAlert('success', `Signed in successfully. Welcome, ${authVm.currentUser.value?.name || 'Customer'}!`)
+          showSuccess(
+            'Signed In Successfully',
+            `Welcome, ${authVm.currentUser.value?.name || 'Customer'}!`,
+            [
+              { label: 'My Profile', onClick: () => navigateTo('/profile') },
+              { label: 'Dismiss' }
+            ]
+          )
           await cartVm.loadCart(true)
         } else {
           authVm.clearLocalSession()
-          triggerAuthAlert('error', 'Google sign-in failed. Please try again.')
+          showError(
+            'Google sign-in failed',
+            "We couldn't sign you in with Google. Please try again.",
+            [
+              { label: 'Try Again', onClick: () => navigateTo('/login') },
+              { label: 'Dismiss' }
+            ]
+          )
         }
       } catch (err) {
         console.error('Google OAuth session hydration failed:', err)
         authVm.clearLocalSession()
+        showError(
+          'Google sign-in failed',
+          "We couldn't sign you in with Google. Please try again.",
+          [
+            { label: 'Try Again', onClick: () => navigateTo('/login') },
+            { label: 'Dismiss' }
+          ]
+        )
       }
 
     } else if (isLoggedIn.value === 'true' || rememberMe.value === 'true' || !isLoggedIn.value) {

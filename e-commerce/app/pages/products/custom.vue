@@ -11,6 +11,7 @@ import {
   TOOL_TABS
 } from '~/features/custom-product'
 import { useCart } from '~/composables/useCart'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import '~/features/custom-product/custom-product.css'
 
 definePageMeta({ layout: false })
@@ -22,6 +23,7 @@ useHead({
 const design = useCustomDesign()
 const { isAdding, addCustomDesignToCart } = useCustomCart()
 const { formatRupiah } = useCart()
+const globalAlert = useGlobalAlert()
 
 const handleFinalize = () => {
   design.showFinalizeChoice = true
@@ -42,7 +44,14 @@ const handleAddToCart = async () => {
     design.upper.headerText
   )
   design.showReview = false
-  design.showThankYou = true
+  globalAlert.showSuccess(
+    'Custom Board Added',
+    'Your personalized flower board has been added to cart!',
+    [
+      { label: 'View Cart', onClick: () => navigateTo('/cart') },
+      { label: 'Dismiss' }
+    ]
+  )
 }
 
 const handleNewDesign = () => {

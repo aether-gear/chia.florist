@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 definePageMeta({
   layout: 'auth'
@@ -14,6 +15,7 @@ useHead({
 })
 
 const authVm = useAuthViewModel()
+const globalAlert = useGlobalAlert()
 
 // 2-Step Login Flow: 'initial' (Choose Google or Enter Email) -> 'credentials' (Password Form without Google)
 const loginStep = ref<'initial' | 'credentials'>('initial')
@@ -27,6 +29,12 @@ const rememberMe = ref(false)
 
 const errorMessage = ref('')
 const successMessage = ref('')
+
+watch(successMessage, (msg) => {
+  if (msg) {
+    globalAlert.showSuccess('Success', msg)
+  }
+})
 const viewMode = ref<'login' | 'forgot_request' | 'forgot_verify' | 'forgot_reset'>('login')
 
 const forgotEmail = ref('')
@@ -39,6 +47,18 @@ onMounted(() => {
   nextTick(() => {
     emailInputRef.value?.focus()
   })
+
+  const route = useRoute()
+  if (route.query.error || route.query.error_description || route.query.google_error) {
+    globalAlert.showError(
+      'Google sign-in failed',
+      "We couldn't sign you in with Google. Please try again.",
+      [
+        { label: 'Try Again', onClick: () => emailInputRef.value?.focus() },
+        { label: 'Dismiss' }
+      ]
+    )
+  }
 })
 
 const focusPasswordInput = () => {

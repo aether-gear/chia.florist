@@ -2,14 +2,15 @@
 import { ref, computed } from 'vue'
 import { authService } from '~/services/authService'
 import { supabaseService } from '~/services/supabaseService'
-import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest } from '~/types/auth'
-import { triggerAuthAlert } from '~/composables/useSessionState'
+import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest, UpdateProfileRequest } from '~/types/auth'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export const useAuthViewModel = () => {
   const currentUser = useState<UserMe | null>('auth_currentUser', () => null)
   const challengeId = useState<string | null>('auth_challengeId', () => null)
   const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
   const isInitialized = useState<boolean>('auth_isInitialized', () => false)
+  const globalAlert = useGlobalAlert()
 
   const getCookieOptions = () => {
     const rememberMeCookie = useCookie('remember_me')
@@ -35,7 +36,7 @@ export const useAuthViewModel = () => {
       if (response && response.is_authenticated && response.account_type === 'customer') {
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-        
+
         isLoggedIn.value = 'true'
 
         let profileDetails: any = null
@@ -47,7 +48,7 @@ export const useAuthViewModel = () => {
         } catch (profileErr) {
           console.warn('Failed to fetch profile details from Golang backend:', profileErr)
         }
-        
+
         let avatarUrlVal: string | null = profileDetails?.AvatarURL || null
         if (import.meta.client) {
           try {
@@ -87,7 +88,7 @@ export const useAuthViewModel = () => {
             avatarUrl: avatarUrlVal
           }
         }
-        
+
         currentUser.value = { ...(userProfile.value as UserMe) }
       } else {
         clearLocalSession()
@@ -113,7 +114,7 @@ export const useAuthViewModel = () => {
   const login = async (credentials: SignInRequest, rememberMe: boolean = false) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       if (import.meta.client) {
         const rememberMeCookie = useCookie('remember_me', {
@@ -133,7 +134,7 @@ export const useAuthViewModel = () => {
         }
         // Fetch profile to populate global user state
         await fetchCurrentUser()
-        
+
         if (!isAuthenticated.value) {
           clearLocalSession()
           const errMsg = error.value || 'Access forbidden: Insufficient account permissions.'
@@ -163,7 +164,7 @@ export const useAuthViewModel = () => {
           currentUser.value = { ...userProfile.value as UserMe }
         }
 
-        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || 'Customer'}!`)
+        globalAlert.showSuccess('Signed In Successfully', `Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
       }
       return false
@@ -182,7 +183,7 @@ export const useAuthViewModel = () => {
   const loginWithGoogle = async () => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const response = await authService.signInWithGoogle()
       if (response.message === 'login success') {
@@ -191,7 +192,7 @@ export const useAuthViewModel = () => {
         }
         // Fetch profile to populate global user state
         await fetchCurrentUser()
-        
+
         if (!isAuthenticated.value) {
           clearLocalSession()
           const errMsg = error.value || 'Access forbidden: Insufficient account permissions.'
@@ -206,8 +207,8 @@ export const useAuthViewModel = () => {
         if (currentUser.value) {
           userProfile.value = { ...currentUser.value }
         }
-        
-        triggerAuthAlert('success', `Signed in successfully. Welcome back, ${currentUser.value?.name || 'Customer'}!`)
+
+        globalAlert.showSuccess('Signed In Successfully', `Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
       }
       return false
@@ -231,7 +232,7 @@ export const useAuthViewModel = () => {
       if (response && response.challenge_id) {
         challengeId.value = response.challenge_id
         registrationEmail.value = signUpData.email
-        
+
         // Save to localStorage as a fallback/state transfer mechanism
         if (import.meta.client) {
           localStorage.setItem('auth_challenge_id', response.challenge_id)
@@ -257,7 +258,7 @@ export const useAuthViewModel = () => {
   const verifyOtp = async (otpCode: string) => {
     isLoading.value = true
     error.value = null
-    
+
     // Restore from localStorage if state was lost on page reload
     if (!challengeId.value && import.meta.client) {
       challengeId.value = localStorage.getItem('auth_challenge_id')
@@ -273,20 +274,20 @@ export const useAuthViewModel = () => {
         challenge_id: challengeId.value,
         otp: otpCode
       }
-      
+
       const response = await authService.verify(reqData)
       if (response.message === 'verify success') {
         let name = 'Verified User'
         let username = 'user'
         let email = ''
         let phone = ''
-        
+
         if (import.meta.client) {
           name = localStorage.getItem('register_name') || 'Verified User'
           username = localStorage.getItem('register_username') || 'user'
           email = localStorage.getItem('register_email') || ''
           phone = localStorage.getItem('register_phone') || ''
-          
+
           localStorage.removeItem('auth_challenge_id')
           localStorage.removeItem('register_email')
           localStorage.removeItem('register_name')
@@ -319,7 +320,7 @@ export const useAuthViewModel = () => {
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
         currentUser.value = { ...(userProfile.value as UserMe) }
-        triggerAuthAlert('success', `Verification successful! Welcome to Chia Florist, ${name}.`)
+        globalAlert.showSuccess('Verification Successful', `Welcome to Chia Florist, ${name}.`)
         return true
       }
       return false
@@ -331,12 +332,11 @@ export const useAuthViewModel = () => {
     }
   }
 
-
   const clearLocalSession = () => {
     currentUser.value = null
     challengeId.value = null
     registrationEmail.value = null
-    
+
     const isLoggedIn = useCookie('is_logged_in')
     isLoggedIn.value = null
     const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
@@ -364,7 +364,7 @@ export const useAuthViewModel = () => {
       console.error('Error hitting logout route:', err)
     } finally {
       clearLocalSession()
-      triggerAuthAlert('info', 'Signed out successfully. See you again soon!')
+      globalAlert.showSuccess('Signed Out', 'Signed out successfully. See you again soon!')
       isLoading.value = false
       navigateTo('/login')
     }
@@ -381,7 +381,7 @@ export const useAuthViewModel = () => {
       if (response && response.profile) {
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile')
         const profile = response.profile
-        
+
         // Update user cookie
         userProfile.value = {
           ...userProfile.value,
@@ -390,7 +390,7 @@ export const useAuthViewModel = () => {
           phone: profile.Phone || userProfile.value?.phone || '',
           avatarUrl: profile.AvatarURL || userProfile.value?.avatarUrl || null
         }
-        
+
         currentUser.value = { ...(userProfile.value as UserMe) }
         return { success: true, profile: response.profile }
       }

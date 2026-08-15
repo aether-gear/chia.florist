@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useCart } from '~/composables/useCart'
-import { useToast } from '~/composables/useToast'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 useHead({
   title: 'Your Shopping Cart - Chia Florist'
@@ -13,6 +13,7 @@ import { productService } from '~/services/productService'
 
 const { cart, isLoadingCart, loadCart, removeFromCart, updateQuantity, changeCartItemShop, cartSubtotal, cartSubtotalFormatted, flushCart, formatRupiah } = useCart()
 const storeSelection = useStoreSelection()
+const globalAlert = useGlobalAlert()
 const activeShops = storeSelection.activeShops
 
 const isPageLoading = ref(true)
@@ -74,9 +75,9 @@ const handleTransferItemShop = async (cartItemId: string, targetShopId: string) 
   try {
     await changeCartItemShop(cartItemId, targetShopId)
     const matchedShop = activeShops.value.find(s => s.id === targetShopId)
-    toast.show(`Item transferred to ${matchedShop?.name || 'new store branch'}!`)
+    globalAlert.showSuccess('Branch Transferred', `Item transferred to ${matchedShop?.name || 'new store branch'}!`)
   } catch (err: any) {
-    toast.show(err.message || 'Failed to transfer item to new shop branch.')
+    globalAlert.showError('Transfer Failed', err.message || 'Failed to transfer item to new shop branch.')
   } finally {
     isTransferringId.value = null
   }
@@ -106,9 +107,9 @@ const cartGroupedByShop = computed(() => {
 const applyPromo = () => {
   if (promoCode.value.toUpperCase() === 'CHIAFLORIST') {
     discount.value = 50000
-    alert(`Promo code applied successfully! You got a ${formatRupiah(50000)} discount.`)
+    globalAlert.showSuccess('Promo Code Applied', `Promo code applied successfully! You received a ${formatRupiah(50000)} discount.`)
   } else {
-    alert('Invalid promo code.')
+    globalAlert.showError('Invalid Promo Code', 'The promo code entered is invalid or has expired.')
   }
 }
 
@@ -123,8 +124,6 @@ const handleImageError = (event: Event) => {
   }
 }
 
-const toast = useToast()
-
 // ── Global remove throttle ────────────────────────────────────────────
 // A single boolean locks ALL remove buttons while any one removal is running.
 // This stops users from spamming remove across multiple products simultaneously.
@@ -138,10 +137,10 @@ const handleRemove = async (id: string, size?: string, color?: string) => {
   activeRemovingId.value = id
   try {
     await removeFromCart(id, size, color)
-    toast.success('Item removed', 'The product has been removed from your cart.')
+    globalAlert.showSuccess('Item Removed', 'The product has been removed from your cart.')
   } catch (e) {
     console.error('Remove failed:', e)
-    toast.error('Could not remove item', 'Please try again.')
+    globalAlert.showError('Remove Failed', 'Could not remove item. Please try again.')
   } finally {
     isRemovingAny.value = false
     activeRemovingId.value = null

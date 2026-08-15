@@ -5,6 +5,7 @@ import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useAddress } from '~/composables/useAddress'
 import { useOrders } from '~/composables/useOrders'
 import type { OrderTab } from '~/composables/useOrders'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { supabaseService } from '~/services/supabaseService'
 import { orderService } from '~/services/orderService'
 import type { UserAddress } from '~/types/address'
@@ -14,6 +15,7 @@ useHead({ title: 'My Profile - Chia Florist' })
 
 const authVm = useAuthViewModel()
 const addressVm = useAddress()
+const globalAlert = useGlobalAlert()
 
 const activeTab = ref('personal')
 const activeOrderStatus = ref<OrderTab>('all')
@@ -30,6 +32,7 @@ const statusLabels: Record<OrderTab, string> = {
 // Edit address states
 const showAddressForm = ref(false)
 const editingAddress = ref<UserAddress | null>(null)
+const addressFormError = ref<string | null>(null)
 
 const provincesList = ref<any[]>([])
 const citiesList = ref<any[]>([])
@@ -249,13 +252,14 @@ const handleFileUpload = (event: Event) => {
   if (!file) return
 
   if (!file.type.startsWith('image/')) {
-    alert('Please select an image file.')
+    uploadError.value = 'Please select a valid image file.'
     return
   }
   if (file.size > 10 * 1024 * 1024) {
-    alert('Image must be less than 10 MB.')
+    uploadError.value = 'Image size must be less than 10 MB.'
     return
   }
+  uploadError.value = null
 
   cropFilename.value = file.name || 'avatar.jpg'
   cropMime.value = file.type || 'image/jpeg'
@@ -273,7 +277,7 @@ const performCropAndUpload = async () => {
   if (!img) return
 
   const userId = authVm.currentUser.value?.id
-  if (!userId) { alert('Not authenticated.'); return }
+  if (!userId) { uploadError.value = 'Not authenticated.'; return }
 
   // Draw to canvas while image element is still in DOM
   const canvas = document.createElement('canvas')
@@ -316,6 +320,7 @@ const performCropAndUpload = async () => {
           authVm.currentUser.value.avatarUrl = urls.signedUrl || urls.publicUrl
         }
         await authVm.updateUserProfile({ avatar_url: urls.signedUrl || urls.publicUrl })
+        globalAlert.showSuccess('Avatar Updated', 'Your profile picture has been updated.')
       } else {
         uploadError.value = 'Upload failed. Please try again.'
       }
@@ -333,6 +338,7 @@ const handleRemovePicture = async () => {
 
   if (confirm('Are you sure you want to remove your profile picture?')) {
     isUploading.value = true
+    uploadError.value = null
     try {
       const files = await supabaseService.listFiles(userId)
       if (files.length > 0) {
@@ -349,9 +355,10 @@ const handleRemovePicture = async () => {
       await authVm.updateUserProfile({
         avatar_url: ''
       })
+      globalAlert.showSuccess('Avatar Removed', 'Your profile picture has been removed.')
     } catch (err) {
       console.error('Failed to remove profile picture:', err)
-      alert('Failed to remove profile picture.')
+      uploadError.value = 'Failed to remove profile picture.'
     } finally {
       isUploading.value = false
     }
@@ -360,7 +367,7 @@ const handleRemovePicture = async () => {
 
 const handleUpdateProfile = async () => {
   if (!user.value.name) {
-    alert('Full name is required.')
+    globalAlert.showWarning('Validation Error', 'Full name is required to update profile.')
     return
   }
 
@@ -371,12 +378,12 @@ const handleUpdateProfile = async () => {
       phone: user.value.phone
     })
     if (res.success) {
-      alert('Profile updated successfully!')
+      globalAlert.showSuccess('Profile Updated', 'Your profile has been updated successfully!')
     } else {
-      alert(res.message || 'Failed to update profile.')
+      globalAlert.showError('Update Failed', res.message || 'Failed to update profile.')
     }
   } catch (err: any) {
-    alert(err.message || 'An error occurred while updating profile.')
+    globalAlert.showError('Update Failed', err.message || 'An error occurred while updating profile.')
   }
 }
 
@@ -412,6 +419,7 @@ onMounted(async () => {
 
 // Chained location selections
 const initAddressForm = async (addr: UserAddress | null = null) => {
+  addressFormError.value = null
   provincesList.value = await addressVm.loadProvinces()
   
   if (addr) {
@@ -469,23 +477,27 @@ const handleSaveAddress = async () => {
   if (!editingAddress.value) return
   const addr = editingAddress.value
   if (!addr.receiver_name || !addr.phone || !addr.province_id || !addr.city_id || !addr.district_id || !addr.village_id || !addr.full_address || !addr.postal_code) {
-    alert('Please fill in all the required fields.')
+    addressFormError.value = 'Please fill in all the required fields.'
     return
   }
+  addressFormError.value = null
   const result = await addressVm.saveAddress(addr)
   if (result.success) {
     showAddressForm.value = false
     editingAddress.value = null
+    globalAlert.showSuccess('Address Saved', 'Shipping address has been saved.')
   } else {
-    alert(result.message)
+    addressFormError.value = result.message || 'Failed to save address.'
   }
 }
 
 const handleDeleteAddress = async (id: string) => {
   if (confirm('Are you sure you want to delete this address?')) {
     const result = await addressVm.deleteAddress(id)
-    if (!result.success) {
-      alert(result.message)
+    if (result.success) {
+      globalAlert.showSuccess('Address Deleted', 'Shipping address has been removed.')
+    } else {
+      globalAlert.showError('Delete Failed', result.message || 'Failed to delete address.')
     }
   }
 }
@@ -513,6 +525,7 @@ watch(activeOrderStatus, (status) => {
 // Logout
 const handleLogout = async () => {
   await authVm.logout()
+  globalAlert.showInfo('Signed Out', 'You have been successfully signed out.')
 }
 
 const selectedOrder = ref<BackendOrder | null>(null)
@@ -536,11 +549,22 @@ const contactDriver = (orderId: string) => {
 }
 
 const leaveReview = (orderId: string) => {
-  window.alert(`Thank you! Review form for order ${orderId} will open shortly. Give us your best stars! ⭐`)
+  globalAlert.showSuccess('Review Submitted', `Thank you! Review form for order ${orderId} has been recorded. ⭐`)
 }
 
 const triggerAlert = (message: string) => {
-  window.alert(message)
+  globalAlert.showInfo('Notice', message)
+}
+
+const handleReorder = () => {
+  globalAlert.showInfo(
+    'Order Expired',
+    'This order was cancelled or expired. You can select an arrangement from our catalog to place a new order.',
+    [
+      { label: 'Browse Catalog', onClick: () => navigateTo('/catalog') },
+      { label: 'Got it' }
+    ]
+  )
 }
 
 const isCheckingPayment = ref(false)
@@ -550,15 +574,22 @@ const handleCheckPaymentStatus = async (orderId: string) => {
   try {
     const res = await orderService.checkOrderPaymentStatus(orderId)
     if (res.status === 'paid') {
-      alert('Payment verified! Your order is now being processed.')
+      globalAlert.showSuccess(
+        'Payment Verified',
+        'Payment verified! Your order is now being processed.',
+        [
+          { label: 'View Orders', onClick: () => loadOrders('all') },
+          { label: 'Got it' }
+        ]
+      )
       closeOrderDetail()
       loadOrders('pending') // Refresh pending orders list
     } else {
-      alert(`Payment status is still pending (status: ${res.status}). If you have already transferred, please wait up to 15 minutes for automated reconciliation.`)
+      globalAlert.showInfo('Payment Pending', `Payment status is still pending (status: ${res.status}). If you have already transferred, please allow up to 15 minutes for automated reconciliation.`)
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
-    alert(err.data?.message || err.message || 'Failed to check payment status. Please try again.')
+    globalAlert.showError('Verification Failed', err.data?.message || err.message || 'Failed to check payment status. Please try again.')
   } finally {
     isCheckingPayment.value = false
   }
@@ -927,6 +958,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         </div>
 
         <div class="p-8 space-y-4 flex-1">
+          <!-- Inline Address Validation Error -->
+          <div v-if="addressFormError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
+            ⚠️ {{ addressFormError }}
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-1">
               <label class="text-xs font-bold text-gray-500">Receiver Name *</label>
@@ -1181,7 +1217,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </button>
             </div>
             <div v-else-if="selectedOrder.status === 'cancelled' || selectedOrder.status === 'expired' || ordersVm.isOrderExpired(selectedOrder)">
-              <button @click="triggerAlert('This order was cancelled or expired. You can rebuild your cart to re-order.')" class="px-5 py-2.5 bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 text-xs font-bold rounded-xl transition cursor-pointer">
+              <button @click="handleReorder" class="px-5 py-2.5 bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 text-xs font-bold rounded-xl transition cursor-pointer">
                 Order Again
               </button>
             </div>

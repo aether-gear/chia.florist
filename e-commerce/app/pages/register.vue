@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 definePageMeta({
   layout: 'auth'
@@ -16,6 +17,7 @@ useHead({
 
 const route = useRoute()
 const authVm = useAuthViewModel()
+const globalAlert = useGlobalAlert()
 
 // 2-Step Registration Flow: 'initial' (Choose Google or Enter Email) -> 'form' (Account Details without Google)
 const registerStep = ref<'initial' | 'form'>('initial')
@@ -38,6 +40,10 @@ onMounted(() => {
   nextTick(() => {
     emailInputRef.value?.focus()
   })
+
+  if (route.query.error || route.query.error_description || route.query.google_error) {
+    globalAlert.showError('Google sign-in failed', "We couldn't sign you in with Google. Please try again.")
+  }
 
   if (route.query.verify === 'true' || route.query.verify === '1') {
     if (authVm.registrationEmail.value) {

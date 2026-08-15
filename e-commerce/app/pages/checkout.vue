@@ -11,6 +11,7 @@ import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod, CheckoutSh
 import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { triggerAuthAlert } from '~/composables/useSessionState'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 useHead({
   title: 'Secure Checkout - Chia Florist'
@@ -20,6 +21,7 @@ const route = useRoute()
 const { cart, orders, loadCart, flushCart, cartSubtotal, cartSubtotalFormatted, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
 const authVm = useAuthViewModel()
+const globalAlert = useGlobalAlert()
 
 // State Management untuk Checkout & Shipping
 const checkoutData = ref<CheckoutResponse | null>(null)
@@ -333,7 +335,7 @@ onMounted(async () => {
     }
   } catch (err) {
     console.error('Failed to initialize checkout:', err)
-    alert('Unable to proceed with checkout. Some items may be out of stock or unavailable. Redirecting you back to your cart to review.')
+    globalAlert.showError('Checkout Error', 'Unable to proceed with checkout. Some items may be out of stock or unavailable. Redirecting to cart...')
     navigateTo('/cart')
   } finally {
     isLoadingCheckout.value = false
@@ -579,11 +581,11 @@ const liveTotalPayment = computed(() => {
 // Eksekusi checkout memindahkan state item keranjang ke invoice order profile
 const handlePlaceOrder = async () => {
   if (!selectedAddressId.value) {
-    alert('Please select a shipping address before completing your order.')
+    globalAlert.showWarning('Address Required', 'Please select a shipping address before completing your order.')
     return
   }
   if (paymentMethods.value.length === 0 || !selectedPaymentMethodId.value) {
-    alert('No payment method available or selected. Please select a payment method before completing your order.')
+    globalAlert.showWarning('Payment Method Required', 'No payment method available or selected. Please select a payment method before completing your order.')
     return
   }
 
@@ -682,11 +684,18 @@ const handlePlaceOrder = async () => {
       cart.value = []
     }
 
-    alert('Order placed successfully! Redirecting to secure payment page...')
+    globalAlert.showSuccess(
+      'Order Placed',
+      'Order placed successfully! Redirecting to secure payment page...',
+      [
+        { label: 'Pay Now', onClick: () => navigateTo(`/payment?orderId=${result.order_id}`) },
+        { label: 'My Orders', onClick: () => navigateTo('/profile') }
+      ]
+    )
     navigateTo(`/payment?orderId=${result.order_id}`)
   } catch (err: any) {
     console.error('Checkout processing error:', err)
-    alert(err.data?.message || err.message || 'Failed to process checkout. Please try again.')
+    globalAlert.showError('Checkout Failed', err.data?.message || err.message || 'Failed to process checkout. Please try again.')
   } finally {
     isProcessing.value = false
   }

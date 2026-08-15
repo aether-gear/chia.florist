@@ -11,6 +11,7 @@ import {
   BORDER_COLORS, BG_PRESETS, DEFAULT_DRAFT_KEY
 } from './constants'
 import { normalizeHexColor, calculateDesignChecksum } from './migrate'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export const useCustomDesign = () => {
   /* ─── STATE ───────────────────────────────────────────────────────── */
@@ -787,7 +788,7 @@ export const useCustomDesign = () => {
       localStorage.setItem(DEFAULT_DRAFT_KEY, JSON.stringify(draft))
       isDirty.value = false
       showMoreMenu.value = false
-      triggerToast('Progress saved successfully! ✅')
+      useGlobalAlert().showSuccess('Draft Saved', 'Your flower board design draft has been saved.')
     } catch (err) {
       console.warn('Failed to save custom board draft:', err)
     }
@@ -842,7 +843,7 @@ export const useCustomDesign = () => {
     heightRatio.value = 0.58
     isDirty.value = false
     showMoreMenu.value = false
-    triggerToast('Board reset to default blank canvas! 🧹')
+    useGlobalAlert().showInfo('Board Reset', 'Board canvas has been reset to default blank state.')
   }
 
   // Track changes to trigger unsaved warning
