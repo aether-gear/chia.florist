@@ -97,17 +97,17 @@ func (m *mockStaffRepo) Delete(ctx context.Context, exec transaction.Executor, s
 var _ staffRepo.StaffRepository = (*mockStaffRepo)(nil)
 
 type mockStaffMembershipRepo struct {
-	membership       *authzDomain.StaffMembership
-	targetMembership *authzDomain.StaffMembership
-	roles            []authzDomain.Role
-	accounts         []authzDomain.StaffAccountMember
-	getMemError      error
-	getRolesError    error
-	listAccsError    error
-	deleteByStaffErr error
-	deleteByAccErr   error
-	saveCalls        int
-	deleteByAccCalls int
+	membership         *authzDomain.StaffMembership
+	targetMembership   *authzDomain.StaffMembership
+	roles              []authzDomain.Role
+	accounts           []authzDomain.StaffAccountMember
+	getMemError        error
+	getRolesError      error
+	listAccsError      error
+	deleteByStaffErr   error
+	deleteByAccErr     error
+	saveCalls          int
+	deleteByAccCalls   int
 	deleteByStaffCalls int
 }
 
@@ -240,5 +240,19 @@ func (m *mockPwHasher) Compare(hash, password string) error {
 
 var _ authenRepo.PasswordHasher = (*mockPwHasher)(nil)
 
-var errMock = errors.New("mock error")
+type mockUserDeletionService struct {
+	deletedUsers []uuid.UUID
+	err          error
+}
 
+func (m *mockUserDeletionService) DeleteUserRecord(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.deletedUsers = append(m.deletedUsers, userID)
+	return nil
+}
+
+var _ authenRepo.UserDeletionService = (*mockUserDeletionService)(nil)
+
+var errMock = errors.New("mock error")

@@ -149,6 +149,12 @@ func (r *testUserRepo) Delete(ctx context.Context, exec transaction.Executor, id
 	return nil
 }
 
+type testUserDeletionService struct{}
+
+func (s *testUserDeletionService) DeleteUserRecord(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
+	return nil
+}
+
 type testRoleRepo struct {
 	role *authzDomain.Role
 }
@@ -160,7 +166,7 @@ func (r *testRoleRepo) GetByCode(ctx context.Context, exec transaction.Executor,
 type testHasher struct{}
 
 func (h *testHasher) Hash(p string) (string, error) { return "hash", nil }
-func (h *testHasher) Compare(hash, p string) error { return nil }
+func (h *testHasher) Compare(hash, p string) error  { return nil }
 
 func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRepo, *testMembershipRepo) {
 	sRepo := &testStaffRepo{
@@ -209,13 +215,14 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 	exec := &mockExec{}
 	tx := &mockTx{}
 	audit := &mockAuditor{}
+	userDeletionSvc := &testUserDeletionService{}
 
 	createUC := usecase.NewCreateStaffUsecase(sRepo, uRepo, exec, tx, audit)
 	addUC := usecase.NewAddStaffAccountUsecase(exec, tx, aRepo, hasher, uRepo, sRepo, mRepo, rRepo, audit)
 	listUC := usecase.NewListStaffAccountsUsecase(exec, sRepo, mRepo, audit)
 	updateUC := usecase.NewUpdateStaffUsecase(exec, tx, sRepo, mRepo, audit)
-	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, audit)
-	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, audit)
+	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, userDeletionSvc, audit)
+	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, userDeletionSvc, audit)
 
 	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC)
 	return handler, sRepo, mRepo
@@ -387,4 +394,3 @@ func TestHandler_AddStaffAccount(t *testing.T) {
 		t.Fatalf("expected status 201, got: %d", rec.Code)
 	}
 }
-

@@ -50,6 +50,7 @@ func TestRemoveStaffAccount_Success(t *testing.T) {
 		},
 	}
 
+	userDeletionService := &mockUserDeletionService{}
 	auditLogger := &mockAuditLogger{}
 
 	uc := NewRemoveStaffAccountUsecase(
@@ -58,6 +59,7 @@ func TestRemoveStaffAccount_Success(t *testing.T) {
 		staffRepo,
 		membershipRepo,
 		accountRepo,
+		userDeletionService,
 		auditLogger,
 	)
 
@@ -75,6 +77,9 @@ func TestRemoveStaffAccount_Success(t *testing.T) {
 	if membershipRepo.deleteByAccCalls != 1 {
 		t.Errorf("expected 1 membership delete call, got: %d", membershipRepo.deleteByAccCalls)
 	}
+	if len(userDeletionService.deletedUsers) != 1 || userDeletionService.deletedUsers[0] != targetAccountUserID {
+		t.Errorf("expected user deletion for %s, got: %v", targetAccountUserID, userDeletionService.deletedUsers)
+	}
 	if len(auditLogger.events) != 1 {
 		t.Errorf("expected 1 audit event, got: %d", len(auditLogger.events))
 	}
@@ -91,6 +96,7 @@ func TestRemoveStaffAccount_SelfRemovalBlocked(t *testing.T) {
 		&mockStaffRepo{},
 		&mockStaffMembershipRepo{},
 		&mockAccountRepo{},
+		&mockUserDeletionService{},
 		&mockAuditLogger{},
 	)
 
@@ -154,6 +160,7 @@ func TestRemoveStaffAccount_PrimaryOwnerRemovalBlocked(t *testing.T) {
 		staffRepo,
 		membershipRepo,
 		accountRepo,
+		&mockUserDeletionService{},
 		&mockAuditLogger{},
 	)
 

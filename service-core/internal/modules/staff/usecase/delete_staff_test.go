@@ -16,6 +16,7 @@ func TestDeleteStaff_Success(t *testing.T) {
 	actorAccountID := uuid.New()
 	actorStaffID := uuid.New()
 	targetStaffID := actorStaffID
+	staffUserID := uuid.New()
 
 	membershipRepo := &mockStaffMembershipRepo{
 		membership: &authzDomain.StaffMembership{
@@ -31,10 +32,11 @@ func TestDeleteStaff_Success(t *testing.T) {
 	staffRepo := &mockStaffRepo{
 		staff: &staffDomain.Staff{
 			ID:     targetStaffID,
-			UserID: uuid.New(),
+			UserID: staffUserID,
 		},
 	}
 
+	userDeletionService := &mockUserDeletionService{}
 	auditLogger := &mockAuditLogger{}
 
 	uc := NewDeleteStaffUsecase(
@@ -42,6 +44,7 @@ func TestDeleteStaff_Success(t *testing.T) {
 		&mockTransactor{},
 		staffRepo,
 		membershipRepo,
+		userDeletionService,
 		auditLogger,
 	)
 
@@ -60,6 +63,9 @@ func TestDeleteStaff_Success(t *testing.T) {
 	}
 	if membershipRepo.deleteByStaffCalls != 1 {
 		t.Errorf("expected 1 membership delete call, got: %d", membershipRepo.deleteByStaffCalls)
+	}
+	if len(userDeletionService.deletedUsers) != 1 || userDeletionService.deletedUsers[0] != staffUserID {
+		t.Errorf("expected user deletion for %s, got: %v", staffUserID, userDeletionService.deletedUsers)
 	}
 	if len(auditLogger.events) != 1 {
 		t.Errorf("expected 1 audit event, got: %d", len(auditLogger.events))
@@ -86,11 +92,14 @@ func TestDeleteStaff_NotFound(t *testing.T) {
 		staff: nil,
 	}
 
+	userDeletionService := &mockUserDeletionService{}
+
 	uc := NewDeleteStaffUsecase(
 		&mockExecutor{},
 		&mockTransactor{},
 		staffRepo,
 		membershipRepo,
+		userDeletionService,
 		&mockAuditLogger{},
 	)
 

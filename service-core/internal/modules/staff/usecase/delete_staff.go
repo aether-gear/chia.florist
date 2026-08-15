@@ -6,6 +6,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
+	authenRepo "service-core/internal/modules/authentication/repository"
 	authzDomain "service-core/internal/modules/authorization/domain"
 	authzRepo "service-core/internal/modules/authorization/repository"
 	staffDomain "service-core/internal/modules/staff/domain"
@@ -16,11 +17,12 @@ import (
 )
 
 type DeleteStaffUsecase struct {
-	executor       transaction.Executor
-	transactor     transaction.Transactor
-	staffRepo      staffRepo.StaffRepository
-	membershipRepo authzRepo.StaffMembershipRepository
-	auditLogger    applogger.AuditLogger
+	executor            transaction.Executor
+	transactor          transaction.Transactor
+	staffRepo           staffRepo.StaffRepository
+	membershipRepo      authzRepo.StaffMembershipRepository
+	userDeletionService authenRepo.UserDeletionService
+	auditLogger         applogger.AuditLogger
 }
 
 func NewDeleteStaffUsecase(
@@ -28,14 +30,16 @@ func NewDeleteStaffUsecase(
 	transactor transaction.Transactor,
 	staffRepo staffRepo.StaffRepository,
 	membershipRepo authzRepo.StaffMembershipRepository,
+	userDeletionService authenRepo.UserDeletionService,
 	auditLogger applogger.AuditLogger,
 ) *DeleteStaffUsecase {
 	return &DeleteStaffUsecase{
-		executor:       executor,
-		transactor:     transactor,
-		staffRepo:      staffRepo,
-		membershipRepo: membershipRepo,
-		auditLogger:    auditLogger,
+		executor:            executor,
+		transactor:          transactor,
+		staffRepo:           staffRepo,
+		membershipRepo:      membershipRepo,
+		userDeletionService: userDeletionService,
+		auditLogger:         auditLogger,
 	}
 }
 
@@ -114,6 +118,12 @@ func (u *DeleteStaffUsecase) Execute(
 			return fmt.Errorf("failed to delete staff memberships: %w", err)
 		}
 
+		if err := u.userDeletionService.DeleteUserRecord(ctx, exec,
+			staff.UserID,
+		); err != nil {
+			return fmt.Errorf("failed to soft-delete user and accounts for staff: %w", err)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -126,7 +136,7 @@ func (u *DeleteStaffUsecase) Execute(
 		Resource:   "staff",
 		ResourceID: input.StaffID.String(),
 		Outcome:    applogger.OutcomeSuccess,
-		Metadata:   map[string]any{"staff_id": input.StaffID.String()},
+		Metadata:   map[string]any{"staff_id": input.StaffID.String(), "user_id": staff.UserID.String()},
 	})
 
 	return nil
