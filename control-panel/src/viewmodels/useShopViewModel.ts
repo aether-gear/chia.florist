@@ -95,7 +95,7 @@ export function useShopViewModel() {
     }
   };
 
-  const saveShop = async (data: { name: string; description?: string; is_active: string }) => {
+  const saveShop = async (data: { name: string; description?: string; is_active?: string; approval_status?: string }) => {
     if (!selectedShopId) return false;
     try {
       setDetailsLoading(true);
@@ -126,7 +126,7 @@ export function useShopViewModel() {
     }
   };
 
-  const createShop = async (data: { name: string; description?: string; is_active: string }) => {
+  const createShop = async (data: { name: string; description?: string; is_active?: string; approval_status?: string }) => {
     try {
       setLoading(true);
       await fetchApi('/shops', {
@@ -145,6 +145,27 @@ export function useShopViewModel() {
       setLoading(false);
     }
   };
+
+  const deleteShop = async (shopId: string) => {
+    try {
+      setLoading(true);
+      await fetchApi(`/shops/${shopId}`, {
+        method: 'DELETE',
+      });
+      if (selectedShopId === shopId) {
+        setSelectedShopId(null);
+        setSelectedShopInfo(null);
+      }
+      await fetchShops();
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const updateInventory = async (shopId: string, productId: string, stock: number) => {
     try {
@@ -238,6 +259,7 @@ export function useShopViewModel() {
     deleteAddress,
     saveShop,
     createShop,
+    deleteShop,
     updateInventory,
     removeInventory,
     selectShop,

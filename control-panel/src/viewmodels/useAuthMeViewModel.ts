@@ -25,9 +25,11 @@ export function useAuthMeViewModel() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Determine admin status from stored email
+  // Determine admin status from roles or stored email
   const storedEmail = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
-  const isAdmin = ADMIN_EMAILS.includes(storedEmail.toLowerCase().trim());
+  const hasAdminRole = data?.roles?.some((r) => r.code === 'staff_admin') ?? false;
+  const isAdmin = hasAdminRole || ADMIN_EMAILS.includes(storedEmail.toLowerCase().trim());
+
 
   useEffect(() => {
     const fetchMe = async () => {

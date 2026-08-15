@@ -7,6 +7,7 @@ import { useMerchantsViewModel } from '../../viewmodels/useMerchantsViewModel';
 import Pagination from '../../components/Pagination';
 import { Skeleton } from '../../components/ui/skeleton';
 import { DataCard, DataCardGridHeader, DataCardList } from '../../components/DataCard';
+import EmptyState from '../../components/EmptyState';
 
 export default function MerchantsListPage() {
   const { data, loading, error, page, limit, setPage, refresh } = useMerchantsViewModel();

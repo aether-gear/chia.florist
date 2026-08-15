@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   MapPin,
   Truck,
@@ -11,8 +11,8 @@ import {
   Edit,
   Trash2,
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -27,7 +27,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
   SheetClose,
 } from '../../components/ui/sheet';
 import {
@@ -46,7 +45,7 @@ import {
   DialogFooter,
 } from '../../components/ui/dialog';
 import { useShopViewModel } from '../../viewmodels/useShopViewModel';
-import { fetchApi } from '../../lib/api';
+import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import Pagination from '../../components/Pagination';
 import SearchInput from '../../components/SearchInput';
 import { DataCard, DataCardList } from '../../components/DataCard';
@@ -55,6 +54,7 @@ import AddressFormSheet from '../../components/shops/AddressFormSheet';
 import Breadcrumb from '../../components/Breadcrumb';
 
 export default function ShopManagementPage() {
+  const { isAdmin } = useAuthMeViewModel();
   const {
     shops,
     total,
@@ -70,10 +70,10 @@ export default function ShopManagementPage() {
     error,
     detailsError,
     setPage,
-    createAddress,
-    updateAddress,
     deleteAddress,
+    saveShop,
     createShop,
+    deleteShop,
     removeInventory,
     selectShop,
     refresh,
@@ -137,10 +137,13 @@ export default function ShopManagementPage() {
       setIsDeletingInventory(false);
     }
   };
+
+  // Add Shop states
   const [isAddShopOpen, setIsAddShopOpen] = useState(false);
   const [newShopName, setNewShopName] = useState('');
   const [newShopDesc, setNewShopDesc] = useState('');
   const [newShopIsActive, setNewShopIsActive] = useState(false);
+  const [newShopApprovalStatus, setNewShopApprovalStatus] = useState<string>('pending');
   const [isCreatingShop, setIsCreatingShop] = useState(false);
   const [addShopError, setAddShopError] = useState<string | null>(null);
 
@@ -150,16 +153,21 @@ export default function ShopManagementPage() {
     setIsCreatingShop(true);
     setAddShopError(null);
     try {
-      const success = await createShop({
+      const payload: any = {
         name: newShopName,
         description: newShopDesc || undefined,
-        is_active: newShopIsActive ? 'true' : 'false',
-      });
+      };
+      if (isAdmin) {
+        payload.is_active = newShopIsActive ? 'true' : 'false';
+        payload.approval_status = newShopApprovalStatus;
+      }
+      const success = await createShop(payload);
       if (success) {
         setIsAddShopOpen(false);
         setNewShopName('');
         setNewShopDesc('');
         setNewShopIsActive(false);
+        setNewShopApprovalStatus('pending');
       } else {
         setAddShopError('Failed to add shop. Please check your inputs or try again.');
       }
@@ -170,8 +178,107 @@ export default function ShopManagementPage() {
     }
   };
 
+  // Edit Shop states
+  const [isEditShopOpen, setIsEditShopOpen] = useState(false);
+  const [editShopName, setEditShopName] = useState('');
+  const [editShopDesc, setEditShopDesc] = useState('');
+  const [editShopIsActive, setEditShopIsActive] = useState(false);
+  const [editShopApprovalStatus, setEditShopApprovalStatus] = useState<string>('pending');
+  const [isSavingShop, setIsSavingShop] = useState(false);
+  const [editShopError, setEditShopError] = useState<string | null>(null);
+
+  const handleOpenEditShop = () => {
+    if (!selectedShopInfo) return;
+    setEditShopName(selectedShopInfo.name || '');
+    setEditShopDesc(selectedShopInfo.description || '');
+    setEditShopIsActive(selectedShopInfo.is_active || false);
+    setEditShopApprovalStatus(selectedShopInfo.approval_status || 'pending');
+    setEditShopError(null);
+    setIsEditShopOpen(true);
+  };
+
+  const handleEditShopSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editShopName) return;
+    setIsSavingShop(true);
+    setEditShopError(null);
+    try {
+      const payload: any = {
+        name: editShopName,
+        description: editShopDesc || undefined,
+      };
+      if (isAdmin) {
+        payload.is_active = editShopIsActive ? 'true' : 'false';
+        payload.approval_status = editShopApprovalStatus;
+      }
+      const success = await saveShop(payload);
+      if (success) {
+        setIsEditShopOpen(false);
+      } else {
+        setEditShopError('Failed to update shop. Please check your inputs.');
+      }
+    } catch (err: any) {
+      setEditShopError(err.message || 'Failed to update shop');
+    } finally {
+      setIsSavingShop(false);
+    }
+  };
+
+  // Delete Shop states
+  const [isDeleteShopOpen, setIsDeleteShopOpen] = useState(false);
+  const [isDeletingShop, setIsDeletingShop] = useState(false);
+  const [deleteShopError, setDeleteShopError] = useState<string | null>(null);
+
+  const handleDeleteShopConfirm = async () => {
+    if (!selectedShopId) return;
+    setIsDeletingShop(true);
+    setDeleteShopError(null);
+    try {
+      await deleteShop(selectedShopId);
+      setIsDeleteShopOpen(false);
+      selectShop(null);
+    } catch (err: any) {
+      setDeleteShopError(err.message || 'Failed to delete shop');
+    } finally {
+      setIsDeletingShop(false);
+    }
+  };
+
   const handleOpenDetails = (shop: any) => {
     selectShop(shop);
+  };
+
+  const getApprovalBadge = (status?: string) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <Badge
+            variant="default"
+            className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 rounded-lg scale-90"
+          >
+            Approved
+          </Badge>
+        );
+      case 'rejected':
+        return (
+          <Badge
+            variant="destructive"
+            className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-0 rounded-lg scale-90"
+          >
+            Rejected
+          </Badge>
+        );
+      case 'pending':
+      default:
+        return (
+          <Badge
+            variant="secondary"
+            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-0 rounded-lg scale-90"
+          >
+            Pending Approval
+          </Badge>
+        );
+    }
   };
 
   return (
@@ -253,7 +360,7 @@ export default function ShopManagementPage() {
                         onClick={() => handleOpenDetails(shop)}
                         className="cursor-pointer hover:border-primary/40 transition-all duration-200"
                       >
-                        <div className="col-span-1 md:col-span-5 min-w-0">
+                        <div className="col-span-1 md:col-span-4 min-w-0">
                           <h4 className="font-semibold font-display text-sm text-foreground truncate group-hover:text-primary">
                             {shop.name}
                           </h4>
@@ -264,7 +371,8 @@ export default function ShopManagementPage() {
                           {shop.description || 'No description provided.'}
                         </div>
 
-                        <div className="col-span-1 md:col-span-3 flex items-center justify-end gap-3">
+                        <div className="col-span-1 md:col-span-4 flex items-center justify-end gap-2 flex-wrap">
+                          {getApprovalBadge(shop.approval_status)}
                           <Badge
                             variant={shop.is_active ? 'default' : 'secondary'}
                             className={
@@ -301,7 +409,7 @@ export default function ShopManagementPage() {
             </div>
           </div>
         ) : (
-          /* View 2: Selected Shop Details View (Slide in from Right to Left) */
+          /* View 2: Selected Shop Details View */
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             {/* Global Breadcrumb Navigation */}
             <Breadcrumb
@@ -320,21 +428,51 @@ export default function ShopManagementPage() {
                     {selectedShopInfo?.name || 'Shop Details'}
                   </h2>
                   {selectedShopInfo && (
-                    <Badge
-                      variant={selectedShopInfo.is_active ? 'default' : 'secondary'}
-                      className={
-                        selectedShopInfo.is_active
-                          ? 'bg-primary/10 text-primary border-0 rounded-lg'
-                          : 'bg-muted text-muted-foreground border-0 rounded-lg'
-                      }
-                    >
-                      {selectedShopInfo.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {getApprovalBadge(selectedShopInfo.approval_status)}
+                      <Badge
+                        variant={selectedShopInfo.is_active ? 'default' : 'secondary'}
+                        className={
+                          selectedShopInfo.is_active
+                            ? 'bg-primary/10 text-primary border-0 rounded-lg'
+                            : 'bg-muted text-muted-foreground border-0 rounded-lg'
+                        }
+                      >
+                        {selectedShopInfo.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
                   )}
                 </div>
                 <p className="text-muted-foreground text-sm pt-1">
                   {selectedShopInfo?.description || 'Manage parameters, addresses, couriers, and product inventory.'}
                 </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenEditShop}
+                  className="rounded-xl border-border text-foreground hover:bg-muted"
+                >
+                  <Edit className="h-4 w-4 mr-1.5" />
+                  Edit Shop
+                </Button>
+
+                {isAdmin && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setDeleteShopError(null);
+                      setIsDeleteShopOpen(true);
+                    }}
+                    className="rounded-xl"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1.5" />
+                    Delete Shop
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -404,7 +542,14 @@ export default function ShopManagementPage() {
                         </div>
 
                         <div className="grid grid-cols-3 gap-2 text-sm">
-                          <span className="text-muted-foreground font-medium">Status</span>
+                          <span className="text-muted-foreground font-medium">Approval Status</span>
+                          <div className="col-span-2">
+                            {getApprovalBadge(selectedShopInfo?.approval_status)}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <span className="text-muted-foreground font-medium">Operating Status</span>
                           <div className="col-span-2">
                             <Badge
                               variant={selectedShopInfo?.is_active ? 'default' : 'secondary'}
@@ -699,16 +844,39 @@ export default function ShopManagementPage() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="newShopIsActive"
-                  checked={newShopIsActive}
-                  onCheckedChange={(checked) => setNewShopIsActive(checked === true)}
-                />
-                <Label htmlFor="newShopIsActive" className="text-sm font-medium leading-none cursor-pointer">
-                  Shop is Active (Staff Admin Only)
-                </Label>
-              </div>
+              {isAdmin ? (
+                <div className="space-y-4 pt-2 border-t border-border/60">
+                  <div className="space-y-2">
+                    <Label htmlFor="newShopApprovalStatus">Approval Status</Label>
+                    <select
+                      id="newShopApprovalStatus"
+                      className="flex h-10 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                      value={newShopApprovalStatus}
+                      onChange={(e) => setNewShopApprovalStatus(e.target.value)}
+                    >
+                      <option value="pending">Pending Approval</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-1">
+                    <Checkbox
+                      id="newShopIsActive"
+                      checked={newShopIsActive}
+                      onCheckedChange={(checked) => setNewShopIsActive(checked === true)}
+                    />
+                    <Label htmlFor="newShopIsActive" className="text-sm font-medium leading-none cursor-pointer">
+                      Shop is Active
+                    </Label>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-muted/40 rounded-xl border border-border text-xs text-muted-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+                  New shops are created as Pending Approval and Inactive until reviewed by an Admin.
+                </div>
+              )}
 
               <div className="pt-4 flex justify-end gap-2">
                 <SheetClose asChild>
@@ -728,6 +896,142 @@ export default function ShopManagementPage() {
             </form>
           </SheetContent>
         </Sheet>
+
+        {/* Edit Shop Sheet */}
+        <Sheet open={isEditShopOpen} onOpenChange={setIsEditShopOpen}>
+          <SheetContent className="w-full sm:max-w-none md:w-[45vw] md:min-w-[45vw] overflow-y-auto border-l border-border/60 bg-background shadow-2xl">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="font-display">Edit Shop</SheetTitle>
+              <SheetDescription>Update store branch parameters and status.</SheetDescription>
+            </SheetHeader>
+
+            {editShopError && (
+              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-xl border border-destructive/20 mb-4 font-sans">
+                {editShopError}
+              </div>
+            )}
+
+            <form onSubmit={handleEditShopSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="editShopName">Shop Name</Label>
+                <Input
+                  id="editShopName"
+                  placeholder="e.g. Depok Warehouse"
+                  value={editShopName}
+                  onChange={(e) => setEditShopName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editShopDesc">Description</Label>
+                <textarea
+                  id="editShopDesc"
+                  className="flex min-h-[80px] w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
+                  placeholder="Brief description of the shop..."
+                  value={editShopDesc}
+                  onChange={(e) => setEditShopDesc(e.target.value)}
+                />
+              </div>
+
+              {isAdmin ? (
+                <div className="space-y-4 pt-2 border-t border-border/60">
+                  <div className="space-y-2">
+                    <Label htmlFor="editShopApprovalStatus">Approval Status</Label>
+                    <select
+                      id="editShopApprovalStatus"
+                      className="flex h-10 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                      value={editShopApprovalStatus}
+                      onChange={(e) => setEditShopApprovalStatus(e.target.value)}
+                    >
+                      <option value="pending">Pending Approval</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-1">
+                    <Checkbox
+                      id="editShopIsActive"
+                      checked={editShopIsActive}
+                      onCheckedChange={(checked) => setEditShopIsActive(checked === true)}
+                    />
+                    <Label htmlFor="editShopIsActive" className="text-sm font-medium leading-none cursor-pointer">
+                      Shop is Active
+                    </Label>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-muted/40 rounded-xl border border-border text-xs text-muted-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                  Approval and operating statuses are managed exclusively by Administrator accounts.
+                </div>
+              )}
+
+              <div className="pt-4 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setIsEditShopOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSavingShop}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                >
+                  {isSavingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          </SheetContent>
+        </Sheet>
+
+        {/* Delete Shop Confirmation Dialog */}
+        <Dialog open={isDeleteShopOpen} onOpenChange={setIsDeleteShopOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive font-display">
+                <AlertTriangle className="h-5 w-5" /> Delete Shop Location
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-sm text-muted-foreground">
+                Are you sure you want to permanently delete the shop branch <strong>{selectedShopInfo?.name}</strong>?
+                This action will mark the shop as deleted and disallow all subsequent transactions.
+              </DialogDescription>
+            </DialogHeader>
+
+            {deleteShopError && (
+              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-xl border border-destructive/20 my-2 font-sans">
+                {deleteShopError}
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setIsDeleteShopOpen(false)}
+                disabled={isDeletingShop}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="rounded-xl"
+                onClick={handleDeleteShopConfirm}
+                disabled={isDeletingShop}
+              >
+                {isDeletingShop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete Shop
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Global Inventory Sheet - Add Mode */}
         <InventoryFormSheet

@@ -23,11 +23,11 @@ import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
 import Pagination from '../../components/Pagination';
-import { DataCard, DataCardGridHeader, DataCardList } from '../../components/DataCard';
+import { DataCard, DataCardList } from '../../components/DataCard';
 
 export default function ProductsPage() {
   const { isAdmin } = useAuthMeViewModel();
-  const { data, loading, error, refresh, page, limit, setPage } = useProductsViewModel();
+  const { data, loading, error, refresh, page, limit, setPage, statusFilter, setStatusFilter } = useProductsViewModel();
   const { data: statsData, loading: statsLoading, error: statsError, refresh: refreshStats } = useProductStatsViewModel();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,33 +141,51 @@ export default function ProductsPage() {
             <p className="text-muted-foreground text-sm">Total {data?.total || 0} items registered.</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search products by name or SKU..."
-              className="relative flex-1 max-w-sm w-full"
-            />
-            <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={() => refresh()}
-                disabled={loading}
-                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Button
-                onClick={() => {
-                  setEditingProductSlug(undefined);
-                  setIsProductSheetOpen(true);
-                }}
-                className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
-              >
-                <Plus className="h-4 w-4" />
-                Add Product
-              </Button>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/60 w-fit">
+              {(['all', 'active', 'inactive', 'archived'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
+                    statusFilter === st
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {st === 'all' ? 'All Products' : st}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search products by name or SKU..."
+                className="relative flex-1 md:w-64 w-full"
+              />
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => refresh()}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingProductSlug(undefined);
+                    setIsProductSheetOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Product
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -201,7 +219,7 @@ export default function ProductsPage() {
                       onClick={() => setActiveProductSlug(product.slug)}
                     >
                       {isDetailOpen ? (
-                        /* Shrunken Compact Row (Thumbnail + Name + Price) */
+                        /* Shrunken Compact Row (Thumbnail + Name + Price + Status) */
                         <div className="col-span-1 md:col-span-12 flex items-center justify-between gap-2 min-w-0">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className="h-8 w-8 overflow-hidden rounded-md border shrink-0 bg-muted flex items-center justify-center">
@@ -216,8 +234,11 @@ export default function ProductsPage() {
                               <p className="text-[10px] text-muted-foreground font-mono truncate">{product.slug}</p>
                             </div>
                           </div>
-                          <div className="text-xs font-bold text-primary shrink-0">
-                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.price || 0)}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <StatusBadge status={product.status || (product.is_available ? 'active' : 'inactive')} className="scale-75 origin-right" />
+                            <div className="text-xs font-bold text-primary">
+                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.price || 0)}
+                            </div>
                           </div>
                         </div>
                       ) : (

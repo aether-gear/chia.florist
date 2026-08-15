@@ -38,7 +38,6 @@ export default function ProductFormSheet({
     loadProduct,
     clearProduct,
     saveProduct,
-    uploadImage,
   } = useProductFormViewModel();
 
   // Form states
@@ -382,9 +381,9 @@ export default function ProductFormSheet({
                 onChange={handleChange}
                 className="mt-1 w-full rounded-xl border border-border bg-background p-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="archived">Archived</option>
+                <option value="active">Active (Visible & Purchasable)</option>
+                <option value="inactive">Inactive (Visible for Preview, Cannot Buy)</option>
+                <option value="archived">Archived (Hidden from Store)</option>
               </select>
             </div>
             <div className="flex items-center pt-5">

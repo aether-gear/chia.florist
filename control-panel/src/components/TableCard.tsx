@@ -39,7 +39,7 @@ export function TableCardHeader({ children, className, ...props }: TableCardHead
   );
 }
 
-export interface TableCardTitleProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface TableCardTitleProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
   children?: React.ReactNode;

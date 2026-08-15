@@ -58,35 +58,6 @@ const getVillageId = (item: any): string => {
   return String(val);
 };
 
-// Robust matcher comparing items by both ID and Name
-const matchLocation = (item: any, targetIdOrObj: any, targetName?: any): boolean => {
-  if (!item) return false;
-
-  const itemId = String(item.id ?? item.code ?? item.province_id ?? item.city_id ?? item.district_id ?? item.village_id ?? '').trim().toLowerCase();
-  const itemName = String(item.name || '').trim().toLowerCase();
-
-  if (targetIdOrObj && typeof targetIdOrObj === 'object') {
-    const tId = String(targetIdOrObj.id || targetIdOrObj.code || '').trim().toLowerCase();
-    const tName = String(targetIdOrObj.name || '').trim().toLowerCase();
-    if (tId && itemId && tId === itemId) return true;
-    if (tName && itemName && tName === itemName) return true;
-  }
-
-  if (targetIdOrObj) {
-    const tId = String(targetIdOrObj).trim().toLowerCase();
-    if (tId && itemId && tId === itemId) return true;
-    if (tId && itemName && tId === itemName) return true;
-  }
-
-  if (targetName) {
-    const tName = String(targetName).trim().toLowerCase();
-    if (tName && itemName && tName === itemName) return true;
-    if (tName && itemId && tName === itemId) return true;
-  }
-
-  return false;
-};
-
 export default function AddressFormSheet({
   open,
   onOpenChange,

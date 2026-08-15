@@ -7,6 +7,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import SearchInput from '../../components/SearchInput';
 import { Button } from '../../components/ui/button';
 import { DataCard, DataCardGridHeader, DataCardList } from '../../components/DataCard';
+import EmptyState from '../../components/EmptyState';
 
 export default function CustomersListPage() {
   const { data, loading, error, page, limit, setPage, refresh } = useCustomersViewModel();
