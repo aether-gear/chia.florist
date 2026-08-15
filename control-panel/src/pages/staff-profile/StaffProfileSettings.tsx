@@ -16,6 +16,7 @@ import {
   IdCard,
   Mail,
   User as UserIcon,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ import { useStaffProfileViewModel } from '@/viewmodels/useStaffProfileViewModel'
 import { useAuthMeViewModel } from '@/viewmodels/useAuthMeViewModel';
 import AvatarUpload from '@/components/AvatarUpload';
 import { useToast } from '@/hooks/use-toast';
+import { formatRelativeLastLogin } from '@/lib/timeUtils';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Full Name is required (minimum 2 characters)'),
@@ -101,9 +103,12 @@ export default function StaffProfileSettings() {
     );
   }
 
+  const lastActiveText = formatRelativeLastLogin(profile?.LastLoginAt, 'Current session');
+  const isActiveNow = lastActiveText === 'Active now' || lastActiveText === 'Current session';
+
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-10 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 max-w-5xl w-full mx-auto space-y-10 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -111,7 +116,7 @@ export default function StaffProfileSettings() {
               Staff Profile
             </h2>
             <p className="text-muted-foreground text-sm">
-              Manage your personal staff credentials, avatar, and view security metadata
+              Manage your display name, contact phone, and avatar
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -135,9 +140,9 @@ export default function StaffProfileSettings() {
           </div>
         )}
 
-        <div className="grid gap-10 lg:grid-cols-12 items-start">
-          {/* Left / Main Profile Information Form (7 Cols) */}
-          <div className="lg:col-span-7 space-y-6">
+        <div className="space-y-10">
+          {/* Top Section: Personal Information & Account Details */}
+          <div className="space-y-6">
             <div className="pb-4 border-b border-border/60">
               <h3 className="font-bold font-display tracking-tight text-lg text-foreground">
                 Personal Information
@@ -147,8 +152,8 @@ export default function StaffProfileSettings() {
               </p>
             </div>
 
-            {/* Profile Picture Upload & Monogram */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-4 rounded-2xl bg-muted/20 border border-border/40">
+            {/* Profile Picture Upload & Monogram Banner */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-5 rounded-2xl bg-muted/20 border border-border/40">
               {profile && (
                 <AvatarUpload
                   userId={profile.user_id}
@@ -163,7 +168,7 @@ export default function StaffProfileSettings() {
                   {profile?.Name || 'Staff Member'}
                 </h4>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-medium">@{profile?.Username}</span>
+                  <span className="font-medium text-foreground/80">@{profile?.Username}</span>
                   <span>•</span>
                   <span>{storedEmail || 'No email associated'}</span>
                 </div>
@@ -173,6 +178,7 @@ export default function StaffProfileSettings() {
               </div>
             </div>
 
+            {/* Editable Form */}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Username (Read Only) */}
@@ -187,7 +193,7 @@ export default function StaffProfileSettings() {
                     disabled
                     className="bg-muted/70 rounded-xl border-border text-muted-foreground font-mono text-sm cursor-not-allowed"
                   />
-                  <p className="text-[11px] text-muted-foreground">Unique identifier for login.</p>
+                  <p className="text-[11px] text-muted-foreground">Unique account sign-in handle.</p>
                 </div>
 
                 {/* Email (Read Only) */}
@@ -202,36 +208,38 @@ export default function StaffProfileSettings() {
                     disabled
                     className="bg-muted/70 rounded-xl border-border text-muted-foreground text-sm cursor-not-allowed"
                   />
-                  <p className="text-[11px] text-muted-foreground">Managed by system admin.</p>
+                  <p className="text-[11px] text-muted-foreground">Primary contact email managed by administrator.</p>
                 </div>
               </div>
 
-              {/* Full Name */}
-              <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-xs font-semibold text-foreground">
-                  Full Name <span className="text-rose-500">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  {...register('name')}
-                  placeholder="e.g. Jane Doe"
-                  className="rounded-xl border-border bg-background text-sm"
-                />
-                {errors.name && <p className="text-xs text-rose-500">{errors.name.message}</p>}
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-xs font-semibold text-foreground">
+                    Full Name <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    {...register('name')}
+                    placeholder="e.g. Jane Doe"
+                    className="rounded-xl border-border bg-background text-sm"
+                  />
+                  {errors.name && <p className="text-xs text-rose-500">{errors.name.message}</p>}
+                </div>
 
-              {/* Phone Number */}
-              <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs font-semibold text-foreground">
-                  Phone Number
-                </Label>
-                <Input
-                  id="phone"
-                  {...register('phone')}
-                  placeholder="e.g. +628123456789"
-                  className="rounded-xl border-border bg-background text-sm"
-                />
-                {errors.phone && <p className="text-xs text-rose-500">{errors.phone.message}</p>}
+                {/* Phone Number */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="text-xs font-semibold text-foreground">
+                    Phone Number
+                  </Label>
+                  <Input
+                    id="phone"
+                    {...register('phone')}
+                    placeholder="e.g. +628123456789"
+                    className="rounded-xl border-border bg-background text-sm"
+                  />
+                  {errors.phone && <p className="text-xs text-rose-500">{errors.phone.message}</p>}
+                </div>
               </div>
 
               <div className="flex justify-end pt-2">
@@ -254,49 +262,51 @@ export default function StaffProfileSettings() {
             </form>
           </div>
 
-          {/* Right / Account Security & Timeline (5 Cols) - NO Session ID */}
-          <div className="lg:col-span-5 space-y-6">
+          {/* Bottom Section: Account Activity & Access (Non-Technical) */}
+          <div className="space-y-6 pt-4">
             <div className="pb-4 border-b border-border/60">
-              <h3 className="font-bold font-display tracking-tight text-lg text-foreground">
-                Account & Security Info
+              <h3 className="font-bold font-display tracking-tight text-lg text-foreground flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Account Activity & Access
               </h3>
               <p className="text-muted-foreground text-xs">
-                System telemetry and authentication timestamps.
+                Overview of your account status, active history, and reference codes.
               </p>
             </div>
 
-            <div className="space-y-4 rounded-2xl bg-muted/10 border border-border/40 p-5">
-              {/* Roles and Permissions */}
-              <div className="pb-4 border-b border-border/30">
+            <div className="space-y-6 rounded-2xl bg-muted/10 border border-border/40 p-6">
+              {/* Access Roles & Permissions */}
+              <div className="pb-5 border-b border-border/30">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
                   <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                  Assigned Roles
+                  Your Access Level
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2">
                   {authData?.roles && authData.roles.length > 0 ? (
                     authData.roles.map((r) => (
                       <span
                         key={r.code}
-                        className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
                       >
+                        <ShieldCheck className="h-3 w-3" />
                         {r.name || r.code}
                       </span>
                     ))
                   ) : (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-muted text-muted-foreground">
+                    <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-medium bg-muted text-muted-foreground">
                       Staff Member
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Timestamps */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-border/30">
-                {/* Registered At */}
+              {/* Activity Timeline Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-5 border-b border-border/30">
+                {/* Member Since */}
                 <div>
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     <Calendar className="h-3 w-3 text-muted-foreground" />
-                    Registered At
+                    Member Since
                   </div>
                   <p className="text-xs font-semibold text-foreground">
                     {profile?.CreatedAt
@@ -304,114 +314,108 @@ export default function StaffProfileSettings() {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
-                        }) +
-                        ' ' +
-                        new Date(profile.CreatedAt).toLocaleTimeString('en-GB', {
-                          hour: '2-digit',
-                          minute: '2-digit',
                         })
                       : 'N/A'}
                   </p>
                 </div>
 
-                {/* Last Login At */}
+                {/* Last Active */}
                 <div>
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     <Clock className="h-3 w-3 text-muted-foreground" />
-                    Last Login At
+                    Last Active
                   </div>
-                  <p className="text-xs font-semibold text-foreground">
-                    {profile?.LastLoginAt
-                      ? new Date(profile.LastLoginAt).toLocaleDateString('en-GB', {
+                  <p className={`text-xs font-semibold flex items-center gap-1.5 ${isActiveNow ? 'text-primary' : 'text-foreground'}`}>
+                    {isActiveNow && <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />}
+                    {lastActiveText}
+                  </p>
+                </div>
+
+                {/* Profile Last Updated */}
+                <div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    Profile Last Updated
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {profile?.UpdatedAt
+                      ? new Date(profile.UpdatedAt).toLocaleDateString('en-GB', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
-                        }) +
-                        ' ' +
-                        new Date(profile.LastLoginAt).toLocaleTimeString('en-GB', {
-                          hour: '2-digit',
-                          minute: '2-digit',
                         })
-                      : 'Current Session'}
+                      : 'No recent updates'}
                   </p>
                 </div>
               </div>
 
-              {/* Last Profile Update */}
-              <div className="pb-4 border-b border-border/30">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                  <Clock className="h-3 w-3 text-muted-foreground" />
-                  Last Updated
-                </div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {profile?.UpdatedAt
-                    ? new Date(profile.UpdatedAt).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : 'No profile updates recorded'}
-                </p>
-              </div>
-
-              {/* UUID Identifiers */}
-              <div className="space-y-3 pt-1">
-                {/* Staff UUID */}
+              {/* Account Reference Codes */}
+              <div className="space-y-4 pt-1">
                 <div>
-                  <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    <span className="flex items-center gap-1">
-                      <IdCard className="h-3 w-3 text-muted-foreground" />
-                      Staff ID
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => profile?.staff_id && handleCopy(profile.staff_id, 'staffId')}
-                      className="text-[10px] text-primary hover:underline flex items-center gap-1"
-                    >
-                      {copiedKey === 'staffId' ? (
-                        <>
-                          <Check className="h-2.5 w-2.5" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-2.5 w-2.5" /> Copy
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-xs font-mono text-muted-foreground truncate bg-background/80 p-1.5 rounded-lg border border-border/60">
-                    {profile?.staff_id || 'N/A'}
+                  <h4 className="text-xs font-bold font-display uppercase tracking-wider text-muted-foreground">
+                    Account Reference Codes
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                    Unique references for your staff assignment and user account. Use these if you ever need support.
                   </p>
                 </div>
 
-                {/* User UUID */}
-                <div>
-                  <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    <span className="flex items-center gap-1">
-                      <UserIcon className="h-3 w-3 text-muted-foreground" />
-                      User ID
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => profile?.user_id && handleCopy(profile.user_id, 'userId')}
-                      className="text-[10px] text-primary hover:underline flex items-center gap-1"
-                    >
-                      {copiedKey === 'userId' ? (
-                        <>
-                          <Check className="h-2.5 w-2.5" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-2.5 w-2.5" /> Copy
-                        </>
-                      )}
-                    </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Staff ID */}
+                  <div className="p-3.5 rounded-xl bg-background border border-border/60">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <IdCard className="h-3 w-3 text-primary" />
+                        Staff Assignment ID
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => profile?.staff_id && handleCopy(profile.staff_id, 'staffId')}
+                        className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-1"
+                      >
+                        {copiedKey === 'staffId' ? (
+                          <>
+                            <Check className="h-2.5 w-2.5" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-2.5 w-2.5" /> Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs font-mono text-muted-foreground truncate select-all">
+                      {profile?.staff_id || 'N/A'}
+                    </p>
                   </div>
-                  <p className="text-xs font-mono text-muted-foreground truncate bg-background/80 p-1.5 rounded-lg border border-border/60">
-                    {profile?.user_id || 'N/A'}
-                  </p>
+
+                  {/* User ID */}
+                  <div className="p-3.5 rounded-xl bg-background border border-border/60">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <UserIcon className="h-3 w-3 text-primary" />
+                        User Account ID
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => profile?.user_id && handleCopy(profile.user_id, 'userId')}
+                        className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-1"
+                      >
+                        {copiedKey === 'userId' ? (
+                          <>
+                            <Check className="h-2.5 w-2.5" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-2.5 w-2.5" /> Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs font-mono text-muted-foreground truncate select-all">
+                      {profile?.user_id || 'N/A'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

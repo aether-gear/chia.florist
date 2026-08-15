@@ -129,7 +129,7 @@ export default function DashboardLayout() {
                 {isAdmin ? '★' : fallbackInitials}
               </AvatarFallback>
             </Avatar>
-            <div className="hidden sm:flex flex-col text-left min-w-0 max-w-[140px]">
+            <div className="hidden sm:flex flex-col text-left min-w-0 max-w-[180px]">
               <span className="text-xs font-bold text-foreground truncate">
                 {staffProfile?.Name || (isAdmin ? 'Administrator' : 'Staff User')}
               </span>
@@ -140,7 +140,7 @@ export default function DashboardLayout() {
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0 ml-0.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-68 p-1.5 shadow-xl border-border/70 rounded-xl">
+        <DropdownMenuContent align="end" className="w-80 p-2 shadow-xl border-border/70 rounded-xl">
           {/* Header Card */}
           <div className="px-3.5 py-3 bg-muted/40 rounded-lg border border-border/40 mb-1.5">
             <div className="flex items-center gap-3 mb-2">
