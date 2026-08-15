@@ -1347,7 +1347,7 @@ Empty body.
 
 - **Method**: `POST`
 - **Endpoint**: `/staff/{staffID}/accounts`
-- **Description**: Register and assign a new account to a staff. The actor must be an admin of the target staff.
+- **Description**: Register and assign a new account to a staff. The actor must be an admin of the target staff. A staff entity can have at most one bound user account (1 account per user rule).
 - **Authentication**: Staff Admin
 - **Request Body**:
 
@@ -1378,7 +1378,7 @@ Empty body.
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
 | `404 Not Found`    | No staff entity found with the given `staffID`. |
-| `409 Conflict`     | An account with this email already exists. |
+| `409 Conflict`     | An account with this email already exists, or the target staff entity already has a bound user account. |
 
 ### Remove Staff Account
 
