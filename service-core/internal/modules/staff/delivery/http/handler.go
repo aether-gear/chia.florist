@@ -5,7 +5,6 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-	authenDomain "service-core/internal/modules/authentication/domain"
 	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/staff/usecase"
@@ -51,15 +50,12 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 		return apperrors.NewBadRequest("invalid staff id")
 	}
 
-	authCtx, ok := authenDomain.GetAuthContext(r.Context())
-	if !ok {
-		return apperrors.NewUnauthorized("authentication required")
-	}
-	_ = authCtx
-
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
 		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.StaffID == nil {
+		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
 	var req addStaffAccountRequest
@@ -70,11 +66,8 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 	if req.Email == "" {
 		return apperrors.NewBadRequest("email is required")
 	}
-	if req.Name == "" {
-		return apperrors.NewBadRequest("name is required")
-	}
-	if req.Username == "" {
-		return apperrors.NewBadRequest("username is required")
+	if req.Password == "" {
+		return apperrors.NewBadRequest("password is required")
 	}
 
 	input := usecase.AddStaffAccountParams{
@@ -82,10 +75,7 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 		ActorStaffID:   *actor.StaffID,
 		StaffID:        staffID,
 		Email:          req.Email,
-		Name:           req.Name,
 		Password:       req.Password,
-		Username:       req.Username,
-		Phone:          req.Phone,
 	}
 
 	err = h.addStaffAccount.Execute(r.Context(), input)
@@ -94,7 +84,7 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 	}
 
 	response := map[string]string{
-		"message": "verify success",
+		"message": "staff account successfully created",
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)
@@ -110,9 +100,13 @@ func (h *staffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) error
 	if req.Name == "" {
 		return apperrors.NewBadRequest("name is required")
 	}
+	if req.Username == "" {
+		return apperrors.NewBadRequest("username is required")
+	}
 
 	input := usecase.CreateStaffInput{
 		Name:        req.Name,
+		Username:    req.Username,
 		Description: req.Description,
 		LogoUrl:     req.LogoUrl,
 		BannerUrl:   req.BannerUrl,

@@ -16,6 +16,8 @@ import (
 	staffDomain "service-core/internal/modules/staff/domain"
 	staffRepo "service-core/internal/modules/staff/repository"
 	"service-core/internal/modules/staff/usecase"
+	userDomain "service-core/internal/modules/user/domain"
+	userRepo "service-core/internal/modules/user/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/go-chi/chi/v5"
@@ -127,6 +129,39 @@ func (r *testAccountRepo) DeleteByUserID(ctx context.Context, exec transaction.E
 	return nil
 }
 
+type testUserRepo struct {
+	user *userDomain.User
+}
+
+func (r *testUserRepo) GetByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*userDomain.User, error) {
+	return r.user, nil
+}
+func (r *testUserRepo) GetByUsername(ctx context.Context, exec transaction.Executor, username string) (*userDomain.User, error) {
+	return nil, nil
+}
+func (r *testUserRepo) CreateUser(ctx context.Context, exec transaction.Executor, props userRepo.CreateUserProps) error {
+	return nil
+}
+func (r *testUserRepo) SaveProfile(ctx context.Context, exec transaction.Executor, props userRepo.SaveProfileProps) error {
+	return nil
+}
+func (r *testUserRepo) Delete(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
+	return nil
+}
+
+type testRoleRepo struct {
+	role *authzDomain.Role
+}
+
+func (r *testRoleRepo) GetByCode(ctx context.Context, exec transaction.Executor, code authzDomain.RoleCode) (*authzDomain.Role, error) {
+	return r.role, nil
+}
+
+type testHasher struct{}
+
+func (h *testHasher) Hash(p string) (string, error) { return "hash", nil }
+func (h *testHasher) Compare(hash, p string) error { return nil }
+
 func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRepo, *testMembershipRepo) {
 	sRepo := &testStaffRepo{
 		staff: &staffDomain.Staff{
@@ -165,17 +200,24 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 			UserID: uuid.New(),
 		},
 	}
+	uRepo := &testUserRepo{}
+	rRepo := &testRoleRepo{
+		role: &authzDomain.Role{ID: uuid.New(), Code: authzDomain.RoleStaff, Name: "Staff"},
+	}
+	hasher := &testHasher{}
 
 	exec := &mockExec{}
 	tx := &mockTx{}
 	audit := &mockAuditor{}
 
+	createUC := usecase.NewCreateStaffUsecase(sRepo, uRepo, exec, tx, audit)
+	addUC := usecase.NewAddStaffAccountUsecase(exec, tx, aRepo, hasher, uRepo, sRepo, mRepo, rRepo, audit)
 	listUC := usecase.NewListStaffAccountsUsecase(exec, sRepo, mRepo, audit)
 	updateUC := usecase.NewUpdateStaffUsecase(exec, tx, sRepo, mRepo, audit)
 	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, audit)
 	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, audit)
 
-	handler := NewStaffHandler(nil, nil, nil, listUC, updateUC, deleteUC, removeUC)
+	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC)
 	return handler, sRepo, mRepo
 }
 
@@ -295,3 +337,54 @@ func TestHandler_RemoveStaffAccount(t *testing.T) {
 		t.Fatalf("expected status 200, got: %d", rec.Code)
 	}
 }
+
+func TestHandler_CreateStaff(t *testing.T) {
+	staffID := uuid.New()
+	accountID := uuid.New()
+	handler, _, _ := setupTestHandler(staffID, accountID)
+
+	body, _ := json.Marshal(createStaffRequest{
+		Name:     "Floral Logistics",
+		Username: "floral-logistics",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/staff", bytes.NewReader(body))
+	req = withActorContext(req, accountID, staffID)
+
+	rec := httptest.NewRecorder()
+	err := handler.CreateStaff(rec, req)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got: %d", rec.Code)
+	}
+}
+
+func TestHandler_AddStaffAccount(t *testing.T) {
+	staffID := uuid.New()
+	accountID := uuid.New()
+	handler, _, _ := setupTestHandler(staffID, accountID)
+
+	body, _ := json.Marshal(addStaffAccountRequest{
+		Email:    "new@chia.florist",
+		Password: "password123",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/staff/"+staffID.String()+"/accounts", bytes.NewReader(body))
+	req = withActorContext(req, accountID, staffID)
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("staffID", staffID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	err := handler.AddStaffAccount(rec, req)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got: %d", rec.Code)
+	}
+}
+

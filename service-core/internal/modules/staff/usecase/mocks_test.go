@@ -11,6 +11,8 @@ import (
 	authzRepo "service-core/internal/modules/authorization/repository"
 	staffDomain "service-core/internal/modules/staff/domain"
 	staffRepo "service-core/internal/modules/staff/repository"
+	userDomain "service-core/internal/modules/user/domain"
+	userRepo "service-core/internal/modules/user/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -57,11 +59,13 @@ type mockStaffRepo struct {
 	getByIDError error
 	updateError  error
 	deleteError  error
+	createCalls  int
 	updateCalls  int
 	deleteCalls  int
 }
 
 func (m *mockStaffRepo) Create(ctx context.Context, exec transaction.Executor, staff staffDomain.Staff) error {
+	m.createCalls++
 	return nil
 }
 
@@ -102,6 +106,7 @@ type mockStaffMembershipRepo struct {
 	listAccsError    error
 	deleteByStaffErr error
 	deleteByAccErr   error
+	saveCalls        int
 	deleteByAccCalls int
 	deleteByStaffCalls int
 }
@@ -128,6 +133,7 @@ func (m *mockStaffMembershipRepo) ListRolesByAccountIDAndStaffID(ctx context.Con
 }
 
 func (m *mockStaffMembershipRepo) Save(ctx context.Context, exec transaction.Executor, membership authzDomain.StaffMembership) error {
+	m.saveCalls++
 	return nil
 }
 
@@ -184,4 +190,55 @@ func (m *mockAccountRepo) DeleteByUserID(ctx context.Context, exec transaction.E
 
 var _ authenRepo.AccountRepository = (*mockAccountRepo)(nil)
 
+type mockUserRepo struct {
+	user        *userDomain.User
+	createCalls int
+}
+
+func (m *mockUserRepo) GetByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*userDomain.User, error) {
+	return m.user, nil
+}
+
+func (m *mockUserRepo) GetByUsername(ctx context.Context, exec transaction.Executor, username string) (*userDomain.User, error) {
+	return m.user, nil
+}
+
+func (m *mockUserRepo) CreateUser(ctx context.Context, exec transaction.Executor, props userRepo.CreateUserProps) error {
+	m.createCalls++
+	return nil
+}
+
+func (m *mockUserRepo) SaveProfile(ctx context.Context, exec transaction.Executor, props userRepo.SaveProfileProps) error {
+	return nil
+}
+
+func (m *mockUserRepo) Delete(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
+	return nil
+}
+
+var _ userRepo.UserRepository = (*mockUserRepo)(nil)
+
+type mockRoleRepo struct {
+	role *authzDomain.Role
+}
+
+func (m *mockRoleRepo) GetByCode(ctx context.Context, exec transaction.Executor, code authzDomain.RoleCode) (*authzDomain.Role, error) {
+	return m.role, nil
+}
+
+var _ authzRepo.RoleRepository = (*mockRoleRepo)(nil)
+
+type mockPwHasher struct{}
+
+func (m *mockPwHasher) Hash(password string) (string, error) {
+	return "hashed_" + password, nil
+}
+
+func (m *mockPwHasher) Compare(hash, password string) error {
+	return nil
+}
+
+var _ authenRepo.PasswordHasher = (*mockPwHasher)(nil)
+
 var errMock = errors.New("mock error")
+

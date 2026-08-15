@@ -7,15 +7,13 @@ import (
 )
 
 type addStaffAccountRequest struct {
-	Email    string  `json:"email"`
-	Name     string  `json:"name"`
-	Username string  `json:"username"`
-	Password string  `json:"password"`
-	Phone    *string `json:"phone"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type createStaffRequest struct {
 	Name        string  `json:"name"`
+	Username    string  `json:"username"`
 	Description *string `json:"description"`
 	LogoUrl     *string `json:"logo_url"`
 	BannerUrl   *string `json:"banner_url"`
