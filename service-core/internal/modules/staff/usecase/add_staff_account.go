@@ -148,6 +148,21 @@ func (u *AddStaffAccountUsecase) Execute(
 		return apperrors.NewNotFound(staffDomain.ErrNotFoundStaff.Error())
 	}
 
+	existingUserAcc, err := u.accountRepo.GetByUserID(ctx, u.executor, existingStaff.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to check existing staff account: %w", err)
+	}
+	if existingUserAcc != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "staff user already has a bound account"},
+		})
+		return apperrors.NewConflict("this staff entity already has a bound account (1 account per user limit)")
+	}
+
 	staffRole, err := u.roleRepo.GetByCode(ctx, u.executor, authzDomain.RoleStaff)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve staff role: %w", err)

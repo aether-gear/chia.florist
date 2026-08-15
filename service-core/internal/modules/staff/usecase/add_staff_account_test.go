@@ -18,12 +18,17 @@ import (
 
 type customMockAccountRepo struct {
 	mockAccountRepo
-	existingAccount *authenDomain.Account
-	createCalls     int
+	existingAccount       *authenDomain.Account
+	existingAccountByUser *authenDomain.Account
+	createCalls           int
 }
 
 func (m *customMockAccountRepo) GetByEmail(ctx context.Context, exec transaction.Executor, email string) (*authenDomain.Account, error) {
 	return m.existingAccount, nil
+}
+
+func (m *customMockAccountRepo) GetByUserID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*authenDomain.Account, error) {
+	return m.existingAccountByUser, nil
 }
 
 func (m *customMockAccountRepo) Create(ctx context.Context, exec transaction.Executor, account authenDomain.Account) error {
@@ -205,4 +210,57 @@ func TestAddStaffAccountUsecase_DuplicateEmail(t *testing.T) {
 	var appErr *apperrors.AppError
 	assert.ErrorAs(t, err, &appErr)
 	assert.Equal(t, 409, appErr.StatusCode)
+}
+
+func TestAddStaffAccountUsecase_AlreadyBoundConflict(t *testing.T) {
+	actorAccountID := uuid.New()
+	actorStaffID := uuid.New()
+	targetStaffID := uuid.New()
+	targetUserID := uuid.New()
+
+	memRepo := &mockStaffMembershipRepo{
+		membership: &authzDomain.StaffMembership{
+			ID:        uuid.New(),
+			StaffID:   actorStaffID,
+			AccountID: actorAccountID,
+		},
+		roles: []authzDomain.Role{
+			{ID: uuid.New(), Code: authzDomain.RoleStaffAdmin, Name: "Staff Admin"},
+		},
+	}
+	staffR := &mockStaffRepo{
+		staff: &staffDomain.Staff{ID: targetStaffID, UserID: targetUserID},
+	}
+	accRepo := &customMockAccountRepo{
+		existingAccountByUser: &authenDomain.Account{
+			ID:     uuid.New(),
+			UserID: targetUserID,
+			Email:  "alreadybound@chia.florist",
+		},
+	}
+
+	uc := NewAddStaffAccountUsecase(
+		&mockExecutor{},
+		&mockTransactor{},
+		accRepo,
+		&mockPwHasher{},
+		&mockUserRepo{},
+		staffR,
+		memRepo,
+		&mockRoleRepo{},
+		&mockAuditLogger{},
+	)
+
+	err := uc.Execute(context.Background(), AddStaffAccountParams{
+		ActorAccountID: actorAccountID,
+		ActorStaffID:   actorStaffID,
+		StaffID:        targetStaffID,
+		Email:          "another@chia.florist",
+		Password:       "password123",
+	})
+	assert.Error(t, err)
+	var appErr *apperrors.AppError
+	assert.ErrorAs(t, err, &appErr)
+	assert.Equal(t, 409, appErr.StatusCode)
+	assert.Contains(t, appErr.Message, "1 account per user limit")
 }

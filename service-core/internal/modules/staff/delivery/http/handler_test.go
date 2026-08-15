@@ -104,7 +104,8 @@ func (r *testMembershipRepo) DeleteByStaffID(ctx context.Context, exec transacti
 }
 
 type testAccountRepo struct {
-	account *authenDomain.Account
+	account       *authenDomain.Account
+	accountByUser *authenDomain.Account
 }
 
 func (r *testAccountRepo) GetByEmail(ctx context.Context, exec transaction.Executor, email string) (*authenDomain.Account, error) {
@@ -114,7 +115,7 @@ func (r *testAccountRepo) GetByID(ctx context.Context, exec transaction.Executor
 	return r.account, nil
 }
 func (r *testAccountRepo) GetByUserID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*authenDomain.Account, error) {
-	return r.account, nil
+	return r.accountByUser, nil
 }
 func (r *testAccountRepo) ActivateByUserID(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
 	return nil
@@ -152,6 +153,24 @@ func (r *testUserRepo) Delete(ctx context.Context, exec transaction.Executor, id
 type testUserDeletionService struct{}
 
 func (s *testUserDeletionService) DeleteUserRecord(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
+	return nil
+}
+
+type testSessionRepo struct{}
+
+func (r *testSessionRepo) GetByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*authenDomain.Session, error) {
+	return nil, nil
+}
+func (r *testSessionRepo) RevokeByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
+	return nil
+}
+func (r *testSessionRepo) RevokeAllByUserID(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
+	return nil
+}
+func (r *testSessionRepo) UpdateLastActivityByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
+	return nil
+}
+func (r *testSessionRepo) Save(ctx context.Context, exec transaction.Executor, session authenDomain.Session) error {
 	return nil
 }
 
@@ -211,6 +230,7 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 		role: &authzDomain.Role{ID: uuid.New(), Code: authzDomain.RoleStaff, Name: "Staff"},
 	}
 	hasher := &testHasher{}
+	sessionRepo := &testSessionRepo{}
 
 	exec := &mockExec{}
 	tx := &mockTx{}
@@ -222,7 +242,7 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 	listUC := usecase.NewListStaffAccountsUsecase(exec, sRepo, mRepo, audit)
 	updateUC := usecase.NewUpdateStaffUsecase(exec, tx, sRepo, mRepo, audit)
 	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, userDeletionSvc, audit)
-	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, userDeletionSvc, audit)
+	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, sessionRepo, audit)
 
 	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC)
 	return handler, sRepo, mRepo

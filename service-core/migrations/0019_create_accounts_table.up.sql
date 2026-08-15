@@ -7,7 +7,7 @@ CREATE TYPE account_type
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    user_id UUID NOT NULL UNIQUE,
+    user_id UUID NOT NULL,
 
     email TEXT NOT NULL,
     password TEXT NOT NULL,
@@ -26,6 +26,10 @@ CREATE TABLE accounts (
         REFERENCES users(id)
         ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX unique_user_per_account
+    ON accounts(user_id)
+    WHERE deleted_at IS NULL;
 
 CREATE UNIQUE INDEX unique_email_per_account
     ON accounts(email)

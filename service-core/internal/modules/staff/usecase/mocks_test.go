@@ -157,7 +157,8 @@ func (m *mockStaffMembershipRepo) DeleteByStaffID(ctx context.Context, exec tran
 var _ authzRepo.StaffMembershipRepository = (*mockStaffMembershipRepo)(nil)
 
 type mockAccountRepo struct {
-	account *authenDomain.Account
+	account     *authenDomain.Account
+	deleteCalls int
 }
 
 func (m *mockAccountRepo) GetByEmail(ctx context.Context, exec transaction.Executor, email string) (*authenDomain.Account, error) {
@@ -185,10 +186,44 @@ func (m *mockAccountRepo) Create(ctx context.Context, exec transaction.Executor,
 }
 
 func (m *mockAccountRepo) DeleteByUserID(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
+	m.deleteCalls++
 	return nil
 }
 
 var _ authenRepo.AccountRepository = (*mockAccountRepo)(nil)
+
+type mockSessionRepo struct {
+	revokeCalls    int
+	revokedUserIDs []uuid.UUID
+	err            error
+}
+
+func (m *mockSessionRepo) GetByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*authenDomain.Session, error) {
+	return nil, nil
+}
+
+func (m *mockSessionRepo) RevokeByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
+	return nil
+}
+
+func (m *mockSessionRepo) RevokeAllByUserID(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.revokeCalls++
+	m.revokedUserIDs = append(m.revokedUserIDs, userID)
+	return nil
+}
+
+func (m *mockSessionRepo) UpdateLastActivityByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) error {
+	return nil
+}
+
+func (m *mockSessionRepo) Save(ctx context.Context, exec transaction.Executor, session authenDomain.Session) error {
+	return nil
+}
+
+var _ authenRepo.SessionRepository = (*mockSessionRepo)(nil)
 
 type mockUserRepo struct {
 	user        *userDomain.User

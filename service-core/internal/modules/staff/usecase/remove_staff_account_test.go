@@ -10,6 +10,8 @@ import (
 	staffDomain "service-core/internal/modules/staff/domain"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRemoveStaffAccount_Success(t *testing.T) {
@@ -50,7 +52,7 @@ func TestRemoveStaffAccount_Success(t *testing.T) {
 		},
 	}
 
-	userDeletionService := &mockUserDeletionService{}
+	sessionRepo := &mockSessionRepo{}
 	auditLogger := &mockAuditLogger{}
 
 	uc := NewRemoveStaffAccountUsecase(
@@ -59,7 +61,7 @@ func TestRemoveStaffAccount_Success(t *testing.T) {
 		staffRepo,
 		membershipRepo,
 		accountRepo,
-		userDeletionService,
+		sessionRepo,
 		auditLogger,
 	)
 
@@ -70,19 +72,13 @@ func TestRemoveStaffAccount_Success(t *testing.T) {
 		AccountID:      targetAccountID,
 	})
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-
-	if membershipRepo.deleteByAccCalls != 1 {
-		t.Errorf("expected 1 membership delete call, got: %d", membershipRepo.deleteByAccCalls)
-	}
-	if len(userDeletionService.deletedUsers) != 1 || userDeletionService.deletedUsers[0] != targetAccountUserID {
-		t.Errorf("expected user deletion for %s, got: %v", targetAccountUserID, userDeletionService.deletedUsers)
-	}
-	if len(auditLogger.events) != 1 {
-		t.Errorf("expected 1 audit event, got: %d", len(auditLogger.events))
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 1, membershipRepo.deleteByAccCalls)
+	assert.Equal(t, 1, accountRepo.deleteCalls)
+	assert.Equal(t, 1, sessionRepo.revokeCalls)
+	assert.Equal(t, []uuid.UUID{targetAccountUserID}, sessionRepo.revokedUserIDs)
+	assert.Len(t, auditLogger.events, 1)
+	assert.Equal(t, "remove_staff_account", auditLogger.events[0].Action)
 }
 
 func TestRemoveStaffAccount_SelfRemovalBlocked(t *testing.T) {
@@ -96,7 +92,7 @@ func TestRemoveStaffAccount_SelfRemovalBlocked(t *testing.T) {
 		&mockStaffRepo{},
 		&mockStaffMembershipRepo{},
 		&mockAccountRepo{},
-		&mockUserDeletionService{},
+		&mockSessionRepo{},
 		&mockAuditLogger{},
 	)
 
@@ -107,21 +103,17 @@ func TestRemoveStaffAccount_SelfRemovalBlocked(t *testing.T) {
 		AccountID:      actorAccountID,
 	})
 
-	if err == nil {
-		t.Fatal("expected error when removing own account, got nil")
-	}
-
-	appErr, ok := err.(*apperrors.AppError)
-	if !ok || appErr.StatusCode != 400 {
-		t.Fatalf("expected 400 Bad Request, got: %v", err)
-	}
+	require.Error(t, err)
+	var badReq *apperrors.AppError
+	require.ErrorAs(t, err, &badReq)
+	assert.Equal(t, 400, badReq.StatusCode)
+	assert.Contains(t, badReq.Message, "cannot remove own account")
 }
 
-func TestRemoveStaffAccount_PrimaryOwnerRemovalBlocked(t *testing.T) {
+func TestRemoveStaffAccount_NonAdminForbidden(t *testing.T) {
 	ctx := context.Background()
 	actorAccountID := uuid.New()
-	ownerAccountID := uuid.New()
-	ownerUserID := uuid.New()
+	targetAccountID := uuid.New()
 	staffID := uuid.New()
 
 	membershipRepo := &mockStaffMembershipRepo{
@@ -130,11 +122,91 @@ func TestRemoveStaffAccount_PrimaryOwnerRemovalBlocked(t *testing.T) {
 			StaffID:   staffID,
 			AccountID: actorAccountID,
 		},
-		targetMembership: &authzDomain.StaffMembership{
+		roles: []authzDomain.Role{
+			{ID: uuid.New(), Code: authzDomain.RoleStaff, Name: "Staff"},
+		},
+	}
+
+	uc := NewRemoveStaffAccountUsecase(
+		&mockExecutor{},
+		&mockTransactor{},
+		&mockStaffRepo{},
+		membershipRepo,
+		&mockAccountRepo{},
+		&mockSessionRepo{},
+		&mockAuditLogger{},
+	)
+
+	err := uc.Execute(ctx, RemoveStaffAccountInput{
+		ActorAccountID: actorAccountID,
+		ActorStaffID:   staffID,
+		StaffID:        staffID,
+		AccountID:      targetAccountID,
+	})
+
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, 403, appErr.StatusCode)
+}
+
+func TestRemoveStaffAccount_StaffNotFound(t *testing.T) {
+	ctx := context.Background()
+	actorAccountID := uuid.New()
+	targetAccountID := uuid.New()
+	staffID := uuid.New()
+
+	membershipRepo := &mockStaffMembershipRepo{
+		membership: &authzDomain.StaffMembership{
 			ID:        uuid.New(),
 			StaffID:   staffID,
-			AccountID: ownerAccountID,
+			AccountID: actorAccountID,
 		},
+		roles: []authzDomain.Role{
+			{ID: uuid.New(), Code: authzDomain.RoleStaffAdmin, Name: "Staff Admin"},
+		},
+	}
+
+	staffRepo := &mockStaffRepo{
+		staff: nil,
+	}
+
+	uc := NewRemoveStaffAccountUsecase(
+		&mockExecutor{},
+		&mockTransactor{},
+		staffRepo,
+		membershipRepo,
+		&mockAccountRepo{},
+		&mockSessionRepo{},
+		&mockAuditLogger{},
+	)
+
+	err := uc.Execute(ctx, RemoveStaffAccountInput{
+		ActorAccountID: actorAccountID,
+		ActorStaffID:   staffID,
+		StaffID:        staffID,
+		AccountID:      targetAccountID,
+	})
+
+	require.Error(t, err)
+	var notFound *apperrors.AppError
+	require.ErrorAs(t, err, &notFound)
+	assert.Equal(t, 404, notFound.StatusCode)
+}
+
+func TestRemoveStaffAccount_TargetMembershipNotFound(t *testing.T) {
+	ctx := context.Background()
+	actorAccountID := uuid.New()
+	targetAccountID := uuid.New()
+	staffID := uuid.New()
+
+	membershipRepo := &mockStaffMembershipRepo{
+		membership: &authzDomain.StaffMembership{
+			ID:        uuid.New(),
+			StaffID:   staffID,
+			AccountID: actorAccountID,
+		},
+		targetMembership: nil,
 		roles: []authzDomain.Role{
 			{ID: uuid.New(), Code: authzDomain.RoleStaffAdmin, Name: "Staff Admin"},
 		},
@@ -143,14 +215,7 @@ func TestRemoveStaffAccount_PrimaryOwnerRemovalBlocked(t *testing.T) {
 	staffRepo := &mockStaffRepo{
 		staff: &staffDomain.Staff{
 			ID:     staffID,
-			UserID: ownerUserID,
-		},
-	}
-
-	accountRepo := &mockAccountRepo{
-		account: &authenDomain.Account{
-			ID:     ownerAccountID,
-			UserID: ownerUserID, // Matches staff owner
+			UserID: uuid.New(),
 		},
 	}
 
@@ -159,8 +224,8 @@ func TestRemoveStaffAccount_PrimaryOwnerRemovalBlocked(t *testing.T) {
 		&mockTransactor{},
 		staffRepo,
 		membershipRepo,
-		accountRepo,
-		&mockUserDeletionService{},
+		&mockAccountRepo{},
+		&mockSessionRepo{},
 		&mockAuditLogger{},
 	)
 
@@ -168,15 +233,11 @@ func TestRemoveStaffAccount_PrimaryOwnerRemovalBlocked(t *testing.T) {
 		ActorAccountID: actorAccountID,
 		ActorStaffID:   staffID,
 		StaffID:        staffID,
-		AccountID:      ownerAccountID,
+		AccountID:      targetAccountID,
 	})
 
-	if err == nil {
-		t.Fatal("expected error when removing primary staff owner, got nil")
-	}
-
-	appErr, ok := err.(*apperrors.AppError)
-	if !ok || appErr.StatusCode != 403 {
-		t.Fatalf("expected 403 Forbidden, got: %v", err)
-	}
+	require.Error(t, err)
+	var notFound *apperrors.AppError
+	require.ErrorAs(t, err, &notFound)
+	assert.Equal(t, 404, notFound.StatusCode)
 }

@@ -17,13 +17,13 @@ import (
 )
 
 type RemoveStaffAccountUsecase struct {
-	executor            transaction.Executor
-	transactor          transaction.Transactor
-	staffRepo           staffRepo.StaffRepository
-	membershipRepo      authzRepo.StaffMembershipRepository
-	accountRepo         authenRepo.AccountRepository
-	userDeletionService authenRepo.UserDeletionService
-	auditLogger         applogger.AuditLogger
+	executor       transaction.Executor
+	transactor     transaction.Transactor
+	staffRepo      staffRepo.StaffRepository
+	membershipRepo authzRepo.StaffMembershipRepository
+	accountRepo    authenRepo.AccountRepository
+	sessionRepo    authenRepo.SessionRepository
+	auditLogger    applogger.AuditLogger
 }
 
 func NewRemoveStaffAccountUsecase(
@@ -32,17 +32,17 @@ func NewRemoveStaffAccountUsecase(
 	staffRepo staffRepo.StaffRepository,
 	membershipRepo authzRepo.StaffMembershipRepository,
 	accountRepo authenRepo.AccountRepository,
-	userDeletionService authenRepo.UserDeletionService,
+	sessionRepo authenRepo.SessionRepository,
 	auditLogger applogger.AuditLogger,
 ) *RemoveStaffAccountUsecase {
 	return &RemoveStaffAccountUsecase{
-		executor:            executor,
-		transactor:          transactor,
-		staffRepo:           staffRepo,
-		membershipRepo:      membershipRepo,
-		accountRepo:         accountRepo,
-		userDeletionService: userDeletionService,
-		auditLogger:         auditLogger,
+		executor:       executor,
+		transactor:     transactor,
+		staffRepo:      staffRepo,
+		membershipRepo: membershipRepo,
+		accountRepo:    accountRepo,
+		sessionRepo:    sessionRepo,
+		auditLogger:    auditLogger,
 	}
 }
 
@@ -132,10 +132,6 @@ func (u *RemoveStaffAccountUsecase) Execute(
 		return apperrors.NewNotFound("target account not found")
 	}
 
-	if targetAccount.UserID == staff.UserID {
-		return apperrors.NewForbidden("cannot remove primary staff owner account")
-	}
-
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.membershipRepo.DeleteByAccountIDAndStaffID(ctx, exec,
 			input.AccountID,
@@ -144,12 +140,16 @@ func (u *RemoveStaffAccountUsecase) Execute(
 			return fmt.Errorf("failed to delete staff membership: %w", err)
 		}
 
-		if u.userDeletionService != nil {
-			if err := u.userDeletionService.DeleteUserRecord(ctx, exec,
-				targetAccount.UserID,
-			); err != nil {
-				return fmt.Errorf("failed to soft-delete user and account for staff member: %w", err)
-			}
+		// Simple attempt for deletion.
+		// Assuming accont has type staff and at the moment is not bind with oauth.
+		if err := u.accountRepo.
+			DeleteByUserID(ctx, exec, targetAccount.UserID); err != nil {
+			return fmt.Errorf("failed to soft delete account: %w", err)
+		}
+
+		if err := u.sessionRepo.
+			RevokeAllByUserID(ctx, exec, targetAccount.UserID); err != nil {
+			return fmt.Errorf("failed to revoke sessions: %w", err)
 		}
 
 		return nil

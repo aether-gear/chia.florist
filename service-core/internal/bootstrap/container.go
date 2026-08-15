@@ -497,7 +497,7 @@ func NewContainer(cfg Config,
 				staffRepo,
 				membershipRepo,
 				accountRepo,
-				userDeletionSvc,
+				sessionRepo,
 				auditLogger,
 			),
 
