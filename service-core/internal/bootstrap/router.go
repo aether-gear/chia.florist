@@ -156,6 +156,10 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.AddStaffAccount,
 			&c.CreateStaff,
 			&c.FindStaff,
+			&c.ListStaffAccounts,
+			&c.UpdateStaff,
+			&c.DeleteStaff,
+			&c.RemoveStaffAccount,
 		)
 
 		customerHandler = customerH.NewCustomerHandler(
@@ -309,7 +313,14 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/", chains.StaffAdminOnly(staffHandler.FindStaff))
 			r.Post("/", chains.StaffAdminOnly(staffHandler.CreateStaff))
 			r.Route("/{staffID}", func(r chi.Router) {
-				r.Post("/accounts", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+				r.Put("/", chains.StaffAdminOnly(staffHandler.UpdateStaff))
+				r.Delete("/", chains.StaffAdminOnly(staffHandler.DeleteStaff))
+
+				r.Route("/accounts", func(r chi.Router) {
+					r.Get("/", chains.StaffAdminOnly(staffHandler.ListStaffAccounts))
+					r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+					r.Delete("/{accountID}", chains.StaffAdminOnly(staffHandler.RemoveStaffAccount))
+				})
 			})
 		})
 

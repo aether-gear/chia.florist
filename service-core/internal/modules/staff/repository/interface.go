@@ -33,4 +33,19 @@ type StaffRepository interface {
 		exec transaction.Executor,
 		params FindStaffParams,
 	) ([]domain.StaffProfile, int, error)
+
+	Update(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+		name string,
+		logoUrl *string,
+		bannerUrl *string,
+	) error
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+	) error
 }

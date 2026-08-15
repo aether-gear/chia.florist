@@ -23,3 +23,18 @@ type StaffMembership struct {
 
 	CreatedAt time.Time
 }
+
+// StaffAccountMember represents account and user details bound to a staff unit.
+type StaffAccountMember struct {
+	AccountID   uuid.UUID
+	UserID      uuid.UUID
+	Email       string
+	Name        string
+	Username    string
+	Phone       *string
+	AvatarURL   *string
+	Role        Role
+	LastLoginAt *time.Time
+	CreatedAt   time.Time
+}
+

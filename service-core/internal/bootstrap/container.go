@@ -101,9 +101,13 @@ type Container struct {
 	ResetPassword         authenUsecase.ResetPasswordUsecase
 	DeleteCustomerAccount customerUsecase.DeleteCustomerAccountUsecase
 
-	FindStaff       staffUsecase.FindStaffUsecase
-	CreateStaff     staffUsecase.CreateStaffUsecase
-	AddStaffAccount staffUsecase.AddStaffAccountUsecase
+	FindStaff          staffUsecase.FindStaffUsecase
+	CreateStaff        staffUsecase.CreateStaffUsecase
+	AddStaffAccount    staffUsecase.AddStaffAccountUsecase
+	ListStaffAccounts  staffUsecase.ListStaffAccountsUsecase
+	UpdateStaff        staffUsecase.UpdateStaffUsecase
+	DeleteStaff        staffUsecase.DeleteStaffUsecase
+	RemoveStaffAccount staffUsecase.RemoveStaffAccountUsecase
 
 	GetCart          cartUsecase.GetCartUsecase
 	AddItem          cartUsecase.AddItemUsecase
@@ -459,6 +463,38 @@ func NewContainer(cfg Config,
 				userRepo,
 				membershipRepo,
 				roleRepo,
+				auditLogger,
+			),
+		ListStaffAccounts: *staffUsecase.
+			NewListStaffAccountsUsecase(
+				infra.TransactionExecutor,
+				staffRepo,
+				membershipRepo,
+				auditLogger,
+			),
+		UpdateStaff: *staffUsecase.
+			NewUpdateStaffUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				staffRepo,
+				membershipRepo,
+				auditLogger,
+			),
+		DeleteStaff: *staffUsecase.
+			NewDeleteStaffUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				staffRepo,
+				membershipRepo,
+				auditLogger,
+			),
+		RemoveStaffAccount: *staffUsecase.
+			NewRemoveStaffAccountUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				staffRepo,
+				membershipRepo,
+				accountRepo,
 				auditLogger,
 			),
 
