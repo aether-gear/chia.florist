@@ -1137,6 +1137,7 @@ Empty body.
   ```json
   {
     "name":        "string (required)",
+    "username":    "string (required)",
     "description": "string (optional)",
     "logo_url":    "string (optional)",
     "banner_url":  "string (optional)"
@@ -1153,9 +1154,10 @@ Empty body.
 
 | Status             | Condition |
 |--------------------|-----------|
-| `400 Bad Request`  | `name` is empty, or optional string fields are present but empty. |
+| `400 Bad Request`  | `name` or `username` is empty, or optional string fields are present but empty. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `409 Conflict`     | A user with this username already exists. |
 
 ### Find Staff
 
@@ -1352,10 +1354,7 @@ Empty body.
   ```json
   {
     "email":    "string (required)",
-    "name":     "string (required)",
-    "username": "string (required)",
-    "password": "string (required)",
-    "phone":    "string (optional)"
+    "password": "string (required)"
   }
   ```
 
@@ -1368,16 +1367,17 @@ Empty body.
 #### Response `201 Created`
 
 ```json
-{ "message": "verify success" }
+{ "message": "staff account successfully created" }
 ```
 
 #### Error Responses
 
 | Status             | Condition |
 |--------------------|-----------|
-| `400 Bad Request`  | `staffID` is not a valid UUID, or `email`, `name`, or `username` is empty. |
+| `400 Bad Request`  | `staffID` is not a valid UUID, or `email` or `password` is empty. |
 | `401 Unauthorized` | Missing or invalid session. |
 | `403 Forbidden`    | Authenticated user does not have the staff admin role. |
+| `404 Not Found`    | No staff entity found with the given `staffID`. |
 | `409 Conflict`     | An account with this email already exists. |
 
 ### Remove Staff Account
