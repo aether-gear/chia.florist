@@ -3,9 +3,9 @@ export interface StaffProfile {
   user_id: string;
   Name: string;
   Username: string;
-  Phone: string;
-  AvatarURL: string;
-  LastLoginAt: string | null;
+  Phone?: string | null;
+  AvatarURL?: string | null;
+  LastLoginAt?: string | null;
   CreatedAt: string;
-  UpdatedAt: string | null;
+  UpdatedAt?: string | null;
 }

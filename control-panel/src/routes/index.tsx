@@ -5,12 +5,10 @@ import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import SecurityPage from '../pages/security/SecurityPage';
 import OrdersPage from '../pages/orders/OrdersPage';
-import MerchantProfileSettings from '../pages/merchant-profile/MerchantProfileSettings';
-import CreateMerchantPage from '../pages/admin/CreateMerchantPage';
-import AddMerchantAccountPage from '../pages/admin/AddMerchantAccountPage';
+import StaffProfileSettings from '../pages/staff-profile/StaffProfileSettings';
 import ProductsPage from '../pages/dashboard/ProductsPage';
 
-import MerchantsListPage from '../pages/admin/MerchantsListPage';
+import StaffListPage from '../pages/admin/StaffListPage';
 import CustomersListPage from '../pages/admin/CustomersListPage';
 import ShopManagementPage from '../pages/shop/ShopManagementPage';
 import PaymentSettingsPage from '../pages/admin/payments/PaymentSettingsPage';
@@ -34,16 +32,21 @@ export default function AppRoutes() {
 
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/shipments" element={<Navigate to="/orders" replace />} />
-            <Route path="/merchant/settings" element={<MerchantProfileSettings />} />
+            
+            {/* Profile Routes */}
+            <Route path="/profile" element={<StaffProfileSettings />} />
+            <Route path="/staff/settings" element={<StaffProfileSettings />} />
+            <Route path="/merchant/settings" element={<Navigate to="/profile" replace />} />
             
             {/* Admin Routes */}
             <Route path="/admin/analytics" element={<AnalyticsPage />} />
-            <Route path="/admin/merchants" element={<MerchantsListPage />} />
+            <Route path="/admin/staff" element={<StaffListPage />} />
+            <Route path="/admin/merchants" element={<Navigate to="/admin/staff" replace />} />
+            <Route path="/admin/merchants/create" element={<Navigate to="/admin/staff" replace />} />
+            <Route path="/admin/merchants/accounts/add" element={<Navigate to="/admin/staff" replace />} />
+            <Route path="/admin/merchants/:merchantId/accounts/add" element={<Navigate to="/admin/staff" replace />} />
             <Route path="/admin/customers" element={<CustomersListPage />} />
             <Route path="/admin/payments" element={<PaymentSettingsPage />} />
-            <Route path="/admin/merchants/create" element={<CreateMerchantPage />} />
-            <Route path="/admin/merchants/accounts/add" element={<AddMerchantAccountPage />} />
-            <Route path="/admin/merchants/:merchantId/accounts/add" element={<AddMerchantAccountPage />} />
             <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
           </Route>
         </Route>
@@ -53,4 +56,3 @@ export default function AppRoutes() {
     </BrowserRouter>
   );
 }
-
