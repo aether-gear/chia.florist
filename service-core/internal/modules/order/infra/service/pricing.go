@@ -199,6 +199,17 @@ func (s *pricingServiceImpl) Calculate(
 		shopMap[sh.ID] = sh
 	}
 
+	for _, shopID := range shopIDs {
+		sh, ok := shopMap[shopID]
+		if !ok || !sh.IsOperable() {
+			shopName := "Unknown Shop"
+			if ok {
+				shopName = sh.Name
+			}
+			return nil, apperrors.NewConflict(fmt.Sprintf("shop '%s' is inactive or not approved for transactions", shopName))
+		}
+	}
+
 	// Calculate estimation, subtotal and weight
 	// based on shop item (giant loop)
 	var (
@@ -260,6 +271,14 @@ func (s *pricingServiceImpl) Calculate(
 			}
 
 			pid := *shopItem.ProductID
+			product, ok := productMap[pid]
+			if !ok || product.Status == productDomain.ProductStatusArchived {
+				return nil, apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
+			}
+			if product.Status != productDomain.ProductStatusActive {
+				return nil, apperrors.NewConflict(fmt.Sprintf("product '%s' is currently not available for purchase", product.Name))
+			}
+
 			shopInventories := inventoryMap[pid]
 			var available int
 			for _, inv := range shopInventories {
@@ -270,14 +289,9 @@ func (s *pricingServiceImpl) Calculate(
 			}
 
 			if shopItem.Quantity > available {
-				productName := productMap[pid].Name
-				return nil, apperrors.NewConflict(fmt.Sprintf("%s is out of stock", productName))
+				return nil, apperrors.NewConflict(fmt.Sprintf("%s is out of stock", product.Name))
 			}
 
-			product, ok := productMap[pid]
-			if !ok {
-				return nil, apperrors.NewNotFound(productDomain.ErrProductNotFound.Error())
-			}
 
 			itemSubtotal := product.Price * int64(shopItem.Quantity)
 			shopSubtotal += itemSubtotal

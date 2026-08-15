@@ -95,6 +95,17 @@ func (r *productRepositoryImpl) FindProducts(
 		argPos++
 	}
 
+	if params.Status != nil {
+		conditions = append(
+			conditions,
+			fmt.Sprintf("p.status = $%d", argPos),
+		)
+		args = append(args, *params.Status)
+		argPos++
+	} else if params.ExcludeArchived {
+		conditions = append(conditions, "p.status != 'archived'")
+	}
+
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -293,6 +304,17 @@ func (r *productRepositoryImpl) FindProductsWithInventory(
 		)
 		args = append(args, "%"+*params.Name+"%")
 		argPos++
+	}
+
+	if params.Status != nil {
+		conditions = append(
+			conditions,
+			fmt.Sprintf("p.status = $%d", argPos),
+		)
+		args = append(args, *params.Status)
+		argPos++
+	} else if params.ExcludeArchived {
+		conditions = append(conditions, "p.status != 'archived'")
 	}
 
 	if len(conditions) > 0 {

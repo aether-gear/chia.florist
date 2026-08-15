@@ -10,10 +10,12 @@ var (
 )
 
 type FindShopsParams struct {
-	ID       *string
-	Name     *string
-	IsActive *bool
+	ID             *string
+	Name           *string
+	IsActive       *bool
+	ApprovalStatus *string
 
 	Pagination query.Pagination
 	Sorts      query.Sorts
 }
+

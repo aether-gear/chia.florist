@@ -122,3 +122,114 @@ func TestFindProducts_WithShopFilter(t *testing.T) {
 			productRepo.capturedParams.ShopID, productRepo.capturedParams.ShopSlug)
 	}
 }
+
+type mockCustomInvRepo struct {
+	inventoryRepo.InventoryRepository
+	inventories map[uuid.UUID][]inventoryDomain.Inventory
+}
+
+func (m *mockCustomInvRepo) ListByProductIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	productIDs []uuid.UUID,
+) (map[uuid.UUID][]inventoryDomain.Inventory, error) {
+	return m.inventories, nil
+}
+
+type mockCustomShopRepo struct {
+	shopRepo.ShopRepository
+	shops []shopDomain.Shop
+}
+
+func (m *mockCustomShopRepo) FindByIDs(
+	ctx context.Context,
+	exec transaction.Executor,
+	IDs []uuid.UUID,
+) ([]shopDomain.Shop, error) {
+	return m.shops, nil
+}
+
+func TestFindProducts_FiltersInactiveOrUnapprovedShops(t *testing.T) {
+	ctx := context.Background()
+	prodID := uuid.New()
+	activeShopID := uuid.New()
+	inactiveShopID := uuid.New()
+	pendingShopID := uuid.New()
+
+	productRepo := &mockFindProductRepo{
+		products: []domain.ProductWithInventory{
+			{
+				Product: domain.Product{
+					ID:     prodID,
+					Name:   "Test Flower",
+					Status: domain.ProductStatusActive,
+				},
+			},
+		},
+	}
+
+	invRepo := &mockCustomInvRepo{
+		inventories: map[uuid.UUID][]inventoryDomain.Inventory{
+			prodID: {
+				{ShopID: activeShopID, TotalStock: 10},
+				{ShopID: inactiveShopID, TotalStock: 5},
+				{ShopID: pendingShopID, TotalStock: 8},
+			},
+		},
+	}
+
+	customShopRepo := &mockCustomShopRepo{
+		shops: []shopDomain.Shop{
+			{
+				ID:             activeShopID,
+				Name:           "Active Shop",
+				Slug:           "active-shop",
+				IsActive:       true,
+				ApprovalStatus: shopDomain.ShopApprovalStatusApproved,
+			},
+			{
+				ID:             inactiveShopID,
+				Name:           "Inactive Shop",
+				Slug:           "inactive-shop",
+				IsActive:       false,
+				ApprovalStatus: shopDomain.ShopApprovalStatusApproved,
+			},
+			{
+				ID:             pendingShopID,
+				Name:           "Pending Shop",
+				Slug:           "pending-shop",
+				IsActive:       true,
+				ApprovalStatus: shopDomain.ShopApprovalStatusPending,
+			},
+		},
+	}
+
+	imgRepo := &mockFindImgRepo{}
+	fileStore := &mockFileStore{}
+	exec := &mockExecutor{}
+
+	uc := NewFindProductsUsecase(productRepo, invRepo, imgRepo, customShopRepo, fileStore, exec)
+
+
+
+	res, _, err := uc.Execute(ctx, FindProductsInput{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(res) != 1 {
+		t.Fatalf("expected 1 product result, got %d", len(res))
+	}
+
+	// Total stock should ONLY count active + approved shop (10), not inactive (5) or pending (8)
+	if res[0].Inventory.TotalStock != 10 {
+		t.Errorf("expected TotalStock to be 10, got %d", res[0].Inventory.TotalStock)
+	}
+
+	if len(res[0].Availability) != 1 {
+		t.Errorf("expected 1 available shop, got %d", len(res[0].Availability))
+	} else if res[0].Availability[0].ShopName != "Active Shop" {
+		t.Errorf("expected Active Shop in availability, got %s", res[0].Availability[0].ShopName)
+	}
+}
+

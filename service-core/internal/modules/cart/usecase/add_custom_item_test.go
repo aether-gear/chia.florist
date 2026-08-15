@@ -8,6 +8,8 @@ import (
 
 	cartDomain "service-core/internal/modules/cart/domain"
 	cartRepo "service-core/internal/modules/cart/repository"
+	shopDomain "service-core/internal/modules/shop/domain"
+	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -19,6 +21,28 @@ type mockTransactor struct {
 
 func (m *mockTransactor) WithinTransaction(ctx context.Context, fn func(transaction.Executor) error) error {
 	return fn(&mockExecutor{})
+}
+
+type mockCartShopRepo struct {
+	shopRepo.ShopRepository
+	shop *shopDomain.Shop
+	err  error
+}
+
+func (m *mockCartShopRepo) GetByID(ctx context.Context, exec transaction.Executor, id uuid.UUID) (*shopDomain.Shop, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.shop != nil {
+		return m.shop, nil
+	}
+	return &shopDomain.Shop{
+		ID:             id,
+		Name:           "Mock Shop",
+		Slug:           "mock-shop",
+		IsActive:       true,
+		ApprovalStatus: shopDomain.ShopApprovalStatusApproved,
+	}, nil
 }
 
 type mockSaveCartRepository struct {
@@ -78,10 +102,11 @@ func TestAddCustomItem_Success(t *testing.T) {
 	}
 
 	cartR := &mockSaveCartRepository{cart: cart}
+	shopR := &mockCartShopRepo{}
 	tx := &mockTransactor{}
 	exec := &mockExecutor{}
 
-	uc := NewAddCustomItemUsecase(exec, tx, cartR)
+	uc := NewAddCustomItemUsecase(exec, tx, cartR, shopR)
 
 	input := AddCustomItemInput{
 		CustomerID:     customerID,
@@ -123,10 +148,11 @@ func TestAddCustomItem_ValidationError_MissingDesign(t *testing.T) {
 	shopID := uuid.New()
 
 	cartR := &mockSaveCartRepository{}
+	shopR := &mockCartShopRepo{}
 	tx := &mockTransactor{}
 	exec := &mockExecutor{}
 
-	uc := NewAddCustomItemUsecase(exec, tx, cartR)
+	uc := NewAddCustomItemUsecase(exec, tx, cartR, shopR)
 
 	input := AddCustomItemInput{
 		CustomerID:     customerID,
@@ -149,10 +175,11 @@ func TestAddCustomItem_ValidationError_MissingPhysicalSize(t *testing.T) {
 	shopID := uuid.New()
 
 	cartR := &mockSaveCartRepository{}
+	shopR := &mockCartShopRepo{}
 	tx := &mockTransactor{}
 	exec := &mockExecutor{}
 
-	uc := NewAddCustomItemUsecase(exec, tx, cartR)
+	uc := NewAddCustomItemUsecase(exec, tx, cartR, shopR)
 
 	input := AddCustomItemInput{
 		CustomerID:     customerID,
@@ -174,10 +201,11 @@ func TestAddCustomItem_InvalidShopID(t *testing.T) {
 	customerID := uuid.New()
 
 	cartR := &mockSaveCartRepository{}
+	shopR := &mockCartShopRepo{}
 	tx := &mockTransactor{}
 	exec := &mockExecutor{}
 
-	uc := NewAddCustomItemUsecase(exec, tx, cartR)
+	uc := NewAddCustomItemUsecase(exec, tx, cartR, shopR)
 
 	input := AddCustomItemInput{
 		CustomerID:     customerID,
@@ -200,10 +228,11 @@ func TestAddCustomItem_GetCartFailure(t *testing.T) {
 	shopID := uuid.New()
 
 	cartR := &mockSaveCartRepository{getErr: errors.New("db error")}
+	shopR := &mockCartShopRepo{}
 	tx := &mockTransactor{}
 	exec := &mockExecutor{}
 
-	uc := NewAddCustomItemUsecase(exec, tx, cartR)
+	uc := NewAddCustomItemUsecase(exec, tx, cartR, shopR)
 
 	input := AddCustomItemInput{
 		CustomerID:     customerID,
@@ -219,3 +248,38 @@ func TestAddCustomItem_GetCartFailure(t *testing.T) {
 		t.Errorf("expected error when get cart fails, got nil")
 	}
 }
+
+func TestAddCustomItem_InactiveShop(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	shopID := uuid.New()
+
+	cartR := &mockSaveCartRepository{}
+	shopR := &mockCartShopRepo{
+		shop: &shopDomain.Shop{
+			ID:             shopID,
+			Name:           "Inactive Shop",
+			IsActive:       false,
+			ApprovalStatus: shopDomain.ShopApprovalStatusApproved,
+		},
+	}
+	tx := &mockTransactor{}
+	exec := &mockExecutor{}
+
+	uc := NewAddCustomItemUsecase(exec, tx, cartR, shopR)
+
+	input := AddCustomItemInput{
+		CustomerID:     customerID,
+		ShopID:         shopID,
+		Quantity:       1,
+		ProductName:    "Custom Board",
+		PhysicalSizeID: "medium",
+		CustomDesign:   json.RawMessage(`{"metadata":{"version":"1.0.0"}}`),
+	}
+
+	err := uc.Execute(ctx, input)
+	if err == nil {
+		t.Errorf("expected error when shop is inactive, got nil")
+	}
+}
+

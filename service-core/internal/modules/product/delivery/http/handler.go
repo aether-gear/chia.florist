@@ -55,6 +55,8 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 	sort := apphttp.Query(r, "sort")
 	shopID := apphttp.Query(r, "shop_id")
 	shopSlug := apphttp.Query(r, "shop_slug")
+	status := apphttp.Query(r, "status")
+	includeArchived := apphttp.Query(r, "include_archived") == "true"
 
 	if shopID == "" && shopSlug == "" {
 		shopID = r.Header.Get("X-Shop-ID")
@@ -77,8 +79,14 @@ func (h *ProductHandler) FindProducts(w http.ResponseWriter, r *http.Request) er
 	if shopSlug != "" {
 		input.ShopSlug = &shopSlug
 	}
+	if status != "" && status != "all" && status != "any" {
+		input.Status = &status
+	} else if !includeArchived && status != "all" && status != "any" {
+		input.ExcludeArchived = true
+	}
 
 	products, total, err := h.findProducts.Execute(r.Context(), input)
+
 	if err != nil {
 		return err
 	}

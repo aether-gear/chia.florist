@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	appclock "service-core/internal/common/clock"
+	apperrors "service-core/internal/common/errors"
 	authorDomain "service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/repository"
@@ -33,10 +34,11 @@ func NewSaveShopUsecase(
 }
 
 type SaveShopInput struct {
-	ID          *uuid.UUID
-	Name        string
-	Description *string
-	IsActive    bool
+	ID             *uuid.UUID
+	Name           string
+	Description    *string
+	IsActive       *bool
+	ApprovalStatus *string
 }
 
 func (u *SaveShopUsecase) Execute(
@@ -44,38 +46,74 @@ func (u *SaveShopUsecase) Execute(
 	actor authorDomain.Actor,
 	input SaveShopInput,
 ) error {
-	canSetActive := false
+	isAdmin := false
 	for _, actorRole := range actor.Roles {
 		if actorRole.Code == authorDomain.RoleStaffAdmin {
-			canSetActive = true
+			isAdmin = true
 			break
 		}
 	}
 
-	var shopID uuid.UUID
-	isCreate := input.ID == nil
-	if isCreate {
-		shopID = uuid.New()
+	var shop domain.Shop
+	now := appclock.Now()
+
+	if input.ID == nil {
+		// Creating new shop
+		shopID := uuid.New()
+		shop = domain.Shop{
+			ID:          shopID,
+			Name:        input.Name,
+			Slug:        u.slugGen.Generate(input.Name),
+			Description: input.Description,
+			CreatedAt:   now,
+		}
+
+		if isAdmin {
+			if input.IsActive != nil {
+				shop.IsActive = *input.IsActive
+			}
+			if input.ApprovalStatus != nil && *input.ApprovalStatus != "" {
+				shop.ApprovalStatus = domain.ShopApprovalStatus(*input.ApprovalStatus)
+			} else {
+				shop.ApprovalStatus = domain.ShopApprovalStatusPending
+			}
+		} else {
+			// Regular staff creates shop in pending approval & inactive state
+			shop.IsActive = false
+			shop.ApprovalStatus = domain.ShopApprovalStatusPending
+		}
 	} else {
-		shopID = *input.ID
+		// Updating existing shop
+		existing, err := u.shopRepo.GetByID(ctx, u.executor, *input.ID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve existing shop: %w", err)
+		}
+		if existing == nil || existing.DeletedAt != nil {
+			return apperrors.NewNotFound("shop not found")
+		}
+
+		shop = *existing
+		shop.Name = input.Name
+		shop.Slug = u.slugGen.Generate(input.Name)
+		shop.Description = input.Description
+		shop.UpdatedAt = &now
+
+		if isAdmin {
+			if input.IsActive != nil {
+				shop.IsActive = *input.IsActive
+			}
+			if input.ApprovalStatus != nil && *input.ApprovalStatus != "" {
+				shop.ApprovalStatus = domain.ShopApprovalStatus(*input.ApprovalStatus)
+			}
+		}
+		// If regular staff, existing IsActive and ApprovalStatus are kept unchanged
 	}
 
-	shop := domain.Shop{
-		ID:          shopID,
-		Name:        input.Name,
-		Slug:        u.slugGen.Generate(input.Name),
-		Description: input.Description,
-		CreatedAt:   appclock.Now(),
-	}
-	if canSetActive {
-		shop.IsActive = input.IsActive
-	}
-
-	err := u.shopRepo.
-		Save(ctx, u.executor, shop)
+	err := u.shopRepo.Save(ctx, u.executor, shop)
 	if err != nil {
-		return fmt.Errorf("failed to create shop: %w", err)
+		return fmt.Errorf("failed to save shop: %w", err)
 	}
 
 	return nil
 }
+

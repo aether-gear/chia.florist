@@ -93,7 +93,7 @@ func NewRouteChains(c *Container) *RouteChains {
 			),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
 			c.Authorizer.LoadActor(c.DBExecutor),
-			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaff),
+			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaff, authorzDomain.RoleStaffAdmin),
 		),
 		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -274,14 +274,14 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
-			r.Post("/", chains.StaffAdminOnly(productHandler.SaveProduct))
+			r.Post("/", chains.StaffOnly(productHandler.SaveProduct))
 			r.Get("/stats", chains.StaffAdminOnly(productHandler.GetProductStats))
 
 			r.Get("/{slug}", chains.Core(productHandler.GetProduct))
 
 			r.Route("/id/{id}", func(r chi.Router) {
 				r.Delete("/", chains.StaffAdminOnly(productHandler.DeleteProduct))
-				r.Post("/images", chains.StaffAdminOnly(productHandler.AddProductImages))
+				r.Post("/images", chains.StaffOnly(productHandler.AddProductImages))
 			})
 		})
 

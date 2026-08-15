@@ -563,12 +563,14 @@ func NewContainer(cfg Config,
 				cartRepo,
 				inventoryRepo,
 				productRepo,
+				shopRepo,
 			),
 		AddCustomItem: *cartUsecase.
 			NewAddCustomItemUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				cartRepo,
+				shopRepo,
 			),
 		UpdateItem: *cartUsecase.
 			NewUpdateItemUsecase(

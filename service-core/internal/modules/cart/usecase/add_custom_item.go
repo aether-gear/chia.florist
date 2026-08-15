@@ -8,6 +8,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/repository"
+	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -26,17 +27,20 @@ type AddCustomItemUsecase struct {
 	executor   transaction.Executor
 	transactor transaction.Transactor
 	cartRepo   repository.CartRepository
+	shopRepo   shopRepo.ShopRepository
 }
 
 func NewAddCustomItemUsecase(
 	executor transaction.Executor,
 	transactor transaction.Transactor,
 	cartRepo repository.CartRepository,
+	shopRepo shopRepo.ShopRepository,
 ) *AddCustomItemUsecase {
 	return &AddCustomItemUsecase{
 		executor:   executor,
 		transactor: transactor,
 		cartRepo:   cartRepo,
+		shopRepo:   shopRepo,
 	}
 }
 
@@ -53,6 +57,15 @@ func (u *AddCustomItemUsecase) Execute(ctx context.Context, input AddCustomItemI
 	if input.PhysicalSizeID == "" {
 		return apperrors.NewInvalidInput("physical_size_id is required for custom items")
 	}
+
+	shop, err := u.shopRepo.GetByID(ctx, u.executor, input.ShopID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve shop: %w", err)
+	}
+	if shop == nil || !shop.IsOperable() {
+		return apperrors.NewConflict("shop is currently inactive or not approved for transactions")
+	}
+
 
 	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor,
 		input.CustomerID,

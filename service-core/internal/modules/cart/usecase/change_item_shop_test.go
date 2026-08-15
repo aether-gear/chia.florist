@@ -62,7 +62,7 @@ func TestChangeItemShop_StandardItem_Success(t *testing.T) {
 	}
 
 	cartR := &mockSaveCartRepository{cart: cart}
-	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true}}
+	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true, ApprovalStatus: shopDomain.ShopApprovalStatusApproved}}
 	invR := &mockChangeShopInventoryRepo{inventory: &inventoryDomain.Inventory{
 		ProductID:  productID,
 		ShopID:     newShopID,
@@ -110,7 +110,7 @@ func TestChangeItemShop_InsufficientStock_Error(t *testing.T) {
 	}
 
 	cartR := &mockSaveCartRepository{cart: cart}
-	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true}}
+	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true, ApprovalStatus: shopDomain.ShopApprovalStatusApproved}}
 	// Inventory stock is 2, which is less than item quantity 5
 	invR := &mockChangeShopInventoryRepo{inventory: &inventoryDomain.Inventory{
 		ProductID:  productID,
@@ -155,7 +155,7 @@ func TestChangeItemShop_CustomItem_Success(t *testing.T) {
 	}
 
 	cartR := &mockSaveCartRepository{cart: cart}
-	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true}}
+	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true, ApprovalStatus: shopDomain.ShopApprovalStatusApproved}}
 	invR := &mockChangeShopInventoryRepo{}
 	exec := &mockExecutor{}
 	tx := &mockTransactor{}
@@ -207,7 +207,7 @@ func TestChangeItemShop_MergeWithExistingItem_Success(t *testing.T) {
 	}
 
 	cartR := &mockSaveCartRepository{cart: cart}
-	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true}}
+	shopR := &mockShopRepo{shop: &shopDomain.Shop{ID: newShopID, IsActive: true, ApprovalStatus: shopDomain.ShopApprovalStatusApproved}}
 	invR := &mockChangeShopInventoryRepo{inventory: &inventoryDomain.Inventory{
 		ProductID:  productID,
 		ShopID:     newShopID,

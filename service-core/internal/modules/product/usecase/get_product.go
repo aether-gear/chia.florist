@@ -150,19 +150,21 @@ func (u *GetProductUsecase) Execute(
 	}
 
 	var (
-		totalStock    = 0
-		reservedStock = 0
-		availability  []ShopAvailabilityResult
+		totalStock          = 0
+		reservedStock       = 0
+		operableInventories []inventoryDomain.Inventory
+		availability        []ShopAvailabilityResult
 	)
 
 	for _, inventory := range inventories {
-		totalStock += inventory.TotalStock
-		reservedStock += inventory.ReservedStock
-
 		shop, ok := shopsMap[inventory.ShopID]
-		if !ok {
+		if !ok || !shop.IsOperable() {
 			continue
 		}
+
+		totalStock += inventory.TotalStock
+		reservedStock += inventory.ReservedStock
+		operableInventories = append(operableInventories, inventory)
 
 		availability = append(availability, ShopAvailabilityResult{
 			ShopName: shop.Name,
@@ -171,9 +173,11 @@ func (u *GetProductUsecase) Execute(
 		})
 	}
 
+	result.ShopInventories = operableInventories
 	result.Inventory.TotalStock = totalStock
 	result.Inventory.ReservedStock = reservedStock
 	result.Availability = availability
+
 
 	return &result, nil
 }

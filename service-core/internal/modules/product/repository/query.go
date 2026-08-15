@@ -35,14 +35,17 @@ type GetProductStatsParams struct {
 }
 
 type FindProductParams struct {
-	ID       *string
-	Name     *string
-	ShopID   *uuid.UUID
-	ShopSlug *string
+	ID              *string
+	Name            *string
+	ShopID          *uuid.UUID
+	ShopSlug        *string
+	Status          *string
+	ExcludeArchived bool
 
 	query.Pagination
 	query.Sorts
 }
+
 
 type UploadProductImagesParams struct {
 	ProductID uuid.UUID

@@ -56,8 +56,8 @@ func (u *ChangeItemShopUsecase) Execute(
 	if err != nil {
 		return fmt.Errorf("failed to retrieve shop: %w", err)
 	}
-	if shop == nil || !shop.IsActive {
-		return apperrors.NewNotFound("target shop not found or inactive")
+	if shop == nil || !shop.IsOperable() {
+		return apperrors.NewConflict("target shop not found, inactive, or not approved")
 	}
 
 	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor, input.CustomerID)
