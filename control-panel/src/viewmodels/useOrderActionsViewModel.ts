@@ -2,6 +2,14 @@ import { useState } from 'react';
 import { fetchApi } from '../lib/api';
 import { useToast } from '../hooks/use-toast';
 
+export interface ShipmentDispatchPayload {
+  fulfillment_method: string;
+  courier: string;
+  service: string;
+  tracking_number?: string;
+  item_ids: string[];
+}
+
 export function useOrderActionsViewModel() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const { toast } = useToast();
@@ -37,11 +45,13 @@ export function useOrderActionsViewModel() {
     orderId: string,
     status: string,
     trackingNumber?: string,
-    fulfillmentMethod?: string
+    fulfillmentMethod?: string,
+    shipments?: ShipmentDispatchPayload[]
   ) => {
     const payload: Record<string, any> = { status };
     if (trackingNumber !== undefined) payload.tracking_number = trackingNumber;
     if (fulfillmentMethod !== undefined) payload.fulfillment_method = fulfillmentMethod;
+    if (shipments !== undefined && shipments.length > 0) payload.shipments = shipments;
 
     return handleAction(
       `/orders/${orderId}/status`,
