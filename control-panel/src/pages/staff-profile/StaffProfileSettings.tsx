@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStaffProfileViewModel } from '@/viewmodels/useStaffProfileViewModel';
 import { useAuthMeViewModel } from '@/viewmodels/useAuthMeViewModel';
+import { useAuth } from '@/context/AuthContext';
 import AvatarUpload from '@/components/AvatarUpload';
 import { useToast } from '@/hooks/use-toast';
 import { formatRelativeLastLogin } from '@/lib/timeUtils';
@@ -37,13 +38,14 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 export default function StaffProfileSettings() {
   const { profile, loading, error, saveProfile } = useStaffProfileViewModel();
   const { data: authData, isAdmin } = useAuthMeViewModel();
+  const { userEmail: authEmail } = useAuth();
   const { toast } = useToast();
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   const storedEmail =
-    localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+    authEmail || localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
 
   const {
     register,

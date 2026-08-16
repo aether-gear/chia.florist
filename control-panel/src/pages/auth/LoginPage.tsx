@@ -1,19 +1,30 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import AuthLayout from '@/layouts/AuthLayout';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated, isLoading, login } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      const redirectPath = (location.state as any)?.from?.pathname || '/';
+      navigate(redirectPath, { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,22 +43,16 @@ export default function LoginPage() {
         })
       });
 
-      // Clear both first to avoid mixed states
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('userEmail');
-      sessionStorage.removeItem('isAuthenticated');
-      sessionStorage.removeItem('userEmail');
-
-      const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem('isAuthenticated', 'true');
-      storage.setItem('userEmail', email);
-      navigate('/');
+      await login(email, rememberMe);
+      const redirectPath = (location.state as any)?.from?.pathname || '/';
+      navigate(redirectPath, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <AuthLayout>

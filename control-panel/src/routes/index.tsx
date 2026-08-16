@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '../context/AuthContext';
 import DashboardLayout from '../layouts/DashboardLayout';
 import LoginPage from '../pages/auth/LoginPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
@@ -19,7 +20,8 @@ import AnalyticsPage from '../pages/admin/analytics/AnalyticsPage';
 export default function AppRoutes() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AuthProvider>
+        <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         
@@ -53,6 +55,7 @@ export default function AppRoutes() {
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

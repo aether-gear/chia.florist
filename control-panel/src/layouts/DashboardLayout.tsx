@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
 import { useStaffProfileViewModel } from '../viewmodels/useStaffProfileViewModel';
-import { fetchApi } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -81,26 +81,18 @@ export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { logout, userEmail: authEmail } = useAuth();
   const { data: authData, isAdmin } = useAuthMeViewModel();
   const { profile: staffProfile } = useStaffProfileViewModel();
 
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
-    try {
-      await fetchApi('/auth/staff/logout', { method: 'POST' });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('userEmail');
-      sessionStorage.removeItem('isAuthenticated');
-      sessionStorage.removeItem('userEmail');
-      navigate('/login');
-    }
+    await logout();
+    navigate('/login');
   };
 
-  const userEmail =
-    localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+  const userEmail = authEmail || localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+
 
   const renderProfileDropdown = () => {
     const fallbackInitials = staffProfile?.Name
