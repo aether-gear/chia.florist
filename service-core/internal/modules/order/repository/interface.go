@@ -88,10 +88,23 @@ type OrderItemRepository interface {
 		orderIDs []uuid.UUID,
 	) ([]domain.OrderItem, error)
 
+	ListByShipmentID(
+		ctx context.Context,
+		exec transaction.Executor,
+		shipmentID uuid.UUID,
+	) ([]domain.OrderItem, error)
+
 	SaveBulk(
 		ctx context.Context,
 		exec transaction.Executor,
 		items []domain.OrderItem,
+	) error
+
+	AssignShipment(
+		ctx context.Context,
+		exec transaction.Executor,
+		shipmentID uuid.UUID,
+		itemIDs []uuid.UUID,
 	) error
 }
 

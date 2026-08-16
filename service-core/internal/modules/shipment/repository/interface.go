@@ -15,16 +15,25 @@ type ShipmentRepository interface {
 		exec transaction.Executor,
 		id uuid.UUID,
 	) (*domain.Shipment, error)
+
 	GetByOrderID(
 		ctx context.Context,
 		exec transaction.Executor,
 		orderID uuid.UUID,
 	) (*domain.Shipment, error)
+
+	ListByOrderID(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderID uuid.UUID,
+	) ([]domain.Shipment, error)
+
 	ListByOrderIDs(
 		ctx context.Context,
 		exec transaction.Executor,
 		orderIDs []uuid.UUID,
 	) ([]domain.Shipment, error)
+
 	Create(
 		ctx context.Context,
 		exec transaction.Executor,
@@ -42,6 +51,7 @@ type ShipmentMethodRepository interface {
 		ctx context.Context,
 		exec transaction.Executor,
 	) ([]domain.ShipmentOption, error)
+
 	GetByID(
 		ctx context.Context,
 		exec transaction.Executor,

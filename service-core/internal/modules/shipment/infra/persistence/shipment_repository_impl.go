@@ -61,22 +61,11 @@ func (r *shipmentRepositoryImpl) GetByID(
 	exec transaction.Executor,
 	id uuid.UUID,
 ) (*domain.Shipment, error) {
-	query := `
-		SELECT id,
-			order_id,
-			status,
-			fulfillment_method,
-			tracking_number,
-			courier_name,
-			service,
-			shipping_cost,
-			weight,
-			origin_id,
-			destination_id,
-			created_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM shipments
 		WHERE id = $1
-	`
+	`, shipmentSelectCols)
 
 	s, err := r.scanShipment(exec.QueryRow(ctx, query, id))
 	if err != nil {
@@ -93,25 +82,13 @@ func (r *shipmentRepositoryImpl) GetByOrderID(
 	exec transaction.Executor,
 	orderID uuid.UUID,
 ) (*domain.Shipment, error) {
-	query := `
-		SELECT
-			id,
-			order_id,
-			status,
-			fulfillment_method,
-			tracking_number,
-			courier_name,
-			service,
-			shipping_cost,
-			weight,
-			origin_id,
-			destination_id,
-			created_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM shipments
 		WHERE order_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1
-	`
+	`, shipmentSelectCols)
 
 	s, err := r.scanShipment(exec.QueryRow(ctx, query, orderID))
 	if err != nil {
@@ -123,6 +100,49 @@ func (r *shipmentRepositoryImpl) GetByOrderID(
 	return s, nil
 }
 
+func (r *shipmentRepositoryImpl) ListByOrderID(
+	ctx context.Context,
+	exec transaction.Executor,
+	orderID uuid.UUID,
+) ([]domain.Shipment, error) {
+	query := fmt.Sprintf(`
+		SELECT %s
+		FROM shipments
+		WHERE order_id = $1
+		ORDER BY created_at ASC
+	`, shipmentSelectCols)
+
+	rows, err := exec.Query(ctx, query, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("query shipments by order id failed: %w", err)
+	}
+	defer rows.Close()
+
+	shipments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Shipment, error) {
+		var s domain.Shipment
+		err := row.Scan(
+			&s.ID,
+			&s.OrderID,
+			&s.Status,
+			&s.FulfillmentMethod,
+			&s.TrackingNumber,
+			&s.Courier,
+			&s.Service,
+			&s.Cost,
+			&s.Weight,
+			&s.OriginID,
+			&s.DestinationID,
+			&s.CreatedAt,
+		)
+		return s, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan shipments failed: %w", err)
+	}
+
+	return shipments, nil
+}
+
 func (r *shipmentRepositoryImpl) ListByOrderIDs(
 	ctx context.Context,
 	exec transaction.Executor,
@@ -132,24 +152,12 @@ func (r *shipmentRepositoryImpl) ListByOrderIDs(
 		return []domain.Shipment{}, nil
 	}
 
-	query := `
-		SELECT DISTINCT ON (order_id)
-			id,
-			order_id,
-			status,
-			fulfillment_method,
-			tracking_number,
-			courier_name,
-			service,
-			shipping_cost,
-			weight,
-			origin_id,
-			destination_id,
-			created_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM shipments
 		WHERE order_id = ANY($1::uuid[])
-		ORDER BY order_id, created_at DESC
-	`
+		ORDER BY created_at ASC
+	`, shipmentSelectCols)
 
 	orderIDStrings := make([]string, len(orderIDs))
 	for i, id := range orderIDs {

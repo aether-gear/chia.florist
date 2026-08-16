@@ -9,6 +9,7 @@ import (
 type OrderItem struct {
 	ID                 uuid.UUID
 	OrderID            uuid.UUID
+	ShipmentID         *uuid.UUID
 	ProductVariantType cartDomain.ProductVariantType
 
 	ShopID   uuid.UUID

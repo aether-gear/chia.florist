@@ -28,8 +28,8 @@ CREATE TABLE shipments (
     courier_name TEXT NOT NULL,
     service TEXT NOT NULL,
 
-    shipping_cost NUMERIC(15, 2) NOT NULL,
-    weight TEXT NOT NULL,
+    shipping_cost BIGINT NOT NULL,
+    weight INTEGER NOT NULL,
     origin_id TEXT NOT NULL,
     destination_id TEXT NOT NULL,
 

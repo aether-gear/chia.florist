@@ -47,6 +47,7 @@ func NewGetOrderTrackingUsecase(
 type GetOrderTrackingInput struct {
 	OrderID    uuid.UUID
 	CustomerID uuid.UUID
+	ShipmentID *uuid.UUID
 }
 
 type TrackingTimelineEvent struct {
@@ -82,12 +83,27 @@ func (u *GetOrderTrackingUsecase) Execute(
 		return nil, apperrors.NewUnauthorized("not authorized")
 	}
 
-	shipment, err := u.shipmentRepo.GetByOrderID(ctx, u.executor,
-		order.ID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get shipment: %w", err)
+	var shipment *shipmentDomain.Shipment
+	if input.ShipmentID != nil {
+		s, err := u.shipmentRepo.GetByID(ctx, u.executor, *input.ShipmentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get shipment: %w", err)
+		}
+		if s != nil && s.OrderID == order.ID {
+			shipment = s
+		}
 	}
+
+	if shipment == nil {
+		shipments, err := u.shipmentRepo.ListByOrderID(ctx, u.executor, order.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list shipments: %w", err)
+		}
+		if len(shipments) > 0 {
+			shipment = &shipments[0]
+		}
+	}
+
 	if shipment == nil {
 		return nil, apperrors.NewNotFound("shipment not found")
 	}

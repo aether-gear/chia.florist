@@ -62,16 +62,16 @@ type GetOrderResult struct {
 	Payment     *paymentDomain.Payment
 	ChannelData *paymentDomain.PaymentChannelData
 	Shipment    *shipmentDomain.Shipment
+	Shipments   []shipmentDomain.Shipment
 }
 
 func (u *GetOrderUsecase) Execute(
 	ctx context.Context,
 	input GetOrderInput,
 ) (*GetOrderResult, error) {
-	order, err := u.orderRepo.
-		GetByID(ctx, u.executor,
-			input.OrderID,
-		)
+	order, err := u.orderRepo.GetByID(ctx, u.executor,
+		input.OrderID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
@@ -85,10 +85,9 @@ func (u *GetOrderUsecase) Execute(
 		return nil, nil
 	}
 
-	items, err := u.orderItemRepo.
-		ListByOrderID(ctx, u.executor,
-			order.ID,
-		)
+	items, err := u.orderItemRepo.ListByOrderID(ctx, u.executor,
+		order.ID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list order items: %w", err)
 	}
@@ -96,48 +95,57 @@ func (u *GetOrderUsecase) Execute(
 		items = []domain.OrderItem{}
 	}
 
-	payment, err := u.paymentRepo.
-		GetByOrderID(ctx, u.executor,
-			order.ID,
-		)
+	payment, err := u.paymentRepo.GetByOrderID(ctx, u.executor,
+		order.ID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
 	var channelData *paymentDomain.PaymentChannelData
 	if payment != nil {
-		cd, err := u.paymentChannelDataRepo.
-			GetByPaymentID(ctx, u.executor,
-				payment.ID,
-			)
+		cd, err := u.paymentChannelDataRepo.GetByPaymentID(ctx, u.executor,
+			payment.ID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get payment channel data: %w", err)
 		}
 		channelData = cd
 	}
 
-	shipment, err := u.shipmentRepo.
-		GetByOrderID(ctx, u.executor,
-			order.ID,
-		)
+	shipments, err := u.shipmentRepo.ListByOrderID(ctx, u.executor,
+		order.ID,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shipment: %w", err)
+		return nil, fmt.Errorf("failed to list shipments: %w", err)
 	}
 
-	if shipment != nil {
-		events, err := u.shipmentEventRepo.
-			ListByShipmentID(ctx, u.executor,
-				shipment.ID,
-			)
+	for i := range shipments {
+		events, err := u.shipmentEventRepo.ListByShipmentID(ctx, u.executor,
+			shipments[i].ID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list shipment events: %w", err)
 		}
-
 		if events == nil {
 			events = []shipmentDomain.ShipmentEvent{}
 		}
 
-		shipment.Events = events
+		shipments[i].Events = events
+
+		// Associate item IDs
+		var itemIDs []uuid.UUID
+		for _, itm := range items {
+			if itm.ShipmentID != nil && *itm.ShipmentID == shipments[i].ID {
+				itemIDs = append(itemIDs, itm.ID)
+			}
+		}
+		shipments[i].ItemIDs = itemIDs
+	}
+
+	var firstShipment *shipmentDomain.Shipment
+	if len(shipments) > 0 {
+		firstShipment = &shipments[0]
 	}
 
 	return &GetOrderResult{
@@ -145,6 +153,7 @@ func (u *GetOrderUsecase) Execute(
 		Items:       items,
 		Payment:     payment,
 		ChannelData: channelData,
-		Shipment:    shipment,
+		Shipment:    firstShipment,
+		Shipments:   shipments,
 	}, nil
 }

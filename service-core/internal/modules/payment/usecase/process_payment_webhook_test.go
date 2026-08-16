@@ -194,8 +194,14 @@ func (m *mockOrderItemRepo) ListByOrderID(_ context.Context, _ transaction.Execu
 func (m *mockOrderItemRepo) ListByOrderIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]orderDomain.OrderItem, error) {
 	return nil, nil
 }
+func (m *mockOrderItemRepo) ListByShipmentID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItem, error) {
+	return nil, nil
+}
 func (m *mockOrderItemRepo) SaveBulk(_ context.Context, _ transaction.Executor, _ []orderDomain.OrderItem) error {
 	return m.saveBulkErr
+}
+func (m *mockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ []uuid.UUID) error {
+	return nil
 }
 
 // mockInventoryRepo supports configurable commitErr, releaseErr, reserveErr.

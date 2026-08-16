@@ -279,7 +279,15 @@ func (m *coMockOrderItemRepo) ListByOrderID(_ context.Context, _ transaction.Exe
 func (m *coMockOrderItemRepo) ListByOrderIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]orderDomain.OrderItem, error) {
 	return nil, nil
 }
+func (m *coMockOrderItemRepo) ListByShipmentID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItem, error) {
+	return nil, nil
+}
+
 func (m *coMockOrderItemRepo) SaveBulk(_ context.Context, _ transaction.Executor, _ []orderDomain.OrderItem) error {
+	return nil
+}
+
+func (m *coMockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ []uuid.UUID) error {
 	return nil
 }
 

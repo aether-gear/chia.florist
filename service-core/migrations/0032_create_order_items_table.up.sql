@@ -10,13 +10,14 @@ CREATE TABLE order_items (
     product_id UUID,
     product_name VARCHAR(255) NOT NULL,
 
-    quantity INTEGER NOT NULL,
-    unit_price BIGINT NOT NULL,
-    subtotal BIGINT NOT NULL,
-
+    shipment_id UUID,
     courier_code VARCHAR(100),
     courier_service VARCHAR(100),
     shipping_fee_total BIGINT NOT NULL,
+
+    quantity INTEGER NOT NULL,
+    unit_price BIGINT NOT NULL,
+    subtotal BIGINT NOT NULL,
 
     CONSTRAINT fk_order_items_order_id
         FOREIGN KEY (order_id)
@@ -46,3 +47,5 @@ CREATE TABLE order_items (
     CONSTRAINT order_items_subtotal_check
         CHECK (subtotal >= 0)
 );
+
+CREATE INDEX idx_order_items_shipment_id ON order_items(shipment_id);
