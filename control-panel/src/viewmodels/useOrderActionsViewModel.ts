@@ -10,6 +10,22 @@ export interface ShipmentDispatchPayload {
   item_ids: string[];
 }
 
+export interface TrackingTimelineEvent {
+  status: string;
+  description: string;
+  location: string;
+  timestamp: string;
+}
+
+export interface OrderTrackingResponse {
+  order_id: string;
+  shipment_id: string;
+  courier: string;
+  tracking_number?: string;
+  warning?: string;
+  timeline: TrackingTimelineEvent[];
+}
+
 export function useOrderActionsViewModel() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const { toast } = useToast();
@@ -38,6 +54,16 @@ export function useOrderActionsViewModel() {
       throw err;
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const fetchOrderTracking = async (orderId: string): Promise<OrderTrackingResponse | null> => {
+    try {
+      const response = await fetchApi(`/orders/${orderId}/tracking`);
+      return response;
+    } catch (err: any) {
+      console.error('Failed to fetch order tracking', err);
+      return null;
     }
   };
 
@@ -93,6 +119,7 @@ export function useOrderActionsViewModel() {
 
   return {
     submitting,
+    fetchOrderTracking,
     updateOrderStatus,
     updateShipmentStatus,
     updateShipmentDetails,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PackageOpen,
@@ -22,11 +22,12 @@ import {
   Clock,
   Store,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useOrdersViewModel } from '../../viewmodels/useOrdersViewModel';
-import { useOrderActionsViewModel, type ShipmentDispatchPayload } from '../../viewmodels/useOrderActionsViewModel';
+import { useOrderActionsViewModel, type ShipmentDispatchPayload, type OrderTrackingResponse } from '../../viewmodels/useOrderActionsViewModel';
 import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
@@ -69,6 +70,7 @@ export default function OrdersPage() {
 
   const {
     submitting,
+    fetchOrderTracking,
     updateOrderStatus,
     updateShipmentStatus,
     updateShipmentDetails
@@ -91,7 +93,37 @@ export default function OrdersPage() {
   const [transitDescription, setTransitDescription] = useState<string>('');
   const [transitLocation, setTransitLocation] = useState<string>('');
 
+  // Live external courier tracking state & cooldown
+  const [liveTracking, setLiveTracking] = useState<OrderTrackingResponse | null>(null);
+  const [loadingLiveTracking, setLoadingLiveTracking] = useState<boolean>(false);
+  const [syncCooldown, setSyncCooldown] = useState<number>(0);
+
   const selectedOrder = data?.orders.find(o => o.id === selectedOrderId);
+
+  // Cooldown countdown timer for sync button to prevent rate limit hits
+  useEffect(() => {
+    if (syncCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setSyncCooldown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [syncCooldown]);
+
+  // Helper to refresh live tracking from backend
+  const loadLiveTracking = useCallback(async (orderId: string) => {
+    if (syncCooldown > 0) return;
+    setLoadingLiveTracking(true);
+    try {
+      const res = await fetchOrderTracking(orderId);
+      setLiveTracking(res);
+      setSyncCooldown(15);
+    } catch (err) {
+      console.error('Failed to load live tracking', err);
+      setLiveTracking(null);
+    } finally {
+      setLoadingLiveTracking(false);
+    }
+  }, [fetchOrderTracking, syncCooldown]);
 
   // Sync dispatch forms based on shops when selected order changes
   useEffect(() => {
@@ -139,9 +171,12 @@ export default function OrdersPage() {
         setActiveShipmentId(null);
       }
 
+      setLiveTracking(null);
       setEditingShipmentId(null);
       setTransitDescription('');
       setTransitLocation('');
+    } else {
+      setLiveTracking(null);
     }
   }, [selectedOrderId, selectedOrder?.id, selectedOrder?.status]);
 
@@ -1261,38 +1296,78 @@ export default function OrdersPage() {
                     {/* Logistics Shipment History Timeline */}
                     {currentShipments.length > 0 && (
                       <div className="space-y-4 pt-2 border-t border-border/60">
-                        <div className="flex items-center justify-between">
-                          <h5 className="text-sm font-bold text-foreground font-display flex items-center gap-1.5">
-                            <Activity className="h-4 w-4 text-muted-foreground" /> Shipment Tracking History
-                          </h5>
-                          {currentShipments.length > 1 && (
-                            <div className="flex gap-1.5">
-                              {currentShipments.map((s, idx) => (
-                                <button
-                                  key={s.id}
-                                  onClick={() => setActiveShipmentId(s.id)}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                                    activeShipmentId === s.id
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-muted text-muted-foreground hover:text-foreground'
-                                  }`}
-                                >
-                                  Pkg #{idx + 1}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <h5 className="text-sm font-bold text-foreground font-display flex items-center gap-1.5">
+                              <Activity className="h-4 w-4 text-muted-foreground" /> Shipment Tracking History
+                            </h5>
+                            {liveTracking?.timeline && liveTracking.timeline.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                Live Courier Feed
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            {loadingLiveTracking && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={loadingLiveTracking || syncCooldown > 0}
+                              onClick={() => selectedOrder && loadLiveTracking(selectedOrder.id)}
+                              className="h-7 px-2.5 text-[11px] rounded-lg gap-1 border-primary/30 text-primary hover:bg-primary/5 cursor-pointer disabled:opacity-60"
+                            >
+                              <RefreshCw className={`h-3 w-3 ${loadingLiveTracking ? 'animate-spin' : ''}`} />
+                              {syncCooldown > 0 ? `Synced (${syncCooldown}s)` : 'Sync Courier Status'}
+                            </Button>
+                            {currentShipments.length > 1 && (
+                              <div className="flex gap-1.5">
+                                {currentShipments.map((s, idx) => (
+                                  <button
+                                    key={s.id}
+                                    onClick={() => setActiveShipmentId(s.id)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                      activeShipmentId === s.id
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                                    }`}
+                                  >
+                                    Pkg #{idx + 1}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
+
+                        {liveTracking?.warning && (
+                          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium leading-relaxed">
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                            <span>{liveTracking.warning}</span>
+                          </div>
+                        )}
 
                         {(() => {
                           const activeShipment = currentShipments.find(s => s.id === activeShipmentId) || currentShipments[0];
-                          const events = activeShipment?.events || [];
+                          
+                          // Prefer live merged timeline from GET /orders/{id}/tracking (which includes live Komerce checkpoints)
+                          const liveEvents = liveTracking?.timeline || [];
+                          const internalEvents = activeShipment?.events || [];
 
-                          if (events.length > 0) {
+                          const eventsToDisplay = liveEvents.length > 0
+                            ? liveEvents.map((e, idx) => ({
+                                id: `live-event-${idx}`,
+                                status: e.status,
+                                description: e.description,
+                                location: e.location,
+                                timestamp: e.timestamp,
+                              }))
+                            : internalEvents;
+
+                          if (eventsToDisplay.length > 0) {
                             return (
                               <div className="relative pl-6 border-l-2 border-primary/20 space-y-6 ml-2 py-1">
-                                {events.map((event, idx) => {
-                                  const isLatest = idx === 0;
+                                {eventsToDisplay.map((event, idx) => {
+                                  const isLatest = idx === eventsToDisplay.length - 1 || idx === 0;
                                   return (
                                     <div key={event.id} className="relative">
                                       <span className={`absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 bg-background flex items-center justify-center transition-colors ${
