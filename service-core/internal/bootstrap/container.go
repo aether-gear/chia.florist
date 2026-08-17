@@ -11,6 +11,7 @@ import (
 	mailerSvc "service-core/internal/shared/mailer"
 	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
+	"service-core/internal/infra/shipping"
 	"service-core/internal/shared/transaction"
 
 	auditInfra "service-core/internal/modules/audit/infra"
@@ -927,6 +928,7 @@ func NewContainer(cfg Config,
 				shipmentEventRepo,
 				infra.LogisticsProvider,
 				addressRepo,
+				shipping.NewTrackingCache(shipping.DefaultTrackingCacheTTL),
 			),
 		ExpireUnfulfilledOrders: *orderUsecase.NewExpireUnfulfilledOrdersUsecase(
 			orderRepo,

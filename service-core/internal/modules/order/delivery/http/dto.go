@@ -182,5 +182,6 @@ type orderTrackingResponse struct {
 	ShipmentID     string                          `json:"shipment_id"`
 	Courier        string                          `json:"courier"`
 	TrackingNumber *string                         `json:"tracking_number,omitempty"`
+	Warning        *string                         `json:"warning,omitempty"`
 	Timeline       []trackingTimelineEventResponse `json:"timeline"`
 }

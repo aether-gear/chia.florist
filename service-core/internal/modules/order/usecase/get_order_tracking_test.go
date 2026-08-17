@@ -183,6 +183,7 @@ func TestGetOrderTracking_OrderNotFound(t *testing.T) {
 		&gotMockShipmentEventRepo{},
 		&gotMockLogisticsProvider{},
 		&gotMockAddressRepo{},
+		nil,
 	)
 
 	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
@@ -218,6 +219,7 @@ func TestGetOrderTracking_CustomerIDMismatch(t *testing.T) {
 		&gotMockShipmentEventRepo{},
 		&gotMockLogisticsProvider{},
 		&gotMockAddressRepo{},
+		nil,
 	)
 
 	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
@@ -252,6 +254,7 @@ func TestGetOrderTracking_ShipmentNotFound(t *testing.T) {
 		&gotMockShipmentEventRepo{},
 		&gotMockLogisticsProvider{},
 		&gotMockAddressRepo{},
+		nil,
 	)
 
 	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
@@ -314,6 +317,7 @@ func TestGetOrderTracking_InternalEventsOnly(t *testing.T) {
 		&gotMockShipmentEventRepo{events: internalEvents},
 		&gotMockLogisticsProvider{events: nil, err: nil}, // returns no external events
 		&gotMockAddressRepo{},
+		nil,
 	)
 
 	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
@@ -409,6 +413,7 @@ func TestGetOrderTracking_MergedEvents(t *testing.T) {
 		&gotMockShipmentEventRepo{events: internalEvents},
 		&gotMockLogisticsProvider{events: externalEvents},
 		&gotMockAddressRepo{addr: addr},
+		nil,
 	)
 
 	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
@@ -477,6 +482,7 @@ func TestGetOrderTracking_ExternalAPIErrorResilience(t *testing.T) {
 		&gotMockShipmentEventRepo{events: internalEvents},
 		&gotMockLogisticsProvider{err: errors.New("external provider timeout")},
 		&gotMockAddressRepo{},
+		nil,
 	)
 
 	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
@@ -497,5 +503,64 @@ func TestGetOrderTracking_ExternalAPIErrorResilience(t *testing.T) {
 	}
 	if result.Timeline[0].Status != "packed" {
 		t.Fatalf("expected packed status, got %q", result.Timeline[0].Status)
+	}
+}
+
+func TestGetOrderTracking_CacheHit(t *testing.T) {
+	orderID := uuid.New()
+	customerID := uuid.New()
+	shipmentID := uuid.New()
+	trackingNo := "TRACK_CACHE_123"
+
+	order := &orderDomain.Order{
+		ID:         orderID,
+		CustomerID: customerID,
+	}
+
+	shipment := &shipmentDomain.Shipment{
+		ID:                shipmentID,
+		OrderID:           orderID,
+		FulfillmentMethod: shipmentDomain.FulfillmentMethodCourier,
+		TrackingNumber:    &trackingNo,
+		Courier:           "jne",
+	}
+
+	cache := shipping.NewTrackingCache(5 * time.Minute)
+	initialEvents := []shipping.TrackingEvent{
+		{
+			Status:      "in_transit",
+			Description: "On the way to hub",
+			Location:    "JAKARTA",
+			Timestamp:   time.Now(),
+		},
+	}
+	cache.Set("jne", trackingNo, initialEvents)
+
+	// Logistics provider is configured to return error if called
+	logisticsMock := &gotMockLogisticsProvider{err: errors.New("should not be called due to cache hit")}
+
+	usecase := NewGetOrderTrackingUsecase(
+		&gotMockExecutor{},
+		&gotMockOrderRepo{order: order},
+		&gotMockShipmentRepo{shipment: shipment},
+		&gotMockShipmentEventRepo{},
+		logisticsMock,
+		&gotMockAddressRepo{},
+		cache,
+	)
+
+	result, err := usecase.Execute(context.Background(), GetOrderTrackingInput{
+		OrderID:    orderID,
+		CustomerID: customerID,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error on cache hit, got %v", err)
+	}
+	if result == nil || len(result.Timeline) != 1 {
+		t.Fatalf("expected 1 cached timeline event, got %v", result)
+	}
+	if result.Timeline[0].Status != "in_transit" {
+		t.Errorf("expected status 'in_transit', got %q", result.Timeline[0].Status)
 	}
 }

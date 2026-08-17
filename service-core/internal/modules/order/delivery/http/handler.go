@@ -666,11 +666,72 @@ func (h *orderHandler) GetMyOrderTracking(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	if result.Warning != nil {
+		w.Header().Set("X-Warning", *result.Warning)
+	}
+
 	resp := orderTrackingResponse{
 		OrderID:        result.OrderID.String(),
 		ShipmentID:     result.ShipmentID.String(),
 		Courier:        result.Courier,
 		TrackingNumber: result.TrackingNumber,
+		Warning:        result.Warning,
+		Timeline:       timeline,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+// GetOrderTrackingForStaff handles GET /orders/{orderID}/tracking — staff-only.
+func (h *orderHandler) GetOrderTrackingForStaff(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.Type != authenDomain.AccountTypeStaff {
+		return apperrors.NewForbidden("forbidden: staff account required")
+	}
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	input := usecase.GetOrderTrackingInput{
+		OrderID:    orderID,
+		CustomerID: uuid.Nil,
+	}
+
+	result, err := h.getOrderTracking.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		return apperrors.NewNotFound("tracking information not found")
+	}
+
+	if result.Warning != nil {
+		w.Header().Set("X-Warning", *result.Warning)
+	}
+
+	timeline := make([]trackingTimelineEventResponse, len(result.Timeline))
+	for i, e := range result.Timeline {
+		timeline[i] = trackingTimelineEventResponse{
+			Status:      e.Status,
+			Description: e.Description,
+			Location:    e.Location,
+			Timestamp:   e.Timestamp,
+		}
+	}
+
+	resp := orderTrackingResponse{
+		OrderID:        result.OrderID.String(),
+		ShipmentID:     result.ShipmentID.String(),
+		Courier:        result.Courier,
+		TrackingNumber: result.TrackingNumber,
+		Warning:        result.Warning,
 		Timeline:       timeline,
 	}
 

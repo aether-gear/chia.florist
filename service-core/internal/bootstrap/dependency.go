@@ -56,6 +56,12 @@ func NewDependency(cfg Config) (*Dependency, error) {
 	switch cfg.Logistics.Provider {
 	case "", "manual":
 		logistics = manualShipProvider.NewManualShippingProvider()
+	case "manual_tracked", "manual_external":
+		komerce, err := komerceProvider.NewKomerceProvider(cfg.Komerce)
+		if err != nil {
+			return nil, err
+		}
+		logistics = manualShipProvider.NewManualTrackedShippingProvider(komerce)
 	case "komerce":
 		logistics, err = komerceProvider.NewKomerceProvider(cfg.Komerce)
 		if err != nil {

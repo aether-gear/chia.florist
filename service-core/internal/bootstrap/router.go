@@ -442,6 +442,7 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/orders", func(r chi.Router) {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
+			r.Get("/{orderID}/tracking", chains.StaffOnly(orderHandler.GetOrderTrackingForStaff))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
 		})
 
