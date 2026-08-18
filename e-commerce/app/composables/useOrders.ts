@@ -1,18 +1,10 @@
 // app/composables/useOrders.ts
 import { ref, computed } from 'vue'
 import { orderService } from '~/services/orderService'
-import type { BackendOrder } from '~/types/order'
+import type { BackendOrder, GetOrderTrackingTimelineResponse } from '~/types/order'
 
-/**
- * Maps Shopee category tab keys to backend status strings.
- *   all        -> all orders (no status filter query)
- *   pending    -> pending (To Pay - active unexpired payment)
- *   processing -> confirmed | processing (To Ship - packing/arranging flowers)
- *   shipping   -> shipped (To Receive - package in transit)
- *   completed  -> delivered | finished (Completed - delivered successfully)
- *   cancelled  -> cancelled | expired (Cancelled / Expired orders)
- */
 export type OrderTab = 'all' | 'pending' | 'processing' | 'shipping' | 'completed' | 'cancelled'
+
 
 const TAB_STATUSES: Record<OrderTab, string[]> = {
   all:        [],
@@ -243,6 +235,25 @@ export const useOrders = () => {
     })
   }
 
+  const trackingData       = ref<GetOrderTrackingTimelineResponse | null>(null)
+  const isTrackingLoading  = ref(false)
+  const trackingError      = ref<string | null>(null)
+
+  const fetchOrderTracking = async (orderId: string) => {
+    if (!orderId) return
+    isTrackingLoading.value = true
+    trackingError.value     = null
+    try {
+      const res = await orderService.getOrderTrackingTimeline(orderId)
+      trackingData.value = res
+    } catch (err: any) {
+      trackingError.value = err?.data?.message || err?.message || 'Failed to load tracking timeline'
+      trackingData.value = null
+    } finally {
+      isTrackingLoading.value = false
+    }
+  }
+
   return {
     orders,
     isLoading,
@@ -253,6 +264,10 @@ export const useOrders = () => {
     totalPages,
     fetchOrders,
     goToPage,
+    trackingData,
+    isTrackingLoading,
+    trackingError,
+    fetchOrderTracking,
     formatRupiah,
     formatDate,
     isOrderExpired,
@@ -262,3 +277,4 @@ export const useOrders = () => {
     getTimeRemaining
   }
 }
+

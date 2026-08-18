@@ -490,8 +490,7 @@ const handleSaveAddress = async () => {
     addressFormError.value = result.message || 'Failed to save address.'
   }
 }
-
-const handleDeleteAddress = async (id: string) => {
+  const handleDeleteAddress = async (id: string) => {
   if (confirm('Are you sure you want to delete this address?')) {
     const result = await addressVm.deleteAddress(id)
     if (result.success) {
@@ -504,6 +503,12 @@ const handleDeleteAddress = async (id: string) => {
 
 // ─── Orders ────────────────────────────────────────────────────────
 const ordersVm = useOrders()
+const {
+  trackingData,
+  isTrackingLoading,
+  trackingError,
+  fetchOrderTracking
+} = ordersVm
 
 // Load orders whenever the orders tab or sub-status tab is activated
 const loadOrders = (tab: OrderTab = activeOrderStatus.value as OrderTab, page = 1) => {
@@ -530,9 +535,17 @@ const handleLogout = async () => {
 
 const selectedOrder = ref<BackendOrder | null>(null)
 const showShippingOverlay = ref(false)
+const isCopied = ref(false)
 
 const openOrderDetail = (order: BackendOrder) => {
   selectedOrder.value = order
+  fetchOrderTracking(order.id)
+}
+
+const openTrackShipment = (order: BackendOrder) => {
+  selectedOrder.value = order
+  showShippingOverlay.value = true
+  fetchOrderTracking(order.id)
 }
 
 const closeOrderDetail = () => {
@@ -543,6 +556,24 @@ const closeOrderDetail = () => {
 const toggleShippingOverlay = () => {
   showShippingOverlay.value = !showShippingOverlay.value
 }
+
+
+watch(showShippingOverlay, (show) => {
+  if (show && selectedOrder.value?.id) {
+    fetchOrderTracking(selectedOrder.value.id)
+  }
+})
+
+const copyTrackingNumber = (trackingNumber: string) => {
+  if (!trackingNumber) return
+  navigator.clipboard.writeText(trackingNumber)
+  isCopied.value = true
+  globalAlert.showSuccess('Copied', 'Tracking number copied to clipboard!')
+  setTimeout(() => {
+    isCopied.value = false
+  }, 2000)
+}
+
 
 const contactDriver = (orderId: string) => {
   window.open(`https://wa.me/628175234999?text=Hello%20Chia%20Florist,%20I%20would%20like%20to%20inquire%20about%20the%20delivery%20status%20for%20order%20${orderId}`, '_blank')
@@ -897,6 +928,14 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                         Pay Now
                       </button>
                       <button 
+                        v-if="['confirmed', 'processing', 'shipped', 'delivered', 'finished'].includes(order.status)"
+                        @click.stop="openTrackShipment(order)"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>🚚</span>
+                        <span>Track Package</span>
+                      </button>
+                      <button 
                         v-if="order.status === 'shipped' || order.status === 'delivered'"
                         @click="contactDriver(order.id)"
                         class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
@@ -911,6 +950,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                         View Details
                       </button>
                     </div>
+
                   </div>
                 </div>
               </div>
@@ -1054,7 +1094,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
         <!-- Body -->
         <div class="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
-          <!-- Current Status Banner (No Delivery Timeline button here) -->
+          <!-- Current Status Banner with Live Tracking Action -->
           <div class="flex flex-wrap items-center justify-between bg-emerald-50/20 border border-emerald-100 p-4 rounded-2xl gap-3">
             <div>
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Order Status</p>
@@ -1067,46 +1107,51 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </span>
               </div>
             </div>
+            <button 
+              v-if="['confirmed', 'processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)"
+              @click="showShippingOverlay = true"
+              class="px-4 py-2 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>🚚</span>
+              <span>Open Tracking Overlay</span>
+            </button>
           </div>
 
-          <!-- Shipping Information & Delivery Timeline Section -->
+          <!-- Shipping Summary Section & Tracking Overlay Launcher -->
           <div class="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100/60 pb-3">
-              <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
-                <span>🚚</span>
-                <span>Shipping Information & Delivery Progress</span>
-              </h4>
-              <span class="text-xs font-bold text-blue-800 bg-blue-100/60 px-2.5 py-0.5 rounded-lg border border-blue-200/50">
-                Courier: {{ selectedOrder.items[0]?.courier_code ? `${selectedOrder.items[0].courier_code.toUpperCase()} ${selectedOrder.items[0].courier_service}` : 'Standard Courier' }}
-              </span>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+                  <span>🚚</span>
+                  <span>Shipping Information</span>
+                </h4>
+                <p class="text-[11px] text-gray-500 mt-1">
+                  Courier: <span class="font-bold text-gray-900 uppercase">{{ trackingData?.courier || selectedOrder.items[0]?.courier_code || 'Standard Courier' }}</span>
+                  <span v-if="selectedOrder.items[0]?.courier_service"> ({{ selectedOrder.items[0].courier_service }})</span>
+                </p>
+              </div>
+
+              <button 
+                @click="showShippingOverlay = true"
+                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+              >
+                <span>📦</span>
+                <span>Open Tracking Overlay</span>
+              </button>
             </div>
 
-            <!-- Delivery Progress Log Step Tracker -->
-            <div class="space-y-3 pt-1">
-              <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Real-time Delivery Timeline</p>
-              <div class="relative pl-6 space-y-4 border-l-2 border-blue-200 ml-2">
-                <div 
-                  v-for="step in ordersVm.getOrderTimelineSteps(selectedOrder)" 
-                  :key="step.step"
-                  class="relative"
-                >
-                  <!-- Dot indicator -->
-                  <div 
-                    :class="[
-                      'absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center text-[8px] font-bold',
-                      step.error ? 'bg-rose-500 border-rose-600 text-white ring-4 ring-rose-100' : (step.active ? 'bg-[#1b4332] border-[#1b4332] text-white ring-4 ring-emerald-100' : (step.done ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-400'))
-                    ]"
-                  >
-                    {{ step.done ? '✓' : step.step }}
-                  </div>
-                  <div>
-                    <h5 :class="['text-xs font-bold', step.active || step.done ? 'text-gray-900' : 'text-gray-400']">{{ step.title }}</h5>
-                    <p class="text-[11px] text-gray-500 mt-0.5 font-medium">{{ step.desc }}</p>
-                  </div>
-                </div>
+            <!-- Resi number pill if available -->
+            <div v-if="trackingData?.tracking_number" class="flex items-center justify-between bg-white p-3 rounded-xl border border-blue-100 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400 font-semibold">Waybill / Resi:</span>
+                <span class="font-mono font-bold text-gray-900">{{ trackingData.tracking_number }}</span>
               </div>
+              <button @click="copyTrackingNumber(trackingData.tracking_number)" class="text-[10px] text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 font-bold transition cursor-pointer">
+                {{ isCopied ? 'Copied!' : 'Copy Resi' }}
+              </button>
             </div>
           </div>
+
 
           <!-- Payment Information Details Box -->
           <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-5 space-y-3">
@@ -1240,14 +1285,23 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Overlay Body -->
           <div class="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
-            <!-- Courier Summary (from first item) -->
+            <!-- Courier Summary (from backend tracking response or first item) -->
             <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 space-y-2">
               <div class="flex justify-between font-semibold">
                 <span class="text-gray-400">Courier Partner</span>
-                <span class="text-gray-900 font-bold">
-                  {{ selectedOrder.items[0]?.courier_code || '—' }}
-                  <span v-if="selectedOrder.items[0]?.courier_service"> ({{ selectedOrder.items[0].courier_service }})</span>
+                <span class="text-gray-900 font-bold uppercase">
+                  {{ trackingData?.courier || selectedOrder.items[0]?.courier_code || '—' }}
+                  <span v-if="selectedOrder.items[0]?.courier_service" class="normal-case"> ({{ selectedOrder.items[0].courier_service }})</span>
                 </span>
+              </div>
+              <div v-if="trackingData?.tracking_number" class="flex justify-between items-center font-semibold pt-1 border-t border-gray-100/60">
+                <span class="text-gray-400">Tracking Number</span>
+                <div class="flex items-center gap-1.5 font-mono font-bold text-gray-900">
+                  <span>{{ trackingData.tracking_number }}</span>
+                  <button @click="copyTrackingNumber(trackingData.tracking_number)" class="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition cursor-pointer">
+                    {{ isCopied ? 'Copied!' : 'Copy' }}
+                  </button>
+                </div>
               </div>
               <div class="flex justify-between font-semibold">
                 <span class="text-gray-400">Shipping Fee</span>
@@ -1276,9 +1330,50 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
             <!-- Shipping Timeline -->
             <div class="space-y-4">
-              <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order Timeline</h4>
+              <div class="flex items-center justify-between">
+                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order &amp; Tracking Timeline</h4>
+                <button 
+                  v-if="selectedOrder.id" 
+                  @click="fetchOrderTracking(selectedOrder.id)" 
+                  class="text-[10px] text-emerald-700 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <span>🔄</span> Refresh Tracking
+                </button>
+              </div>
+
+              <!-- Loading Skeleton -->
+              <div v-if="isTrackingLoading" class="p-6 text-center space-y-3">
+                <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-emerald-600 border-t-transparent"></div>
+                <p class="text-gray-400 text-[11px]">Fetching latest tracking updates from courier...</p>
+              </div>
               
-              <div class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
+              <!-- Dynamic Real-time Courier Timeline -->
+              <div 
+                v-else-if="trackingData?.timeline && trackingData.timeline.length > 0"
+                class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-emerald-100"
+              >
+                <div 
+                  v-for="(event, idx) in trackingData.timeline" 
+                  :key="idx" 
+                  class="relative"
+                >
+                  <span 
+                    class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white"
+                    :class="[idx === 0 ? 'bg-emerald-500 ring-4 ring-emerald-100 animate-pulse' : 'bg-emerald-400']"
+                  ></span>
+                  <div class="flex items-center justify-between">
+                    <p class="font-bold text-gray-900 capitalize">{{ event.status.replace(/_/g, ' ') }}</p>
+                    <span class="text-[10px] font-mono text-gray-400">{{ ordersVm.formatDate(event.timestamp) }}</span>
+                  </div>
+                  <p class="text-[11px] text-gray-600 mt-0.5">{{ event.description }}</p>
+                  <p v-if="event.location" class="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                    <span>📍</span> {{ event.location }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Fallback Status Milestones (when tracking is not yet available or returns empty) -->
+              <div v-else class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
                 <!-- Milestone: Placed -->
                 <div class="relative">
                   <span 
@@ -1302,7 +1397,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
 
                 <!-- Milestone: Arranging Flowers (for processing or later) -->
-                <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative"> <!-- Milestone: Arranging Flowers -->
+                <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Flower Arrangement Complete</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Expert florist team finished production</p>
@@ -1354,6 +1449,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
               </div>
             </div>
+
           </div>
 
           <!-- Overlay Footer -->
