@@ -146,6 +146,8 @@ type mockAccountRepo struct {
 	activateCalls          int
 	updatePasswordCalls    int
 	lastPasswordUpdateHash string
+	updateLastLoginAtCalls int
+	lastLoginAtRecorded    time.Time
 }
 
 func (m *mockAccountRepo) GetByEmail(_ context.Context, _ transaction.Executor, _ string) (*domain.Account, error) {
@@ -170,6 +172,14 @@ func (m *mockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transactio
 	return nil
 }
 func (m *mockAccountRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
+func (m *mockAccountRepo) UpdateLastLoginAt(_ context.Context, _ transaction.Executor, _ uuid.UUID, lastLoginAt time.Time) error {
+	m.updateLastLoginAtCalls++
+	m.lastLoginAtRecorded = lastLoginAt
+	if m.account != nil {
+		m.account.LastLoginAt = &lastLoginAt
+	}
 	return nil
 }
 

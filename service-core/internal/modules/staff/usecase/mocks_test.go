@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"time"
 
 	applogger "service-core/internal/common/logger"
 	authenDomain "service-core/internal/modules/authentication/domain"
@@ -187,6 +188,10 @@ func (m *mockAccountRepo) Create(ctx context.Context, exec transaction.Executor,
 
 func (m *mockAccountRepo) DeleteByUserID(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
 	m.deleteCalls++
+	return nil
+}
+
+func (m *mockAccountRepo) UpdateLastLoginAt(ctx context.Context, exec transaction.Executor, id uuid.UUID, lastLoginAt time.Time) error {
 	return nil
 }
 

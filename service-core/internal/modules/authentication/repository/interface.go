@@ -53,6 +53,13 @@ type AccountRepository interface {
 		exec transaction.Executor,
 		userID uuid.UUID,
 	) error
+
+	UpdateLastLoginAt(
+		ctx context.Context,
+		exec transaction.Executor,
+		accID uuid.UUID,
+		lastLoginAt time.Time,
+	) error
 }
 
 type SessionRepository interface {

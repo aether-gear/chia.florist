@@ -84,8 +84,7 @@ func (u *VerifyAccountUsecase) Execute(
 ) (*VerifyAccountResult, error) {
 	now := appclock.Now()
 
-	challenge, err := u.challengeRepo.
-		GetByID(ctx, u.executor, input.ChallengeID)
+	challenge, err := u.challengeRepo.GetByID(ctx, u.executor, input.ChallengeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get challenge: %w", err)
 	}
@@ -141,23 +140,16 @@ func (u *VerifyAccountUsecase) Execute(
 		return nil, apperrors.NewConflict(domain.ErrMaxAttemptReached.Error())
 	}
 
-	if err := u.pwHasher.
-		Compare(
-			challenge.CodeHash,
-			input.OTP,
-		); err != nil {
+	if err := u.pwHasher.Compare(
+		challenge.CodeHash,
+		input.OTP,
+	); err != nil {
 		challenge.AttemptCount++
 
-		if err := u.challengeRepo.
-			Save(
-				ctx,
-				u.executor,
-				*challenge,
-			); err != nil {
-			return nil, fmt.Errorf(
-				"failed to update challenge attempts: %w",
-				err,
-			)
+		if err := u.challengeRepo.Save(ctx, u.executor,
+			*challenge,
+		); err != nil {
+			return nil, fmt.Errorf("failed to update challenge attempts: %w", err)
 		}
 
 		u.auditLogger.Log(ctx, applogger.AuditEvent{
@@ -180,16 +172,15 @@ func (u *VerifyAccountUsecase) Execute(
 		roleCodes  []authorzDomain.RoleCode
 	)
 
-	account, err := u.accountRepo.
-		GetByUserID(ctx, u.executor, *challenge.UserID)
+	account, err := u.accountRepo.GetByUserID(ctx, u.executor, *challenge.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
+
 	if account != nil {
 		switch account.Type {
 		case domain.AccountTypeCustomer:
-			cust, err := u.customerRepo.
-				GetByUserID(ctx, u.executor, account.UserID)
+			cust, err := u.customerRepo.GetByUserID(ctx, u.executor, account.UserID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get customer profile: %w", err)
 			}
@@ -197,20 +188,16 @@ func (u *VerifyAccountUsecase) Execute(
 				customerID = &cust.ID
 			}
 		case domain.AccountTypeStaff:
-			memberStaff, err := u.membershipRepo.
-				GetByAccountID(ctx, u.executor, account.ID)
+			memberStaff, err := u.membershipRepo.GetByAccountID(ctx, u.executor, account.ID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get staff membership: %w", err)
 			}
 			if memberStaff != nil {
 				staffID = &memberStaff.StaffID
-				roles, err := u.membershipRepo.
-					ListRolesByAccountIDAndStaffID(
-						ctx,
-						u.executor,
-						account.ID,
-						memberStaff.StaffID,
-					)
+				roles, err := u.membershipRepo.ListRolesByAccountIDAndStaffID(ctx, u.executor,
+					account.ID,
+					memberStaff.StaffID,
+				)
 				if err != nil {
 					return nil, fmt.Errorf("failed to list staff roles: %w", err)
 				}
@@ -223,30 +210,28 @@ func (u *VerifyAccountUsecase) Execute(
 	}
 
 	sessionID := uuid.New()
-	accessTkn, err := u.tokenSvc.
-		Generate(repository.GenerateTokenParams{
-			UserID:     *challenge.UserID,
-			SessionID:  sessionID,
-			StaffID:    staffID,
-			CustomerID: customerID,
-			Roles:      roleCodes,
-			Type:       domain.TokenTypeAccess,
-			Duration:   30 * time.Minute,
-		})
+	accessTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
+		UserID:     *challenge.UserID,
+		SessionID:  sessionID,
+		StaffID:    staffID,
+		CustomerID: customerID,
+		Roles:      roleCodes,
+		Type:       domain.TokenTypeAccess,
+		Duration:   30 * time.Minute,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshTkn, err := u.tokenSvc.
-		Generate(repository.GenerateTokenParams{
-			UserID:     *challenge.UserID,
-			SessionID:  sessionID,
-			StaffID:    staffID,
-			CustomerID: customerID,
-			Roles:      roleCodes,
-			Type:       domain.TokenTypeRefresh,
-			Duration:   7 * 24 * time.Hour,
-		})
+	refreshTkn, err := u.tokenSvc.Generate(repository.GenerateTokenParams{
+		UserID:     *challenge.UserID,
+		SessionID:  sessionID,
+		StaffID:    staffID,
+		CustomerID: customerID,
+		Roles:      roleCodes,
+		Type:       domain.TokenTypeRefresh,
+		Duration:   7 * 24 * time.Hour,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -269,32 +254,34 @@ func (u *VerifyAccountUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	err = u.transactor.WithinTransaction(
-		ctx,
-		func(exec transaction.Executor) error {
-			if err := u.challengeRepo.
-				Save(ctx, exec, *challenge); err != nil {
-				return fmt.Errorf("failed to consume challenge: %w", err)
-			}
+	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.challengeRepo.Save(ctx, exec, *challenge); err != nil {
+			return fmt.Errorf("failed to consume challenge: %w", err)
+		}
 
-			if err := u.accountRepo.
-				ActivateByUserID(ctx, exec, *challenge.UserID); err != nil {
-				return fmt.Errorf("failed to activate account: %w", err)
-			}
+		if err := u.accountRepo.ActivateByUserID(ctx, exec, *challenge.UserID); err != nil {
+			return fmt.Errorf("failed to activate account: %w", err)
+		}
 
-			if err := u.sessionRepo.
-				Save(ctx, exec, session); err != nil {
-				return fmt.Errorf("failed to save session %w", err)
-			}
+		if err := u.sessionRepo.Save(ctx, exec, session); err != nil {
+			return fmt.Errorf("failed to save session %w", err)
+		}
 
-			if err := u.refreshTokenRepo.
-				Save(ctx, exec, refreshToken); err != nil {
-				return fmt.Errorf("failed to save refresh token %w", err)
-			}
+		if err := u.refreshTokenRepo.Save(ctx, exec, refreshToken); err != nil {
+			return fmt.Errorf("failed to save refresh token %w", err)
+		}
 
-			return nil
-		},
-	)
+		if account != nil {
+			if err := u.accountRepo.UpdateLastLoginAt(ctx, exec,
+				account.ID,
+				now,
+			); err != nil {
+				return fmt.Errorf("failed to update last login at: %w", err)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

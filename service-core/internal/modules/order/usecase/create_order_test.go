@@ -117,6 +117,9 @@ func (m *coMockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transact
 func (m *coMockAccountRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
+func (m *coMockAccountRepo) UpdateLastLoginAt(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time) error {
+	return nil
+}
 
 // --- payment method repo ---
 

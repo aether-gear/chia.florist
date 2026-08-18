@@ -82,13 +82,10 @@ func (u *AuthenticateOAuthUsecase) Execute(
 ) (*AuthenticateOAuthResult, error) {
 	now := appclock.Now()
 
-	conn, err := u.oauthRepo.
-		GetByProviderAndSubject(
-			ctx,
-			u.executor,
-			input.Provider,
-			input.Subject,
-		)
+	conn, err := u.oauthRepo.GetByProviderAndSubject(ctx, u.executor,
+		input.Provider,
+		input.Subject,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve oauth connection: %w", err)
 	}
@@ -103,8 +100,10 @@ func (u *AuthenticateOAuthUsecase) Execute(
 		userID = conn.UserID
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-			if err := u.oauthRepo.
-				UpdateLastLogin(ctx, exec, conn.ID, now); err != nil {
+			if err := u.oauthRepo.UpdateLastLogin(ctx, exec,
+				conn.ID,
+				now,
+			); err != nil {
 				return fmt.Errorf("failed to update last login: %w", err)
 			}
 
@@ -114,8 +113,7 @@ func (u *AuthenticateOAuthUsecase) Execute(
 			return nil, err
 		}
 
-		account, err = u.accountRepo.
-			GetByUserID(ctx, u.executor, userID)
+		account, err = u.accountRepo.GetByUserID(ctx, u.executor, userID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get account: %w", err)
 		}
@@ -152,8 +150,7 @@ func (u *AuthenticateOAuthUsecase) Execute(
 		}
 
 		if account.Status == domain.AccountPending {
-			err = u.accountRepo.
-				ActivateByUserID(ctx, u.executor, userID)
+			err = u.accountRepo.ActivateByUserID(ctx, u.executor, userID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to activate account: %w", err)
 			}
@@ -165,8 +162,7 @@ func (u *AuthenticateOAuthUsecase) Execute(
 	// No linked OAuth identity found;
 	// check whether the email belongs to an existing account.
 	if conn == nil {
-		account, err = u.accountRepo.
-			GetByEmail(ctx, u.executor, input.Email)
+		account, err = u.accountRepo.GetByEmail(ctx, u.executor, input.Email)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve account by email: %w", err)
 		}
@@ -177,8 +173,7 @@ func (u *AuthenticateOAuthUsecase) Execute(
 	if conn == nil && account != nil {
 		// The schema enforces user_id UNIQUE,
 		// so check if user already have any OAuth connection.
-		existingConn, err := u.oauthRepo.
-			GetByUserID(ctx, u.executor, account.UserID)
+		existingConn, err := u.oauthRepo.GetByUserID(ctx, u.executor, account.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check existing connection by user id: %w", err)
 		}
@@ -211,16 +206,13 @@ func (u *AuthenticateOAuthUsecase) Execute(
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 			if account.Status == domain.AccountPending {
-				if err := u.accountRepo.
-					ActivateByUserID(ctx, exec, userID); err != nil {
+				if err := u.accountRepo.ActivateByUserID(ctx, exec, userID); err != nil {
 					return fmt.Errorf("failed to activate account: %w", err)
 				}
-
 				account.Status = domain.AccountActive
 			}
 
-			if err := u.oauthRepo.
-				Create(ctx, exec, newConn); err != nil {
+			if err := u.oauthRepo.Create(ctx, exec, newConn); err != nil {
 				return fmt.Errorf("failed to link oauth connection: %w", err)
 			}
 
@@ -283,28 +275,23 @@ func (u *AuthenticateOAuthUsecase) Execute(
 		}
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-			if err := u.userRepo.
-				CreateUser(ctx, exec, userProps); err != nil {
+			if err := u.userRepo.CreateUser(ctx, exec, userProps); err != nil {
 				return fmt.Errorf("failed to create user: %w", err)
 			}
 
-			if err := u.userRepo.
-				SaveProfile(ctx, exec, profile); err != nil {
+			if err := u.userRepo.SaveProfile(ctx, exec, profile); err != nil {
 				return fmt.Errorf("failed to save user profile: %w", err)
 			}
 
-			if err := u.customerRepo.
-				Create(ctx, exec, cust); err != nil {
+			if err := u.customerRepo.Create(ctx, exec, cust); err != nil {
 				return fmt.Errorf("failed to create customer profile: %w", err)
 			}
 
-			if err := u.accountRepo.
-				Create(ctx, exec, newAcc); err != nil {
+			if err := u.accountRepo.Create(ctx, exec, newAcc); err != nil {
 				return fmt.Errorf("failed to create account: %w", err)
 			}
 
-			if err := u.oauthRepo.
-				Create(ctx, exec, newConn); err != nil {
+			if err := u.oauthRepo.Create(ctx, exec, newConn); err != nil {
 				return fmt.Errorf("failed to create oauth connection: %w", err)
 			}
 
@@ -327,8 +314,7 @@ func (u *AuthenticateOAuthUsecase) Execute(
 	}
 
 	var customerID *uuid.UUID
-	custProfile, err := u.customerRepo.
-		GetByUserID(ctx, u.executor, userID)
+	custProfile, err := u.customerRepo.GetByUserID(ctx, u.executor, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve customer profile: %w", err)
 	}
@@ -370,14 +356,19 @@ func (u *AuthenticateOAuthUsecase) Execute(
 	}
 
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		if err := u.sessionRepo.
-			Save(ctx, exec, session); err != nil {
+		if err := u.sessionRepo.Save(ctx, exec, session); err != nil {
 			return fmt.Errorf("failed to save session: %w", err)
 		}
 
-		if err := u.refreshTokenRepo.
-			Save(ctx, exec, refreshTknDomain); err != nil {
+		if err := u.refreshTokenRepo.Save(ctx, exec, refreshTknDomain); err != nil {
 			return fmt.Errorf("failed to save refresh token: %w", err)
+		}
+
+		if err := u.accountRepo.UpdateLastLoginAt(ctx, exec,
+			account.ID,
+			now,
+		); err != nil {
+			return fmt.Errorf("failed to update last login at: %w", err)
 		}
 
 		return nil
