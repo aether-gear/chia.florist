@@ -37,7 +37,7 @@ export function useStaffViewModel() {
       const staffList = result.staff || [];
       // Concurrently fetch accounts for each staff member to determine binding status
       // and wait until BOTH staff data and all account bindings have resolved
-      let accountsMapResult: Record<string, StaffAccountMember[]> = {};
+      const accountsMapResult: Record<string, StaffAccountMember[]> = {};
       if (staffList.length > 0) {
         const results = await Promise.all(
           staffList.map((s) =>

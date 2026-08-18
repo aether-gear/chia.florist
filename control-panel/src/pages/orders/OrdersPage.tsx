@@ -374,6 +374,7 @@ export default function OrdersPage() {
     const target = new Date(expiryStr);
     if (isNaN(target.getTime())) return null;
 
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const diffMs = target.getTime() - now;
 
@@ -391,14 +392,12 @@ export default function OrdersPage() {
       const hours = Math.floor(totalSecs / 3600);
       const minutes = Math.floor((totalSecs % 3600) / 60);
 
-      let timeWords = '';
-      if (hours > 0) {
-        timeWords = `${hours}h ${minutes > 0 ? `${minutes}m` : ''}`.trim() + ' left';
-      } else if (minutes > 0) {
-        timeWords = `${minutes}m left`;
-      } else {
-        timeWords = `${totalSecs}s left`;
-      }
+      const timeWords =
+        hours > 0
+          ? `${hours}h ${minutes > 0 ? `${minutes}m` : ''}`.trim() + ' left'
+          : minutes > 0
+          ? `${minutes}m left`
+          : `${totalSecs}s left`;
 
       return {
         label: timeWords,
