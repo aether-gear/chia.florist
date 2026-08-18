@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	apperrors "service-core/internal/common/errors"
 	shipping "service-core/internal/infra/shipping"
 	config "service-core/internal/shared/config"
 )
@@ -80,11 +82,15 @@ func (p *komerceProvider) CreateOrder(
 	ctx context.Context,
 	input shipping.CreateOrderInput,
 ) (*shipping.CreateOrderResult, error) {
+	if !isValidKomerceCourier(input.CourierCode) {
+		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+	}
+
 	endpoint := "/order/api/v1/orders/store"
 	reqBody := createOrderRequestBody{
 		OriginAreaID:      input.OriginAreaID,
 		DestinationAreaID: input.DestinationAreaID,
-		Courier:           input.CourierCode,
+		Courier:           normalizeCourierCode(input.CourierCode),
 		CourierService:    input.CourierService,
 		Weight:            input.Weight,
 		UniqueOrderID:     input.UniqueOrderID,
@@ -122,14 +128,11 @@ func (p *komerceProvider) CreateOrder(
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		switch resp.StatusCode {
-		case http.StatusBadRequest:
-			return nil, fmt.Errorf("one or more request parameters are invalid")
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
 
 		case http.StatusUnauthorized:
-			return nil, fmt.Errorf("invalid or missing API key")
-
-		case http.StatusUnprocessableEntity:
-			return nil, fmt.Errorf("missing required parameter")
+			return nil, apperrors.NewUnauthorized("invalid or missing API key")
 
 		case http.StatusInternalServerError:
 			return nil, fmt.Errorf("provider service unavailable")
@@ -146,11 +149,11 @@ func (p *komerceProvider) CreateOrder(
 
 	var result createOrderResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
 	}
 
 	if result.Meta.Code != 200 {
-		return nil, fmt.Errorf("rejected (%d): %s", result.Meta.Code, result.Meta.Message)
+		return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
 	}
 
 	return &shipping.CreateOrderResult{
@@ -188,32 +191,54 @@ func (p *komerceProvider) TrackShipment(
 	ctx context.Context,
 	input shipping.TrackShipmentInput,
 ) ([]shipping.TrackingEvent, error) {
+	if !isValidKomerceCourier(input.Courier) {
+		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+	}
+
 	endpoint := "/api/v1/track/waybill"
-	reqBody := trackWaybillRequestBody{
-		AWB:             input.TrackingNumber,
-		Courier:         normalizeCourierCode(input.Courier),
-		LastPhone:       input.LastPhone,
-		LastPhoneNumber: input.LastPhone,
-	}
-
-	body, err := json.Marshal(reqBody)
+	reqURL, err := url.Parse(p.trackBaseURL + endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("parse url: %w", err)
 	}
 
-	url := p.trackBaseURL + endpoint
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	q := reqURL.Query()
+	q.Set("courier", normalizeCourierCode(input.Courier))
+	q.Set("awb", input.TrackingNumber)
+	if input.LastPhone != nil && *input.LastPhone != "" {
+		q.Set("last_phone_number", *input.LastPhone)
+	}
+	reqURL.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Key", p.shippingKey)
+	req.Header.Set("key", p.shippingKey)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		switch resp.StatusCode {
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+
+		case http.StatusUnauthorized:
+			return nil, apperrors.NewUnauthorized("invalid or missing API key")
+
+		case http.StatusNotFound:
+			return nil, apperrors.NewNotFound("tracking number not found or not yet scanned by courier")
+
+		case http.StatusTooManyRequests:
+			return nil, apperrors.NewTooManyRequests("Komerce API rate limit exceeded")
+
+		default:
+			return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+		}
+	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -222,7 +247,7 @@ func (p *komerceProvider) TrackShipment(
 
 	var result trackWaybillResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
 	}
 
 	if result.Meta.Code != 200 {
@@ -244,33 +269,41 @@ func (p *komerceProvider) TrackShipment(
 	return events, nil
 }
 
+func isValidKomerceCourier(courier string) bool {
+	c := normalizeCourierCode(courier)
+	switch c {
+	case "jne", "jnt", "ninja", "tiki", "pos", "anteraja", "sap", "lion", "wahana", "first", "ide":
+		return true
+	default:
+		return false
+	}
+}
+
 func normalizeCourierCode(courier string) string {
 	c := strings.ToLower(strings.TrimSpace(courier))
 	switch {
-	case strings.Contains(c, "spx") || strings.Contains(c, "shopee"):
-		return "spx"
 	case strings.Contains(c, "jne"):
 		return "jne"
 	case strings.Contains(c, "j&t") || strings.Contains(c, "jnt"):
 		return "jnt"
-	case strings.Contains(c, "sicepat"):
-		return "sicepat"
-	case strings.Contains(c, "pos"):
-		return "pos"
-	case strings.Contains(c, "tiki"):
-		return "tiki"
 	case strings.Contains(c, "ninja"):
 		return "ninja"
+	case strings.Contains(c, "tiki"):
+		return "tiki"
+	case strings.Contains(c, "pos"):
+		return "pos"
+	case strings.Contains(c, "anteraja"):
+		return "anteraja"
+	case strings.Contains(c, "sap"):
+		return "sap"
 	case strings.Contains(c, "lion"):
 		return "lion"
 	case strings.Contains(c, "wahana"):
 		return "wahana"
+	case strings.Contains(c, "first"):
+		return "first"
 	case strings.Contains(c, "idexpress") || strings.Contains(c, "ide"):
 		return "ide"
-	case strings.Contains(c, "sentral"):
-		return "sentral"
-	case strings.Contains(c, "rex"):
-		return "rex"
 	default:
 		fields := strings.Fields(c)
 		if len(fields) > 0 {
