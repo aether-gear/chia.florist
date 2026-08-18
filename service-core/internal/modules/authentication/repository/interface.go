@@ -7,6 +7,7 @@ import (
 	appcookie "service-core/internal/common/http/cookie"
 	appmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
+	authorzDomain "service-core/internal/modules/authorization/domain"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -203,4 +204,41 @@ type UserDeletionService interface {
 		exec transaction.Executor,
 		userID uuid.UUID,
 	) error
+}
+
+type IssueSessionParams struct {
+	UserID     uuid.UUID
+	AccountID  uuid.UUID
+	UserAgent  *string
+	IPAddress  *string
+	StaffID    *uuid.UUID
+	CustomerID *uuid.UUID
+	Roles      []authorzDomain.RoleCode
+}
+
+type IssueSessionResult struct {
+	SessionID    uuid.UUID
+	AccessToken  GeneratedToken
+	RefreshToken GeneratedToken
+}
+
+type SessionIssuerService interface {
+	Issue(
+		ctx context.Context,
+		params IssueSessionParams,
+	) (*IssueSessionResult, error)
+}
+
+type CreateChallengeParams struct {
+	UserID   *uuid.UUID
+	Email    string
+	Purpose  domain.OTPPurpose
+	Duration time.Duration
+}
+
+type ChallengeService interface {
+	CreateAndSend(
+		ctx context.Context,
+		params CreateChallengeParams,
+	) (*uuid.UUID, error)
 }
