@@ -191,7 +191,7 @@ func TestGetCart_Success_NoDeletedProducts(t *testing.T) {
 	store := &mockStorageProvider{}
 	exec := &mockExecutor{}
 
-	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, store, exec)
+	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, nil, store, exec)
 	result, err := uc.Execute(ctx, customerID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -270,7 +270,7 @@ func TestGetCart_Success_WithDeletedProducts(t *testing.T) {
 	store := &mockStorageProvider{}
 	exec := &mockExecutor{}
 
-	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, store, exec)
+	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, nil, store, exec)
 	result, err := uc.Execute(ctx, customerID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -325,7 +325,7 @@ func TestGetCart_Success_ProductNotFound(t *testing.T) {
 	store := &mockStorageProvider{}
 	exec := &mockExecutor{}
 
-	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, store, exec)
+	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, nil, store, exec)
 	result, err := uc.Execute(ctx, customerID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -369,7 +369,7 @@ func TestGetCart_Success_WithCustomItem(t *testing.T) {
 	store := &mockStorageProvider{}
 	exec := &mockExecutor{}
 
-	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, store, exec)
+	uc := NewGetCartUsecase(cartR, invR, prodR, imgR, nil, store, exec)
 	result, err := uc.Execute(ctx, customerID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

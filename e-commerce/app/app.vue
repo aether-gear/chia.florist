@@ -3,8 +3,8 @@
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <CGlobalAlert />
     <CSessionExpiredNotification />
-    <CAuthNotificationToast />
     <CToastContainer />
   </div>
 </template>

@@ -4,6 +4,7 @@ export interface Shop {
   slug: string;
   description?: string;
   is_active?: boolean;
+  approval_status?: 'pending' | 'approved' | 'rejected';
   created_at?: string;
   updated_at?: string | null;
 }

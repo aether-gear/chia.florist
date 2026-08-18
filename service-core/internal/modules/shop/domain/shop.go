@@ -6,6 +6,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type ShopApprovalStatus string
+
+const (
+	ShopApprovalStatusPending  ShopApprovalStatus = "pending"
+	ShopApprovalStatusApproved ShopApprovalStatus = "approved"
+	ShopApprovalStatusRejected ShopApprovalStatus = "rejected"
+)
+
 type Shop struct {
 	ID uuid.UUID
 
@@ -13,9 +21,15 @@ type Shop struct {
 	Slug        string
 	Description *string
 
-	IsActive bool
+	IsActive       bool
+	ApprovalStatus ShopApprovalStatus
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
 	DeletedAt *time.Time
 }
+
+func (s *Shop) IsOperable() bool {
+	return s.IsActive && s.ApprovalStatus == ShopApprovalStatusApproved && s.DeletedAt == nil
+}
+

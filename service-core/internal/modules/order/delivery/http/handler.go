@@ -49,6 +49,11 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			s := item.ProductID.String()
 			productIDStr = &s
 		}
+		var shipmentIDStr *string
+		if item.ShipmentID != nil {
+			s := item.ShipmentID.String()
+			shipmentIDStr = &s
+		}
 		variantType := string(item.ProductVariantType)
 		if variantType == "" {
 			if item.ProductID == nil {
@@ -60,6 +65,7 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 
 		items[j] = orderItemResponse{
 			ID:                 item.ID.String(),
+			ShipmentID:         shipmentIDStr,
 			ProductID:          productIDStr,
 			ProductVariantType: variantType,
 			IsCustom:           item.ProductID == nil || variantType == "custom",
@@ -75,18 +81,26 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 		}
 	}
 
+	shipments := make([]shipmentDetailResponse, len(o.Shipments))
+	for i := range o.Shipments {
+		shipments[i] = *mapShipmentDetail(&o.Shipments[i])
+	}
+
 	resp := orderResponse{
-		ID:          o.Order.ID.String(),
-		Number:      o.Order.Number,
-		CustomerID:  o.Order.CustomerID.String(),
-		AddressID:   o.Order.AddressID.String(),
-		Status:      string(o.Order.Status),
-		Subtotal:    o.Order.Subtotal,
-		ShippingFee: o.Order.ShippingFee,
-		Total:       o.Order.Total,
-		CreatedAt:   o.Order.CreatedAt,
-		UpdatedAt:   o.Order.UpdatedAt,
-		Items:       items,
+		ID:                o.Order.ID.String(),
+		Number:            o.Order.Number,
+		CustomerID:        o.Order.CustomerID.String(),
+		AddressID:         o.Order.AddressID.String(),
+		Status:            string(o.Order.Status),
+		Subtotal:          o.Order.Subtotal,
+		ShippingFee:       o.Order.ShippingFee,
+		Total:             o.Order.Total,
+		ConfirmedAt:       o.Order.ConfirmedAt,
+		HandlingExpiresAt: o.Order.HandlingExpiresAt,
+		CreatedAt:         o.Order.CreatedAt,
+		UpdatedAt:         o.Order.UpdatedAt,
+		Items:             items,
+		Shipments:         shipments,
 	}
 
 	if o.Payment != nil {
@@ -94,6 +108,8 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 	}
 	if o.Shipment != nil {
 		resp.Shipment = mapShipmentDetail(o.Shipment)
+	} else if len(shipments) > 0 {
+		resp.Shipment = &shipments[0]
 	}
 	if o.Address != nil {
 		resp.Address = &orderAddressResponse{
@@ -147,8 +163,14 @@ func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 		}
 	}
 
+	itemIDs := make([]string, len(s.ItemIDs))
+	for i, id := range s.ItemIDs {
+		itemIDs[i] = id.String()
+	}
+
 	return &shipmentDetailResponse{
 		ID:                s.ID.String(),
+		OrderID:           s.OrderID.String(),
 		Status:            string(s.Status),
 		FulfillmentMethod: string(s.FulfillmentMethod),
 		Courier:           s.Courier,
@@ -157,6 +179,7 @@ func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 		Cost:              s.Cost,
 		CreatedAt:         s.CreatedAt,
 		Events:            events,
+		ItemIDs:           itemIDs,
 	}
 }
 
@@ -268,6 +291,7 @@ func (h *orderHandler) GetOrder(w http.ResponseWriter, r *http.Request) error {
 		Payment:     result.Payment,
 		ChannelData: result.ChannelData,
 		Shipment:    result.Shipment,
+		Shipments:   result.Shipments,
 	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
@@ -560,20 +584,43 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		return apperrors.NewBadRequest("status is required")
 	}
 
+	var shipmentsInput []usecase.ShipmentDispatchInput
+	if len(req.Shipments) > 0 {
+		for _, sReq := range req.Shipments {
+			var itemUUIDs []uuid.UUID
+			for _, idStr := range sReq.ItemIDs {
+				parsed, err := uuid.Parse(idStr)
+				if err != nil {
+					return apperrors.NewBadRequest("invalid item id in shipments")
+				}
+				itemUUIDs = append(itemUUIDs, parsed)
+			}
+			shipmentsInput = append(shipmentsInput, usecase.ShipmentDispatchInput{
+				FulfillmentMethod: sReq.FulfillmentMethod,
+				Courier:           sReq.Courier,
+				Service:           sReq.Service,
+				TrackingNumber:    sReq.TrackingNumber,
+				ItemIDs:           itemUUIDs,
+			})
+		}
+	}
+
 	result, err := h.updateOrderStatus.Execute(r.Context(), usecase.UpdateOrderStatusInput{
 		OrderID:           orderID,
 		Status:            orderDomain.OrderStatus(req.Status),
 		TrackingNumber:    req.TrackingNumber,
 		FulfillmentMethod: req.FulfillmentMethod,
+		Shipments:         shipmentsInput,
 	})
 	if err != nil {
 		return err
 	}
 
 	resp := buildOrderResponse(usecase.OrderSearchResult{
-		Order:    result.Order,
-		Items:    []orderDomain.OrderItem{},
-		Shipment: result.Shipment,
+		Order:     result.Order,
+		Items:     []orderDomain.OrderItem{},
+		Shipment:  result.Shipment,
+		Shipments: result.Shipments,
 	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
@@ -619,11 +666,72 @@ func (h *orderHandler) GetMyOrderTracking(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	if result.Warning != nil {
+		w.Header().Set("X-Warning", *result.Warning)
+	}
+
 	resp := orderTrackingResponse{
 		OrderID:        result.OrderID.String(),
 		ShipmentID:     result.ShipmentID.String(),
 		Courier:        result.Courier,
 		TrackingNumber: result.TrackingNumber,
+		Warning:        result.Warning,
+		Timeline:       timeline,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+// GetOrderTrackingForStaff handles GET /orders/{orderID}/tracking — staff-only.
+func (h *orderHandler) GetOrderTrackingForStaff(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.Type != authenDomain.AccountTypeStaff {
+		return apperrors.NewForbidden("forbidden: staff account required")
+	}
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	input := usecase.GetOrderTrackingInput{
+		OrderID:    orderID,
+		CustomerID: uuid.Nil,
+	}
+
+	result, err := h.getOrderTracking.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		return apperrors.NewNotFound("tracking information not found")
+	}
+
+	if result.Warning != nil {
+		w.Header().Set("X-Warning", *result.Warning)
+	}
+
+	timeline := make([]trackingTimelineEventResponse, len(result.Timeline))
+	for i, e := range result.Timeline {
+		timeline[i] = trackingTimelineEventResponse{
+			Status:      e.Status,
+			Description: e.Description,
+			Location:    e.Location,
+			Timestamp:   e.Timestamp,
+		}
+	}
+
+	resp := orderTrackingResponse{
+		OrderID:        result.OrderID.String(),
+		ShipmentID:     result.ShipmentID.String(),
+		Courier:        result.Courier,
+		TrackingNumber: result.TrackingNumber,
+		Warning:        result.Warning,
 		Timeline:       timeline,
 	}
 

@@ -72,30 +72,30 @@ export function useShopViewModel() {
     fetchShops();
   }, [fetchShops]);
 
-  const createAddress = async (data: any) => {
-    if (!selectedShopId) return false;
+  const createAddress = async (shopId: string, data: any) => {
+    const targetId = shopId || selectedShopId;
+    if (!targetId) throw new Error('No shop ID specified');
     const isActiveValue = data.is_active ? "true" : "false";
     try {
       setDetailsLoading(true);
-      await fetchApi(`/shops/${selectedShopId}/addresses`, {
+      await fetchApi(`/shops/${targetId}/addresses`, {
         method: 'POST',
         body: JSON.stringify({
           ...data,
-          shop_id: selectedShopId,
           is_active: isActiveValue
         })
       });
-      await fetchShopDetails(selectedShopId);
+      await fetchShopDetails(targetId);
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      return false;
+      throw err;
     } finally {
       setDetailsLoading(false);
     }
   };
 
-  const saveShop = async (data: { name: string; description?: string; is_active: string }) => {
+  const saveShop = async (data: { name: string; description?: string; is_active?: string; approval_status?: string }) => {
     if (!selectedShopId) return false;
     try {
       setDetailsLoading(true);
@@ -126,7 +126,7 @@ export function useShopViewModel() {
     }
   };
 
-  const createShop = async (data: { name: string; description?: string; is_active: string }) => {
+  const createShop = async (data: { name: string; description?: string; is_active?: string; approval_status?: string }) => {
     try {
       setLoading(true);
       await fetchApi('/shops', {
@@ -143,6 +143,98 @@ export function useShopViewModel() {
       return false;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteShop = async (shopId: string) => {
+    try {
+      setLoading(true);
+      await fetchApi(`/shops/${shopId}`, {
+        method: 'DELETE',
+      });
+      if (selectedShopId === shopId) {
+        setSelectedShopId(null);
+        setSelectedShopInfo(null);
+      }
+      await fetchShops();
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const updateInventory = async (shopId: string, productId: string, stock: number) => {
+    try {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${shopId}/products/${productId}/inventories`, {
+        method: 'PUT',
+        body: JSON.stringify({ stock }),
+      });
+      await fetchShopDetails(shopId);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const removeInventory = async (shopId: string, productId: string) => {
+    try {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${shopId}/products/${productId}/inventories`, {
+        method: 'DELETE',
+      });
+      await fetchShopDetails(shopId);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const updateAddress = async (shopId: string, addressId: string, data: any) => {
+    const isActiveValue = data.is_active ? "true" : "false";
+    try {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${shopId}/addresses/${addressId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...data,
+          shop_id: shopId,
+          is_active: isActiveValue,
+        }),
+      });
+      await fetchShopDetails(shopId);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const deleteAddress = async (shopId: string, addressId: string) => {
+    try {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${shopId}/addresses/${addressId}`, {
+        method: 'DELETE',
+      });
+      await fetchShopDetails(shopId);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setDetailsLoading(false);
     }
   };
 
@@ -163,8 +255,13 @@ export function useShopViewModel() {
     setPage,
     setLimit,
     createAddress,
+    updateAddress,
+    deleteAddress,
     saveShop,
     createShop,
+    deleteShop,
+    updateInventory,
+    removeInventory,
     selectShop,
     fetchShopDetails,
     refresh: fetchShops

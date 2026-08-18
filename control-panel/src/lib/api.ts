@@ -1,9 +1,26 @@
 export const API_BASE_URL = '/api/core';
 
+export function clearAuthStorage(): void {
+  localStorage.removeItem('isAuthenticated');
+  localStorage.removeItem('userEmail');
+  sessionStorage.removeItem('isAuthenticated');
+  sessionStorage.removeItem('userEmail');
+}
+
+const PUBLIC_AUTH_ENDPOINTS = [
+  '/auth/staff/signin',
+  '/auth/signin',
+  '/auth/staff/forgot-password',
+  '/auth/forgot-password/verify',
+  '/auth/forgot-password/reset',
+];
+
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    'X-Account-Type': 'staff',
+  };
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
@@ -31,6 +48,19 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     } catch {
       // ignore parsing error
     }
+
+    // If 401 on an authenticated endpoint, invalidate the session and redirect to login
+    const isPublicAuthEndpoint = PUBLIC_AUTH_ENDPOINTS.some((pub) => endpoint.startsWith(pub));
+    if (response.status === 401 && !isPublicAuthEndpoint) {
+      clearAuthStorage();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+
     throw new Error(errorMsg);
   }
 
@@ -41,3 +71,4 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 
   return response.json();
 }
+

@@ -287,13 +287,17 @@ No authentication is required for these endpoints.
 
 #### Query Parameters
 
-| Parameter | Type   | Required | Description |
-|-----------|--------|----------|-------------|
-| `id`      | UUID   | No       | Filter products by product ID. |
-| `name`    | string | No       | Search products by name. |
-| `page`    | int    | No       | Page number. Defaults to `1`. |
-| `limit`   | int    | No       | Number of results per page. |
-| `sort`    | string | No       | Comma-separated sort expressions. Format: `<field>:<direction>`. |
+| Parameter   | Type   | Required | Description |
+|-------------|--------|----------|-------------|
+| `id`        | UUID   | No       | Filter products by product ID. |
+| `name`      | string | No       | Search products by name. |
+| `shop_id`   | UUID   | No       | Filter products stocked/available at a specific shop ID. |
+| `shop_slug` | string | No       | Filter products stocked/available at a specific shop slug. |
+| `page`      | int    | No       | Page number. Defaults to `1`. |
+| `limit`     | int    | No       | Number of results per page. |
+| `sort`      | string | No       | Comma-separated sort expressions. Format: `<field>:<direction>`. |
+
+> **Store Selection & Header Context**: You can pass `X-Shop-ID: <UUID>` header as an alternative to specify store context for catalog browsing. If neither query parameters nor the header are provided, products across all shops will be returned.
 
 #### Sort Fields
 
@@ -311,6 +315,8 @@ No authentication is required for these endpoints.
 **Examples**:
 - `GET /products?page=1&limit=10`
 - `GET /products?name=anniversary`
+- `GET /products?shop_id=c3d4e5f6-a7b8-9012-cdef-123456789012`
+- `GET /products?shop_slug=chia-medan-satria`
 - `GET /products?sort=price:asc`
 
 #### Response `200 OK`
@@ -414,6 +420,7 @@ No authentication is required for these endpoints.
 |-----------|--------|----------|-------------|
 | `id`      | UUID   | No       | Filter by exact shop ID. |
 | `name`    | string | No       | Filter by shop name. |
+| `active`  | bool   | No       | Filter shops by active status (`true` for store picker). |
 | `page`    | int    | No       | Page number. Defaults to `1`. |
 | `limit`   | int    | No       | Number of results per page. Defaults to `10`. |
 | `sort`    | string | No       | Comma-separated sort expressions. |
@@ -991,6 +998,8 @@ These endpoints require a valid customer session set via the Sign In or Verify A
       "product_variant_type": "standard",
       "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
       "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "shop_name":  "Chia Medan Satria",
+      "shop_slug":  "chia-medan-satria",
       "name":       "Anniversary Flower Stand",
       "price":      85000,
       "quantity":   2,
@@ -1004,6 +1013,8 @@ These endpoints require a valid customer session set via the Sign In or Verify A
       "product_variant_type": "custom",
       "product_id": null,
       "shop_id":    "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "shop_name":  "Chia Medan Satria",
+      "shop_slug":  "chia-medan-satria",
       "name":       "(Custom Board)",
       "price":      0,
       "quantity":   1,
@@ -1156,6 +1167,46 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 |--------------------|-----------|
 | `400 Bad Request`  | `shopID` or `productID` is not a valid UUID, or `quantity` is `< 0`. |
 | `401 Unauthorized` | Missing or invalid session. |
+
+### Change Item Shop
+
+- **Method**: `PATCH`
+- **Endpoint**: `/carts/items/{cartItemID}/shop`
+- **Description**: Update the fulfillment shop for an existing cart item (standard or custom) prior to checkout. For standard items, stock at the target shop is validated. If the same product already exists under the target shop in the cart, quantities are merged.
+- **Authentication**: Customer
+- **Request Body**:
+  ```json
+  {
+    "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012"
+  }
+  ```
+
+#### Path Parameters
+
+| Parameter    | Type | Description |
+|--------------|------|-------------|
+| `cartItemID` | UUID | The cart item ID to transfer to a new shop. |
+
+#### Request Fields
+
+| Field     | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `shop_id` | UUID | Yes      | Target active shop ID. |
+
+#### Response `200 OK`
+
+```json
+{ "message": "item shop updated" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | Invalid `cartItemID` or `shop_id` UUID string format. |
+| `401 Unauthorized` | Missing or invalid customer authentication session. |
+| `404 Not Found`    | Cart item not found or target shop not found/inactive. |
+| `409 Conflict`     | Target shop has insufficient stock for standard catalog product. |
 
 ### Remove Item
 

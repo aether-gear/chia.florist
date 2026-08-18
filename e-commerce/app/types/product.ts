@@ -7,6 +7,19 @@ export interface ProductImage {
 }
 
 /**
+ * Query parameters for Find Products (GET /products)
+ */
+export interface FindProductsParams {
+  id?: string
+  name?: string
+  shop_id?: string
+  shop_slug?: string
+  page?: number
+  limit?: number
+  sort?: string
+}
+
+/**
  * Raw API Response structure for Product Detail (GET /products/{slug})
  */
 export interface ApiProductDetail {
@@ -72,6 +85,29 @@ export interface ApiProductListResponse {
   products: ApiProductListItem[]
 }
 
+export interface ProductInventory {
+  total_stock: number
+  reserved_stock: number
+  available: number
+}
+
+export interface ApiShopProductsResponse {
+  shop_id: string
+  products: {
+    id: string
+    sku: string
+    name: string
+    slug: string
+    description: string
+    status: string
+    price: number
+    weight: number
+    inventory: ProductInventory
+    created_at: string
+    updated_at: string
+  }[]
+}
+
 /**
  * Domain Model Product type used throughout the Frontend UI (Details page)
  */
@@ -88,9 +124,16 @@ export interface Product {
   sizes: string[]
   sku?: string
   slug?: string
+  status?: string
   weight?: number
   stock?: number
   shopId?: string
+  inventory?: ProductInventory
+  availability?: {
+    slug: string
+    name: string
+    stock: number
+  }[]
 }
 
 /**
@@ -108,4 +151,26 @@ export interface CatalogProduct {
   isCustomRoute?: boolean
   isAvailable: boolean
   slug?: string
+  sku?: string
+  status?: string
+  stock?: number
+  shopId?: string
+  shopSlug?: string
+  inventory?: ProductInventory
+  availability?: {
+    slug: string
+    name: string
+    stock: number
+  }[]
 }
+
+/**
+ * Paginated Catalog Product response returned by productService
+ */
+export interface PaginatedCatalogProducts {
+  products: CatalogProduct[]
+  limit: number
+  page: number
+  total: number
+}
+

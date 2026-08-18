@@ -1,0 +1,37 @@
+# Feature Extraction Pipeline Configuration
+experiment_name: "phase_1_feature_extraction"
+seed: 42
+
+# Database Connection (uses env vars if available, otherwise synthetic fallback)
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: ""
+  dbname: "chia_florist"
+  use_synthetic_fallback: true
+  query_limit_days: 90
+
+# Time-Series Feature Parameters (Demand Forecasting)
+time_series:
+  lags: [1, 7, 14, 30]
+  rolling_windows: [7, 30]
+  target_horizon_days: 7
+  date_column: "created_at"
+
+# Stockout Risk Parameters
+stockout:
+  lead_time_default_days: 3
+  burn_rate_window_days: 7
+
+# Anomaly Detection Parameters
+anomaly:
+  latency_window_hours: 24
+  zscore_threshold: 3.0
+
+# Data Output Settings
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  scaling_method: "standard" # "standard" or "minmax"
+  train_val_test_split: [0.7, 0.15, 0.15]

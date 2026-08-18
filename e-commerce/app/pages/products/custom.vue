@@ -1,2458 +1,296 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useCart, normalizeHexColor, calculateDesignChecksum } from '~/composables/useCart'
-import { supabaseService } from '~/services/supabaseService'
-import type { CustomDesignPayload } from '~/composables/useCart'
+import { onMounted, onUnmounted } from 'vue'
+import {
+  useCustomDesign,
+  useCustomCart,
+  CanvasBoard,
+  ToolPanel,
+  ReviewModal,
+  FinalizeChoiceOverlay,
+  ThankYouOverlay,
+  TOOL_TABS
+} from '~/features/custom-product'
+import { useCart } from '~/composables/useCart'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import '~/features/custom-product/custom-product.css'
 
-definePageMeta({ layout: false, middleware: ['auth'] })
+definePageMeta({ layout: false })
 useHead({
-  title: 'Chia Florist — Board Designer',
+  title: 'Chia Florist — Board Designer (v3.0)',
   meta: [{ name: 'description', content: 'Design your custom flower board with our interactive canvas designer.' }]
 })
 
-const { addToCart, formatRupiah } = useCart()
+const design = useCustomDesign()
+const { isAdding, addCustomDesignToCart } = useCustomCart()
+const { formatRupiah } = useCart()
+const globalAlert = useGlobalAlert()
 
-/* ─── TYPES ───────────────────────────────────────────────────────── */
-type FontId      = 'inter' | 'playfair' | 'dancing' | 'bebas' | 'merriweather' | 'pacifico'
-type CornerStyle = 'none' | 'rounded' | 'cut' | 'ornate' | 'floral'
-type FrameStyle  = 'none' | 'square' | 'circle'
-type BrushType   = 'flower' | 'rose'
-type BorderStyle = 'none' | 'solid' | 'double' | 'dashed' | 'dotted' | 'groove' | 'ridge' | 'ornate'
-type FloralStyle = 'classic' | 'modern' | 'grand'
-type ToolTab     = 'text' | 'image' | 'brush' | 'border' | 'corner' | 'floral'
-type SectionKey  = 'upper' | 'lower'
-
-interface BoardSection {
-  headerText: string; bodyText: string
-  headerFontSize: number; bodyFontSize: number
-  headerFont: FontId; bodyFont: FontId
-  headerAlign: 'left' | 'center' | 'right'
-  bodyAlign: 'left' | 'center' | 'right'
-  bgColor: string; headerColor: string; bodyColor: string
-  cornerStyle: CornerStyle
-}
-interface CanvasImage {
-  id: string; type: 'image'; src: string; frame: FrameStyle
-  x: number; y: number; width: number; zoom: number; cropX: number; cropY: number
-}
-interface BrushStroke {
-  id: string; type: 'brush'; brushType: BrushType
-  x: number; y: number; size: number; color: string; rotation: number
-}
-type CanvasElement = CanvasImage | BrushStroke
-interface BoardBorder { style: BorderStyle; color: string; width: number; center: boolean }
-interface FloralCrest { enabled: boolean; style: FloralStyle; primary: string; secondary: string; size: number }
-
-/* ─── CONSTANTS ───────────────────────────────────────────────────── */
-const boardW = computed(() => 800)
-const boardH = computed(() => {
-  // Real-world proportions: height = (real_height / real_width) * boardW
-  // small:  1.5 × 2.0m → ratio 2.0/1.5 = 1.333 → too tall; width is 1.5m, height is 2.0m
-  //         canvas: 800 × (2.0/1.5 * 800) would be huge. Instead use portrait 3:4 per size:
-  // small:  1.5m wide × 2.0m tall → 3:4 → h/w = 2.0/1.5 = 1.333 → 600 * 1.5/2.0 = 450 → use 500
-  // medium: 1.8m wide × 2.5m tall → h/w = 2.5/1.8 = 1.389 → use 576
-  // large:  2.0m wide × 3.0m tall → h/w = 3.0/2.0 = 1.500 → use 600  (tallest = largest)
-  if (physicalSize.value === 'small')  return 500   // compact — smallest canvas
-  if (physicalSize.value === 'large')  return 600   // grand   — tallest canvas
-  return 576                                         // standard (medium)
-})
-
-const FONTS: { id: FontId; label: string; family: string }[] = [
-  { id: 'inter',        label: 'Inter',        family: "'Inter', sans-serif" },
-  { id: 'playfair',     label: 'Playfair',     family: "'Playfair Display', serif" },
-  { id: 'dancing',      label: 'Dancing',      family: "'Dancing Script', cursive" },
-  { id: 'bebas',        label: 'Bebas',        family: "'Bebas Neue', sans-serif" },
-  { id: 'merriweather', label: 'Merriweather', family: "'Merriweather', serif" },
-  { id: 'pacifico',     label: 'Pacifico',     family: "'Pacifico', cursive" },
-]
-
-const CORNERS: { id: CornerStyle; label: string }[] = [
-  { id: 'none', label: 'None' }, { id: 'rounded', label: 'Rounded' },
-  { id: 'cut', label: 'Cut' }, { id: 'ornate', label: 'Ornate' }, { id: 'floral', label: 'Floral' },
-]
-
-const BORDER_STYLES: { id: BorderStyle; label: string }[] = [
-  { id: 'none', label: 'None' }, { id: 'solid', label: 'Solid' }, { id: 'double', label: 'Double' },
-  { id: 'dashed', label: 'Dashed' }, { id: 'dotted', label: 'Dotted' },
-  { id: 'groove', label: 'Groove' }, { id: 'ridge', label: 'Ridge' }, { id: 'ornate', label: 'Ornate' },
-]
-
-const SIZES = [
-  { id: 'small',  label: '1.5 × 2.0m', price: 150_000, desc: 'Compact' },
-  { id: 'medium', label: '1.8 × 2.5m', price: 200_000, desc: 'Standard', recommended: true },
-  { id: 'large',  label: '2.0 × 3.0m', price: 280_000, desc: 'Grand' },
-]
-
-const BRUSH_COLORS  = ['#e85d75','#f4845f','#f9c74f','#90be6d','#4cc9f0','#c77dff','#ffffff','#222222']
-const BORDER_COLORS = ['#f5c842','#e63946','#2a9d8f','#264653','#e76f51','#a8dadc','#f1faee','#1d3557']
-const BG_PRESETS    = ['#c0392b','#1a3a5c','#145a32','#6c3483','#a04000','#17202a','#f0f0f0','#ffffff']
-
-const TOOL_TABS: { id: ToolTab; label: string }[] = [
-  { id: 'text', label: 'Text' }, { id: 'image', label: 'Image' },
-  { id: 'brush', label: 'Brush' }, { id: 'border', label: 'Border' }, { id: 'corner', label: 'Corner' },
-  { id: 'floral', label: 'Floral' },
-]
-
-/* ─── STATE ───────────────────────────────────────────────────────── */
-const upper = ref<BoardSection>({
-  headerText: 'Selamat & Sukses', bodyText: 'Atas Pelantikan Saudara/i\nNama Lengkap Anda',
-  headerFontSize: 36, bodyFontSize: 20, headerFont: 'playfair', bodyFont: 'inter',
-  headerAlign: 'center', bodyAlign: 'center',
-  bgColor: '#c0392b', headerColor: '#ffd700', bodyColor: '#ffffff', cornerStyle: 'none',
-})
-const lower = ref<BoardSection>({
-  headerText: '', bodyText: 'Nama Pengirim\nNama Instansi / Perusahaan',
-  headerFontSize: 26, bodyFontSize: 22, headerFont: 'bebas', bodyFont: 'inter',
-  headerAlign: 'center', bodyAlign: 'center',
-  bgColor: '#1a3a5c', headerColor: '#ffffff', bodyColor: '#ffffff', cornerStyle: 'none',
-})
-
-const heightRatio  = ref(0.58)
-const border       = ref<BoardBorder>({ style: 'solid', color: '#f5c842', width: 12, center: true })
-const topCrest     = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 })
-const bottomCrest  = ref<FloralCrest>({ enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 })
-const elements     = ref<CanvasElement[]>([])
-
-const activeTab     = ref<ToolTab>('text')
-const activeSection = ref<SectionKey>('upper')
-const selectedId    = ref<string | null>(null)
-const physicalSize  = ref('medium')
-const showReview        = ref(false)
-const showToast         = ref(false)
-const isAdding          = ref(false)
-const showFinalizeChoice = ref(false)   // overlay: go-to-cart or keep designing
-const showThankYou      = ref(false)   // thank-you page overlay after cart add
-
-const brushType     = ref<BrushType>('flower')
-const brushColor    = ref('#e85d75')
-const brushSize     = ref(48)
-const brushRotation = ref(0)
-const isBrushMode   = computed(() => activeTab.value === 'brush')
-
-const containerRef = ref<HTMLElement | null>(null)
-const boardRef     = ref<HTMLElement | null>(null)
-const boardScale   = ref(0.75)
-
-// Snapshot state — generated from real Canvas 2D render at finalize time
-const snapshotDataUrl  = ref<string>('')
-const snapshotLoading  = ref(false)
-
-/* ─── HELPERS ─────────────────────────────────────────────────────── */
-const getFont  = (id: FontId) => FONTS.find(f => f.id === id)?.family ?? "'Inter', sans-serif"
-const sec      = computed(() => activeSection.value === 'upper' ? upper.value : lower.value)
-const upperH   = computed(() => Math.round(heightRatio.value * boardH.value))
-const lowerH   = computed(() => boardH.value - upperH.value)
-
-const boardBorderStyle = computed((): Record<string, string> => {
-  const { style, color, width } = border.value
-  if (style === 'none' || width === 0) return {}
-  if (style === 'ornate') return { border: `${width}px solid ${color}`, outline: `${Math.max(2, Math.round(width * 0.35))}px solid ${color}`, outlineOffset: '5px' }
-  return { border: `${width}px ${style} ${color}` }
-})
-
-const centerBorderStyle = computed((): Record<string, string> => {
-  if (!border.value.center) return {}
-  const { style, color, width } = border.value
-  if (style === 'none' || width === 0) return {}
-  return {
-    width: '100%',
-    borderTop: `${width}px ${style === 'ornate' ? 'solid' : style} ${color}`,
-    ...(style === 'ornate' ? {
-      boxShadow: `0 -${Math.max(2, Math.round(width * 0.35))}px 0 ${color}, 0 ${Math.max(2, Math.round(width * 0.35))}px 0 ${color}`
-    } : {})
-  }
-})
-
-const upperCornerStyle = computed((): Record<string, string> => {
-  const s = upper.value.cornerStyle
-  if (s === 'rounded') return { borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }
-  if (s === 'cut') return { clipPath: 'polygon(14px 0%,calc(100% - 14px) 0%,100% 14px,100% 100%,0% 100%,0% 14px)' }
-  if (s === 'ornate') return { borderTopLeftRadius: '4px 18px', borderTopRightRadius: '4px 18px' }
-  return {}
-})
-
-const lowerCornerStyle = computed((): Record<string, string> => {
-  const s = lower.value.cornerStyle
-  if (s === 'rounded') return { borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }
-  if (s === 'cut') return { clipPath: 'polygon(0% 0%,100% 0%,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0% calc(100% - 14px))' }
-  if (s === 'ornate') return { borderBottomLeftRadius: '4px 18px', borderBottomRightRadius: '4px 18px' }
-  return {}
-})
-
-const floralSec = computed(() => activeSection.value === 'upper' ? topCrest.value : bottomCrest.value)
-
-const selectedEl   = computed(() => elements.value.find(e => e.id === selectedId.value) ?? null)
-const selectedImg  = computed(() => (selectedEl.value?.type === 'image'  ? selectedEl.value : null) as CanvasImage | null)
-const selectedBrush = computed(() => (selectedEl.value?.type === 'brush' ? selectedEl.value : null) as BrushStroke | null)
-const imgElements  = computed(() => elements.value.filter(e => e.type === 'image') as CanvasImage[])
-const brushElements = computed(() => elements.value.filter(e => e.type === 'brush') as BrushStroke[])
-
-/* ─── LIVE PRICE BREAKDOWN PREVIEW FORMULA ───────────────────────── */
-const baseSizePrice = computed(() => SIZES.find(s => s.id === physicalSize.value)?.price ?? 200_000)
-const brushFee     = computed(() => brushElements.value.length * 2000)
-
-const uniqueColors = computed(() => {
-  const set = new Set<string>()
-  const add = (c?: string) => {
-    if (c) set.add(normalizeHexColor(c, '#FFFFFF'))
-  }
-  add(upper.value.bgColor)
-  add(lower.value.bgColor)
-  add(upper.value.headerColor)
-  add(upper.value.bodyColor)
-  add(lower.value.headerColor)
-  add(lower.value.bodyColor)
-  if (border.value.style !== 'none' && border.value.width > 0) {
-    add(border.value.color)
-  }
-  if (topCrest.value.enabled) {
-    add(topCrest.value.primary)
-    add(topCrest.value.secondary)
-  }
-  if (bottomCrest.value.enabled) {
-    add(bottomCrest.value.primary)
-    add(bottomCrest.value.secondary)
-  }
-  brushElements.value.forEach(b => add(b.color))
-  return Array.from(set)
-})
-
-const colorFee = computed(() => Math.max(0, uniqueColors.value.length - 3) * 10_000)
-
-const borderFee = computed(() => {
-  if (border.value.style !== 'none' && border.value.width > 0) {
-    if (['double', 'groove', 'ridge', 'ornate'].includes(border.value.style)) {
-      return 15_000
-    }
-  }
-  return 0
-})
-
-const getCrestFee = (crest: FloralCrest) => {
-  if (!crest.enabled) return 0
-  if (crest.style === 'grand') return 45_000
-  if (crest.style === 'modern') return 30_000
-  return 25_000
+const handleFinalize = () => {
+  design.showFinalizeChoice = true
 }
 
-const accessoriesFee = computed(() => borderFee.value + getCrestFee(topCrest.value) + getCrestFee(bottomCrest.value))
-const mediaFee       = computed(() => imgElements.value.length * 20_000)
-
-const totalPrice     = computed(() => baseSizePrice.value + brushFee.value + colorFee.value + accessoriesFee.value + mediaFee.value)
-
-// Sync sliders with selected brush
-watch(selectedBrush, (br) => {
-  if (br) {
-    brushSize.value     = br.size
-    brushRotation.value = br.rotation
-    brushColor.value    = br.color
-    brushType.value     = br.brushType
-  }
-})
-// Live-update selected brush when sliders change
-watch(brushSize, (v)     => { if (selectedBrush.value) selectedBrush.value.size = v })
-watch(brushRotation, (v) => { if (selectedBrush.value) selectedBrush.value.rotation = v })
-watch(brushColor, (v)    => { if (selectedBrush.value) selectedBrush.value.color = v })
-
-/* ─── SCALE & ANIMATION ───────────────────────────────────────────── */
-const randomizeDesign = () => {
-  const rand = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!
-  upper.value.bgColor = rand(BG_PRESETS)
-  lower.value.bgColor = rand(BG_PRESETS)
-  upper.value.headerFont = rand(FONTS).id
-  upper.value.bodyFont = rand(FONTS).id
-  lower.value.headerFont = rand(FONTS).id
-  lower.value.bodyFont = rand(FONTS).id
-  border.value.style = rand(BORDER_STYLES).id
-  border.value.color = rand(BORDER_COLORS)
-  border.value.width = Math.floor(Math.random() * 16) + 4
-  border.value.center = Math.random() > 0.5
-  upper.value.cornerStyle = rand(CORNERS).id
-  lower.value.cornerStyle = rand(CORNERS).id
-
-  topCrest.value.enabled = Math.random() > 0.5
-  topCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
-  topCrest.value.primary = rand(BG_PRESETS)
-  topCrest.value.secondary = rand(BG_PRESETS)
-
-  bottomCrest.value.enabled = Math.random() > 0.5
-  bottomCrest.value.style = rand(['classic', 'modern', 'grand'] as FloralStyle[])
-  bottomCrest.value.primary = rand(BG_PRESETS)
-  bottomCrest.value.secondary = rand(BG_PRESETS)
-
-  // Interactive scale bounce feedback
-  boardScale.value = boardScale.value * 0.95
-  setTimeout(updateScale, 150)
+const handleOpenReview = () => {
+  design.showFinalizeChoice = false
+  design.showReview = true
 }
 
-const updateScale = () => {
-  const el = containerRef.value
-  if (!el) return
-  const pad = 64
-  boardScale.value = Math.max(0.25, Math.min((el.offsetWidth - pad) / boardW.value, (el.offsetHeight - pad) / boardH.value, 1.1))
+const handleAddToCart = async () => {
+  const payload = design.buildCustomDesignPayload(design.snapshotDataUrl)
+  await addCustomDesignToCart(
+    payload,
+    design.snapshotDataUrl,
+    design.totalPrice,
+    design.physicalSize,
+    design.upper.headerText
+  )
+  design.showReview = false
+  globalAlert.showSuccess(
+    'Custom Board Added',
+    'Your personalized flower board has been added to cart!',
+    [
+      { label: 'View Cart', onClick: () => navigateTo('/cart') },
+      { label: 'Dismiss' }
+    ]
+  )
 }
 
-watch(physicalSize, () => {
-  updateScale()
-})
-
-/* ─── Z-ORDER (Instagram story: last in array = top layer) ────────── */
-const bringToFront = (id: string) => {
-  const idx = elements.value.findIndex(e => e.id === id)
-  if (idx < 0) return
-  const [el] = elements.value.splice(idx, 1)
-  elements.value.push(el!)
-  selectedId.value = id
+const handleNewDesign = () => {
+  design.resetDesign()
+  design.showThankYou = false
 }
 
-const deleteSelected = () => {
-  if (!selectedId.value) return
-  elements.value = elements.value.filter(e => e.id !== selectedId.value)
-  selectedId.value = null
-}
-
-/* ─── IMAGE ───────────────────────────────────────────────────────── */
-const makeImage = (src: string, x = 15, y = 15): CanvasImage => ({
-  id: 'img-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-  type: 'image', src, frame: 'square', x, y, width: 22, zoom: 1, cropX: 50, cropY: 50,
-})
-
-const readFile = (file: File, x: number, y: number) => {
-  const reader = new FileReader()
-  reader.onload = ev => {
-    const img = makeImage(ev.target?.result as string, x, y)
-    elements.value.push(img)
-    selectedId.value = img.id
-    activeTab.value = 'image'
-  }
-  reader.readAsDataURL(file)
-}
-
-const handleDrop = (e: DragEvent) => {
-  e.preventDefault()
-  const file = e.dataTransfer?.files[0]
-  if (!file?.type.startsWith('image/')) return
-  const board = boardRef.value; if (!board) return
-  const r = board.getBoundingClientRect()
-  readFile(file, Math.max(2, Math.min(((e.clientX - r.left) / r.width) * 100 - 11, 76)), Math.max(2, Math.min(((e.clientY - r.top) / r.height) * 100 - 11, 76)))
-}
-
-const handleFileInput = (e: Event) => {
-  const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return
-  readFile(f, 15, 15);
-  (e.target as HTMLInputElement).value = ''
-}
-
-/* ─── BRUSH PLACEMENT ─────────────────────────────────────────────── */
-let _suppressBrushPlace = false
-const handleBrushMousedown = (e: MouseEvent, id: string) => {
-  selectedId.value = id
-  _suppressBrushPlace = true
-  startDragEl(e, id)
-}
-
-const handleBoardClick = (e: MouseEvent) => {
-  if (_suppressBrushPlace) { _suppressBrushPlace = false; return }
-  if (isBrushMode.value) {
-    const r = boardRef.value!.getBoundingClientRect()
-    const stroke: BrushStroke = {
-      id: 'br-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-      type: 'brush', brushType: brushType.value,
-      x: ((e.clientX - r.left) / r.width) * 100,
-      y: ((e.clientY - r.top)  / r.height) * 100,
-      size: brushSize.value, color: brushColor.value, rotation: brushRotation.value,
-    }
-    elements.value.push(stroke)
-    selectedId.value = stroke.id
+const pendingTargetUrl = ref('/')
+const handleTryLeave = (targetUrl = '/') => {
+  if (design.isDirty) {
+    pendingTargetUrl.value = targetUrl
+    design.showLeaveConfirm = true
   } else {
-    selectedId.value = null
+    navigateTo(targetUrl)
   }
 }
 
-/* ─── DRAG ────────────────────────────────────────────────────────── */
-let _draggingEl = false, _draggingDiv = false, _dragElId = ''
-let _rect = { left: 0, top: 0, width: 0, height: 0 }
-let _dragBX = 0, _dragBY = 0, _dragElX0 = 0, _dragElY0 = 0
-let _divStartY = 0, _divStartR = 0
-
-const startDragEl = (e: MouseEvent, id: string) => {
-  e.stopPropagation(); e.preventDefault()
-  bringToFront(id)
-  const board = boardRef.value; if (!board) return
-  _rect = board.getBoundingClientRect(); _draggingEl = true; _dragElId = id
-  _dragBX = (e.clientX - _rect.left) / _rect.width  * 100
-  _dragBY = (e.clientY - _rect.top)  / _rect.height * 100
-  const el = elements.value.find(e => e.id === id)
-  if (el) { _dragElX0 = el.x; _dragElY0 = el.y }
+const confirmLeaveWithoutSaving = () => {
+  design.showLeaveConfirm = false
+  design.isDirty = false
+  navigateTo(pendingTargetUrl.value)
 }
 
-const startDragDiv = (e: MouseEvent) => {
-  e.stopPropagation(); e.preventDefault()
-  const board = boardRef.value; if (!board) return
-  _rect = board.getBoundingClientRect(); _draggingDiv = true
-  _divStartY = e.clientY; _divStartR = heightRatio.value
+const confirmSaveAndLeave = () => {
+  design.saveDraft()
+  design.showLeaveConfirm = false
+  navigateTo(pendingTargetUrl.value)
 }
 
-const onMouseMove = (e: MouseEvent) => {
-  if (_draggingEl) {
-    const el = elements.value.find(ev => ev.id === _dragElId)
-    if (el) {
-      el.x = Math.max(-5, Math.min(_dragElX0 + ((e.clientX - _rect.left) / _rect.width  * 100 - _dragBX), 95))
-      el.y = Math.max(-5, Math.min(_dragElY0 + ((e.clientY - _rect.top)  / _rect.height * 100 - _dragBY), 95))
-    }
-  }
-  if (_draggingDiv) {
-    heightRatio.value = Math.max(0.25, Math.min(_divStartR + (e.clientY - _divStartY) / _rect.height, 0.75))
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (design.isDirty) {
+    e.preventDefault()
+    e.returnValue = ''
   }
 }
 
-const onMouseUp = () => { _draggingEl = false; _draggingDiv = false }
-
-/* ─── SNAPSHOT (Canvas 2D renderer) ───────────────────────────────── */
-// Draws the board design into an offscreen <canvas> and exports a PNG.
-// No external dependencies — pure Browser Canvas API.
-const generateBoardSnapshot = (): Promise<string> => {
-  return new Promise((resolve) => {
-    const W = 800, H = boardH.value
-    const uH = Math.round(heightRatio.value * H)
-    const lH = H - uH
-    const bw = border.value.style !== 'none' ? border.value.width : 0
-
-    const canvas = document.createElement('canvas')
-    canvas.width  = W
-    canvas.height = H
-    const ctx = canvas.getContext('2d')!
-
-    // ── Upper section ──────────────────────────────────────────────
-    ctx.fillStyle = upper.value.bgColor
-    ctx.fillRect(0, 0, W, uH)
-
-    // Upper header text
-    if (upper.value.headerText) {
-      const fam = getFont(upper.value.headerFont).replace(/'/g, '')
-      const sz  = Math.round(upper.value.headerFontSize * 0.9)
-      ctx.font      = `700 ${sz}px ${fam}, sans-serif`
-      ctx.fillStyle = upper.value.headerColor
-      ctx.textAlign = upper.value.headerAlign as CanvasTextAlign
-      ctx.textBaseline = 'middle'
-      const tX = upper.value.headerAlign === 'left' ? 32 : upper.value.headerAlign === 'right' ? W - 32 : W / 2
-      ctx.fillText(upper.value.headerText, tX, uH * 0.38, W - 64)
-    }
-    // Upper body text (multiline)
-    if (upper.value.bodyText) {
-      const fam = getFont(upper.value.bodyFont).replace(/'/g, '')
-      const sz  = Math.round(upper.value.bodyFontSize * 0.85)
-      ctx.font      = `${sz}px ${fam}, sans-serif`
-      ctx.fillStyle = upper.value.bodyColor
-      ctx.textAlign = upper.value.bodyAlign as CanvasTextAlign
-      ctx.textBaseline = 'middle'
-      const lines = upper.value.bodyText.split('\n')
-      const tX    = upper.value.bodyAlign === 'left' ? 32 : upper.value.bodyAlign === 'right' ? W - 32 : W / 2
-      lines.forEach((line, i) => {
-        ctx.fillText(line, tX, uH * 0.68 + i * (sz + 8), W - 64)
-      })
-    }
-
-    // ── Lower section ──────────────────────────────────────────────
-    ctx.fillStyle = lower.value.bgColor
-    ctx.fillRect(0, uH, W, lH)
-
-    // Lower header text
-    if (lower.value.headerText) {
-      const fam = getFont(lower.value.headerFont).replace(/'/g, '')
-      const sz  = Math.round(lower.value.headerFontSize * 0.9)
-      ctx.font      = `700 ${sz}px ${fam}, sans-serif`
-      ctx.fillStyle = lower.value.headerColor
-      ctx.textAlign = lower.value.headerAlign as CanvasTextAlign
-      ctx.textBaseline = 'middle'
-      const tX = lower.value.headerAlign === 'left' ? 32 : lower.value.headerAlign === 'right' ? W - 32 : W / 2
-      ctx.fillText(lower.value.headerText, tX, uH + lH * 0.32, W - 64)
-    }
-    // Lower body text (multiline)
-    if (lower.value.bodyText) {
-      const fam = getFont(lower.value.bodyFont).replace(/'/g, '')
-      const sz  = Math.round(lower.value.bodyFontSize * 0.85)
-      ctx.font      = `${sz}px ${fam}, sans-serif`
-      ctx.fillStyle = lower.value.bodyColor
-      ctx.textAlign = lower.value.bodyAlign as CanvasTextAlign
-      ctx.textBaseline = 'middle'
-      const lines = lower.value.bodyText.split('\n')
-      const startY = lower.value.headerText ? uH + lH * 0.58 : uH + lH * 0.4
-      const tX     = lower.value.bodyAlign === 'left' ? 32 : lower.value.bodyAlign === 'right' ? W - 32 : W / 2
-      lines.forEach((line, i) => {
-        ctx.fillText(line, tX, startY + i * (sz + 8), W - 64)
-      })
-    }
-
-    // ── Center divider line ────────────────────────────────────────
-    if (border.value.center && border.value.style !== 'none' && bw > 0) {
-      ctx.strokeStyle = border.value.color
-      ctx.lineWidth   = bw
-      ctx.beginPath()
-      ctx.moveTo(0, uH); ctx.lineTo(W, uH)
-      ctx.stroke()
-    }
-
-    // ── Board border ───────────────────────────────────────────────
-    if (border.value.style !== 'none' && bw > 0) {
-      ctx.strokeStyle = border.value.color
-      ctx.lineWidth   = bw
-      ctx.strokeRect(bw / 2, bw / 2, W - bw, H - bw)
-      // Ornate: double border
-      if (border.value.style === 'ornate') {
-        const gap = Math.max(3, Math.round(bw * 0.4))
-        ctx.lineWidth = Math.max(1, Math.round(bw * 0.35))
-        ctx.strokeRect(bw + gap, bw + gap, W - (bw + gap) * 2, H - (bw + gap) * 2)
-      }
-    }
-
-    // ── Images (drawn async) ──────────────────────────────────────
-    const imgEls = elements.value.filter(e => e.type === 'image') as CanvasImage[]
-    const draws  = imgEls.map(el => new Promise<void>(res => {
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => {
-        const px = (el.x / 100) * W
-        const py = (el.y / 100) * H
-        const pw = (el.width / 100) * W
-        ctx.save()
-        ctx.beginPath()
-        if (el.frame === 'circle') {
-          ctx.arc(px, py, pw / 2, 0, Math.PI * 2)
-        } else {
-          ctx.rect(px - pw / 2, py - pw / 2, pw, pw)
-        }
-        ctx.clip()
-        ctx.drawImage(img, px - pw / 2, py - pw / 2, pw, pw)
-        ctx.restore()
-        res()
-      }
-      img.onerror = () => res()
-      img.src = el.src
-    }))
-
-    Promise.all(draws).then(() => {
-      // ── Brush strokes ─────────────────────────────────────────
-      const brushEls = elements.value.filter(e => e.type === 'brush') as BrushStroke[]
-      brushEls.forEach(el => {
-        const cx = (el.x / 100) * W
-        const cy = (el.y / 100) * H
-        const r  = el.size / 2
-        ctx.save()
-        ctx.translate(cx, cy)
-        ctx.rotate((el.rotation * Math.PI) / 180)
-        ctx.fillStyle = el.color
-        if (el.brushType === 'flower') {
-          for (let i = 0; i < 5; i++) {
-            ctx.save()
-            ctx.rotate((i * 72 * Math.PI) / 180)
-            ctx.beginPath()
-            ctx.ellipse(0, -r * 0.6, r * 0.28, r * 0.5, 0, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.restore()
-          }
-          ctx.fillStyle = '#ffd700'
-          ctx.beginPath()
-          ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2)
-          ctx.fill()
-        } else {
-          // Rose — filled circle with inner highlight
-          ctx.beginPath()
-          ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.fillStyle = 'rgba(0,0,0,0.2)'
-          ctx.beginPath()
-          ctx.arc(r * 0.15, -r * 0.1, r * 0.5, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.fillStyle = '#ffe066'
-          ctx.globalAlpha = 0.7
-          ctx.beginPath()
-          ctx.arc(0, r * 0.1, r * 0.18, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.globalAlpha = 1
-        }
-        ctx.restore()
-      })
-
-      resolve(canvas.toDataURL('image/png', 0.92))
-    })
-  })
-}
-
-/* ─── PAYLOAD BUILDER ──────────────────────────────────────────────── */
-const buildCustomDesignPayload = (previewBase64: string): CustomDesignPayload => {
-  const payload: CustomDesignPayload = {
-    metadata: {
-      version: '1.0.0',
-      editorVersion: '1.0.0',
-      platform: 'web',
-      locale: 'id-ID',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      checksum: ''
-    },
-    layout: {
-      physicalSizeId: physicalSize.value as any,
-      upperHeightRatio: heightRatio.value,
-      border: {
-        style: border.value.style as any,
-        colorHex: normalizeHexColor(border.value.color, '#F5C842'),
-        widthPx: border.value.width,
-        showCenterDivider: border.value.center
-      }
-    },
-    sections: {
-      upper: {
-        bgColorHex: normalizeHexColor(upper.value.bgColor, '#C0392B'),
-        cornerStyle: upper.value.cornerStyle as any,
-        header: {
-          text: upper.value.headerText || null,
-          fontId: upper.value.headerFont as any,
-          fontSizePx: upper.value.headerFontSize,
-          fontColorHex: normalizeHexColor(upper.value.headerColor, '#FFD700'),
-          alignment: upper.value.headerAlign as any
-        },
-        body: {
-          text: upper.value.bodyText || null,
-          fontId: upper.value.bodyFont as any,
-          fontSizePx: upper.value.bodyFontSize,
-          fontColorHex: normalizeHexColor(upper.value.bodyColor, '#FFFFFF'),
-          alignment: upper.value.bodyAlign as any
-        }
-      },
-      lower: {
-        bgColorHex: normalizeHexColor(lower.value.bgColor, '#1A3A5C'),
-        cornerStyle: lower.value.cornerStyle as any,
-        header: {
-          text: lower.value.headerText || null,
-          fontId: lower.value.headerFont as any,
-          fontSizePx: lower.value.headerFontSize,
-          fontColorHex: normalizeHexColor(lower.value.headerColor, '#FFFFFF'),
-          alignment: lower.value.headerAlign as any
-        },
-        body: {
-          text: lower.value.bodyText || null,
-          fontId: lower.value.bodyFont as any,
-          fontSizePx: lower.value.bodyFontSize,
-          fontColorHex: normalizeHexColor(lower.value.bodyColor, '#FFFFFF'),
-          alignment: lower.value.bodyAlign as any
-        }
-      }
-    },
-    decorations: {
-      topCrest: {
-        visible: topCrest.value.enabled,
-        variantId: topCrest.value.style as any,
-        primaryColorHex: normalizeHexColor(topCrest.value.primary, '#E63946'),
-        secondaryColorHex: normalizeHexColor(topCrest.value.secondary, '#F1FAEE'),
-        scalePercent: topCrest.value.size
-      },
-      bottomCrest: {
-        visible: bottomCrest.value.enabled,
-        variantId: bottomCrest.value.style as any,
-        primaryColorHex: normalizeHexColor(bottomCrest.value.primary, '#E63946'),
-        secondaryColorHex: normalizeHexColor(bottomCrest.value.secondary, '#F1FAEE'),
-        scalePercent: bottomCrest.value.size
-      }
-    },
-    elements: elements.value.map(el => {
-      if (el.type === 'image') {
-        const img = el as CanvasImage
-        return {
-          id: img.id,
-          type: 'image' as const,
-          src: img.src,
-          frameStyle: img.frame as any,
-          crop: { xPercent: img.cropX, yPercent: img.cropY, zoom: img.zoom },
-          transform: {
-            xPercent: img.x,
-            yPercent: img.y,
-            scalePercent: img.width,
-            rotationDeg: 0
-          }
-        }
-      }
-      const br = el as BrushStroke
-      return {
-        id: br.id,
-        type: 'brush' as const,
-        brushType: br.brushType as any,
-        colorHex: normalizeHexColor(br.color, '#E85D75'),
-        transform: {
-          xPercent: br.x,
-          yPercent: br.y,
-          scalePercent: br.size,
-          rotationDeg: br.rotation
-        }
-      }
-    }),
-    assets: {
-      previewBase64: previewBase64 || null,
-      previewAssetId: null,
-      previewUrl: null,
-      bucketPath: null,
-      storageProvider: 'supabase'
-    }
-  }
-
-  payload.metadata.checksum = calculateDesignChecksum(payload)
-  return payload
-}
-
-/* ─── CART ────────────────────────────────────────────────────────── */
-const handleFinalizeAndOrder = () => {
-  // Show the choice overlay — user decides: go to cart or keep designing
-  showFinalizeChoice.value = true
-  const design = buildCustomDesignPayload(snapshotDataUrl.value || '')
-  console.log('[Chia Florist] Finalize & Order Clicked - Custom Design JSON Payload:\n', JSON.stringify(design, null, 2))
-}
-
-const openReviewModal = () => {
-  showFinalizeChoice.value = false
-  showReview.value = true
-}
-
-const addToCartHandler = async () => {
-  isAdding.value = true
-  const design = buildCustomDesignPayload(snapshotDataUrl.value)
-
-  if (snapshotDataUrl.value && snapshotDataUrl.value.startsWith('data:image/')) {
-    try {
-      const response = await fetch(snapshotDataUrl.value)
-      const blob = await response.blob()
-      const uploadRes = await supabaseService.uploadCustomPreview(blob)
-      if (uploadRes) {
-        design.assets.previewUrl = uploadRes.publicUrl
-        design.assets.bucketPath = uploadRes.bucketPath
-        design.assets.storageProvider = 'supabase'
-      }
-    } catch (err) {
-      console.warn('[Chia Florist] Could not upload custom preview to Supabase:', err)
-    }
-  }
-
-  const previewUrl = design.assets.previewUrl || snapshotDataUrl.value || '/images/custom-preview.png'
-  console.log('[Chia Florist] Finalized Custom Design Payload for Cart/Order:\n', JSON.stringify(design, null, 2))
-  const itemId = 'custom-' + Date.now()
-  await addToCart({
-    id: itemId,
-    name: `Custom Board — ${upper.value.headerText || 'My Design'}`,
-    price: totalPrice.value,
-    image: previewUrl,
-    size: SIZES.find(s => s.id === physicalSize.value)?.label ?? '',
-    color: upper.value.bgColor,
-    shopId: '99ef0062-1040-4574-a4be-0123abce5670',
-    isCustom: true,
-    itemType: 'custom',
-    customDesign: design,
-  }, 1)
-  isAdding.value = false
-  showReview.value = false
-  showThankYou.value = true
-}
-
-const resetCanvasAndCreateNew = () => {
-  showThankYou.value = false
-  elements.value = []
-  selectedId.value = null
-  snapshotDataUrl.value = ''
-  upper.value = {
-    headerText: 'Selamat & Sukses', bodyText: 'Atas Pelantikan Saudara/i\nNama Lengkap Anda',
-    headerFontSize: 36, bodyFontSize: 20, headerFont: 'playfair', bodyFont: 'inter',
-    headerAlign: 'center', bodyAlign: 'center',
-    bgColor: '#c0392b', headerColor: '#ffd700', bodyColor: '#ffffff', cornerStyle: 'none',
-  }
-  lower.value = {
-    headerText: '', bodyText: 'Nama Pengirim\nNama Instansi / Perusahaan',
-    headerFontSize: 26, bodyFontSize: 22, headerFont: 'bebas', bodyFont: 'inter',
-    headerAlign: 'center', bodyAlign: 'center',
-    bgColor: '#1a3a5c', headerColor: '#ffffff', bodyColor: '#ffffff', cornerStyle: 'none',
-  }
-  border.value = { style: 'solid', color: '#f5c842', width: 12, center: true }
-  topCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
-  bottomCrest.value = { enabled: false, style: 'classic', primary: '#e63946', secondary: '#f1faee', size: 40 }
-  physicalSize.value = 'medium'
-  heightRatio.value = 0.58
-}
-
-/* ─── KEYBOARD ────────────────────────────────────────────────────── */
-const onKeyDown = (e: KeyboardEvent) => {
-  const tag = (document.activeElement as HTMLElement)?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA') return
-  if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected()
-  if (e.key === 'Escape') selectedId.value = null
-}
-
-// Trigger snapshot generation when review modal opens
-watch(showReview, async (open) => {
-  if (!open) return
-  snapshotLoading.value = true
-  snapshotDataUrl.value = ''
-  await nextTick()
-  try {
-    snapshotDataUrl.value = await generateBoardSnapshot()
-    const updatedDesign = buildCustomDesignPayload(snapshotDataUrl.value)
-    console.log('[Chia Florist] Review Modal Open - Generated Custom Design Payload:\n', JSON.stringify(updatedDesign, null, 2))
-  } catch (e) {
-    console.warn('Snapshot generation failed:', e)
-  } finally {
-    snapshotLoading.value = false
-  }
-})
-
-/* ─── LIFECYCLE ───────────────────────────────────────────────────── */
-let ro: ResizeObserver | null = null
 onMounted(() => {
-  updateScale()
-  ro = new ResizeObserver(updateScale)
-  if (containerRef.value) ro.observe(containerRef.value)
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
-  window.addEventListener('keydown', onKeyDown)
+  design.loadDraft()
+  design.updateScale()
+  window.addEventListener('mousemove', design.onMouseMove)
+  window.addEventListener('mouseup', design.onMouseUp)
+  window.addEventListener('keydown', design.onKeyDown)
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
+
 onUnmounted(() => {
-  ro?.disconnect()
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
-  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('mousemove', design.onMouseMove)
+  window.removeEventListener('mouseup', design.onMouseUp)
+  window.removeEventListener('keydown', design.onKeyDown)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 
 <template>
   <div class="dr-root">
-
     <!-- ═══ NAVBAR ═══════════════════════════════════════════════════ -->
     <nav class="dr-nav">
-      <NuxtLink to="/" class="dr-back">
+      <button class="dr-back" @click="handleTryLeave('/')" title="Back to Home">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         Home
-      </NuxtLink>
+      </button>
       <div class="dr-nav-center">
         <span class="dr-brand">CHIA FLORIST</span>
         <span class="dr-dot">◆</span>
-        <span class="dr-page-title">Board Designer</span>
+        <span class="dr-page-title">Board Designer v3.0</span>
       </div>
       <div class="dr-nav-right">
-        <span class="dr-scale-chip">{{ Math.round(boardScale * 100) }}%</span>
-        <button class="dr-random-btn" @click="randomizeDesign" title="Randomize Design">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>
-          </svg>
-          Randomize
-        </button>
+        <!-- Zoom controls -->
+        <div class="dr-zoom-controls">
+          <button class="dr-zoom-btn" @click="design.zoomOut()" title="Zoom out (Ctrl+-)">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <input type="range" min="20" max="150" step="5"
+            :value="Math.round(design.boardScale * 100)"
+            :style="{ '--v': Math.round(design.boardScale * 100) }"
+            @input="(e) => { design.boardScale = parseInt((e.target as HTMLInputElement).value) / 100 }"
+            class="dr-zoom-slider" title="Zoom"/>
+          <button class="dr-zoom-btn" @click="design.zoomIn()" title="Zoom in (Ctrl+=)">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="dr-scale-chip" @click="design.resetZoom()" title="Reset zoom (Ctrl+0)">{{ Math.round(design.boardScale * 100) }}%</button>
+        </div>
       </div>
     </nav>
 
-    <!-- ═══ BODY ══════════════════════════════════════════════════════ -->
-    <div class="dr-body">
+    <!-- ═══ BODY (Client Only for Interactive Board Designer) ════════ -->
+    <ClientOnly>
+      <div class="dr-body">
+        <!-- Canvas area -->
+        <div class="dr-canvas-wrapper">
+          <CanvasBoard :design="design" />
 
-      <!-- ── CANVAS AREA (left on md+) ──────────────────────────────── -->
-      <div class="dr-canvas-area" ref="containerRef">
-        <div class="chess-bg" @dragover.prevent>
-          <!-- Board scaler: sized to match scale -->
-          <div class="board-scaler"
-            :style="{ width: Math.round(boardW * boardScale) + 'px', height: Math.round(boardH * boardScale) + 'px' }">
-            <svg width="0" height="0" style="position:absolute">
-              <defs>
-                <g id="fw">
-                  <path d="M0 -12 C 4 -12 4 -4 12 -12 C 4 -4 12 -4 12 0 C 12 4 4 4 12 12 C 4 4 4 12 0 12 C -4 12 -4 4 -12 12 C -4 4 -12 4 -12 0 C -12 -4 -4 -4 -12 -12 C -4 -4 -4 -12 0 -12" fill="currentColor"/>
-                  <circle cx="0" cy="0" r="4" fill="#ffd700" opacity="0.9"/>
-                </g>
-                <g id="lf">
-                  <path d="M0 0 Q 15 -10 25 0 Q 15 10 0 0 Z" fill="#2d5a27"/>
-                </g>
-              </defs>
-            </svg>
-
-            <!-- 🌸 TOP FLORAL CREST 🌸 -->
-            <div v-if="topCrest.enabled" class="floral-crest fc-top"
-                 :style="{ '--p': topCrest.primary, '--s': topCrest.secondary, width: topCrest.size + '%' }">
-              <svg v-if="topCrest.style === 'classic'" viewBox="0 0 300 150" class="crest-svg">
-                <use href="#lf" x="60" y="145" transform="rotate(-30 60 145) scale(2)"/><use href="#lf" x="240" y="145" transform="rotate(210 240 145) scale(2)"/><use href="#lf" x="150" y="55" transform="rotate(-90 150 55) scale(2)"/>
-                <g fill="var(--p)">
-                  <use href="#fw" x="70" y="150"/><use href="#fw" x="74" y="125"/><use href="#fw" x="84" y="103"/><use href="#fw" x="103" y="84"/><use href="#fw" x="125" y="74"/><use href="#fw" x="150" y="70"/><use href="#fw" x="175" y="74"/><use href="#fw" x="197" y="84"/><use href="#fw" x="216" y="103"/><use href="#fw" x="226" y="125"/><use href="#fw" x="230" y="150"/>
-                </g>
-                <g fill="var(--s)">
-                  <use href="#fw" x="90" y="150"/><use href="#fw" x="96" y="124"/><use href="#fw" x="115" y="101"/><use href="#fw" x="140" y="91"/><use href="#fw" x="160" y="91"/><use href="#fw" x="185" y="101"/><use href="#fw" x="204" y="124"/><use href="#fw" x="210" y="150"/>
-                </g>
-                <g fill="#f1faee">
-                  <use href="#fw" x="110" y="150"/><use href="#fw" x="122" y="122"/><use href="#fw" x="150" y="110"/><use href="#fw" x="178" y="122"/><use href="#fw" x="190" y="150"/>
-                </g>
-                <g fill="#f5c842">
-                  <use href="#fw" x="130" y="150"/><use href="#fw" x="150" y="130"/><use href="#fw" x="170" y="150"/>
-                </g>
-              </svg>
-              <svg v-else-if="topCrest.style === 'modern'" viewBox="0 0 400 150" class="crest-svg">
-                <use href="#lf" x="40" y="145" transform="rotate(-30 40 145) scale(2)"/><use href="#lf" x="360" y="145" transform="rotate(210 360 145) scale(2)"/>
-                <g fill="var(--p)">
-                  <use href="#fw" x="60" y="150"/><use href="#fw" x="85" y="150"/><use href="#fw" x="110" y="150"/><use href="#fw" x="135" y="150"/><use href="#fw" x="160" y="150"/><use href="#fw" x="185" y="150"/><use href="#fw" x="215" y="150"/><use href="#fw" x="240" y="150"/><use href="#fw" x="265" y="150"/><use href="#fw" x="290" y="150"/><use href="#fw" x="315" y="150"/><use href="#fw" x="340" y="150"/>
-                  <use href="#fw" x="80" y="130"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="90"/><use href="#fw" x="140" y="70"/><use href="#fw" x="320" y="130"/><use href="#fw" x="300" y="110"/><use href="#fw" x="280" y="90"/><use href="#fw" x="260" y="70"/>
-                </g>
-                <g fill="var(--s)">
-                  <use href="#fw" x="110" y="130"/><use href="#fw" x="130" y="110"/><use href="#fw" x="150" y="90"/><use href="#fw" x="170" y="70"/><use href="#fw" x="190" y="55"/><use href="#fw" x="210" y="55"/><use href="#fw" x="230" y="70"/><use href="#fw" x="250" y="90"/><use href="#fw" x="270" y="110"/><use href="#fw" x="290" y="130"/>
-                </g>
-                <g fill="#f1faee">
-                  <use href="#fw" x="140" y="130"/><use href="#fw" x="160" y="110"/><use href="#fw" x="180" y="90"/><use href="#fw" x="200" y="75"/><use href="#fw" x="220" y="90"/><use href="#fw" x="240" y="110"/><use href="#fw" x="260" y="130"/>
-                </g>
-                <g fill="#f5c842">
-                  <use href="#fw" x="170" y="130"/><use href="#fw" x="190" y="110"/><use href="#fw" x="210" y="110"/><use href="#fw" x="230" y="130"/><use href="#fw" x="200" y="130"/>
-                </g>
-              </svg>
-              <svg v-else-if="topCrest.style === 'grand'" viewBox="0 0 500 150" class="crest-svg">
-                <g fill="var(--s)">
-                  <use href="#fw" x="40" y="150"/><use href="#fw" x="50" y="120"/><use href="#fw" x="70" y="95"/><use href="#fw" x="100" y="90"/><use href="#fw" x="130" y="95"/><use href="#fw" x="150" y="120"/><use href="#fw" x="160" y="150"/>
-                  <use href="#fw" x="340" y="150"/><use href="#fw" x="350" y="120"/><use href="#fw" x="370" y="95"/><use href="#fw" x="400" y="90"/><use href="#fw" x="430" y="95"/><use href="#fw" x="450" y="120"/><use href="#fw" x="460" y="150"/>
-                </g>
-                <g fill="var(--p)">
-                  <use href="#fw" x="60" y="150"/><use href="#fw" x="80" y="120"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="120"/><use href="#fw" x="140" y="150"/>
-                  <use href="#fw" x="360" y="150"/><use href="#fw" x="380" y="120"/><use href="#fw" x="400" y="110"/><use href="#fw" x="420" y="120"/><use href="#fw" x="440" y="150"/>
-                  <use href="#fw" x="170" y="150"/><use href="#fw" x="174" y="125"/><use href="#fw" x="184" y="103"/><use href="#fw" x="203" y="84"/><use href="#fw" x="225" y="74"/><use href="#fw" x="250" y="70"/><use href="#fw" x="275" y="74"/><use href="#fw" x="297" y="84"/><use href="#fw" x="316" y="103"/><use href="#fw" x="326" y="125"/><use href="#fw" x="330" y="150"/>
-                </g>
-                <g fill="#f1faee">
-                  <use href="#fw" x="190" y="150"/><use href="#fw" x="196" y="124"/><use href="#fw" x="215" y="101"/><use href="#fw" x="240" y="91"/><use href="#fw" x="260" y="91"/><use href="#fw" x="285" y="101"/><use href="#fw" x="304" y="124"/><use href="#fw" x="310" y="150"/>
-                </g>
-                <g fill="#f5c842">
-                  <use href="#fw" x="210" y="150"/><use href="#fw" x="222" y="122"/><use href="#fw" x="250" y="110"/><use href="#fw" x="278" y="122"/><use href="#fw" x="290" y="150"/>
-                </g>
-              </svg>
-            </div>
-
-            <!-- 🌸 BOTTOM FLORAL CREST 🌸 -->
-            <div v-if="bottomCrest.enabled" class="floral-crest fc-bottom"
-                 :style="{ '--p': bottomCrest.primary, '--s': bottomCrest.secondary, width: bottomCrest.size + '%' }">
-              <svg v-if="bottomCrest.style === 'classic'" viewBox="0 0 300 150" class="crest-svg">
-                <use href="#lf" x="60" y="145" transform="rotate(-30 60 145) scale(2)"/><use href="#lf" x="240" y="145" transform="rotate(210 240 145) scale(2)"/><use href="#lf" x="150" y="55" transform="rotate(-90 150 55) scale(2)"/>
-                <g fill="var(--p)">
-                  <use href="#fw" x="70" y="150"/><use href="#fw" x="74" y="125"/><use href="#fw" x="84" y="103"/><use href="#fw" x="103" y="84"/><use href="#fw" x="125" y="74"/><use href="#fw" x="150" y="70"/><use href="#fw" x="175" y="74"/><use href="#fw" x="197" y="84"/><use href="#fw" x="216" y="103"/><use href="#fw" x="226" y="125"/><use href="#fw" x="230" y="150"/>
-                </g>
-                <g fill="var(--s)">
-                  <use href="#fw" x="90" y="150"/><use href="#fw" x="96" y="124"/><use href="#fw" x="115" y="101"/><use href="#fw" x="140" y="91"/><use href="#fw" x="160" y="91"/><use href="#fw" x="185" y="101"/><use href="#fw" x="204" y="124"/><use href="#fw" x="210" y="150"/>
-                </g>
-                <g fill="#f1faee">
-                  <use href="#fw" x="110" y="150"/><use href="#fw" x="122" y="122"/><use href="#fw" x="150" y="110"/><use href="#fw" x="178" y="122"/><use href="#fw" x="190" y="150"/>
-                </g>
-                <g fill="#f5c842">
-                  <use href="#fw" x="130" y="150"/><use href="#fw" x="150" y="130"/><use href="#fw" x="170" y="150"/>
-                </g>
-              </svg>
-              <svg v-else-if="bottomCrest.style === 'modern'" viewBox="0 0 400 150" class="crest-svg">
-                <use href="#lf" x="40" y="145" transform="rotate(-30 40 145) scale(2)"/><use href="#lf" x="360" y="145" transform="rotate(210 360 145) scale(2)"/>
-                <g fill="var(--p)">
-                  <use href="#fw" x="60" y="150"/><use href="#fw" x="85" y="150"/><use href="#fw" x="110" y="150"/><use href="#fw" x="135" y="150"/><use href="#fw" x="160" y="150"/><use href="#fw" x="185" y="150"/><use href="#fw" x="215" y="150"/><use href="#fw" x="240" y="150"/><use href="#fw" x="265" y="150"/><use href="#fw" x="290" y="150"/><use href="#fw" x="315" y="150"/><use href="#fw" x="340" y="150"/>
-                  <use href="#fw" x="80" y="130"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="90"/><use href="#fw" x="140" y="70"/><use href="#fw" x="320" y="130"/><use href="#fw" x="300" y="110"/><use href="#fw" x="280" y="90"/><use href="#fw" x="260" y="70"/>
-                </g>
-                <g fill="var(--s)">
-                  <use href="#fw" x="110" y="130"/><use href="#fw" x="130" y="110"/><use href="#fw" x="150" y="90"/><use href="#fw" x="170" y="70"/><use href="#fw" x="190" y="55"/><use href="#fw" x="210" y="55"/><use href="#fw" x="230" y="70"/><use href="#fw" x="250" y="90"/><use href="#fw" x="270" y="110"/><use href="#fw" x="290" y="130"/>
-                </g>
-                <g fill="#f1faee">
-                  <use href="#fw" x="140" y="130"/><use href="#fw" x="160" y="110"/><use href="#fw" x="180" y="90"/><use href="#fw" x="200" y="75"/><use href="#fw" x="220" y="90"/><use href="#fw" x="240" y="110"/><use href="#fw" x="260" y="130"/>
-                </g>
-                <g fill="#f5c842">
-                  <use href="#fw" x="170" y="130"/><use href="#fw" x="190" y="110"/><use href="#fw" x="210" y="110"/><use href="#fw" x="230" y="130"/><use href="#fw" x="200" y="130"/>
-                </g>
-              </svg>
-              <svg v-else-if="bottomCrest.style === 'grand'" viewBox="0 0 500 150" class="crest-svg">
-                <g fill="var(--s)">
-                  <use href="#fw" x="40" y="150"/><use href="#fw" x="50" y="120"/><use href="#fw" x="70" y="95"/><use href="#fw" x="100" y="90"/><use href="#fw" x="130" y="95"/><use href="#fw" x="150" y="120"/><use href="#fw" x="160" y="150"/>
-                  <use href="#fw" x="340" y="150"/><use href="#fw" x="350" y="120"/><use href="#fw" x="370" y="95"/><use href="#fw" x="400" y="90"/><use href="#fw" x="430" y="95"/><use href="#fw" x="450" y="120"/><use href="#fw" x="460" y="150"/>
-                </g>
-                <g fill="var(--p)">
-                  <use href="#fw" x="60" y="150"/><use href="#fw" x="80" y="120"/><use href="#fw" x="100" y="110"/><use href="#fw" x="120" y="120"/><use href="#fw" x="140" y="150"/>
-                  <use href="#fw" x="360" y="150"/><use href="#fw" x="380" y="120"/><use href="#fw" x="400" y="110"/><use href="#fw" x="420" y="120"/><use href="#fw" x="440" y="150"/>
-                  <use href="#fw" x="170" y="150"/><use href="#fw" x="174" y="125"/><use href="#fw" x="184" y="103"/><use href="#fw" x="203" y="84"/><use href="#fw" x="225" y="74"/><use href="#fw" x="250" y="70"/><use href="#fw" x="275" y="74"/><use href="#fw" x="297" y="84"/><use href="#fw" x="316" y="103"/><use href="#fw" x="326" y="125"/><use href="#fw" x="330" y="150"/>
-                </g>
-                <g fill="#f1faee">
-                  <use href="#fw" x="190" y="150"/><use href="#fw" x="196" y="124"/><use href="#fw" x="215" y="101"/><use href="#fw" x="240" y="91"/><use href="#fw" x="260" y="91"/><use href="#fw" x="285" y="101"/><use href="#fw" x="304" y="124"/><use href="#fw" x="310" y="150"/>
-                </g>
-                <g fill="#f5c842">
-                  <use href="#fw" x="210" y="150"/><use href="#fw" x="222" y="122"/><use href="#fw" x="250" y="110"/><use href="#fw" x="278" y="122"/><use href="#fw" x="290" y="150"/>
-                </g>
-              </svg>
-            </div>
-
-            <!-- ╔══ THE BOARD ══╗ -->
-            <div
-              ref="boardRef"
-              class="board-frame"
-              :style="{
-                width: boardW + 'px', height: boardH + 'px',
-                transform: `scale(${boardScale})`, transformOrigin: 'top left',
-                cursor: isBrushMode ? 'crosshair' : 'default',
-                ...boardBorderStyle,
-              }"
-              @click="handleBoardClick"
-              @dragover.prevent
-              @drop="handleDrop"
-            >
-              <!-- ▲ UPPER SECTION -->
-              <div class="board-section"
-                :style="{ top: 0, left: 0, right: 0, height: upperH + 'px', backgroundColor: upper.bgColor, ...upperCornerStyle }">
-                <template v-if="upper.cornerStyle === 'floral'">
-                  <span class="floral-corner fc-tl">🌸</span>
-                  <span class="floral-corner fc-tr">🌸</span>
-                </template>
-                <div class="sec-inner">
-                  <div v-if="upper.headerText" class="sec-text sec-header"
-                    :style="{ fontSize: upper.headerFontSize + 'px', fontFamily: getFont(upper.headerFont), color: upper.headerColor, textAlign: upper.headerAlign }">
-                    {{ upper.headerText }}
-                  </div>
-                  <div class="sec-text sec-body"
-                    :style="{ fontSize: upper.bodyFontSize + 'px', fontFamily: getFont(upper.bodyFont), color: upper.bodyColor, textAlign: upper.bodyAlign }">
-                    {{ upper.bodyText }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- ── SECTION DIVIDER (drag to resize) ── -->
-              <div class="section-divider" :style="{ top: upperH + 'px', '--dc': border.color || '#ccc' }"
-                @mousedown.stop="startDragDiv" @click.stop>
-                <div class="div-track" :style="!border.center ? { opacity: 0.6 } : { display: 'none' }"/>
-                <div v-if="border.center" :style="{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }">
-                  <div :style="centerBorderStyle"></div>
-                </div>
-                <div class="div-knob">
-                  <svg viewBox="0 0 20 6" width="20" height="6">
-                    <circle cx="3" cy="3" r="2" fill="currentColor"/>
-                    <circle cx="10" cy="3" r="2" fill="currentColor"/>
-                    <circle cx="17" cy="3" r="2" fill="currentColor"/>
-                  </svg>
-                </div>
-              </div>
-
-              <!-- ▼ LOWER SECTION -->
-              <div class="board-section"
-                :style="{ top: upperH + 'px', left: 0, right: 0, height: lowerH + 'px', backgroundColor: lower.bgColor, overflow: 'visible', ...lowerCornerStyle }">
-                <template v-if="lower.cornerStyle === 'floral'">
-                  <span class="floral-corner fc-bl">🌸</span>
-                  <span class="floral-corner fc-br">🌸</span>
-                </template>
-                <div class="sec-inner">
-                  <div v-if="lower.headerText" class="sec-text sec-header"
-                    :style="{ fontSize: lower.headerFontSize + 'px', fontFamily: getFont(lower.headerFont), color: lower.headerColor, textAlign: lower.headerAlign }">
-                    {{ lower.headerText }}
-                  </div>
-                  <div class="sec-text sec-body"
-                    :style="{ fontSize: lower.bodyFontSize + 'px', fontFamily: getFont(lower.bodyFont), color: lower.bodyColor, textAlign: lower.bodyAlign }">
-                    {{ lower.bodyText }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- ★ CANVAS ELEMENTS — array order = z-order (last = top) -->
-              <template v-for="(el, idx) in elements" :key="el.id">
-
-                <!-- Image element -->
-                <div v-if="el.type === 'image'" class="canvas-el"
-                  :class="{ 'el-selected': selectedId === el.id }"
-                  :style="{
-                    left: (el as CanvasImage).x + '%', top: (el as CanvasImage).y + '%',
-                    width: (el as CanvasImage).width + '%', aspectRatio: '1/1',
-                    zIndex: idx + 10, overflow: 'hidden',
-                    borderRadius: (el as CanvasImage).frame === 'circle' ? '50%' : (el as CanvasImage).frame === 'square' ? '4px' : '0',
-                    pointerEvents: isBrushMode ? 'none' : 'auto', cursor: 'grab',
-                  }"
-                  @mousedown.stop="startDragEl($event, el.id)">
-                  <img :src="(el as CanvasImage).src" draggable="false"
-                    :style="{
-                      width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-                      objectPosition: (el as CanvasImage).cropX + '% ' + (el as CanvasImage).cropY + '%',
-                      transform: 'scale(' + (el as CanvasImage).zoom + ')',
-                      transformOrigin: (el as CanvasImage).cropX + '% ' + (el as CanvasImage).cropY + '%',
-                    }"/>
-                  <div v-if="selectedId === el.id && !isBrushMode" class="el-del" @click.stop="deleteSelected" title="Remove">×</div>
-                </div>
-
-                <!-- Brush stroke element -->
-                <div v-else-if="el.type === 'brush'" class="canvas-el"
-                  :class="{ 'el-selected': selectedId === el.id }"
-                  :style="{
-                    left: (el as BrushStroke).x + '%', top: (el as BrushStroke).y + '%',
-                    width: (el as BrushStroke).size + 'px', height: (el as BrushStroke).size + 'px',
-                    transform: `translate(-50%,-50%) rotate(${(el as BrushStroke).rotation}deg)`,
-                    zIndex: idx + 10, color: (el as BrushStroke).color,
-                    pointerEvents: 'auto', cursor: isBrushMode ? 'crosshair' : 'pointer',
-                  }"
-                  @mousedown.stop="handleBrushMousedown($event, el.id)">
-                  <!-- Flower SVG -->
-                  <svg v-if="(el as BrushStroke).brushType === 'flower'" viewBox="-20 -20 40 40" width="100%" height="100%">
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(0,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(72,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(144,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(216,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(288,0,0)"/>
-                    <circle cx="0" cy="0" r="5.5" fill="#ffe066"/>
-                    <circle cx="0" cy="0" r="2.5" fill="#f59e0b"/>
-                  </svg>
-                  <!-- Rose SVG -->
-                  <svg v-else viewBox="-20 -20 40 40" width="100%" height="100%">
-                    <path d="M0,-16 C6,-13 14,-7 12,0 C18,-4 20,5 15,10 C10,15 3,16 0,13 C-3,16 -10,15 -15,10 C-20,5 -18,-4 -12,0 C-14,-7 -6,-13 0,-16Z" fill="currentColor"/>
-                    <path d="M0,-9 C4,-6 8,-1 6,3 C9,0 11,5 8,8 C5,11 1,11 0,9 C-1,11 -5,11 -8,8 C-11,5 -9,0 -6,3 C-8,-1 -4,-6 0,-9Z" fill="currentColor" opacity="0.55"/>
-                    <circle cx="0" cy="2" r="3" fill="#ffe066" opacity="0.75"/>
-                  </svg>
-                  <div v-if="selectedId === el.id" class="el-del" @click.stop="deleteSelected" title="Remove">×</div>
-                </div>
-              </template>
-            </div><!-- /board-frame -->
-          </div><!-- /board-scaler -->
-        </div><!-- /chess-bg -->
-
-        <!-- Canvas info bar -->
-        <div class="canvas-info">
-          <span>{{ elements.length }} element{{ elements.length !== 1 ? 's' : '' }}</span>
-          <span v-if="selectedId" class="ci-sel"> · 1 selected</span>
-          <button v-if="selectedId" class="ci-desel" @click="selectedId = null">Deselect</button>
-          <span v-if="isBrushMode" class="ci-hint">Click canvas to place brush stroke · Del to remove selected</span>
-          <span v-else-if="!isBrushMode && selectedId" class="ci-hint">Drag to move · Del to remove</span>
-        </div>
-      </div><!-- /canvas-area -->
-
-      <!-- ── TOOL PANEL (right on md+) ──────────────────────────────── -->
-      <aside class="dr-panel">
-
-        <!-- Tab bar -->
-        <div class="tab-bar" role="tablist">
-          <button v-for="tab in TOOL_TABS" :key="tab.id"
-            class="tab-btn" :class="{ 'tab-active': activeTab === tab.id }"
-            @click="activeTab = tab.id" role="tab" :aria-selected="activeTab === tab.id"
-            :id="'tab-' + tab.id">
-            <!-- Tab icons -->
-            <svg v-if="tab.id === 'text'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
-            </svg>
-            <svg v-else-if="tab.id === 'image'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-            </svg>
-            <svg v-else-if="tab.id === 'brush'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/>
-              <path d="M9 8c-2 2.5-2 5-2 5"/>
-            </svg>
-            <svg v-else-if="tab.id === 'border'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="2"/>
-            </svg>
-            <svg v-else-if="tab.id === 'corner'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <path d="M3 9V5a2 2 0 012-2h4"/><path d="M3 15v4a2 2 0 002 2h4"/>
-            </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22C12 22 20 18 20 12C20 6 12 2 12 2C12 2 4 6 4 12C4 18 12 22 12 22Z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-            <span>{{ tab.label }}</span>
-          </button>
-        </div>
-
-        <!-- Tab content area (scrollable) -->
-        <div class="tab-body">
-
-          <!-- ╔══ TEXT TAB ══╗ -->
-          <div v-if="activeTab === 'text'" class="tab-pane">
-            <div class="sec-toggle">
-              <button class="stg-btn" :class="{ active: activeSection === 'upper' }" @click="activeSection = 'upper'">Upper</button>
-              <button class="stg-btn" :class="{ active: activeSection === 'lower' }" @click="activeSection = 'lower'">Lower</button>
-            </div>
-
-            <!-- Background -->
-            <div class="tg">
-              <div class="tg-label">BACKGROUND</div>
-              <div class="color-row">
-                <input id="bg-color-input" type="color" v-model="sec.bgColor" class="csi"/>
-                <span class="cval">{{ sec.bgColor }}</span>
-              </div>
-              <div class="dot-row">
-                <button v-for="c in BG_PRESETS" :key="c" class="pdot"
-                  :style="{ background: c, outline: sec.bgColor === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : 'none' }"
-                  @click="sec.bgColor = c"/>
-              </div>
-            </div>
-
-            <!-- Header -->
-            <div class="tg">
-              <div class="tg-label">HEADER</div>
-              <textarea class="dr-ta" v-model="sec.headerText" placeholder="Header text…" rows="2"/>
-              <div class="cr">
-                <label class="clabel">Size</label>
-                <input type="range" min="10" max="96" class="dr-range" v-model.number="sec.headerFontSize"/>
-                <span class="cval">{{ sec.headerFontSize }}px</span>
-              </div>
-              <div class="font-grid">
-                <button v-for="f in FONTS" :key="f.id" class="font-chip" :class="{ 'fc-active': sec.headerFont === f.id }"
-                  :style="{ fontFamily: f.family }" @click="sec.headerFont = f.id">{{ f.label }}</button>
-              </div>
-              <div class="align-row">
-                <button v-for="a in (['left','center','right'] as const)" :key="a" class="aln-btn"
-                  :class="{ 'aln-active': sec.headerAlign === a }" @click="sec.headerAlign = a"
-                  :title="a">
-                  <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                    <line x1="0" y1="2" x2="16" y2="2"/>
-                    <line :x1="a==='left'?0:a==='center'?3:6" y1="6" :x2="a==='left'?10:a==='center'?13:16" y2="6"/>
-                    <line x1="0" y1="10" x2="16" y2="10"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="color-row">
-                <label class="clabel">Color</label>
-                <input type="color" v-model="sec.headerColor" class="csi"/>
-                <span class="cval">{{ sec.headerColor }}</span>
-              </div>
-            </div>
-
-            <!-- Body -->
-            <div class="tg">
-              <div class="tg-label">BODY</div>
-              <textarea class="dr-ta" v-model="sec.bodyText" placeholder="Body text… (new line = Enter)" rows="3"/>
-              <div class="cr">
-                <label class="clabel">Size</label>
-                <input type="range" min="8" max="72" class="dr-range" v-model.number="sec.bodyFontSize"/>
-                <span class="cval">{{ sec.bodyFontSize }}px</span>
-              </div>
-              <div class="font-grid">
-                <button v-for="f in FONTS" :key="f.id" class="font-chip" :class="{ 'fc-active': sec.bodyFont === f.id }"
-                  :style="{ fontFamily: f.family }" @click="sec.bodyFont = f.id">{{ f.label }}</button>
-              </div>
-              <div class="align-row">
-                <button v-for="a in (['left','center','right'] as const)" :key="a" class="aln-btn"
-                  :class="{ 'aln-active': sec.bodyAlign === a }" @click="sec.bodyAlign = a" :title="a">
-                  <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                    <line x1="0" y1="2" x2="16" y2="2"/>
-                    <line :x1="a==='left'?0:a==='center'?3:6" y1="6" :x2="a==='left'?10:a==='center'?13:16" y2="6"/>
-                    <line x1="0" y1="10" x2="16" y2="10"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="color-row">
-                <label class="clabel">Color</label>
-                <input type="color" v-model="sec.bodyColor" class="csi"/>
-                <span class="cval">{{ sec.bodyColor }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ╔══ IMAGE TAB ══╗ -->
-          <div v-else-if="activeTab === 'image'" class="tab-pane">
-            <!-- Drop zone (no images at all) -->
-            <template v-if="imgElements.length === 0">
-              <div class="drop-zone" @dragover.prevent @drop="handleDrop">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="dz-icon">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-                </svg>
-                <p class="dz-title">Drop image here</p>
-                <p class="dz-sub">or drag from files onto the board</p>
-                <label class="dz-browse" for="dz-file-input">Browse Files</label>
-                <input id="dz-file-input" type="file" accept="image/*" @change="handleFileInput" style="display:none"/>
-              </div>
-              <p class="dz-note">Images are registered as canvas components. Use frame, zoom and crop to style them.</p>
-            </template>
-
-            <!-- Image controls (image selected) -->
-            <template v-else>
-              <div style="padding: 1rem 1rem 0;">
-                <label class="primary-btn" style="display:flex; justify-content:center; cursor:pointer; align-items:center; background:#4a4a4a; color:#fff; padding:0.6rem; border-radius:4px; font-weight:500; font-size:0.85rem">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px;margin-right:6px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  Upload Another Image
-                  <input type="file" accept="image/*" @change="handleFileInput" style="display:none"/>
-                </label>
-              </div>
-
-              <template v-if="selectedImg">
-                <div class="img-preview-wrap">
-                <img :src="selectedImg.src" class="img-preview-thumb"
-                  :style="{ borderRadius: selectedImg.frame === 'circle' ? '50%' : '4px' }"/>
-              </div>
-
-              <div class="tg">
-                <div class="tg-label">FRAME</div>
-                <div class="frame-row">
-                  <button v-for="f in (['none','square','circle'] as FrameStyle[])" :key="f"
-                    class="frame-btn" :class="{ 'fb-active': selectedImg.frame === f }"
-                    @click="selectedImg.frame = f">
-                    <svg v-if="f==='none'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="2" x2="14" y2="14"/><line x1="14" y1="2" x2="2" y2="14"/></svg>
-                    <svg v-else-if="f==='square'" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
-                    <svg v-else viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6"/></svg>
-                    {{ f === 'none' ? 'None' : f === 'square' ? 'Square' : 'Circle' }}
-                  </button>
-                </div>
-              </div>
-
-              <div class="tg">
-                <div class="tg-label">SIZE</div>
-                <div class="cr">
-                  <label class="clabel">Width</label>
-                  <input type="range" min="5" max="80" class="dr-range" v-model.number="selectedImg.width"/>
-                  <span class="cval">{{ selectedImg.width }}%</span>
-                </div>
-              </div>
-
-              <div class="tg">
-                <div class="tg-label">ZOOM &amp; CROP</div>
-                <div class="cr">
-                  <label class="clabel">Zoom</label>
-                  <input type="range" min="1" max="3" step="0.05" class="dr-range" v-model.number="selectedImg.zoom"/>
-                  <span class="cval">{{ selectedImg.zoom.toFixed(1) }}×</span>
-                </div>
-                <div class="cr">
-                  <label class="clabel">Crop X</label>
-                  <input type="range" min="0" max="100" class="dr-range" v-model.number="selectedImg.cropX"/>
-                  <span class="cval">{{ selectedImg.cropX }}%</span>
-                </div>
-                <div class="cr">
-                  <label class="clabel">Crop Y</label>
-                  <input type="range" min="0" max="100" class="dr-range" v-model.number="selectedImg.cropY"/>
-                  <span class="cval">{{ selectedImg.cropY }}%</span>
-                </div>
-              </div>
-
-              <button class="danger-btn" @click="deleteSelected">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                Remove Image
-              </button>
-              </template>
-            </template>
-
-            <!-- All images list -->
-            <div v-if="imgElements.length" class="el-section">
-              <div class="tg-label" style="padding:0.875rem 1rem 0.4rem">ALL IMAGES ({{ imgElements.length }})</div>
-              <div class="el-list">
-                <div v-for="img in imgElements" :key="img.id" class="el-item"
-                  :class="{ 'el-active': selectedId === img.id }" @click="bringToFront(img.id); activeTab='image'">
-                  <img :src="img.src" class="el-thumb" :style="{ borderRadius: img.frame === 'circle' ? '50%' : '3px' }"/>
-                  <div class="el-meta"><span>{{ img.frame }} frame</span><span>{{ img.width }}% wide</span></div>
-                  <button class="el-del-list" @click.stop="selectedId = img.id; deleteSelected()">×</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ╔══ BRUSH TAB ══╗ -->
-          <div v-else-if="activeTab === 'brush'" class="tab-pane">
-            <div class="brush-info">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              <p>Click empty canvas to stamp flowers. Drag or click any placed flower to move, rotate, &amp; edit it live!</p>
-            </div>
-
-            <div class="tg">
-              <div class="tg-label">TYPE</div>
-              <div class="brush-types">
-                <button class="btype-btn" :class="{ 'btype-active': brushType === 'flower' }" @click="brushType = 'flower'">
-                  <svg viewBox="-20 -20 40 40" width="44" height="44" :style="{ color: brushColor }">
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(0,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(72,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(144,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(216,0,0)"/>
-                    <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(288,0,0)"/>
-                    <circle cx="0" cy="0" r="5" fill="#ffe066"/>
-                  </svg>
-                  <span>Flower</span>
-                </button>
-                <button class="btype-btn" :class="{ 'btype-active': brushType === 'rose' }" @click="brushType = 'rose'">
-                  <svg viewBox="-20 -20 40 40" width="44" height="44" :style="{ color: brushColor }">
-                    <path d="M0,-16 C6,-13 14,-7 12,0 C18,-4 20,5 15,10 C10,15 3,16 0,13 C-3,16 -10,15 -15,10 C-20,5 -18,-4 -12,0 C-14,-7 -6,-13 0,-16Z" fill="currentColor"/>
-                    <path d="M0,-9 C4,-6 8,-1 6,3 C9,0 11,5 8,8 C5,11 1,11 0,9 C-1,11 -5,11 -8,8 C-11,5 -9,0 -6,3 C-8,-1 -4,-6 0,-9Z" fill="currentColor" opacity="0.55"/>
-                    <circle cx="0" cy="2" r="2.5" fill="#ffe066" opacity="0.8"/>
-                  </svg>
-                  <span>Rose</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="tg">
-              <div class="tg-label">COLOR</div>
-              <div class="dot-row">
-                <button v-for="c in BRUSH_COLORS" :key="c" class="pdot"
-                  :style="{ background: c, outline: brushColor === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : 'none' }"
-                  @click="brushColor = c"/>
-              </div>
-              <div class="color-row" style="margin-top:0.35rem">
-                <label class="clabel">Custom</label>
-                <input type="color" v-model="brushColor" class="csi"/>
-                <span class="cval">{{ brushColor }}</span>
-              </div>
-            </div>
-
-            <div class="tg">
-              <div class="tg-label">SIZE &amp; ANGLE</div>
-              <div class="cr">
-                <label class="clabel">Size</label>
-                <input type="range" min="16" max="120" class="dr-range" v-model.number="brushSize"/>
-                <span class="cval">{{ brushSize }}px</span>
-              </div>
-              <div class="cr">
-                <label class="clabel">Angle</label>
-                <input type="range" min="0" max="360" class="dr-range" v-model.number="brushRotation"/>
-                <span class="cval">{{ brushRotation }}°</span>
-              </div>
-            </div>
-
-            <!-- Live preview -->
-            <div class="brush-preview">
-              <svg :viewBox="'-20 -20 40 40'" :width="Math.min(brushSize, 80)" :height="Math.min(brushSize, 80)"
-                :style="{ color: brushColor, transform: `rotate(${brushRotation}deg)`, display: 'block' }">
-                <template v-if="brushType === 'flower'">
-                  <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(0,0,0)"/>
-                  <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(72,0,0)"/>
-                  <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(144,0,0)"/>
-                  <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(216,0,0)"/>
-                  <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(288,0,0)"/>
-                  <circle cx="0" cy="0" r="5" fill="#ffe066"/>
-                </template>
-                <template v-else>
-                  <path d="M0,-16 C6,-13 14,-7 12,0 C18,-4 20,5 15,10 C10,15 3,16 0,13 C-3,16 -10,15 -15,10 C-20,5 -18,-4 -12,0 C-14,-7 -6,-13 0,-16Z" fill="currentColor"/>
-                  <path d="M0,-9 C4,-6 8,-1 6,3 C9,0 11,5 8,8 C5,11 1,11 0,9 C-1,11 -5,11 -8,8 C-11,5 -9,0 -6,3 C-8,-1 -4,-6 0,-9Z" fill="currentColor" opacity="0.55"/>
-                </template>
-              </svg>
-              <span class="bp-label">{{ selectedBrush ? 'Editing selected' : 'Preview (next stamp)' }}</span>
-            </div>
-
-            <!-- Placed brush list -->
-            <div v-if="brushElements.length" class="el-section">
-              <div class="tg-label" style="padding:0.875rem 1rem 0.4rem">PLACED ({{ brushElements.length }})</div>
-              <div class="el-list">
-                <div v-for="br in brushElements" :key="br.id" class="el-item"
-                  :class="{ 'el-active': selectedId === br.id }"
-                  @click="selectedId = br.id; bringToFront(br.id)">
-                  <div class="el-brush-icon" :style="{ color: br.color }">
-                    <svg viewBox="-20 -20 40 40" width="28" height="28">
-                      <template v-if="br.brushType === 'flower'">
-                        <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(0,0,0)"/>
-                        <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(72,0,0)"/>
-                        <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(144,0,0)"/>
-                        <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(216,0,0)"/>
-                        <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" transform="rotate(288,0,0)"/>
-                        <circle cx="0" cy="0" r="5" fill="#ffe066"/>
-                      </template>
-                      <template v-else>
-                        <path d="M0,-16 C6,-13 14,-7 12,0 C18,-4 20,5 15,10 C10,15 3,16 0,13 C-3,16 -10,15 -15,10 C-20,5 -18,-4 -12,0 C-14,-7 -6,-13 0,-16Z" fill="currentColor"/>
-                      </template>
-                    </svg>
-                  </div>
-                  <div style="flex:1;min-width:0">
-                    <span style="display:block;font-size:0.68rem">{{ br.brushType }} · {{ br.size }}px · {{ br.rotation }}°</span>
-                    <span style="display:block;font-size:0.65rem;color:#999">{{ selectedId === br.id ? '✏️ editing' : 'click to edit' }}</span>
-                  </div>
-                  <button class="el-del-list" @click.stop="selectedId = br.id; deleteSelected()">×</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ╔══ BORDER TAB ══╗ -->
-          <div v-else-if="activeTab === 'border'" class="tab-pane">
-            <div class="tg">
-              <div class="tg-label">STYLE</div>
-              <div class="border-grid">
-                <button v-for="s in BORDER_STYLES" :key="s.id" class="bsb"
-                  :class="{ 'bsb-active': border.style === s.id }" @click="border.style = s.id">
-                  <span class="bsb-line" :style="{ borderBottomWidth:'3px', borderBottomStyle: s.id==='ornate'||s.id==='none'?'solid':s.id, borderBottomColor: s.id==='none'?'transparent':'#888' }"/>
-                  {{ s.label }}
-                </button>
-              </div>
-            </div>
-            <div class="tg">
-              <div class="tg-label">COLOR</div>
-              <div class="dot-row">
-                <button v-for="c in BORDER_COLORS" :key="c" class="pdot"
-                  :style="{ background: c, outline: border.color === c ? '2px solid #c4703e' : '2px solid transparent', outlineOffset: '2px', boxShadow: c === '#f1faee' ? 'inset 0 0 0 1px #ccc' : 'none' }"
-                  @click="border.color = c"/>
-              </div>
-              <div class="color-row" style="margin-top:0.35rem">
-                <label class="clabel">Custom</label>
-                <input type="color" v-model="border.color" class="csi"/>
-                <span class="cval">{{ border.color }}</span>
-              </div>
-            </div>
-            <div class="tg">
-              <div class="tg-label">WIDTH</div>
-              <div class="cr">
-                <label class="clabel">Size</label>
-                <input type="range" min="0" max="32" class="dr-range" v-model.number="border.width"/>
-                <span class="cval">{{ border.width }}px</span>
-              </div>
-            </div>
-
-            <!-- Center Border Toggle -->
-            <div class="tg" style="margin-top: 1rem;">
-              <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing: 0.05em;">
-                <input type="checkbox" v-model="border.center" style="width:16px;height:16px;accent-color:#c4703e;"/>
-                SHOW CENTER BORDER
-              </label>
-            </div>
-
-            <!-- Preview -->
-            <div class="tg">
-              <div class="tg-label">PREVIEW</div>
-              <div class="border-preview"
-                :style="{
-                  border: border.style !== 'none' && border.width > 0 ? `${border.width}px ${border.style === 'ornate' ? 'solid' : border.style} ${border.color}` : '1px dashed #ccc',
-                  outline: border.style === 'ornate' && border.width > 0 ? `${Math.max(1,Math.round(border.width*0.35))}px solid ${border.color}` : 'none',
-                  outlineOffset: '3px',
-                }">Board Border
-              </div>
-            </div>
-          </div>
-
-          <!-- ╔══ CORNER TAB ══╗ -->
-          <div v-else-if="activeTab === 'corner'" class="tab-pane">
-            <div class="sec-toggle">
-              <button class="stg-btn" :class="{ active: activeSection === 'upper' }" @click="activeSection = 'upper'">Upper</button>
-              <button class="stg-btn" :class="{ active: activeSection === 'lower' }" @click="activeSection = 'lower'">Lower</button>
-            </div>
-            <div class="tg">
-              <div class="tg-label">CORNER STYLE — {{ activeSection === 'upper' ? 'UPPER' : 'LOWER' }} SECTION</div>
-              <div class="corner-grid">
-                <button v-for="c in CORNERS" :key="c.id" class="corner-btn"
-                  :class="{ 'cb-active': sec.cornerStyle === c.id }"
-                  @click="sec.cornerStyle = c.id">
-                  <div class="cb-preview"
-                    :style="{
-                      borderRadius: c.id==='rounded'?'8px':c.id==='ornate'?'2px 12px':'2px',
-                      clipPath: c.id==='cut'?'polygon(8px 0%,calc(100% - 8px) 0%,100% 8px,100% 100%,0% 100%,0% 8px)':'none',
-                    }"/>
-                  <span>{{ c.label }}</span>
-                  <span v-if="c.id === 'floral'" style="font-size:0.75rem">🌸</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- ╔══ FLORAL TAB ══╗ -->
-          <div v-else-if="activeTab === 'floral'" class="tab-pane">
-            <div class="sec-toggle">
-              <button class="stg-btn" :class="{ active: activeSection === 'upper' }" @click="activeSection = 'upper'">Top Crest</button>
-              <button class="stg-btn" :class="{ active: activeSection === 'lower' }" @click="activeSection = 'lower'">Bottom Base</button>
-            </div>
-
-            <div class="tg" style="margin-top: 1rem;">
-              <label style="display:flex; align-items:center; gap:0.6rem; font-size:0.75rem; font-weight:700; color:#555; cursor:pointer; letter-spacing:0.05em;">
-                <input type="checkbox" v-model="floralSec.enabled" style="width:16px;height:16px;accent-color:#c4703e;"/>
-                ENABLE FLORAL DECOR
-              </label>
-            </div>
-
-            <template v-if="floralSec.enabled">
-              <div class="tg">
-                <div class="tg-label">STYLE</div>
-                <div class="frame-row">
-                  <button v-for="s in (['classic','modern','grand'] as FloralStyle[])" :key="s"
-                    class="frame-btn" :class="{ 'fb-active': floralSec.style === s }"
-                    @click="floralSec.style = s" style="text-transform: capitalize;">
-                    {{ s }}
-                  </button>
-                </div>
-              </div>
-
-              <div class="tg">
-                <div class="tg-label">SIZE SCALING</div>
-                <div class="cr">
-                  <input type="range" min="20" max="100" class="dr-range" v-model.number="floralSec.size"/>
-                  <span class="cval">{{ floralSec.size }}%</span>
-                </div>
-              </div>
-
-              <div class="tg">
-                <div class="tg-label">COLORS</div>
-                <div class="color-row" style="margin-bottom:0.5rem">
-                  <label class="clabel" style="width:70px">Primary</label>
-                  <input type="color" v-model="floralSec.primary" class="csi"/>
-                  <span class="cval">{{ floralSec.primary }}</span>
-                </div>
-                <div class="color-row">
-                  <label class="clabel" style="width:70px">Secondary</label>
-                  <input type="color" v-model="floralSec.secondary" class="csi"/>
-                  <span class="cval">{{ floralSec.secondary }}</span>
-                </div>
-              </div>
-            </template>
-          </div>
-
-        </div><!-- /tab-body -->
-
-        <!-- ── PANEL FOOTER ────────────────────────────────────────── -->
-        <div class="panel-footer">
-          <div class="size-sect">
-            <div class="tg-label">BOARD SIZE</div>
-            <div class="size-opts">
-              <button v-for="s in SIZES" :key="s.id" class="size-opt"
-                :class="{ 'so-active': physicalSize === s.id }" @click="physicalSize = s.id">
-                <span class="so-label">{{ s.label }}</span>
-                <span class="so-sub">{{ s.desc }}</span>
-                <span class="so-price">{{ formatRupiah(s.price) }}</span>
-                <span v-if="s.recommended" class="so-badge">★</span>
-              </button>
-            </div>
-          </div>
-          <button id="btn-finalize-footer" class="finalize-btn" @click="handleFinalizeAndOrder">
-            <span class="fb-left">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
-              </svg>
-              Finalize &amp; Order
+          <!-- ✦ Canvas Summary Bar — elements + price + finalize (floating above toolbar) -->
+          <div class="canvas-summary-bar">
+            <span class="csb-count">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              {{ design.elements.length }} element{{ design.elements.length !== 1 ? 's' : '' }}
             </span>
-            <span class="fb-price">{{ formatRupiah(totalPrice) }}</span>
+            <span class="csb-divider">·</span>
+            <span class="csb-price">{{ formatRupiah(design.totalPrice) }}</span>
+            <button class="csb-finalize" @click="handleFinalize">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg>
+              Finalize &amp; Order
+            </button>
+          </div>
+        </div>
+
+        <!-- Right panel: width 0 when no tab active, 340px when open -->
+        <ToolPanel
+          :design="design"
+          :class="{ 'panel-open': design.activeTab }"
+        />
+      </div>
+
+      <!-- ✦ BOTTOM-LEFT CORNER MORE BUTTON & POPOVER (3x3 Grid Icon) -->
+      <div class="zzz-more-corner-wrap">
+        <button
+          class="zzz-tab-btn zzz-more-btn"
+          :class="{ 'tab-active': design.showMoreMenu }"
+          @click="design.showMoreMenu = !design.showMoreMenu"
+          title="More Actions (Save, Reset, Randomize)"
+        >
+          <span v-if="design.showMoreMenu" class="zzz-indicator"></span>
+          <div class="zzz-tab-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <circle cx="5" cy="5" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/>
+              <circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/>
+              <circle cx="5" cy="19" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/>
+            </svg>
+          </div>
+          <span class="zzz-tab-label">More</span>
+        </button>
+
+        <!-- MORE QUICK ACTIONS MENU POPOVER -->
+        <div v-if="design.showMoreMenu" class="more-menu-popover">
+          <button class="more-menu-item" @click="design.saveDraft()">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <span>Save Progress</span>
+          </button>
+          <button class="more-menu-item" @click="design.randomizeDesign()">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>
+            </svg>
+            <span>Randomize Design</span>
+          </button>
+          <button class="more-menu-item danger" @click="design.resetDesign()">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+            </svg>
+            <span>Reset to Default</span>
           </button>
         </div>
+      </div>
 
-      </aside><!-- /panel -->
-
-    </div><!-- /dr-body -->
-
-    <!-- ═══ REVIEW MODAL ══════════════════════════════════════════════ -->
-    <Transition name="modal-fade">
-      <div v-if="showReview" class="modal-backdrop" @click.self="showReview = false" role="dialog" aria-modal="true">
-        <div class="review-modal">
-          <button class="rm-close" @click="showReview = false" aria-label="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-          <div class="rm-header">
-            <p class="rm-eyebrow">REVIEW ORDER</p>
-            <h2 class="rm-title">Your Custom Board</h2>
+      <!-- ⬡ ZZZ Bottom Toolbar — Centered Tool Buttons -->
+      <nav class="zzz-bottom-bar" role="tablist" aria-label="Tool selection">
+        <button
+          v-for="tab in TOOL_TABS"
+          :key="tab.id"
+          class="zzz-tab-btn"
+          :class="{ 'tab-active': design.activeTab === tab.id }"
+          @click="design.activeTab === tab.id ? (design.activeTab = null) : (design.activeTab = tab.id)"
+          role="tab"
+          :aria-selected="design.activeTab === tab.id"
+        >
+          <span v-if="design.activeTab === tab.id" class="zzz-indicator"></span>
+          <div class="zzz-tab-icon">
+            <svg v-if="tab.id === 'text'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+            <svg v-else-if="tab.id === 'image'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <svg v-else-if="tab.id === 'brush'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 2.5-2 5-2 5"/></svg>
+            <svg v-else-if="tab.id === 'border'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/></svg>
+            <svg v-else-if="tab.id === 'corner'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 9V5a2 2 0 012-2h4"/><path d="M3 15v4a2 2 0 002 2h4"/></svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C12 22 20 18 20 12C20 6 12 2 12 2C12 2 4 6 4 12C4 18 12 22 12 22Z"/><circle cx="12" cy="12" r="3"/></svg>
           </div>
-          <div class="rm-body">
-            <!-- ── Realistic Snapshot Preview ──────────────────────── -->
-            <div class="rm-snapshot-wrap">
-              <!-- Loading shimmer while snapshot generates -->
-              <div v-if="snapshotLoading" class="rm-snapshot-shimmer">
-                <div class="shimmer-bar" style="width:60%;height:14px;margin-bottom:8px"/>
-                <div class="shimmer-bar" style="width:80%;height:10px;margin-bottom:6px"/>
-                <div class="shimmer-bar" style="width:50%;height:10px"/>
-                <p class="snapshot-gen-label">Generating preview…</p>
-              </div>
-              <!-- Real rendered image -->
-              <template v-else-if="snapshotDataUrl">
-                <div class="rm-snapshot-badge">✓ Realistic Preview</div>
-                <img
-                  :src="snapshotDataUrl"
-                  class="rm-snapshot-img"
-                  alt="Your custom board preview"
-                  :style="{ border: border.style !== 'none' && border.width > 0 ? `${border.width}px ${border.style === 'ornate' ? 'solid' : border.style} ${border.color}` : 'none' }"
-                />
-                <!-- Download preview link -->
-                <a :href="snapshotDataUrl" download="my-custom-board.png" class="rm-download-btn">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Save preview image
-                </a>
-              </template>
-              <!-- Fallback: simple color blocks -->
-              <div v-else class="rm-board" :style="boardBorderStyle">
-                <div :style="{ height: (heightRatio * 100)+'%', backgroundColor: upper.bgColor, display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', overflow:'hidden' }">
-                  <span :style="{ fontFamily: getFont(upper.headerFont), color: upper.headerColor, fontSize:'13px', fontWeight:700, textAlign:'center' }">{{ upper.headerText || '(no header)' }}</span>
-                </div>
-                <div :style="{ height: ((1-heightRatio)*100)+'%', backgroundColor: lower.bgColor, display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', overflow:'hidden' }">
-                  <span :style="{ fontFamily: getFont(lower.bodyFont), color: lower.bodyColor, fontSize:'11px', textAlign:'center' }">{{ lower.bodyText.replace(/\n/g,' / ') || '(no text)' }}</span>
-                </div>
-              </div>
-            </div>
+          <span class="zzz-tab-label">{{ tab.label }}</span>
+        </button>
+      </nav>
 
-            <!-- ── Specs & Price Breakdown ─────────────────────────────── -->
-            <div class="rm-specs">
-              <div class="spec-row"><span class="sk">Upper Header</span><span class="sv">{{ upper.headerText || '—' }}</span></div>
-              <div class="spec-row"><span class="sk">Upper Body</span><span class="sv">{{ upper.bodyText.replace(/\n/g,' / ') || '—' }}</span></div>
-              <div class="spec-row"><span class="sk">Lower Body</span><span class="sv">{{ lower.bodyText.replace(/\n/g,' / ') || '—' }}</span></div>
-              
-              <div class="spec-divider"/>
-              <div class="sk" style="font-weight:700; font-size:0.75rem; color:#888; margin-bottom:0.25rem; letter-spacing:0.05em;">ESTIMATED PRICE BREAKDOWN</div>
-              <div class="spec-row"><span class="sk">Base Size ({{ SIZES.find(s=>s.id===physicalSize)?.label }})</span><span class="sv">{{ formatRupiah(baseSizePrice) }}</span></div>
-              <div v-if="brushElements.length" class="spec-row"><span class="sk">Brush Strokes ({{ brushElements.length }}× @ 2k)</span><span class="sv">{{ formatRupiah(brushFee) }}</span></div>
-              <div v-if="colorFee > 0" class="spec-row"><span class="sk">Color Palette ({{ uniqueColors.length }} colors)</span><span class="sv">{{ formatRupiah(colorFee) }}</span></div>
-              <div v-if="accessoriesFee > 0" class="spec-row"><span class="sk">Borders & Crests</span><span class="sv">{{ formatRupiah(accessoriesFee) }}</span></div>
-              <div v-if="mediaFee > 0" class="spec-row"><span class="sk">Custom Images ({{ imgElements.length }}× @ 20k)</span><span class="sv">{{ formatRupiah(mediaFee) }}</span></div>
+      <!-- ✦ TOAST POPUP NOTIFICATION -->
+      <Transition name="toast-fade">
+        <div v-if="design.saveToastNotice" class="dr-toast-popup">
+          {{ design.saveToastMessage }}
+        </div>
+      </Transition>
 
-              <div class="spec-divider"/>
-              <div class="spec-row spec-total"><span class="sk">Total Preview</span><span class="sv spec-price">{{ formatRupiah(totalPrice) }}</span></div>
-              <p class="spec-note">* Note: Unit prices and totals are verified and controlled by the server during checkout.</p>
-            </div>
+      <!-- ✦ UNSAVED LEAVE WARNING CONFIRMATION MODAL -->
+      <div v-if="design.showLeaveConfirm" class="dr-modal-backdrop" @click.self="design.showLeaveConfirm = false">
+        <div class="dr-modal choice-modal">
+          <div class="dr-modal-head">
+            <h2>Unsaved Progress Warning</h2>
+            <button class="dr-modal-close" @click="design.showLeaveConfirm = false">×</button>
           </div>
-          <div class="rm-footer">
-            <button class="rm-back" @click="showReview = false">Back to Designer</button>
-            <button id="btn-add-to-cart" class="rm-confirm" :class="{ loading: isAdding }" :disabled="isAdding || snapshotLoading" @click="addToCartHandler">
-              <svg v-if="!isAdding && !snapshotLoading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M16.5 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0Zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0Z"/>
-              </svg>
-              <svg v-else class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-              {{ snapshotLoading ? 'Generating preview…' : isAdding ? 'Adding…' : `Add to Cart — ${formatRupiah(totalPrice)}` }}
-            </button>
+          <div class="choice-body">
+            <p class="choice-subtitle">
+              Are you sure you want to leave? Your unsaved board progress will be lost.
+            </p>
+            <div class="choice-actions">
+              <button class="choice-btn primary" @click="confirmSaveAndLeave">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Draft &amp; Leave
+              </button>
+              <button class="choice-btn secondary" @click="confirmLeaveWithoutSaving">
+                Leave Without Saving
+              </button>
+              <button class="choice-btn secondary" @click="design.showLeaveConfirm = false">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </Transition>
 
-    <!-- ═══ SUCCESS TOAST ══════════════════════════════════════════════ -->
-    <Transition name="toast-slide">
-      <div v-if="showToast" class="success-toast" role="status">
-        <div class="toast-check">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg>
-        </div>
-        <div><p class="toast-title">Added to cart!</p><p class="toast-sub">Redirecting you home…</p></div>
-      </div>
-    </Transition>
+      <!-- ═══ MODALS & OVERLAYS ═════════════════════════════════════════ -->
+      <FinalizeChoiceOverlay
+        :show="design.showFinalizeChoice"
+        @close="design.showFinalizeChoice = false"
+        @review="handleOpenReview"
+      />
+      <ReviewModal
+        :design="design"
+        :is-adding="isAdding"
+        @close="design.showReview = false"
+        @add-to-cart="handleAddToCart"
+      />
+      <ThankYouOverlay
+        :show="design.showThankYou"
+        @new-design="handleNewDesign"
+      />
 
-    <!-- ═══ FINALIZE CHOICE OVERLAY ═══════════════════════════════════ -->
-    <Transition name="modal-fade">
-      <div v-if="showFinalizeChoice" class="modal-backdrop" @click.self="showFinalizeChoice = false" role="dialog" aria-modal="true" aria-label="Finalize options">
-        <div class="choice-panel">
-          <!-- Close -->
-          <button class="rm-close" @click="showFinalizeChoice = false" aria-label="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-
-          <!-- Header -->
-          <div class="cp-header">
-            <div class="cp-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
-              </svg>
-            </div>
-            <p class="cp-eyebrow">DESIGN READY</p>
-            <h2 class="cp-title">What would you like to do?</h2>
-            <p class="cp-desc">Your custom board design has been captured. Choose how you'd like to proceed.</p>
-          </div>
-
-          <!-- Choices -->
-          <div class="cp-choices">
-            <!-- Option A: Review & Add to Cart -->
-            <button class="cp-choice cp-choice--primary" @click="openReviewModal">
-              <div class="cp-choice-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M16.5 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0Zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0Z"/>
-                </svg>
-              </div>
-              <div class="cp-choice-body">
-                <span class="cp-choice-title">Add to Cart</span>
-                <span class="cp-choice-desc">Review your design and proceed to order — {{ formatRupiah(totalPrice) }}</span>
-              </div>
-              <svg class="cp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
-            </button>
-
-            <!-- Option B: Keep designing -->
-            <button class="cp-choice cp-choice--secondary" @click="showFinalizeChoice = false">
-              <div class="cp-choice-icon cp-choice-icon--muted">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-              </div>
-              <div class="cp-choice-body">
-                <span class="cp-choice-title">Continue Designing</span>
-                <span class="cp-choice-desc">Go back and make more changes to your board</span>
-              </div>
-              <svg class="cp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
-            </button>
+      <template #fallback>
+        <div class="dr-body flex items-center justify-center min-h-[400px]">
+          <div class="flex flex-col items-center gap-3">
+            <div class="dr-spinner"></div>
+            <p class="text-xs text-gray-500 font-semibold">Loading Board Designer v3.0…</p>
           </div>
         </div>
-      </div>
-    </Transition>
-
-    <!-- ═══ THANK YOU OVERLAY ══════════════════════════════════════════ -->
-    <Transition name="modal-fade">
-      <div v-if="showThankYou" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Thank you overlay">
-        <div class="thankyou-panel">
-          
-          <div class="ty-header">
-            <div class="ty-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-            </div>
-            <p class="ty-eyebrow">ORDER CONFIRMED & IN CART</p>
-            <h2 class="ty-title">Thank You for Shopping at Chia Florist!</h2>
-            <p class="ty-desc">Your custom flower board design has been successfully added to your cart. What would you like to do next?</p>
-          </div>
-
-          <!-- Summary Card -->
-          <div class="ty-summary">
-            <div v-if="snapshotDataUrl" class="ty-thumb-wrap">
-              <img :src="snapshotDataUrl" class="ty-thumb" alt="Custom board snapshot" />
-            </div>
-            <div class="ty-summary-info">
-              <span class="ty-item-title">Custom Board — {{ upper.headerText || 'My Design' }}</span>
-              <div class="ty-item-tags">
-                <span class="ty-tag">Size: {{ SIZES.find(s=>s.id===physicalSize)?.label }}</span>
-                <span class="ty-tag ty-tag--green">✨ Custom Design</span>
-              </div>
-              <span class="ty-item-price">{{ formatRupiah(totalPrice) }}</span>
-            </div>
-          </div>
-
-          <!-- Options -->
-          <div class="ty-actions">
-            <!-- Option 1: Go to Home Page -->
-            <button class="ty-btn ty-btn--primary" @click="navigateTo('/')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-              Go to Home Page
-            </button>
-
-            <!-- Option 2: Create Another Custom Product -->
-            <button class="ty-btn ty-btn--secondary" @click="resetCanvasAndCreateNew">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="16"/>
-                <line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Create Another Custom Product
-            </button>
-
-            <!-- Option 3: View Shopping Cart -->
-            <button class="ty-btn ty-btn--cart" @click="navigateTo('/cart')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-              </svg>
-              View Shopping Cart
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </Transition>
-
+      </template>
+    </ClientOnly>
   </div>
 </template>
-
-<style scoped>
-/* ─── GOOGLE FONTS ─────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:ital,wght@0,700;0,800;1,600&family=Dancing+Script:wght@600;700&family=Bebas+Neue&family=Merriweather:wght@700;900&family=Pacifico&display=swap');
-
-/* ─── RESET ──────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-button { font-family: inherit; }
-
-/* ─── ROOT ───────────────────────────────────────────────────────── */
-.dr-root {
-  position: fixed; inset: 0;
-  display: flex; flex-direction: column;
-  font-family: 'Inter', system-ui, sans-serif;
-  background: #f4f0eb; color: #1c1813;
-  overflow: hidden; color-scheme: light;
-}
-
-/* ─── NAVBAR ─────────────────────────────────────────────────────── */
-.dr-nav {
-  height: 52px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 1.25rem;
-  background: #ffffff; border-bottom: 1px solid #e5ddd4;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06); z-index: 30;
-}
-.dr-back {
-  display: flex; align-items: center; gap: 0.35rem;
-  color: #6b5d52; text-decoration: none; font-size: 0.78rem; font-weight: 600;
-  padding: 0.3rem 0.7rem; border-radius: 6px; transition: background 0.15s, color 0.15s;
-}
-.dr-back:hover { background: #f4f0eb; color: #1c1813; }
-.dr-back svg { width: 0.9rem; height: 0.9rem; }
-.dr-nav-center {
-  display: flex; align-items: center; gap: 0.5rem;
-  position: absolute; left: 50%; transform: translateX(-50%);
-}
-.dr-brand { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.25em; color: #a8998d; }
-.dr-dot { color: #d4c9bc; font-size: 0.65rem; }
-.dr-page-title { font-size: 0.84rem; font-weight: 700; color: #1c1813; }
-.dr-nav-right { display: flex; align-items: center; gap: 0.7rem; }
-.dr-scale-chip { font-size: 0.63rem; font-weight: 700; color: #a8998d; background: #f4f0eb; border: 1px solid #e5ddd4; padding: 0.18rem 0.5rem; border-radius: 4px; letter-spacing: 0.05em; }
-.dr-random-btn {
-  display: flex; align-items: center; gap: 0.45rem;
-  background: #f4f0eb; color: #555; font-size: 0.77rem; font-weight: 600;
-  padding: 0.45rem 0.85rem; border: 1px solid #ddd; border-radius: 6px; cursor: pointer;
-  transition: all 0.15s;
-}
-.dr-random-btn:hover { background: #e8e2da; color: #111; transform: translateY(-1px); }
-.dr-random-btn svg { width: 0.85rem; height: 0.85rem; }
-
-/* ─── BODY LAYOUT ────────────────────────────────────────────────── */
-.dr-body { flex: 1; display: flex; overflow: hidden; }
-
-/* ─── CANVAS AREA ────────────────────────────────────────────────── */
-.dr-canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-
-.chess-bg {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  overflow: hidden; position: relative;
-  background-image: repeating-conic-gradient(#ede8e0 0% 25%, #f8f5f0 0% 50%);
-  background-size: 20px 20px;
-}
-
-.board-scaler { position: relative; flex-shrink: 0; transform-origin: top left; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* ─── BOARD ──────────────────────────────────────────────────────── */
-.board-frame {
-  position: absolute; top: 0; left: 0;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.08);
-  overflow: hidden;
-  background-color: #fff;
-  transition: border 0.2s, outline 0.2s, width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ─── SECTIONS ───────────────────────────────────────────────────── */
-.board-section { position: absolute; left: 0; right: 0; overflow: visible; transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s; }
-.sec-inner {
-  width: 100%; height: 100%; position: relative; z-index: 1;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 1.25rem 2rem; gap: 0.5rem;
-}
-.sec-text { line-height: 1.3; word-break: break-word; transition: all 0.25s; width: 100%; }
-.sec-header { font-weight: 800; }
-.sec-body   { white-space: pre-line; }
-
-/* ─── FLORAL CORNERS ─────────────────────────────────────────────── */
-.floral-corner { position: absolute; z-index: 5; pointer-events: none; font-size: 1.5rem; line-height: 1; }
-.fc-tl { top: 5px; left: 8px; }
-.fc-tr { top: 5px; right: 8px; }
-.fc-bl { bottom: 5px; left: 8px; }
-.fc-br { bottom: 5px; right: 8px; }
-
-/* ─── FLORAL CRESTS (Top & Bottom) ───────────────────────────────── */
-.floral-crest {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  display: flex; justify-content: center; align-items: flex-end;
-  pointer-events: none; z-index: 20;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.fc-top { bottom: 100%; transform-origin: bottom center; margin-bottom: -4px; }
-.fc-bottom { top: 100%; transform-origin: top center; margin-top: -4px; }
-.crest-svg { width: 100%; height: auto; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); transition: all 0.3s; }
-.fc-bottom .crest-svg { transform: scaleY(-1); }
-
-/* ─── SECTION DIVIDER ────────────────────────────────────────────── */
-.section-divider {
-  position: absolute; left: 0; right: 0; height: 12px; margin-top: -6px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: row-resize; z-index: 50;
-  transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.div-track {
-  position: absolute; inset: 5px 0;
-  background: var(--dc, #f5c842); opacity: 0.6; transition: opacity 0.2s;
-}
-.div-knob {
-  position: relative; z-index: 2; background: #fff; border: 1px solid #e0d8ce;
-  border-radius: 4px; padding: 0.15rem 0.45rem;
-  opacity: 0; transition: opacity 0.2s, transform 0.2s;
-  color: #a8998d; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-}
-.section-divider:hover .div-track { opacity: 1; }
-.section-divider:hover .div-knob  { opacity: 1; transform: scale(1.05); }
-
-/* ─── CANVAS ELEMENTS ────────────────────────────────────────────── */
-.canvas-el { position: absolute; user-select: none; }
-.el-selected { outline: 2px dashed rgba(196,112,62,0.85); outline-offset: 2px; }
-.el-del {
-  position: absolute; top: -10px; right: -10px;
-  width: 22px; height: 22px; background: #e63946; color: #fff; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.9rem; font-weight: 900; cursor: pointer; z-index: 99;
-  box-shadow: 0 2px 6px rgba(230,57,70,0.4); transition: transform 0.15s, background 0.15s;
-  border: none; line-height: 1;
-}
-.el-del:hover { transform: scale(1.15); background: #c1121f; }
-
-/* ─── BRUSH OVERLAY ──────────────────────────────────────────────── */
-.brush-overlay {
-  position: absolute; inset: 0; pointer-events: none; z-index: 200;
-  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;
-}
-.brush-overlay span {
-  background: rgba(0,0,0,0.52); color: #fff; font-size: 0.72rem; font-weight: 600;
-  padding: 0.3rem 0.85rem; border-radius: 20px; backdrop-filter: blur(4px); letter-spacing: 0.03em;
-}
-
-/* ─── CANVAS INFO BAR ────────────────────────────────────────────── */
-.canvas-info {
-  flex-shrink: 0; height: 32px; display: flex; align-items: center; gap: 0.45rem;
-  padding: 0 1rem; background: #fff; border-top: 1px solid #e5ddd4; font-size: 0.7rem; color: #a8998d;
-}
-.ci-sel { color: #c4703e; font-weight: 600; }
-.ci-desel { font-size: 0.65rem; font-weight: 700; color: #6b5d52; background: #f4f0eb; border: 1px solid #e5ddd4; padding: 0.12rem 0.45rem; border-radius: 4px; cursor: pointer; }
-.ci-hint { margin-left: auto; font-size: 0.65rem; font-style: italic; color: #c4703e; }
-
-/* ─── TOOL PANEL ─────────────────────────────────────────────────── */
-.dr-panel { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-left: 1px solid #e5ddd4; overflow: hidden; }
-
-/* ─── TAB BAR ────────────────────────────────────────────────────── */
-.tab-bar { display: flex; flex-shrink: 0; border-bottom: 1px solid #e5ddd4; background: #f9f6f2; }
-.tab-btn {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.22rem;
-  padding: 0.55rem 0.2rem; font-size: 0.57rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  color: #a8998d; background: none; border: none; cursor: pointer;
-  border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.tab-btn svg { width: 1.1rem; height: 1.1rem; }
-.tab-btn:hover { color: #6b5d52; background: rgba(196,112,62,0.04); }
-.tab-btn.tab-active { color: #c4703e; border-bottom-color: #c4703e; background: #fff; }
-
-/* ─── TAB BODY ───────────────────────────────────────────────────── */
-.tab-body { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d4c9bc transparent; }
-.tab-body::-webkit-scrollbar { width: 4px; }
-.tab-body::-webkit-scrollbar-thumb { background: #d4c9bc; border-radius: 2px; }
-.tab-pane { display: flex; flex-direction: column; }
-
-/* ─── TOOL GROUP ─────────────────────────────────────────────────── */
-.tg { padding: 0.875rem 1rem; border-bottom: 1px solid #f0ebe4; display: flex; flex-direction: column; gap: 0.55rem; }
-.tg-label { font-size: 0.56rem; font-weight: 900; letter-spacing: 0.18em; color: #c4703e; text-transform: uppercase; }
-
-/* ─── SECTION TOGGLE ─────────────────────────────────────────────── */
-.sec-toggle { display: flex; border-bottom: 1px solid #e5ddd4; background: #f9f6f2; flex-shrink: 0; }
-.stg-btn { flex: 1; padding: 0.6rem; font-size: 0.72rem; font-weight: 700; color: #a8998d; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
-.stg-btn.active { color: #c4703e; border-bottom-color: #c4703e; }
-
-/* ─── INPUTS ─────────────────────────────────────────────────────── */
-.dr-ta {
-  width: 100%; resize: vertical; background: #f9f6f2; border: 1px solid #e5ddd4;
-  border-radius: 6px; color: #1c1813; font-size: 0.8rem; font-family: inherit;
-  padding: 0.5rem 0.65rem; outline: none; line-height: 1.5; transition: border-color 0.15s, background 0.15s;
-  user-select: text;
-}
-.dr-ta:focus { border-color: #c4703e; background: #fff; }
-.dr-ta::placeholder { color: #c0b0a4; }
-
-.cr { display: flex; align-items: center; gap: 0.45rem; }
-.clabel { font-size: 0.6rem; font-weight: 700; color: #a8998d; min-width: 38px; flex-shrink: 0; }
-.cval { font-size: 0.63rem; font-weight: 700; color: #6b5d52; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
-
-.dr-range { flex: 1; height: 4px; border-radius: 2px; appearance: none; background: #e5ddd4; outline: none; cursor: pointer; }
-.dr-range::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: #c4703e; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.2); transition: transform 0.1s; }
-.dr-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
-.dr-range::-moz-range-thumb { width: 14px; height: 14px; background: #c4703e; border-radius: 50%; border: 2px solid #fff; }
-
-/* ─── FONT GRID ──────────────────────────────────────────────────── */
-.font-grid { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.font-chip { padding: 0.28rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; background: #f4f0eb; border: 1px solid #e5ddd4; color: #6b5d52; cursor: pointer; transition: all 0.15s; }
-.font-chip:hover { border-color: #c4703e; color: #c4703e; }
-.font-chip.fc-active { background: #c4703e; color: #fff; border-color: #c4703e; }
-
-/* ─── ALIGNMENT ──────────────────────────────────────────────────── */
-.align-row { display: flex; gap: 0.3rem; }
-.aln-btn { display: flex; align-items: center; padding: 0.28rem 0.45rem; border-radius: 4px; background: #f4f0eb; border: 1px solid #e5ddd4; color: #6b5d52; cursor: pointer; transition: all 0.15s; }
-.aln-btn svg { width: 0.85rem; height: 0.65rem; }
-.aln-btn:hover { border-color: #c4703e; color: #c4703e; }
-.aln-btn.aln-active { background: #c4703e; color: #fff; border-color: #c4703e; }
-
-/* ─── COLORS ─────────────────────────────────────────────────────── */
-.color-row { display: flex; align-items: center; gap: 0.45rem; }
-.csi { width: 30px; height: 26px; border: 2px solid #e5ddd4; border-radius: 4px; cursor: pointer; padding: 1px; background: none; transition: border-color 0.15s; }
-.csi:hover { border-color: #c4703e; }
-.dot-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.pdot { width: 22px; height: 22px; border-radius: 50%; border: none; cursor: pointer; padding: 0; transition: transform 0.15s; }
-.pdot:hover { transform: scale(1.2); }
-
-/* ─── DROP ZONE ──────────────────────────────────────────────────── */
-.drop-zone { margin: 1rem; border: 2px dashed #d4c9bc; border-radius: 8px; padding: 1.75rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; transition: border-color 0.2s, background 0.2s; cursor: pointer; }
-.drop-zone:hover { border-color: #c4703e; background: rgba(196,112,62,0.04); }
-.dz-icon { width: 2.25rem; height: 2.25rem; color: #a8998d; }
-.dz-title { font-size: 0.82rem; font-weight: 700; color: #1c1813; }
-.dz-sub { font-size: 0.7rem; color: #a8998d; line-height: 1.5; }
-.dz-browse { font-size: 0.72rem; font-weight: 700; color: #c4703e; border: 1px solid #c4703e; border-radius: 6px; padding: 0.38rem 0.9rem; cursor: pointer; transition: background 0.15s, color 0.15s; }
-.dz-browse:hover { background: #c4703e; color: #fff; }
-.dz-note { margin: 0 1rem 1rem; font-size: 0.65rem; color: #a8998d; line-height: 1.55; padding: 0.5rem 0.7rem; background: #f9f6f2; border-radius: 6px; border-left: 2px solid #c4703e; }
-
-/* ─── IMAGE CONTROLS ─────────────────────────────────────────────── */
-.img-preview-wrap { padding: 1rem; display: flex; justify-content: center; border-bottom: 1px solid #f0ebe4; }
-.img-preview-thumb { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.frame-row { display: flex; gap: 0.45rem; }
-.frame-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; padding: 0.55rem; border: 1px solid #e5ddd4; border-radius: 6px; background: #f4f0eb; color: #6b5d52; cursor: pointer; font-size: 0.62rem; font-weight: 700; transition: all 0.15s; }
-.frame-btn svg { width: 0.9rem; height: 0.9rem; }
-.frame-btn:hover { border-color: #c4703e; color: #c4703e; }
-.frame-btn.fb-active { background: #c4703e; color: #fff; border-color: #c4703e; }
-.danger-btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; margin: 0.875rem 1rem; padding: 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 700; color: #e63946; background: #fff5f5; border: 1px solid rgba(230,57,70,0.25); cursor: pointer; transition: all 0.15s; }
-.danger-btn svg { width: 0.85rem; height: 0.85rem; }
-.danger-btn:hover { background: #e63946; color: #fff; border-color: #e63946; }
-
-/* ─── ELEMENT LIST ───────────────────────────────────────────────── */
-.el-section { border-top: 1px solid #f0ebe4; }
-.el-list { display: flex; flex-direction: column; gap: 0.3rem; padding: 0 1rem 0.875rem; }
-.el-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.6rem; border-radius: 6px; border: 1px solid #e5ddd4; background: #f9f6f2; cursor: pointer; transition: all 0.15s; font-size: 0.68rem; color: #6b5d52; }
-.el-item:hover { border-color: #c4703e; background: rgba(196,112,62,0.04); }
-.el-item.el-active { border-color: #c4703e; background: rgba(196,112,62,0.08); color: #c4703e; }
-.el-thumb { width: 34px; height: 34px; object-fit: cover; flex-shrink: 0; border-radius: 3px; }
-.el-meta { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; }
-.el-del-list { width: 20px; height: 20px; border-radius: 50%; background: #f4f0eb; border: 1px solid #e5ddd4; color: #6b5d52; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; line-height: 1; }
-.el-del-list:hover { background: #e63946; color: #fff; border-color: #e63946; }
-.el-brush-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-
-/* ─── BRUSH PANEL ────────────────────────────────────────────────── */
-.brush-info { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.875rem 1rem; background: rgba(196,112,62,0.06); border-bottom: 1px solid #f0ebe4; }
-.brush-info svg { width: 1rem; height: 1rem; flex-shrink: 0; color: #c4703e; margin-top: 1px; }
-.brush-info p { font-size: 0.7rem; color: #6b5d52; line-height: 1.5; }
-.brush-info strong { color: #c4703e; }
-.brush-types { display: flex; gap: 0.5rem; }
-.btype-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 0.75rem 0.5rem; border: 1px solid #e5ddd4; border-radius: 6px; background: #f4f0eb; color: #6b5d52; cursor: pointer; font-size: 0.7rem; font-weight: 700; transition: all 0.15s; }
-.btype-btn:hover { border-color: #c4703e; }
-.btype-btn.btype-active { background: #fff3ed; border-color: #c4703e; color: #c4703e; }
-.brush-preview { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 1rem; background: #f9f6f2; border-top: 1px solid #f0ebe4; border-bottom: 1px solid #f0ebe4; }
-.bp-label { font-size: 0.6rem; font-weight: 700; color: #a8998d; letter-spacing: 0.08em; }
-
-/* ─── BORDER PANEL ───────────────────────────────────────────────── */
-.border-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; }
-.bsb { display: flex; flex-direction: column; align-items: center; gap: 0.38rem; padding: 0.5rem 0.3rem; border: 1px solid #e5ddd4; border-radius: 6px; background: #f4f0eb; color: #6b5d52; cursor: pointer; font-size: 0.58rem; font-weight: 700; transition: all 0.15s; }
-.bsb-line { width: 100%; display: block; }
-.bsb:hover { border-color: #c4703e; }
-.bsb.bsb-active { background: #fff3ed; border-color: #c4703e; color: #c4703e; }
-.border-preview { height: 52px; background: #f4f0eb; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: #a8998d; transition: border 0.2s; }
-
-/* ─── CORNER PANEL ───────────────────────────────────────────────── */
-.corner-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.35rem; }
-.corner-btn { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 0.55rem 0.3rem; border: 1px solid #e5ddd4; border-radius: 6px; background: #f4f0eb; color: #6b5d52; cursor: pointer; font-size: 0.56rem; font-weight: 700; transition: all 0.15s; }
-.cb-preview { width: 24px; height: 18px; background: #c0b0a0; }
-.corner-btn:hover { border-color: #c4703e; }
-.corner-btn.cb-active { background: #fff3ed; border-color: #c4703e; color: #c4703e; }
-.corner-btn.cb-active .cb-preview { background: #c4703e; }
-
-/* ─── PANEL FOOTER ───────────────────────────────────────────────── */
-.panel-footer { flex-shrink: 0; border-top: 1px solid #e5ddd4; background: #fff; padding: 0.875rem 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
-.size-sect { display: flex; flex-direction: column; gap: 0.4rem; }
-.size-opts { display: flex; gap: 0.4rem; }
-.size-opt { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.5rem 0.25rem; border: 1px solid #e5ddd4; border-radius: 6px; background: #f4f0eb; cursor: pointer; position: relative; transition: all 0.15s; }
-.so-label { font-size: 0.65rem; font-weight: 800; color: #1c1813; text-align: center; }
-.so-sub { font-size: 0.54rem; color: #a8998d; }
-.so-price { font-size: 0.6rem; font-weight: 700; color: #c4703e; }
-.so-badge { position: absolute; top: -6px; right: -6px; font-size: 0.55rem; background: #f59e0b; color: #fff; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; line-height: 1; }
-.size-opt:hover { border-color: #c4703e; }
-.size-opt.so-active { background: #fff3ed; border-color: #c4703e; border-width: 2px; }
-.finalize-btn { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: linear-gradient(135deg, #c4703e, #a85a2e); color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 3px 12px rgba(196,112,62,0.35); transition: all 0.15s; }
-.finalize-btn:hover { background: linear-gradient(135deg, #b5622f, #8f4a22); transform: translateY(-1px); box-shadow: 0 5px 16px rgba(196,112,62,0.45); }
-.fb-left { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 700; }
-.fb-left svg { width: 0.95rem; height: 0.95rem; }
-.fb-price { font-size: 0.85rem; font-weight: 900; font-variant-numeric: tabular-nums; }
-
-/* ─── REVIEW MODAL ───────────────────────────────────────────────── */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
-.review-modal { background: #fff; border-radius: 12px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 24px 64px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
-.rm-close { position: absolute; top: 1rem; right: 1rem; width: 32px; height: 32px; border-radius: 50%; background: #f4f0eb; border: 1px solid #e5ddd4; color: #6b5d52; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-.rm-close svg { width: 0.9rem; height: 0.9rem; }
-.rm-close:hover { background: #e5ddd4; color: #1c1813; }
-.rm-header { padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid #f0ebe4; }
-.rm-eyebrow { font-size: 0.6rem; font-weight: 900; letter-spacing: 0.2em; color: #c4703e; margin-bottom: 0.25rem; }
-.rm-title { font-size: 1.4rem; font-weight: 800; color: #1c1813; }
-.rm-body { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.25rem 1.5rem; }
-.rm-specs { display: flex; flex-direction: column; gap: 0; }
-.spec-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.45rem 0; border-bottom: 1px solid #f0ebe4; gap: 0.75rem; }
-.sk { font-size: 0.68rem; font-weight: 600; color: #a8998d; flex-shrink: 0; }
-.sv { font-size: 0.72rem; font-weight: 600; color: #1c1813; text-align: right; word-break: break-word; }
-.spec-divider { border-top: 2px solid #e5ddd4; margin: 0.5rem 0; }
-.spec-total { margin-top: 0.25rem; }
-.spec-price { font-size: 1.1rem; font-weight: 900; color: #c4703e; }
-.spec-note { font-size: 0.65rem; color: #a8998d; line-height: 1.5; margin-top: 0.75rem; padding: 0.5rem 0.7rem; background: #f9f6f2; border-radius: 6px; border-left: 2px solid #e5ddd4; }
-.rm-footer { display: flex; gap: 0.75rem; padding: 1rem 1.5rem 1.5rem; border-top: 1px solid #f0ebe4; }
-.rm-back { flex: 1; padding: 0.75rem; border-radius: 6px; background: #f4f0eb; border: 1px solid #e5ddd4; color: #6b5d52; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
-.rm-back:hover { background: #ede8e0; }
-.rm-confirm { flex: 2; display: flex; align-items: center; justify-content: center; gap: 0.45rem; padding: 0.75rem; border-radius: 6px; background: linear-gradient(135deg, #c4703e, #a85a2e); color: #fff; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 8px rgba(196,112,62,0.3); }
-.rm-confirm:hover:not(:disabled) { background: linear-gradient(135deg, #b5622f, #8f4a22); }
-.rm-confirm:disabled { opacity: 0.7; cursor: not-allowed; }
-.rm-confirm svg { width: 1rem; height: 1rem; }
-.rm-confirm.loading { opacity: 0.8; }
-.spin { animation: spinAnim 0.9s linear infinite; }
-@keyframes spinAnim { to { transform: rotate(360deg); } }
-
-/* ─── SNAPSHOT PREVIEW (Canvas render) ──────────────────────────── */
-.rm-snapshot-wrap {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  background: #111;
-  border-radius: 10px;
-  padding: 1.25rem 1rem 0.75rem;
-  position: relative;
-}
-.rm-snapshot-badge {
-  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em;
-  color: #4ade80; text-transform: uppercase;
-  background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3);
-  border-radius: 20px; padding: 0.2rem 0.65rem;
-  align-self: flex-start;
-}
-.rm-snapshot-img {
-  width: 100%; max-height: 340px;
-  object-fit: contain;
-  border-radius: 4px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  animation: snapIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes snapIn {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.rm-download-btn {
-  display: flex; align-items: center; gap: 0.35rem;
-  font-size: 0.68rem; font-weight: 600; color: #9ca3af;
-  text-decoration: none; transition: color 0.15s;
-  padding: 0.3rem 0.5rem; border-radius: 4px;
-}
-.rm-download-btn:hover { color: #e5e7eb; background: rgba(255,255,255,0.06); }
-.rm-snapshot-shimmer {
-  width: 100%; min-height: 180px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 0; padding: 2rem;
-}
-.shimmer-bar {
-  border-radius: 4px;
-  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-}
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-.snapshot-gen-label {
-  margin-top: 1rem; font-size: 0.68rem; color: #6b7280; font-weight: 600; letter-spacing: 0.05em;
-}
-
-/* ─── SUCCESS TOAST ──────────────────────────────────────────────── */
-.success-toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0.75rem; background: #fff; border: 1px solid #e5ddd4; border-radius: 10px; padding: 0.875rem 1.25rem; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 300; min-width: 240px; }
-.toast-check { width: 32px; height: 32px; border-radius: 50%; background: rgba(107,143,110,0.12); color: #6b8f6e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(107,143,110,0.3); }
-.toast-check svg { width: 1rem; height: 1rem; }
-.toast-title { font-size: 0.82rem; font-weight: 800; color: #1c1813; margin-bottom: 0.1rem; }
-.toast-sub { font-size: 0.68rem; color: #a8998d; }
-
-/* ─── TRANSITIONS ────────────────────────────────────────────────── */
-.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.25s, transform 0.25s; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
-.modal-fade-enter-from .review-modal, .modal-fade-leave-to .review-modal { transform: scale(0.95) translateY(10px); }
-
-.toast-slide-enter-active, .toast-slide-leave-active { transition: opacity 0.3s, transform 0.3s; }
-.toast-slide-enter-from, .toast-slide-leave-to { opacity: 0; transform: translateX(-50%) translateY(16px); }
-
-/* ─── RESPONSIVE ─────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .dr-body { flex-direction: column; }
-  .dr-canvas-area { flex: none; height: 45vh; }
-  .dr-panel { width: 100%; height: 55vh; flex-direction: column; border-left: none; border-top: 1px solid #e5ddd4; }
-  .dr-nav-center { display: none; }
-  .dr-scale-chip { display: none; }
-}
-
-/* ─── FINALIZE CHOICE PANEL ──────────────────────────────────────── */
-.choice-panel {
-  background: #fff;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 420px;
-  position: relative;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.22);
-  overflow: hidden;
-  animation: choiceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes choiceIn {
-  from { opacity: 0; transform: scale(0.9) translateY(20px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.cp-header {
-  padding: 2rem 1.75rem 1.5rem;
-  background: linear-gradient(160deg, #fdf8f5 0%, #fff 100%);
-  border-bottom: 1px solid #f0ebe4;
-  text-align: center;
-}
-.cp-icon {
-  width: 52px; height: 52px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #c4703e22, #a85a2e11);
-  border: 1px solid #e5c4a8;
-  display: flex; align-items: center; justify-content: center;
-  color: #c4703e;
-  margin: 0 auto 1rem;
-}
-.cp-icon svg { width: 1.5rem; height: 1.5rem; }
-.cp-eyebrow {
-  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.2em;
-  color: #c4703e; margin-bottom: 0.4rem;
-}
-.cp-title {
-  font-size: 1.25rem; font-weight: 800; color: #1c1813; margin-bottom: 0.5rem;
-}
-.cp-desc {
-  font-size: 0.75rem; color: #a8998d; line-height: 1.5;
-}
-
-.cp-choices {
-  padding: 1.25rem 1.25rem 1.5rem;
-  display: flex; flex-direction: column; gap: 0.75rem;
-}
-.cp-choice {
-  display: flex; align-items: center; gap: 1rem;
-  padding: 1rem 1.1rem;
-  border-radius: 12px;
-  border: none;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.18s;
-}
-.cp-choice--primary {
-  background: linear-gradient(135deg, #c4703e, #a85a2e);
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(196,112,62,0.35);
-}
-.cp-choice--primary:hover {
-  background: linear-gradient(135deg, #b5622f, #8f4a22);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(196,112,62,0.45);
-}
-.cp-choice--secondary {
-  background: #f4f0eb;
-  color: #1c1813;
-  border: 1px solid #e5ddd4;
-}
-.cp-choice--secondary:hover {
-  background: #ede8e0;
-  transform: translateY(-1px);
-}
-
-.cp-choice-icon {
-  width: 38px; height: 38px; flex-shrink: 0;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.25);
-  display: flex; align-items: center; justify-content: center;
-}
-.cp-choice-icon--muted {
-  background: rgba(0,0,0,0.06);
-  color: #6b5d52;
-}
-.cp-choice-icon svg { width: 1.1rem; height: 1.1rem; }
-.cp-choice-body { flex: 1; min-width: 0; }
-.cp-choice-title {
-  display: block; font-size: 0.82rem; font-weight: 800; margin-bottom: 0.15rem;
-}
-.cp-choice-desc {
-  display: block; font-size: 0.68rem; opacity: 0.75; line-height: 1.3;
-}
-.cp-arrow {
-  width: 1rem; height: 1rem; flex-shrink: 0; opacity: 0.7;
-  transition: transform 0.15s;
-}
-.cp-choice:hover .cp-arrow { transform: translateX(3px); opacity: 1; }
-
-/* ─── THANK YOU PANEL ────────────────────────────────────────────── */
-.thankyou-panel {
-  background: #fff;
-  border-radius: 20px;
-  width: 100%;
-  max-width: 480px;
-  position: relative;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
-  overflow: hidden;
-  animation: choiceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.ty-header {
-  padding: 2.25rem 2rem 1.25rem;
-  background: linear-gradient(160deg, #f3faf5 0%, #fff 100%);
-  border-bottom: 1px solid #e8f3eb;
-  text-align: center;
-}
-.ty-icon {
-  width: 58px; height: 58px;
-  border-radius: 50%;
-  background: rgba(46, 125, 50, 0.1);
-  border: 2px solid rgba(46, 125, 50, 0.25);
-  display: flex; align-items: center; justify-content: center;
-  color: #2e7d32;
-  margin: 0 auto 1.1rem;
-}
-.ty-icon svg { width: 1.8rem; height: 1.8rem; }
-.ty-eyebrow {
-  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.22em;
-  color: #2e7d32; margin-bottom: 0.4rem;
-}
-.ty-title {
-  font-size: 1.35rem; font-weight: 800; color: #1c1813; margin-bottom: 0.5rem;
-}
-.ty-desc {
-  font-size: 0.78rem; color: #6b5d52; line-height: 1.5;
-}
-
-.ty-summary {
-  margin: 1.25rem 1.5rem 0;
-  padding: 1rem;
-  background: #fdfaf7;
-  border: 1px solid #f0ebe4;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-.ty-thumb-wrap {
-  width: 90px; height: 60px;
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  background: #111;
-}
-.ty-thumb {
-  width: 100%; height: 100%; object-fit: contain;
-}
-.ty-summary-info {
-  display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 0;
-}
-.ty-item-title {
-  font-size: 0.82rem; font-weight: 800; color: #1c1813;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ty-item-tags {
-  display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
-}
-.ty-tag {
-  font-size: 0.62rem; font-weight: 700; color: #6b5d52;
-  background: #ede8e1; padding: 0.15rem 0.45rem; border-radius: 4px;
-}
-.ty-tag--green {
-  color: #2e7d32; background: rgba(46, 125, 50, 0.12);
-}
-.ty-item-price {
-  font-size: 0.88rem; font-weight: 900; color: #c4703e; margin-top: 0.1rem;
-}
-
-.ty-actions {
-  padding: 1.25rem 1.5rem 1.75rem;
-  display: flex; flex-direction: column; gap: 0.65rem;
-}
-.ty-btn {
-  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
-  padding: 0.85rem 1.2rem;
-  border-radius: 12px;
-  font-size: 0.82rem; font-weight: 700;
-  border: none;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  width: 100%;
-}
-.ty-btn svg { width: 1.1rem; height: 1.1rem; }
-
-.ty-btn--primary {
-  background: linear-gradient(135deg, #1b4332, #0d281e);
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(27,67,50,0.3);
-}
-.ty-btn--primary:hover {
-  background: linear-gradient(135deg, #143326, #05140e);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(27,67,50,0.4);
-}
-
-.ty-btn--secondary {
-  background: linear-gradient(135deg, #c4703e, #a85a2e);
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(196,112,62,0.3);
-}
-.ty-btn--secondary:hover {
-  background: linear-gradient(135deg, #b5622f, #8f4a22);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(196,112,62,0.4);
-}
-
-.ty-btn--cart {
-  background: #f4f0eb;
-  color: #1c1813;
-  border: 1px solid #e5ddd4;
-}
-.ty-btn--cart:hover {
-  background: #ede8e0;
-  transform: translateY(-1px);
-}
-
-</style>

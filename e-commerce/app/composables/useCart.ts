@@ -3,259 +3,23 @@ import { computed, watch } from 'vue'
 import { cartService } from '~/services/cartService'
 import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Global
 
-/* ─── Standardized Custom Design Payload Schema (v1.0.0) ───────────────── */
+import { migrateToV3, calculateDesignChecksum, normalizeHexColor } from '~/features/custom-product/migrate'
+import type {
+  TypographySpec, BoardSectionSpec, BorderSpec, CrestSpec,
+  BaseElement, ImageElement, BrushElement, DesignElement,
+  CustomDesignPayloadV1, CustomDesignPayloadV3, CustomDesignPayload
+} from '~/features/custom-product/types'
 
-export interface TypographySpec {
-  text: string | null
-  fontId: 'inter' | 'playfair' | 'dancing' | 'bebas' | 'merriweather' | 'pacifico'
-  fontSizePx: number
-  fontColorHex: string // 6-digit hex format: #RRGGBB
-  alignment: 'left' | 'center' | 'right'
+export type {
+  TypographySpec, BoardSectionSpec, BorderSpec, CrestSpec,
+  BaseElement, ImageElement, BrushElement, DesignElement,
+  CustomDesignPayloadV1, CustomDesignPayloadV3, CustomDesignPayload
 }
+export { calculateDesignChecksum, normalizeHexColor }
 
-export interface BoardSectionSpec {
-  bgColorHex: string
-  cornerStyle: 'none' | 'rounded' | 'cut' | 'ornate' | 'floral'
-  header: TypographySpec
-  body: TypographySpec
-}
-
-export interface BorderSpec {
-  style: 'none' | 'solid' | 'double' | 'dashed' | 'dotted' | 'groove' | 'ridge' | 'ornate'
-  colorHex: string
-  widthPx: number
-  showCenterDivider: boolean
-}
-
-export interface CrestSpec {
-  visible: boolean
-  variantId: 'classic' | 'modern' | 'grand'
-  primaryColorHex: string
-  secondaryColorHex: string
-  scalePercent: number
-}
-
-export interface BaseElement {
-  id: string
-  type: 'image' | 'brush'
-  transform: {
-    xPercent: number
-    yPercent: number
-    scalePercent: number
-    rotationDeg: number
-  }
-}
-
-export interface ImageElement extends BaseElement {
-  type: 'image'
-  src: string
-  frameStyle: 'none' | 'square' | 'circle'
-  crop: { xPercent: number; yPercent: number; zoom: number }
-}
-
-export interface BrushElement extends BaseElement {
-  type: 'brush'
-  brushType: 'flower' | 'rose'
-  colorHex: string
-}
-
-export type DesignElement = ImageElement | BrushElement
-
-export interface CustomDesignPayloadV1 {
-  metadata: {
-    version: '1.0.0'
-    editorVersion: string
-    platform: string
-    locale: string
-    createdAt: string
-    updatedAt: string
-    checksum: string
-  }
-  layout: {
-    physicalSizeId: 'small' | 'medium' | 'large'
-    upperHeightRatio: number
-    border: BorderSpec
-  }
-  sections: {
-    upper: BoardSectionSpec
-    lower: BoardSectionSpec
-  }
-  decorations: {
-    topCrest: CrestSpec
-    bottomCrest: CrestSpec
-  }
-  elements: DesignElement[]
-  assets: {
-    previewBase64: string | null
-    previewAssetId: string | null
-    previewUrl: string | null
-    bucketPath: string | null
-    storageProvider: 'supabase' | 's3' | 'local' | null
-  }
-}
-
-export type CustomDesignPayload = CustomDesignPayloadV1
-
-// Calculate SHA-256 / FNV-1a checksum for design deduplication
-export const calculateDesignChecksum = (payload: any): string => {
-  const copy = { ...payload }
-  if (copy.metadata) copy.metadata = { ...copy.metadata, checksum: '' }
-  const jsonStr = JSON.stringify(copy)
-  let hash = 0x811c9dc5
-  for (let i = 0; i < jsonStr.length; i++) {
-    hash ^= jsonStr.charCodeAt(i)
-    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0')
-}
-
-// Validate 6-digit hex color format (#RRGGBB)
-export const normalizeHexColor = (color: string | undefined, fallback = '#FFFFFF'): string => {
-  if (!color) return fallback
-  const trimmed = color.trim().toUpperCase()
-  if (/^#[0-9A-F]{6}$/.test(trimmed)) return trimmed
-  if (/^#[0-9A-F]{3}$/.test(trimmed)) {
-    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`
-  }
-  return fallback
-}
-
-// Migration utility to seamlessly upgrade legacy v1.0 flat payloads to v1.0.0
-export const migrateCustomDesignPayload = (raw: any): CustomDesignPayloadV1 => {
-  if (!raw) {
-    throw new Error('Empty custom design payload')
-  }
-
-  // Already v1.0.0 structured payload
-  if (raw.metadata && raw.metadata.version === '1.0.0' && raw.layout && raw.sections) {
-    const payload = raw as CustomDesignPayloadV1
-    if (!payload.metadata.checksum) {
-      payload.metadata.checksum = calculateDesignChecksum(payload)
-    }
-    return payload
-  }
-
-  // Legacy v1.0 flat format migration
-  const upper = raw.upper || {}
-  const lower = raw.lower || {}
-  const border = raw.border || {}
-  const topCrest = raw.topCrest || {}
-  const bottomCrest = raw.bottomCrest || {}
-
-  const payload: CustomDesignPayloadV1 = {
-    metadata: {
-      version: '1.0.0',
-      editorVersion: '1.0.0',
-      platform: 'web',
-      locale: 'id-ID',
-      createdAt: raw.generatedAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      checksum: ''
-    },
-    layout: {
-      physicalSizeId: (raw.physicalSizeId || 'medium') as any,
-      upperHeightRatio: Math.max(0.25, Math.min(Number(raw.heightRatio || 0.58), 0.75)),
-      border: {
-        style: (border.style || 'solid') as any,
-        colorHex: normalizeHexColor(border.color, '#F5C842'),
-        widthPx: Number(border.width || 12),
-        showCenterDivider: Boolean(border.center ?? true)
-      }
-    },
-    sections: {
-      upper: {
-        bgColorHex: normalizeHexColor(upper.bgColor, '#C0392B'),
-        cornerStyle: (upper.cornerStyle || 'none') as any,
-        header: {
-          text: upper.headerText || null,
-          fontId: (upper.headerFont || 'playfair') as any,
-          fontSizePx: Number(upper.headerFontSize || 36),
-          fontColorHex: normalizeHexColor(upper.headerColor, '#FFD700'),
-          alignment: (upper.headerAlign || 'center') as any
-        },
-        body: {
-          text: upper.bodyText || null,
-          fontId: (upper.bodyFont || 'inter') as any,
-          fontSizePx: Number(upper.bodyFontSize || 20),
-          fontColorHex: normalizeHexColor(upper.bodyColor, '#FFFFFF'),
-          alignment: (upper.bodyAlign || 'center') as any
-        }
-      },
-      lower: {
-        bgColorHex: normalizeHexColor(lower.bgColor, '#1A3A5C'),
-        cornerStyle: (lower.cornerStyle || 'none') as any,
-        header: {
-          text: lower.headerText || null,
-          fontId: (lower.headerFont || 'bebas') as any,
-          fontSizePx: Number(lower.headerFontSize || 26),
-          fontColorHex: normalizeHexColor(lower.headerColor, '#FFFFFF'),
-          alignment: (lower.headerAlign || 'center') as any
-        },
-        body: {
-          text: lower.bodyText || null,
-          fontId: (lower.bodyFont || 'inter') as any,
-          fontSizePx: Number(lower.bodyFontSize || 22),
-          fontColorHex: normalizeHexColor(lower.bodyColor, '#FFFFFF'),
-          alignment: (lower.bodyAlign || 'center') as any
-        }
-      }
-    },
-    decorations: {
-      topCrest: {
-        visible: Boolean(topCrest.enabled),
-        variantId: (topCrest.style || 'classic') as any,
-        primaryColorHex: normalizeHexColor(topCrest.primary, '#E63946'),
-        secondaryColorHex: normalizeHexColor(topCrest.secondary, '#F1FAEE'),
-        scalePercent: Number(topCrest.size || 40)
-      },
-      bottomCrest: {
-        visible: Boolean(bottomCrest.enabled),
-        variantId: (bottomCrest.style || 'classic') as any,
-        primaryColorHex: normalizeHexColor(bottomCrest.primary, '#E63946'),
-        secondaryColorHex: normalizeHexColor(bottomCrest.secondary, '#F1FAEE'),
-        scalePercent: Number(bottomCrest.size || 40)
-      }
-    },
-    elements: Array.isArray(raw.elements) ? raw.elements.map((el: any) => {
-      if (el.type === 'image') {
-        return {
-          id: el.id || `elem-${Math.random()}`,
-          type: 'image' as const,
-          src: el.src || '',
-          frameStyle: (el.frame || 'square') as any,
-          crop: { xPercent: el.cropX ?? 50, yPercent: el.cropY ?? 50, zoom: el.zoom ?? 1 },
-          transform: {
-            xPercent: el.x ?? 15,
-            yPercent: el.y ?? 15,
-            scalePercent: el.width ?? 22,
-            rotationDeg: el.rotation ?? 0
-          }
-        }
-      }
-      return {
-        id: el.id || `elem-${Math.random()}`,
-        type: 'brush' as const,
-        brushType: (el.brushType || 'flower') as any,
-        colorHex: normalizeHexColor(el.color, '#E85D75'),
-        transform: {
-          xPercent: el.x ?? 50,
-          yPercent: el.y ?? 50,
-          scalePercent: el.size ?? 48,
-          rotationDeg: el.rotation ?? 0
-        }
-      }
-    }) : [],
-    assets: {
-      previewBase64: raw.previewBase64 || raw.assets?.previewBase64 || null,
-      previewAssetId: raw.previewAssetId || raw.assets?.previewAssetId || null,
-      previewUrl: raw.previewUrl || raw.assets?.previewUrl || null,
-      bucketPath: raw.bucketPath || raw.assets?.bucketPath || null,
-      storageProvider: raw.storageProvider || raw.assets?.storageProvider || 'supabase'
-    }
-  }
-
-  payload.metadata.checksum = calculateDesignChecksum(payload)
-  return payload
+// Migration utility to seamlessly upgrade raw payloads (v1.0 flat, v1.0.0, or v3.0.0)
+export const migrateCustomDesignPayload = (raw: any): CustomDesignPayloadV3 => {
+  return migrateToV3(raw)
 }
 
 export interface CartItem {
@@ -270,8 +34,12 @@ export interface CartItem {
   color?: string
   isCustom?: boolean
   itemType?: 'standard' | 'custom'
+  productVariantType?: 'standard' | 'custom'
+  slug?: string
   shopId?: string
-  customDesign?: CustomDesignPayloadV1  // only present for custom board orders
+  shopName?: string
+  shopSlug?: string
+  customDesign?: CustomDesignPayload  // only present for custom board orders
 }
 
 export interface Order {
@@ -497,7 +265,7 @@ export const useCart = () => {
       return Promise.resolve()
     }
 
-    if (loadCartPromise) return loadCartPromise
+    if (!force && loadCartPromise) return loadCartPromise
 
     isLoadingCart.value = true
     loadCartPromise = (async () => {
@@ -509,21 +277,24 @@ export const useCart = () => {
             let color = '#1b4332'
             let price = Number(item.price ?? item.unit_price ?? 0)
             let subtotal = Number(item.subtotal ?? (price * Number(item.quantity || 1)))
+            const cartItemId = item.cart_item_id || item.id || `item-${Date.now()}`
 
             if (item.product_variant_type === 'custom' || item.item_type === 'custom' || item.custom_design) {
               const migratedDesign = item.custom_design ? migrateCustomDesignPayload(item.custom_design) : undefined
-              const cartItemId = item.cart_item_id || item.id || `custom-${Date.now()}`
               return {
                 id: cartItemId,
                 cartItemId: cartItemId,
-                name: item.product_name || item.name || 'Custom Board',
+                name: item.name || item.product_name || 'Custom Board',
                 price: price,
                 subtotal: subtotal,
                 image: migratedDesign?.assets?.previewUrl || migratedDesign?.assets?.previewBase64 || item.images?.thumbnail || '/images/custom-preview.png',
                 quantity: Number(item.quantity),
                 shopId: item.shop_id,
+                shopName: item.shop_name,
+                shopSlug: item.shop_slug,
                 isCustom: true,
                 itemType: 'custom',
+                productVariantType: 'custom',
                 customDesign: migratedDesign,
                 size: migratedDesign?.layout?.physicalSizeId || size,
                 color: migratedDesign?.sections?.upper?.bgColorHex || color
@@ -545,14 +316,20 @@ export const useCart = () => {
             }
 
             return {
-              id: item.product_id,
+              id: item.product_id || cartItemId,
+              cartItemId: cartItemId,
               name: item.name,
               price: price,
+              subtotal: subtotal,
               image: item.images?.thumbnail || '',
               quantity: Number(item.quantity),
+              slug: item.slug || item.product_slug,
               shopId: item.shop_id,
+              shopName: item.shop_name,
+              shopSlug: item.shop_slug,
               isCustom: false,
               itemType: 'standard',
+              productVariantType: 'standard',
               size: size, 
               color: color
             }
@@ -582,6 +359,7 @@ export const useCart = () => {
 
     return loadCartPromise
   }
+
 
   if (import.meta.client && !cartWatcherInitialized) {
     cartWatcherInitialized = true
@@ -700,7 +478,8 @@ export const useCart = () => {
       cart.value = cart.value.filter(i => i.id !== id)
       if (isLoggedIn.value === 'true') {
         try {
-          await cartService.removeCustomItem(id)
+          const cartItemId = item.cartItemId || id
+          await cartService.removeCustomItem(cartItemId)
           await loadCart(true)
         } catch (err) {
           console.error('Failed to remove custom item from backend:', err)
@@ -844,6 +623,36 @@ export const useCart = () => {
     }
   }
 
+  const changeCartItemShop = async (cartItemId: string, shopId: string) => {
+    const item = cart.value.find(i => (i as any).cartItemId === cartItemId || i.id === cartItemId)
+    if (!item) return
+
+    const storeSelection = useStoreSelection()
+    const targetShop = storeSelection.activeShops.value.find(s => s.id === shopId)
+
+    if (isLoggedIn.value === 'true') {
+      try {
+        const idToTransfer = (item as any).cartItemId || item.id
+        await cartService.updateCartItemShop(idToTransfer, shopId)
+        item.shopId = shopId
+        if (targetShop) {
+          item.shopName = targetShop.name
+          item.shopSlug = targetShop.slug
+        }
+        await loadCart(true)
+      } catch (err) {
+        console.error('Failed to update cart item shop:', err)
+        throw err
+      }
+    } else {
+      item.shopId = shopId
+      if (targetShop) {
+        item.shopName = targetShop.name
+        item.shopSlug = targetShop.slug
+      }
+    }
+  }
+
   return {
     cart,
     orders,
@@ -853,6 +662,7 @@ export const useCart = () => {
     addToCart,
     removeFromCart,
     updateQuantity,
+    changeCartItemShop,
     cartSubtotal,
     cartSubtotalFormatted,
     cartCount,

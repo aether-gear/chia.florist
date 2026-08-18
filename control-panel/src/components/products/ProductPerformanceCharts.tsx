@@ -25,6 +25,8 @@ type TimeWindow = '7d' | '30d' | '90d';
 export default function ProductPerformanceCharts({ stats }: ProductPerformanceChartsProps) {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('30d');
 
+  const safeStats = useMemo(() => (Array.isArray(stats) ? stats : []), [stats]);
+
   // Colors based on index.css CSS variables
   const colors = [
     'hsl(var(--chart-1))',
@@ -44,28 +46,28 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
         ? 'sales_velocity_30d'
         : 'sales_velocity_90d';
 
-    return [...stats]
-      .sort((a, b) => b[field] - a[field])
+    return [...safeStats]
+      .sort((a, b) => (b[field] || 0) - (a[field] || 0))
       .slice(0, 8)
       .map((item) => ({
         name: item.name,
-        sales: item[field],
+        sales: item[field] || 0,
       }));
-  }, [stats, timeWindow]);
+  }, [safeStats, timeWindow]);
 
   // 2. Donut Chart data: Revenue contribution percentage
   const donutChartData = useMemo(() => {
-    const sorted = [...stats].sort(
-      (a, b) => b.revenue_contribution_percentage - a.revenue_contribution_percentage
+    const sorted = [...safeStats].sort(
+      (a, b) => (b.revenue_contribution_percentage || 0) - (a.revenue_contribution_percentage || 0)
     );
     const top5 = sorted.slice(0, 5);
     const othersPct = sorted
       .slice(5)
-      .reduce((acc, item) => acc + item.revenue_contribution_percentage, 0);
+      .reduce((acc, item) => acc + (item.revenue_contribution_percentage || 0), 0);
 
     const data = top5.map((item) => ({
       name: item.name,
-      value: parseFloat(item.revenue_contribution_percentage.toFixed(1)),
+      value: parseFloat((item.revenue_contribution_percentage || 0).toFixed(1)),
     }));
 
     if (othersPct > 0) {
@@ -75,20 +77,19 @@ export default function ProductPerformanceCharts({ stats }: ProductPerformanceCh
       });
     }
     return data;
-  }, [stats]);
+  }, [safeStats]);
 
   // 3. Scatter Chart data: Conversion Rate vs Views
   const scatterChartData = useMemo(() => {
-    return stats.map((item) => ({
+    return safeStats.map((item) => ({
       name: item.name,
-      views: item.view_count,
-      conversion: item.conversion_rate,
-      stock: item.stock,
+      views: item.view_count || 0,
+      conversion: item.conversion_rate || 0,
+      stock: item.stock || 0,
     }));
-  }, [stats]);
+  }, [safeStats]);
 
-
-  if (stats.length === 0) {
+  if (!safeStats || safeStats.length === 0) {
     return null;
   }
 

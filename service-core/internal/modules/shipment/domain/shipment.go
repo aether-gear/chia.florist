@@ -111,6 +111,7 @@ type Shipment struct {
 	CreatedAt time.Time
 
 	Events []ShipmentEvent
+	ItemIDs []uuid.UUID
 }
 
 func (d *Shipment) Validate() error {

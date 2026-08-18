@@ -1,5 +1,6 @@
 export interface OrderItem {
   id: string;
+  shipment_id?: string | null;
   product_id: string;
   product_name: string;
   quantity: number;
@@ -7,8 +8,8 @@ export interface OrderItem {
   subtotal: number;
   shop_id: string;
   shop_name: string;
-  courier_code: string;
-  courier_service: string;
+  courier_code?: string;
+  courier_service?: string;
   shipping_fee: number;
 }
 
@@ -31,6 +32,7 @@ export interface ShipmentEvent {
 
 export interface OrderShipment {
   id: string;
+  order_id?: string;
   status: string;
   fulfillment_method: string;
   courier: string;
@@ -39,6 +41,7 @@ export interface OrderShipment {
   cost: number;
   created_at: string;
   events?: ShipmentEvent[];
+  item_ids?: string[];
 }
 
 export interface OrderAddress {
@@ -64,11 +67,14 @@ export interface Order {
   subtotal: number;
   shipping_fee: number;
   total: number;
+  confirmed_at?: string | null;
+  handling_expires_at?: string | null;
   created_at: string;
   updated_at: string | null;
   items: OrderItem[];
   payment?: OrderPayment;
   shipment?: OrderShipment;
+  shipments?: OrderShipment[];
   address?: OrderAddress;
 }
 

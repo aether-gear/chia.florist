@@ -41,13 +41,19 @@ export default defineEventHandler(async (event) => {
           }
         }
 
+        // Enforce 30-day expiration when rememberMe is enabled
+        const thirtyDays = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+        const cookieExpires = rememberMe
+          ? (expires && expires.getTime() > thirtyDays.getTime() ? expires : thirtyDays)
+          : undefined
+
         // Strip Secure flag in local development
         setCookie(event, name, value, {
           path,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite,
-          expires: rememberMe ? expires : undefined
+          expires: cookieExpires
         })
       }
     }

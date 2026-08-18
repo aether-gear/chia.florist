@@ -1,11 +1,27 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Package, FileText, Truck, LogOut, Menu, Store, Users, Wallet, Crown, User, ChevronDown, Shield, ClipboardClock, BarChart3 } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Package,
+  FileText,
+  Truck,
+  LogOut,
+  Menu,
+  Users,
+  Wallet,
+  Crown,
+  User,
+  ChevronDown,
+  Shield,
+  ClipboardClock,
+  BarChart3,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthMeViewModel } from '../viewmodels/useAuthMeViewModel';
-import { useMerchantProfileViewModel } from '../viewmodels/useMerchantProfileViewModel';
-import { fetchApi } from '../lib/api';
+import { useStaffProfileViewModel } from '../viewmodels/useStaffProfileViewModel';
+import { useAuth } from '../context/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -32,7 +48,7 @@ const navigationGroups: NavigationGroup[] = [
     title: null,
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    ]
+    ],
   },
   {
     title: 'OPERATIONS',
@@ -41,105 +57,141 @@ const navigationGroups: NavigationGroup[] = [
       { name: 'Products', href: '/products', icon: Package },
       { name: 'Shop', href: '/shop', icon: ShoppingBag },
       { name: 'Shipments', href: '/shipments', icon: Truck, adminOnly: true },
-    ]
+    ],
   },
   {
     title: 'ADMIN',
     items: [
       { name: 'Analytics', href: '/admin/analytics', icon: BarChart3, adminOnly: true },
       { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: true },
-      { name: 'Merchants', href: '/admin/merchants', icon: Store, adminOnly: true },
+      { name: 'Staff', href: '/admin/staff', icon: Users, adminOnly: true },
       { name: 'Audit Logs', href: '/admin/audit-logs', icon: ClipboardClock, adminOnly: true },
       { name: 'Security', href: '/security', icon: Shield },
-    ]
+    ],
   },
   {
     title: 'SETTINGS',
     items: [
       { name: 'Payment Settings', href: '/admin/payments', icon: Wallet },
-    ]
-  }
+    ],
+  },
 ];
 
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { logout, userEmail: authEmail } = useAuth();
   const { data: authData, isAdmin } = useAuthMeViewModel();
-  const { profile: staffProfile } = useMerchantProfileViewModel();
+  const { profile: staffProfile } = useStaffProfileViewModel();
 
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
-    try {
-      await fetchApi('/auth/logout', { method: 'POST' });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('userEmail');
-      sessionStorage.removeItem('isAuthenticated');
-      sessionStorage.removeItem('userEmail');
-      navigate('/login');
-    }
+    await logout();
+    navigate('/login');
   };
 
-  const userEmail = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+  const userEmail = authEmail || localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+
 
   const renderProfileDropdown = () => {
     const fallbackInitials = staffProfile?.Name
-      ? staffProfile.Name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-      : (isAdmin ? 'AD' : 'ME');
+      ? staffProfile.Name.split(' ')
+          .map((n) => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase()
+      : isAdmin
+      ? 'AD'
+      : 'ST';
 
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 hover:bg-muted p-1.5 px-2.5 rounded-lg transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring text-left">
-            <Avatar className="h-8 w-8 ring-2 ring-primary/10">
+          <button className="flex items-center gap-2 hover:bg-muted/70 p-1.5 px-2.5 rounded-xl transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring text-left border border-border/40 hover:border-border">
+            <Avatar className="h-8 w-8 ring-2 ring-primary/20 shrink-0">
               {staffProfile?.AvatarURL && (
-                <AvatarImage src={staffProfile.AvatarURL} alt={staffProfile.Name} className="object-cover" />
+                <AvatarImage
+                  src={staffProfile.AvatarURL}
+                  alt={staffProfile.Name}
+                  className="object-cover"
+                />
               )}
-              <AvatarFallback className={`font-bold text-xs uppercase bg-primary text-primary-foreground`}>
+              <AvatarFallback className="font-bold text-xs uppercase bg-primary text-primary-foreground">
                 {isAdmin ? '★' : fallbackInitials}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden sm:inline text-sm font-semibold text-foreground max-w-[120px] truncate">
-              {staffProfile?.Name || (isAdmin ? 'Administrator' : 'User')}
-            </span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground/60" />
+            <div className="hidden sm:flex flex-col text-left min-w-0 max-w-[180px]">
+              <span className="text-xs font-bold text-foreground truncate">
+                {staffProfile?.Name || (isAdmin ? 'Administrator' : 'Staff User')}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium truncate">
+                {staffProfile?.Username ? `@${staffProfile.Username}` : userEmail || 'Staff'}
+              </span>
+            </div>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0 ml-0.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64 p-1">
-          <div className="px-3 py-2.5 bg-muted/50 rounded-t-md border-b border-border/85 mb-1">
-            <div className="text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wider mb-0.5">Signed in as</div>
-            <div className="text-sm font-bold text-foreground truncate" title={userEmail}>
+        <DropdownMenuContent align="end" className="w-80 p-2 shadow-xl border-border/70 rounded-xl">
+          {/* Header Card */}
+          <div className="px-3.5 py-3 bg-muted/40 rounded-lg border border-border/40 mb-1.5">
+            <div className="flex items-center gap-3 mb-2">
+              <Avatar className="h-9 w-9 ring-1 ring-primary/20 shrink-0">
+                {staffProfile?.AvatarURL && (
+                  <AvatarImage
+                    src={staffProfile.AvatarURL}
+                    alt={staffProfile.Name}
+                    className="object-cover"
+                  />
+                )}
+                <AvatarFallback className="font-bold text-xs uppercase bg-primary text-primary-foreground">
+                  {fallbackInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold text-foreground truncate">
+                  {staffProfile?.Name || 'Staff Member'}
+                </div>
+                {staffProfile?.Username && (
+                  <div className="text-[11px] text-muted-foreground font-medium truncate">
+                    @{staffProfile.Username}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-[11px] font-mono text-muted-foreground/80 truncate mb-2" title={userEmail}>
               {userEmail}
             </div>
-            {staffProfile?.Username && (
-              <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
-                @{staffProfile.Username}
-              </div>
-            )}
-            <div className="mt-1.5">
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/20`}>
-                {isAdmin ? 'Administrator' : (authData?.roles[0]?.name || 'Merchant')}
-              </span>
+
+            <div>
+              {isAdmin ? (
+                <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  <Crown className="h-2.5 w-2.5" />
+                  Administrator
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                  {authData?.roles?.[0]?.name || 'Staff Member'}
+                </span>
+              )}
             </div>
           </div>
 
-          <DropdownMenuItem asChild className="cursor-pointer flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md">
-            <Link to="/merchant/settings">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>Account</span>
+          <DropdownMenuItem asChild className="cursor-pointer flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-lg">
+            <Link to="/profile">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Staff Profile</span>
             </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-1 bg-border/40" />
 
           <DropdownMenuItem
             onClick={() => handleLogout()}
-            className="focus:bg-destructive/10 focus:text-destructive text-destructive cursor-pointer flex w-full items-center gap-2 px-3 py-2 text-sm font-medium rounded-md"
+            className="focus:bg-destructive/10 focus:text-destructive text-destructive cursor-pointer flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-lg"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
             <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -148,10 +200,18 @@ export default function DashboardLayout() {
   };
 
   const renderSidebarContent = () => (
-    <div className="flex h-full flex-col bg-zinc-100">
+    <div className="flex h-full flex-col bg-zinc-100 dark:bg-zinc-900">
       <div className="flex h-16 shrink-0 items-center px-6 gap-2.5 border-b border-border/30">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-          <svg className="w-4.5 h-4.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            className="w-4.5 h-4.5 text-primary"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22c0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10 0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10z" />
           </svg>
         </div>
@@ -171,7 +231,9 @@ export default function DashboardLayout() {
       <div className="flex-1 overflow-y-auto py-4">
         <nav className="space-y-1 px-3">
           {navigationGroups.map((group, idx) => {
-            const visibleItems = group.items.filter(item => isAdmin || !item.adminOnly);
+            const visibleItems = group.items.filter(
+              (item) => isAdmin || !item.adminOnly
+            );
             if (visibleItems.length === 0) return null;
 
             return (
@@ -185,18 +247,25 @@ export default function DashboardLayout() {
                 )}
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
-                    const isActive = location.pathname === item.href;
+                    const isActive =
+                      location.pathname === item.href ||
+                      (item.href !== '/' && location.pathname.startsWith(item.href));
+
                     return (
                       <Link
                         key={item.name}
                         to={item.href}
                         className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 ease-out active:scale-[0.98] ${
-                          isActive ? 'bg-primary text-primary-foreground font-semibold shadow-sm shadow-primary/5' : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                          isActive
+                            ? 'bg-primary text-primary-foreground font-semibold shadow-sm shadow-primary/5'
+                            : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
                         }`}
                       >
                         <item.icon
                           className={`flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors ${
-                            isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'
+                            isActive
+                              ? 'text-primary-foreground'
+                              : 'text-muted-foreground group-hover:text-foreground'
                           }`}
                           aria-hidden="true"
                         />
@@ -227,7 +296,15 @@ export default function DashboardLayout() {
             </SheetTrigger>
             <div className="ml-2 flex items-center gap-1.5">
               <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center border border-primary/20">
-                <svg className="w-3.5 h-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  className="w-3.5 h-3.5 text-primary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M12 22c0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10 0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10z" />
                 </svg>
               </div>
@@ -236,9 +313,7 @@ export default function DashboardLayout() {
               </span>
             </div>
           </div>
-          <div className="flex items-center">
-            {renderProfileDropdown()}
-          </div>
+          <div className="flex items-center">{renderProfileDropdown()}</div>
         </div>
         <SheetContent side="left" className="p-0 w-64 border-r border-border/40">
           {renderSidebarContent()}
@@ -255,11 +330,19 @@ export default function DashboardLayout() {
         <header className="hidden lg:flex h-16 flex-shrink-0 items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur-md px-8 text-foreground sticky top-0 z-10">
           <h1 className="text-xl font-bold font-display tracking-tight text-foreground">
             {(() => {
-              const matchedGroup = navigationGroups.find(g =>
-                g.items.some(item => location.pathname === item.href || location.pathname.startsWith(item.href + '/'))
+              if (location.pathname === '/profile' || location.pathname === '/staff/settings') {
+                return 'Profile';
+              }
+              const matchedGroup = navigationGroups.find((g) =>
+                g.items.some(
+                  (item) =>
+                    location.pathname === item.href ||
+                    location.pathname.startsWith(item.href + '/')
+                )
               );
               return matchedGroup?.title
-                ? matchedGroup.title.charAt(0) + matchedGroup.title.slice(1).toLowerCase()
+                ? matchedGroup.title.charAt(0) +
+                    matchedGroup.title.slice(1).toLowerCase()
                 : 'Dashboard';
             })()}
           </h1>
@@ -268,7 +351,7 @@ export default function DashboardLayout() {
           </div>
         </header>
         <main className="flex-1">
-          <div className="mx-auto max-w-7xl p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+          <div className="mx-auto max-w-7xl py-4 sm:p-8 animate-in fade-in duration-300">
             <Outlet />
           </div>
         </main>

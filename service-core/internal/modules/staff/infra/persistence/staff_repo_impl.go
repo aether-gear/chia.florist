@@ -60,6 +60,7 @@ func (r *staffRepositoryImpl) GetByID(
 			deleted_at
 		FROM staff
 		WHERE id = $1
+			AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -266,4 +267,68 @@ func (r *staffRepositoryImpl) FindStaff(
 	}
 
 	return results, total, nil
+}
+
+func (r *staffRepositoryImpl) Update(
+	ctx context.Context,
+	exec transaction.Executor,
+	staffID uuid.UUID,
+	name string,
+	logoUrl *string,
+	bannerUrl *string,
+) error {
+	staffQuery := `
+		UPDATE staff
+		SET updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+	staffRes, err := exec.Exec(ctx, staffQuery, staffID)
+	if err != nil {
+		return fmt.Errorf("update staff failed: %w", err)
+	}
+	if staffRes.RowsAffected() == 0 {
+		return domain.ErrNotFoundStaff
+	}
+
+	userQuery := `
+		UPDATE users
+		SET name = $2,
+		    avatar_url = COALESCE($3, avatar_url),
+		    updated_at = NOW()
+		WHERE id = (SELECT user_id FROM staff WHERE id = $1)
+		  AND deleted_at IS NULL
+	`
+	_, err = exec.Exec(ctx, userQuery,
+		staffID,
+		name,
+		logoUrl,
+	)
+	if err != nil {
+		return fmt.Errorf("update staff user failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *staffRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	staffID uuid.UUID,
+) error {
+	query := `
+		UPDATE staff
+		SET deleted_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND deleted_at IS NULL
+	`
+	res, err := exec.Exec(ctx, query, staffID)
+	if err != nil {
+		return fmt.Errorf("soft delete staff failed: %w", err)
+	}
+	if res.RowsAffected() == 0 {
+		return domain.ErrNotFoundStaff
+	}
+
+	return nil
 }

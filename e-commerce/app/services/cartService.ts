@@ -48,6 +48,13 @@ export const cartService = {
     })
   },
 
+  async updateCartItemShop(cartItemId: string, shopId: string): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}/shop`, {
+      method: 'PATCH',
+      body: { shop_id: shopId }
+    })
+  },
+
   async checkout(data: CheckoutRequest): Promise<CheckoutResponse> {
     return bootstrapConfig.fetchApi<CheckoutResponse>('/carts/checkout', {
       method: 'POST',

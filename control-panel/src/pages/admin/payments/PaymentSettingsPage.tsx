@@ -2,17 +2,12 @@ import { useState, useMemo } from 'react';
 import { CreditCard, RefreshCw } from 'lucide-react';
 import SearchInput from '../../../components/SearchInput';
 import { Button } from '../../../components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../components/ui/table';
 import { Switch } from '../../../components/ui/switch';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { usePaymentsViewModel } from '../../../viewmodels/usePaymentsViewModel';
+
+import { DataCard, DataCardGridHeader, DataCardList } from '../../../components/DataCard';
+import EmptyState from '@/components/EmptyState';
 
 export default function PaymentSettingsPage() {
   const { methods, loading, toggling, error, togglePaymentMethodActive, refetch } = usePaymentsViewModel();
@@ -40,103 +35,97 @@ export default function PaymentSettingsPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="pb-4 border-b border-border/60 mb-6">
-            <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Available Methods</h3>
-            <p className="text-muted-foreground text-sm">
-              These are the payment channels available for processing customer payments.
-            </p>
+          <div className="pb-4 border-b border-border/60">
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Available Methods</h3>
+            <p className="text-muted-foreground text-sm">These are the payment channels available for processing customer payments.</p>
           </div>
-          <div>
-            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              {/* Left Side: Filter and Search */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <SearchInput
-                  value={methodSearch}
-                  onChange={setMethodSearch}
-                  placeholder="Search methods..."
-                />
-              </div>
 
-              {/* Right Side: Refresh */}
-              <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetch()}
-                  disabled={loading || toggling}
-                  className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading || toggling ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+            <SearchInput
+              value={methodSearch}
+              onChange={setMethodSearch}
+              placeholder="Search methods..."
+              className="relative flex-1 max-w-sm w-full"
+            />
+            <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={loading || toggling}
+                className="flex items-center gap-1.5 border-border text-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading || toggling ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
+          </div>
 
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Active</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={`methods-skeleton-${i}`}>
-                        <TableCell><Skeleton className="h-5 w-5 rounded bg-muted animate-pulse" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-32 bg-muted animate-pulse" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-16 bg-muted animate-pulse" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-20 bg-muted animate-pulse" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24 bg-muted animate-pulse" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-40 bg-muted animate-pulse" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto bg-muted animate-pulse" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center h-24 text-destructive">
-                        {error}
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredMethods.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
-                        {methodSearch ? `No methods match "${methodSearch}"` : "No payment methods configured."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredMethods.map((method) => (
-                      <TableRow key={method.id}>
-                        <TableCell>
-                          <CreditCard className="h-5 w-5 text-muted-foreground" />
-                        </TableCell>
-                        <TableCell className="font-medium">{method.name}</TableCell>
-                        <TableCell className="font-mono text-xs">{method.code}</TableCell>
-                        <TableCell className="capitalize text-xs font-semibold text-indigo-600 dark:text-indigo-400">{method.provider}</TableCell>
-                        <TableCell className="uppercase text-xs">{method.type.replace('_', ' ')}</TableCell>
-                        <TableCell className="max-w-xs truncate text-muted-foreground">
-                          {method.description}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Switch
-                            checked={method.is_active}
-                            disabled={loading || toggling}
-                            onCheckedChange={(checked) => togglePaymentMethodActive(method.id, checked)}
-                            className="ml-auto data-[state=checked]:bg-primary"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+            <span>Found {filteredMethods.length} methods</span>
+          </div>
+
+          {/* Content */}
+          <div className="flex flex-col gap-2">
+            <DataCardGridHeader>
+              <span className="col-span-4">Method</span>
+              <span className="col-span-3">Provider & Type</span>
+              <span className="col-span-3">Description</span>
+              <span className="col-span-2 text-right">Active Status</span>
+            </DataCardGridHeader>
+
+            <DataCardList>
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <DataCard key={`skeleton-${i}`}>
+                    <div className="col-span-4 flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 rounded-lg bg-muted animate-pulse" />
+                      <Skeleton className="h-4 w-32 bg-muted animate-pulse" />
+                    </div>
+                    <div className="col-span-3"><Skeleton className="h-4 w-24 bg-muted animate-pulse" /></div>
+                    <div className="col-span-3"><Skeleton className="h-4 w-40 bg-muted animate-pulse" /></div>
+                    <div className="col-span-2 text-right"><Skeleton className="h-5 w-12 ml-auto bg-muted animate-pulse" /></div>
+                  </DataCard>
+                ))
+              ) : error ? (
+                <EmptyState title="Failed to load payment methods" description={error} className="py-12 border-0 bg-transparent text-destructive" />
+              ) : filteredMethods.length === 0 ? (
+                <EmptyState icon={<CreditCard className="h-8 w-8 text-slate-400 mb-2 mx-auto" />} title="No methods found" description="No payment methods configured matching your search." className="py-12 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10" />
+              ) : (
+                filteredMethods.map((method) => (
+                  <DataCard key={method.id}>
+                    <div className="col-span-1 md:col-span-4 flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                        <CreditCard className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold font-display text-sm text-foreground truncate">{method.name}</h4>
+                        <p className="text-xs font-mono text-muted-foreground truncate">{method.code}</p>
+                      </div>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-3 text-xs">
+                      <span className="font-semibold text-primary capitalize">{method.provider}</span>
+                      <span className="text-muted-foreground uppercase ml-1.5 font-sans">({method.type.replace('_', ' ')})</span>
+                    </div>
+
+                    <div className="col-span-1 md:col-span-3 text-xs text-muted-foreground truncate">
+                      {method.description || '-'}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-muted-foreground md:hidden mr-1">Active:</span>
+                      <Switch
+                        checked={method.is_active}
+                        disabled={loading || toggling}
+                        onCheckedChange={(checked) => togglePaymentMethodActive(method.id, checked)}
+                        className="data-[state=checked]:bg-primary"
+                      />
+                    </div>
+                  </DataCard>
+                ))
+              )}
+            </DataCardList>
           </div>
         </div>
       </div>

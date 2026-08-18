@@ -5,7 +5,39 @@ export default defineEventHandler(async (event) => {
 
   let slug = id || ''
 
-  // 2. Fetch full product details strictly from backend by slug
+  // Virtual handler for client-side interactive custom simulator
+  if (slug === 'custom') {
+    return {
+      id: 'custom',
+      sku: 'CUSTOM-BOARD-V3',
+      name: 'Custom Board Simulator',
+      slug: 'custom',
+      status: 'active',
+      is_available: true,
+      price: 150000,
+      stock: 999,
+      description: 'Interactive Custom Flower Board Simulator',
+      banner: { thumbnail: '/images/custom-preview.png', preview: '/images/custom-preview.png', detail: '/images/custom-preview.png' },
+      gallery: [],
+      availability: [],
+      shop_id: '99ef0062-1040-4574-a4be-0123abce5670'
+    }
+  }
+
+  // 2. If parameter is a UUID string, resolve it to slug via GET /products?id={uuid}
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+  if (isUuid) {
+    try {
+      const listRes: any = await $fetch(`${backendBaseUrl}/products?id=${slug}`)
+      if (listRes && Array.isArray(listRes.products) && listRes.products.length > 0 && listRes.products[0].slug) {
+        slug = listRes.products[0].slug
+      }
+    } catch (lookupErr) {
+      console.error(`Failed to resolve product slug for UUID ${slug}:`, lookupErr)
+    }
+  }
+
+  // 3. Fetch full product details strictly from backend by slug
   let product: any = null
   try {
     product = await $fetch(`${backendBaseUrl}/products/${slug}`)

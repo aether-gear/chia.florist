@@ -5,7 +5,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
-	authenDomain "service-core/internal/modules/authentication/domain"
+	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/staff/usecase"
 
@@ -14,20 +14,32 @@ import (
 )
 
 type staffHandler struct {
-	addStaffAccount *usecase.AddStaffAccountUsecase
-	createStaff     *usecase.CreateStaffUsecase
-	findStaff       *usecase.FindStaffUsecase
+	addStaffAccount    *usecase.AddStaffAccountUsecase
+	createStaff        *usecase.CreateStaffUsecase
+	findStaff          *usecase.FindStaffUsecase
+	listStaffAccounts  *usecase.ListStaffAccountsUsecase
+	updateStaff        *usecase.UpdateStaffUsecase
+	deleteStaff        *usecase.DeleteStaffUsecase
+	removeStaffAccount *usecase.RemoveStaffAccountUsecase
 }
 
 func NewStaffHandler(
 	addStaffAccount *usecase.AddStaffAccountUsecase,
 	createStaff *usecase.CreateStaffUsecase,
 	findStaff *usecase.FindStaffUsecase,
+	listStaffAccounts *usecase.ListStaffAccountsUsecase,
+	updateStaff *usecase.UpdateStaffUsecase,
+	deleteStaff *usecase.DeleteStaffUsecase,
+	removeStaffAccount *usecase.RemoveStaffAccountUsecase,
 ) *staffHandler {
 	return &staffHandler{
-		addStaffAccount: addStaffAccount,
-		createStaff:     createStaff,
-		findStaff:       findStaff,
+		addStaffAccount:    addStaffAccount,
+		createStaff:        createStaff,
+		findStaff:          findStaff,
+		listStaffAccounts:  listStaffAccounts,
+		updateStaff:        updateStaff,
+		deleteStaff:        deleteStaff,
+		removeStaffAccount: removeStaffAccount,
 	}
 }
 
@@ -38,15 +50,12 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 		return apperrors.NewBadRequest("invalid staff id")
 	}
 
-	authCtx, ok := authenDomain.GetAuthContext(r.Context())
-	if !ok {
-		return apperrors.NewUnauthorized("authentication required")
-	}
-	_ = authCtx
-
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
 		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.StaffID == nil {
+		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
 	var req addStaffAccountRequest
@@ -57,11 +66,8 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 	if req.Email == "" {
 		return apperrors.NewBadRequest("email is required")
 	}
-	if req.Name == "" {
-		return apperrors.NewBadRequest("name is required")
-	}
-	if req.Username == "" {
-		return apperrors.NewBadRequest("username is required")
+	if req.Password == "" {
+		return apperrors.NewBadRequest("password is required")
 	}
 
 	input := usecase.AddStaffAccountParams{
@@ -69,10 +75,7 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 		ActorStaffID:   *actor.StaffID,
 		StaffID:        staffID,
 		Email:          req.Email,
-		Name:           req.Name,
 		Password:       req.Password,
-		Username:       req.Username,
-		Phone:          req.Phone,
 	}
 
 	err = h.addStaffAccount.Execute(r.Context(), input)
@@ -81,7 +84,7 @@ func (h *staffHandler) AddStaffAccount(w http.ResponseWriter, r *http.Request) e
 	}
 
 	response := map[string]string{
-		"message": "verify success",
+		"message": "staff account successfully created",
 	}
 
 	apphttp.WriteJSON(w, http.StatusCreated, response)
@@ -97,9 +100,13 @@ func (h *staffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) error
 	if req.Name == "" {
 		return apperrors.NewBadRequest("name is required")
 	}
+	if req.Username == "" {
+		return apperrors.NewBadRequest("username is required")
+	}
 
 	input := usecase.CreateStaffInput{
 		Name:        req.Name,
+		Username:    req.Username,
 		Description: req.Description,
 		LogoUrl:     req.LogoUrl,
 		BannerUrl:   req.BannerUrl,
@@ -172,3 +179,182 @@ func (h *staffHandler) FindStaff(w http.ResponseWriter, r *http.Request) error {
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
+
+func (h *staffHandler) ListStaffAccounts(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.StaffID == nil {
+		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
+	}
+
+	input := usecase.ListStaffAccountsParams{
+		ActorAccountID: actor.AccountID,
+		ActorStaffID:   *actor.StaffID,
+		StaffID:        staffID,
+	}
+
+	accounts, err := h.listStaffAccounts.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	results := make([]staffAccountResponse, 0, len(accounts))
+	for _, m := range accounts {
+		results = append(results, staffAccountResponse{
+			AccountID:   m.AccountID,
+			UserID:      m.UserID,
+			Email:       m.Email,
+			Name:        m.Name,
+			Username:    m.Username,
+			Phone:       m.Phone,
+			AvatarURL:   m.AvatarURL,
+			Role: staffAccountRoleResponse{
+				ID:   m.Role.ID,
+				Code: string(m.Role.Code),
+				Name: m.Role.Name,
+			},
+			LastLoginAt: m.LastLoginAt,
+			CreatedAt:   m.CreatedAt,
+		})
+	}
+
+	response := listStaffAccountsResponse{
+		StaffID:  staffID,
+		Total:    len(results),
+		Accounts: results,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *staffHandler) UpdateStaff(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.StaffID == nil {
+		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
+	}
+
+	var req updateStaffRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid body request")
+	}
+
+	if req.Name == "" {
+		return apperrors.NewBadRequest("name is required")
+	}
+
+	input := usecase.UpdateStaffInput{
+		ActorAccountID: actor.AccountID,
+		ActorStaffID:   *actor.StaffID,
+		StaffID:        staffID,
+		Name:           req.Name,
+		Description:    req.Description,
+		LogoUrl:        req.LogoUrl,
+		BannerUrl:      req.BannerUrl,
+	}
+
+	err = h.updateStaff.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "staff successfully updated",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *staffHandler) DeleteStaff(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.StaffID == nil {
+		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
+	}
+
+	input := usecase.DeleteStaffInput{
+		ActorAccountID: actor.AccountID,
+		ActorStaffID:   *actor.StaffID,
+		StaffID:        staffID,
+	}
+
+	err = h.deleteStaff.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "staff successfully deleted",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *staffHandler) RemoveStaffAccount(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	accountIDStr := chi.URLParam(r, "accountID")
+	accountID, err := uuid.Parse(accountIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid account id")
+	}
+
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.StaffID == nil {
+		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
+	}
+
+	input := usecase.RemoveStaffAccountInput{
+		ActorAccountID: actor.AccountID,
+		ActorStaffID:   *actor.StaffID,
+		StaffID:        staffID,
+		AccountID:      accountID,
+	}
+
+	err = h.removeStaffAccount.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "staff account successfully removed",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+

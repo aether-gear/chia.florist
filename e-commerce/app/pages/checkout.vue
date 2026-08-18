@@ -11,15 +11,20 @@ import type { CheckoutResponse, CheckoutCourierOption, PaymentMethod, CheckoutSh
 import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { triggerAuthAlert } from '~/composables/useSessionState'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 useHead({
-  title: 'Secure Checkout - Chia Florist'
+  title: 'Secure Checkout - Chia Florist',
+  meta: [
+    { name: 'description', content: 'Complete your flower board order with secure payment and verified courier delivery at Chia Florist.' }
+  ]
 })
 
 const route = useRoute()
-const { cart, orders, loadCart, flushCart, cartSubtotal, cartSubtotalFormatted, checkoutToOrder, formatRupiah } = useCart()
+const { cart, orders, loadCart, flushCart, cartSubtotal, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
 const authVm = useAuthViewModel()
+const globalAlert = useGlobalAlert()
 
 // State Management untuk Checkout & Shipping
 const checkoutData = ref<CheckoutResponse | null>(null)
@@ -234,7 +239,6 @@ onMounted(async () => {
 
     let defaultAddr = addressVm.addresses.value.find(a => a.is_default)
     if (!defaultAddr && addressVm.addresses.value.length > 0) {
-      console.log('Self-healing on mount: Setting first address as default')
       const firstAddr = addressVm.addresses.value[0]
       if (firstAddr) {
         const updated: UserAddress = { ...firstAddr, is_default: true }
@@ -248,14 +252,14 @@ onMounted(async () => {
       selectedAddressId.value = defaultAddr.address_id || ''
     }
 
-    const shopsMap: Record<string, any[]> = {}
+    const shopsPayloadMap: Record<string, any[]> = {}
     checkoutItems.value.forEach(item => {
       const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
-      if (!shopsMap[shopId]) {
-        shopsMap[shopId] = []
+      if (!shopsPayloadMap[shopId]) {
+        shopsPayloadMap[shopId] = []
       }
       if (item.isCustom) {
-        shopsMap[shopId].push({
+        shopsPayloadMap[shopId].push({
           cart_item_id: item.cartItemId || item.id,
           product_variant_type: 'custom',
           item_type: 'custom',
@@ -266,7 +270,7 @@ onMounted(async () => {
           custom_design: item.customDesign
         })
       } else {
-        shopsMap[shopId].push({
+        shopsPayloadMap[shopId].push({
           item_type: 'standard',
           product_id: item.id,
           quantity: item.quantity
@@ -274,9 +278,9 @@ onMounted(async () => {
       }
     })
 
-    const shopsPayload = Object.keys(shopsMap).map(shopId => ({
+    const shopsPayload = Object.keys(shopsPayloadMap).map(shopId => ({
       shop_id: shopId,
-      items: shopsMap[shopId]
+      items: shopsPayloadMap[shopId]
     }))
 
     let res: CheckoutResponse | null = null
@@ -286,7 +290,6 @@ onMounted(async () => {
         res = await cartService.checkout(payload)
       } catch (checkoutErr: any) {
         console.warn('Backend returned error during checkout initialization, using fallback client estimation:', checkoutErr)
-        // Fallback gracefully without throwing so the UI can still load
       }
     }
 
@@ -333,7 +336,7 @@ onMounted(async () => {
     }
   } catch (err) {
     console.error('Failed to initialize checkout:', err)
-    alert('Unable to proceed with checkout. Some items may be out of stock or unavailable. Redirecting you back to your cart to review.')
+    globalAlert.showError('Checkout Error', 'Unable to proceed with checkout. Some items may be out of stock or unavailable. Redirecting to cart...')
     navigateTo('/cart')
   } finally {
     isLoadingCheckout.value = false
@@ -448,7 +451,6 @@ const runCalculate = async () => {
       const addresses = addressVm.addresses.value
       const defaultAddr = addresses.find(a => a.is_default)
       if (!defaultAddr && addresses.length > 0) {
-        console.log('Self-healing in runCalculate: Setting default address and retrying calculation...')
         try {
           const firstAddr = addresses[0]
           if (firstAddr) {
@@ -499,7 +501,6 @@ watch(selectedPaymentMethodId, (newId, oldId) => {
     }, 300)
   }
 })
-
 
 let courierTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -579,11 +580,11 @@ const liveTotalPayment = computed(() => {
 // Eksekusi checkout memindahkan state item keranjang ke invoice order profile
 const handlePlaceOrder = async () => {
   if (!selectedAddressId.value) {
-    alert('Please select a shipping address before completing your order.')
+    globalAlert.showWarning('Address Required', 'Please select a shipping address before completing your order.')
     return
   }
   if (paymentMethods.value.length === 0 || !selectedPaymentMethodId.value) {
-    alert('No payment method available or selected. Please select a payment method before completing your order.')
+    globalAlert.showWarning('Payment Method Required', 'No payment method available or selected. Please select a payment method before completing your order.')
     return
   }
 
@@ -682,11 +683,18 @@ const handlePlaceOrder = async () => {
       cart.value = []
     }
 
-    alert('Order placed successfully! Redirecting to secure payment page...')
+    globalAlert.showSuccess(
+      'Order Placed',
+      'Order placed successfully! Redirecting to secure payment page...',
+      [
+        { label: 'Pay Now', onClick: () => navigateTo(`/payment?orderId=${result.order_id}`) },
+        { label: 'My Orders', onClick: () => navigateTo('/profile') }
+      ]
+    )
     navigateTo(`/payment?orderId=${result.order_id}`)
   } catch (err: any) {
     console.error('Checkout processing error:', err)
-    alert(err.data?.message || err.message || 'Failed to process checkout. Please try again.')
+    globalAlert.showError('Checkout Failed', err.data?.message || err.message || 'Failed to process checkout. Please try again.')
   } finally {
     isProcessing.value = false
   }
@@ -694,119 +702,241 @@ const handlePlaceOrder = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50/50 py-16 font-sans">
-    <div class="max-w-7xl mx-auto px-6 lg:px-8">
+  <div class="min-h-screen bg-gray-50/50 py-10 sm:py-14 font-sans">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
-      <div class="mb-10">
-        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Secure Checkout</h1>
-        <p class="text-sm text-gray-500 mt-1">Please confirm your shipping metadata and billing totals below.</p>
+      <!-- Page Navigation & Title Header -->
+      <div class="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <CButton
+              to="/cart"
+              variant="ghost"
+              size="sm"
+              class="-ml-2 text-gray-500 hover:text-gray-900"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              <span>Back to Cart</span>
+            </CButton>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Secure Checkout</h1>
+          <p class="text-sm text-gray-500 mt-1">Confirm your delivery destination, shipping method, and billing totals.</p>
+        </div>
+
+        <div class="hidden sm:flex items-center gap-2 bg-emerald-50/80 border border-emerald-100 text-emerald-900 px-3.5 py-2 rounded-xl text-xs font-semibold">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+          <span>256-Bit Encrypted Transaction</span>
+        </div>
       </div>
 
-      <div v-if="isLoadingCheckout" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1b4332]"></div>
-        <p class="text-gray-500 font-medium animate-pulse text-sm">Initializing secure checkout session...</p>
+      <!-- Loading Checkout State -->
+      <div v-if="isLoadingCheckout" class="bg-white border border-gray-100 rounded-3xl p-12 sm:p-16 shadow-xs flex flex-col items-center justify-center min-h-[380px] space-y-4 text-center">
+        <div class="relative flex items-center justify-center">
+          <div class="w-12 h-12 rounded-full border-3 border-gray-100 border-t-[#1b4332] animate-spin"></div>
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-gray-800">Initializing Checkout Session</h2>
+          <p class="text-xs text-gray-400 mt-1 max-w-sm">Fetching verified destination rates and supported payment gateways...</p>
+        </div>
       </div>
 
-      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      <!-- Main Checkout Layout -->
+      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
         
-        <div class="lg:col-span-7 space-y-6">
+        <!-- Left Column: Checkout Steps & Forms -->
+        <div class="lg:col-span-8 space-y-6">
           
-          <!-- 1. Alamat Pengiriman -->
-          <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-            <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">1. Shipping Destination</h3>
+          <!-- STEP 1: Alamat Pengiriman -->
+          <div class="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+            <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div class="flex items-center gap-3">
+                <span class="w-7 h-7 rounded-full bg-[#1b4332] text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                <h2 class="font-extrabold text-gray-900 text-lg">Shipping Destination</h2>
+              </div>
+              <CButton
+                to="/profile"
+                variant="outline"
+                size="sm"
+                class="text-xs"
+              >
+                <span>Manage Addresses</span>
+              </CButton>
+            </div>
             
-            <div v-if="addressVm.isLoading.value" class="flex flex-col items-center justify-center py-6 space-y-2">
-              <div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#1b4332]"></div>
-              <p class="text-gray-400 text-xs">Fetching address cards...</p>
+            <div v-if="addressVm.isLoading.value" class="flex flex-col items-center justify-center py-8 space-y-3">
+              <div class="w-6 h-6 rounded-full border-2 border-gray-200 border-t-[#1b4332] animate-spin"></div>
+              <p class="text-gray-400 text-xs font-medium">Loading destination addresses...</p>
             </div>
 
-            <div class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4" v-else-if="addressVm.addresses.value.length === 0">
-              <p class="text-sm text-gray-500">No addresses registered to your profile.</p>
-              <NuxtLink to="/profile" class="text-xs font-bold text-[#1b4332] underline mt-1 inline-block">Add address in Profile Settings</NuxtLink>
+            <!-- Empty Address State -->
+            <div v-else-if="addressVm.addresses.value.length === 0" class="text-center py-8 border-2 border-dashed border-gray-200 rounded-2xl p-6 space-y-3">
+              <div class="w-12 h-12 rounded-full bg-emerald-50 text-[#1b4332] flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+              </div>
+              <p class="text-sm font-semibold text-gray-800">No shipping addresses found</p>
+              <p class="text-xs text-gray-500 max-w-sm mx-auto">Please add your event delivery location in your profile settings before continuing.</p>
+              <div class="pt-2">
+                <CButton
+                  to="/profile"
+                  variant="primary"
+                  size="sm"
+                >
+                  <span>Add Address in Profile</span>
+                </CButton>
+              </div>
             </div>
 
-            <div class="space-y-3" v-else>
+            <!-- Address Radio Card Selection -->
+            <div v-else class="space-y-3">
               <label 
                 v-for="addr in addressVm.addresses.value" 
                 :key="addr.address_id"
-                :class="['border rounded-2xl p-4 flex items-start gap-4 cursor-pointer transition-all', selectedAddressId === addr.address_id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300', (isLoadingCalculate || isLoadingCheckout) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '']"
+                :class="[
+                  'border rounded-2xl p-4.5 sm:p-5 flex items-start gap-4 cursor-pointer transition-all duration-200 select-none',
+                  selectedAddressId === addr.address_id 
+                    ? 'border-[#1b4332] bg-emerald-50/25 ring-1 ring-[#1b4332] shadow-2xs' 
+                    : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50/50',
+                  (isLoadingCalculate || isLoadingCheckout) ? 'opacity-60 pointer-events-none cursor-not-allowed' : ''
+                ]"
               >
-                <input 
-                  type="radio" 
-                  v-model="selectedAddressId" 
-                  :value="addr.address_id" 
-                  :disabled="isLoadingCalculate || isLoadingCheckout"
-                  class="mt-1 accent-[#1b4332]" 
-                />
-                <div class="flex-1 text-xs">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="font-bold text-gray-900">{{ addr.receiver_name }}</span>
-                    <span class="bg-emerald-100 text-emerald-800 font-bold text-[9px] px-2 py-0.2 rounded-full" v-if="addr.is_default">Default</span>
+                <!-- Custom Radio Button Indicator -->
+                <div class="mt-0.5 relative flex items-center justify-center shrink-0">
+                  <input 
+                    type="radio" 
+                    v-model="selectedAddressId" 
+                    :value="addr.address_id" 
+                    :disabled="isLoadingCalculate || isLoadingCheckout"
+                    class="sr-only" 
+                  />
+                  <div 
+                    class="w-5 h-5 rounded-full border transition-all flex items-center justify-center"
+                    :class="selectedAddressId === addr.address_id ? 'border-[#1b4332] bg-[#1b4332]' : 'border-gray-300 bg-white'"
+                  >
+                    <div v-if="selectedAddressId === addr.address_id" class="w-2 h-2 rounded-full bg-white"></div>
                   </div>
-                  <p class="text-gray-600 font-semibold mb-1">📞 {{ addr.phone }}</p>
-                  <p class="text-gray-500 leading-normal">{{ addr.full_address }}, {{ addr.postal_code }}</p>
+                </div>
+
+                <div class="flex-1 min-w-0 text-xs sm:text-sm">
+                  <div class="flex items-center flex-wrap gap-2 mb-1.5">
+                    <span class="font-bold text-gray-900 text-sm sm:text-base">{{ addr.receiver_name }}</span>
+                    <span v-if="addr.is_default" class="bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      Default
+                    </span>
+                  </div>
+
+                  <!-- Contact Phone -->
+                  <div class="flex items-center gap-1.5 text-gray-600 font-medium mb-1 text-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                    </svg>
+                    <span>{{ addr.phone }}</span>
+                  </div>
+
+                  <!-- Full Address -->
+                  <div class="flex items-start gap-1.5 text-gray-500 leading-relaxed text-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                    </svg>
+                    <span>{{ addr.full_address }}<span v-if="addr.postal_code">, {{ addr.postal_code }}</span></span>
+                  </div>
                 </div>
               </label>
             </div>
           </div>
 
-          <!-- 2. Ringkasan Papan Bunga & Kurir Per Toko -->
-          <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-            <div class="flex justify-between items-center border-b border-gray-50 pb-4">
-              <h3 class="font-bold text-gray-900 text-lg">2. Review Ordered Flower Boards</h3>
-              <div v-if="isLoadingCalculate" class="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
-                <div class="animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-b-2 border-emerald-700"></div>
-                <span>Recalculating...</span>
+          <!-- STEP 2: Ringkasan Papan Bunga & Kurir Per Toko -->
+          <div class="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+              <div class="flex items-center gap-3">
+                <span class="w-7 h-7 rounded-full bg-[#1b4332] text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                <h2 class="font-extrabold text-gray-900 text-lg">Review Items & Courier</h2>
+              </div>
+              <div v-if="isLoadingCalculate" class="flex items-center gap-1.5 text-xs text-emerald-800 font-semibold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                <div class="w-3 h-3 rounded-full border-2 border-emerald-700 border-t-transparent animate-spin"></div>
+                <span>Recalculating rates...</span>
               </div>
             </div>
 
+            <!-- Shops and items -->
             <div v-if="checkoutData" class="space-y-6">
-              <div v-for="shop in checkoutData.shops" :key="shop.shop_id" class="border border-gray-100 rounded-2xl p-5 space-y-4 shadow-sm">
+              <div 
+                v-for="shop in checkoutData.shops" 
+                :key="shop.shop_id" 
+                class="border border-gray-200/80 rounded-2xl p-5 sm:p-6 space-y-5 bg-white shadow-2xs"
+              >
                 <!-- Header Toko -->
-                <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-gray-100 gap-2">
                   <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Seller Shop ID:</span>
-                    <span class="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">{{ shop.shop_id.slice(0, 8) }}...</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-800 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
+                    </svg>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Fulfilled by:</span>
+                    <span class="text-xs font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md">{{ shop.name || 'Chia Florist Branch' }}</span>
                   </div>
-                  <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Subtotal: {{ formatRupiah(shop.subtotal) }}</span>
+                  <span class="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 self-start sm:self-auto">
+                    Subtotal: {{ formatRupiah(shop.subtotal) }}
+                  </span>
                 </div>
                 
                 <!-- Items list in this shop -->
-                <div class="divide-y divide-gray-50">
-                  <div v-for="item in shop.items" :key="item.product_id" class="flex gap-4 items-center py-3 first:pt-0 last:pb-0">
-                    <div class="w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                      <img :src="getCartProductImage(item.product_id)" :alt="item.name" class="w-full h-full object-cover" />
+                <div class="divide-y divide-gray-100">
+                  <div 
+                    v-for="item in shop.items" 
+                    :key="item.product_id" 
+                    class="flex gap-4 items-center py-4 first:pt-0 last:pb-0"
+                  >
+                    <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0 relative">
+                      <img 
+                        :src="getCartProductImage(item.product_id || '')" 
+                        :alt="item.name" 
+                        class="w-full h-full object-cover" 
+                      />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <h4 class="font-bold text-gray-900 text-sm truncate">{{ item.name }}</h4>
-                      <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-400 mt-1 font-semibold">
-                        <span>Qty: {{ item.quantity }}</span>
-                        <span>|</span>
-                        <span>Price: {{ formatRupiah(item.price) }}</span>
-                        <span v-if="(item as any).size">| Size: {{ (item as any).size }}</span>
-                        <span v-if="(item as any).color" class="flex items-center gap-1">
-                          | Color:
+                      <h3 class="font-bold text-gray-900 text-sm truncate leading-snug">{{ item.name }}</h3>
+                      <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-gray-500 mt-1 font-medium">
+                        <span class="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">Qty: {{ item.quantity }}</span>
+                        <span>•</span>
+                        <span>{{ formatRupiah(item.price) }}</span>
+                        <span v-if="(item as any).size" class="text-gray-400">• Size: {{ (item as any).size }}</span>
+                        <div v-if="(item as any).color" class="flex items-center gap-1 text-gray-400">
+                          <span>• Color:</span>
                           <span :style="{ backgroundColor: (item as any).color }" class="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block"></span>
+                        </div>
+                        <span v-if="(item as any).custom_design || item.product_variant_type === 'custom'" class="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-emerald-200">
+                          Custom Design
                         </span>
                       </div>
                     </div>
-                    <div class="text-sm font-extrabold text-gray-900 text-right">
+                    <div class="text-sm sm:text-base font-extrabold text-gray-900 text-right shrink-0">
                       {{ formatRupiah(item.subtotal) }}
                     </div>
                   </div>
                 </div>
 
-                <!-- Kurir untuk Toko ini -->
-                <div class="bg-gray-50/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100">
-                  <div class="text-xs font-bold text-gray-500">
-                    🚚 Choose Delivery Courier:
+                <!-- Courier Dropdown Section -->
+                <div class="bg-gray-50/70 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 border border-gray-200/80">
+                  <div class="flex items-center gap-2 text-xs font-bold text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#1b4332] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                    </svg>
+                    <span>Delivery Courier Service:</span>
                   </div>
-                  <div class="flex items-center">
+
+                  <div class="flex items-center w-full sm:w-auto">
                     <select 
                       :value="getCourierSelectValue(shop.shop_id)"
                       @change="handleCourierChange(shop.shop_id, $event)"
                       :disabled="isLoadingCalculate || isLoadingCheckout"
-                      class="bg-white border border-gray-200 rounded-xl text-xs p-2.5 outline-none focus:border-emerald-700 transition-all font-bold cursor-pointer text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-full sm:w-auto bg-white border border-gray-200 rounded-xl text-xs sm:text-sm px-4 py-3 outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all font-bold cursor-pointer text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
                     >
                       <option 
                         v-for="courier in getCourierOptions(shop.shop_id)" 
@@ -824,11 +954,11 @@ const handlePlaceOrder = async () => {
             <!-- Fallback UI apabila data backend checkout gagal termuat -->
             <div v-else class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               <div v-for="(item, idx) in checkoutItems" :key="idx" class="flex gap-4 items-center py-4 first:pt-0 last:pb-0">
-                <div class="w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+                <div class="w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0">
                   <img :src="item.image || '/images/custom-preview.png'" :alt="item.name" class="w-full h-full object-cover" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <h4 class="font-bold text-gray-900 text-sm truncate">{{ item.name }}</h4>
+                  <h3 class="font-bold text-gray-900 text-sm truncate">{{ item.name }}</h3>
                   <p class="text-xs text-gray-400 mt-1 font-semibold">Qty: {{ item.quantity }} | Size: {{ item.size || 'Standard' }}</p>
                 </div>
                 <div class="text-sm font-extrabold text-gray-900 text-right">
@@ -837,66 +967,108 @@ const handlePlaceOrder = async () => {
               </div>
             </div>
           </div>
-          <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-            <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">3. Payment Method</h3>
+
+          <!-- STEP 3: Payment Method -->
+          <div class="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+            <div class="flex items-center gap-3 border-b border-gray-100 pb-4">
+              <span class="w-7 h-7 rounded-full bg-[#1b4332] text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
+              <h2 class="font-extrabold text-gray-900 text-lg">Payment Gateway Channel</h2>
+            </div>
             
-            <!-- Backend Payment Methods Selection (Always Visible) -->
             <div class="space-y-4">
-              <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Select Payment Gateway Channel:</div>
-              <div v-if="paymentMethods.length === 0" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-2xl p-4">
-                <p class="text-sm text-gray-500">No payment methods available.</p>
+              <div v-if="paymentMethods.length === 0" class="text-center py-8 border-2 border-dashed border-gray-200 rounded-2xl p-4">
+                <p class="text-sm text-gray-500 font-medium">No payment channels currently available.</p>
               </div>
 
-              <div v-else class="space-y-3">
+              <div v-else class="space-y-3.5">
                 <!-- Iterate over payment categories (types) -->
                 <div 
                   v-for="type in paymentMethodTypes" 
                   :key="type" 
-                  class="border border-gray-100 rounded-2xl overflow-hidden transition-all duration-300"
-                  :class="[openedCategories[type] ? 'border-[#1b4332] shadow-sm' : 'hover:border-gray-200']"
+                  class="border border-gray-200 rounded-2xl overflow-hidden transition-all duration-200"
+                  :class="[openedCategories[type] ? 'border-[#1b4332] shadow-2xs' : 'hover:border-gray-300']"
                 >
                   <!-- Accordion Header -->
                   <button
                     type="button"
                     @click="toggleCategory(type)"
                     :disabled="isLoadingCalculate || isLoadingCheckout"
-                    class="w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-50/80 transition-all font-bold text-xs text-gray-700 text-left outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    class="w-full flex items-center justify-between p-4 bg-gray-50/70 hover:bg-gray-100/70 transition-all font-bold text-xs sm:text-sm text-gray-800 text-left outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm" v-if="type === 'ewallet'">📱</span>
-                      <span class="text-sm" v-else-if="type === 'bank_transfer'">🏦</span>
-                      <span class="text-sm" v-else-if="type === 'qr_code'">🔍</span>
-                      <span class="text-sm" v-else>💳</span>
+                    <div class="flex items-center gap-2.5">
+                      <!-- Category Icons -->
+                      <div class="w-7 h-7 rounded-lg bg-white border border-gray-200 text-[#1b4332] flex items-center justify-center shrink-0">
+                        <svg v-if="type === 'ewallet'" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+                        </svg>
+                        <svg v-else-if="type === 'bank_transfer'" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5m-15 10.5V10.5M3 21h18M3 9h18" />
+                        </svg>
+                        <svg v-else-if="type === 'qr_code'" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                        </svg>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                        </svg>
+                      </div>
                       <span>{{ formatPaymentType(type) }}</span>
                     </div>
-                    <span class="text-xs transition-transform duration-300" :class="[openedCategories[type] ? 'rotate-180' : '']">
-                      ▼
-                    </span>
+
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      class="w-4 h-4 text-gray-400 transition-transform duration-200" 
+                      :class="[openedCategories[type] ? 'rotate-180 text-gray-700' : '']"
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor" 
+                      stroke-width="2.5"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
                   </button>
 
                   <!-- Accordion Content: Vertical Flat Radio List -->
                   <div 
                     v-show="openedCategories[type]" 
-                    class="p-4 bg-white border-t border-gray-50 flex flex-col space-y-2"
+                    class="p-4 bg-white border-t border-gray-100 flex flex-col space-y-2.5"
                   >
                     <label 
                       v-for="method in paymentMethodsGroupedByType[type]" 
                       :key="method.id"
-                      :class="['border rounded-xl p-3.5 flex items-center justify-between gap-3.5 cursor-pointer transition-all', selectedPaymentMethodId === method.id ? 'border-[#1b4332] bg-emerald-50/5' : 'border-gray-200 hover:border-gray-300', (isLoadingCalculate || isLoadingCheckout) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '']"
+                      :class="[
+                        'border rounded-xl px-4 py-3 flex items-center justify-between gap-3.5 cursor-pointer transition-all duration-200 select-none',
+                        selectedPaymentMethodId === method.id 
+                          ? 'border-[#1b4332] bg-emerald-50/25 ring-1 ring-[#1b4332] shadow-2xs' 
+                          : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50/50',
+                        (isLoadingCalculate || isLoadingCheckout) ? 'opacity-60 pointer-events-none cursor-not-allowed' : ''
+                      ]"
                     >
                       <div class="flex items-center gap-3">
-                        <input 
-                          type="radio" 
-                          v-model="selectedPaymentMethodId" 
-                          :value="method.id" 
-                          :disabled="isLoadingCalculate || isLoadingCheckout"
-                          class="accent-[#1b4332]" 
-                        />
-                        <span class="font-bold text-gray-900 text-xs">{{ method.name }}</span>
+                        <div class="relative flex items-center justify-center shrink-0">
+                          <input 
+                            type="radio" 
+                            v-model="selectedPaymentMethodId" 
+                            :value="method.id" 
+                            :disabled="isLoadingCalculate || isLoadingCheckout"
+                            class="sr-only" 
+                          />
+                          <div 
+                            class="w-4.5 h-4.5 rounded-full border transition-all flex items-center justify-center"
+                            :class="selectedPaymentMethodId === method.id ? 'border-[#1b4332] bg-[#1b4332]' : 'border-gray-300 bg-white'"
+                          >
+                            <div v-if="selectedPaymentMethodId === method.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                          </div>
+                        </div>
+                        <span class="font-bold text-gray-900 text-xs sm:text-sm">{{ method.name }}</span>
                       </div>
-                      <div class="text-right text-xs">
-                        <span class="text-emerald-700 font-bold" v-if="method.fee > 0">Fee: {{ formatRupiah(method.fee) }}</span>
-                        <span class="text-emerald-700 font-bold text-[10px]" v-else>Free Fee</span>
+
+                      <div class="text-right">
+                        <span v-if="method.fee > 0" class="text-emerald-800 font-bold text-xs bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                          Fee: {{ formatRupiah(method.fee) }}
+                        </span>
+                        <span v-else class="text-emerald-800 font-bold text-[11px] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                          Free Fee
+                        </span>
                       </div>
                     </label>
                   </div>
@@ -906,14 +1078,14 @@ const handlePlaceOrder = async () => {
           </div>
         </div>
 
-        <!-- Sidebar Summary Tagihan -->
-        <div class="lg:col-span-4 space-y-6">
-          <div class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-            <h3 class="font-bold text-gray-900 text-lg border-b border-gray-50 pb-4">Billing Summary</h3>
+        <!-- Right Column: Sidebar Summary Tagihan -->
+        <div class="lg:col-span-4 space-y-6 sticky top-24">
+          <div class="bg-white border border-gray-100 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+            <h2 class="font-extrabold text-gray-900 text-lg border-b border-gray-100 pb-4">Billing Summary</h2>
             
-            <div class="space-y-4 text-sm font-medium text-gray-600">
+            <div class="space-y-3.5 text-xs sm:text-sm font-medium text-gray-600">
               <div class="flex justify-between items-center">
-                <span>Subtotal</span>
+                <span>Items Subtotal</span>
                 <span class="text-gray-900 font-bold">{{ formatRupiah(liveSubtotal) }}</span>
               </div>
               
@@ -923,38 +1095,47 @@ const handlePlaceOrder = async () => {
               </div>
 
               <div class="flex justify-between items-center">
-                <span>Payment Fee</span>
+                <span>Payment Processing Fee</span>
                 <span class="text-gray-900 font-bold">
                   {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
                 </span>
               </div>
               
-              <div class="flex justify-between items-center" v-if="discount > 0">
+              <div class="flex justify-between items-center text-emerald-700" v-if="discount > 0">
                 <span>Promo Discount</span>
                 <span class="font-bold">-{{ formatRupiah(discount) }}</span>
               </div>
               
-              <div class="border-t border-gray-100 pt-4 flex justify-between items-center text-base font-bold text-gray-900">
-                <span>Total Bill</span>
-                <span class="text-2xl font-black text-[#1b4332]">
+              <div class="border-t border-gray-100 pt-4 flex justify-between items-baseline">
+                <span class="text-sm font-bold text-gray-900">Total Bill</span>
+                <span class="text-2xl font-black text-[#1b4332] tracking-tight">
                   {{ formatRupiah(liveTotalPayment) }}
                 </span>
               </div>
             </div>
 
-            <button 
+            <!-- Primary CTA Action Button using CButton -->
+            <CButton 
               @click="handlePlaceOrder"
               :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || paymentMethods.length === 0 || !selectedPaymentMethodId"
-              class="w-full bg-[#1b4332] hover:bg-[#143326] disabled:bg-gray-300 text-white font-bold py-4 rounded-xl transition shadow-md hover:shadow-lg text-center text-sm tracking-wide cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
+              :loading="isProcessing"
+              variant="primary"
+              size="lg"
+              full-width
+              class="shadow-xs hover:shadow"
             >
-              <span v-if="isProcessing">Processing Order...</span>
-              <span v-else>Confirm & Pay Now</span>
-            </button>
+              <span>Confirm & Pay Now</span>
+            </CButton>
           </div>
           
-          <div class="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex gap-3 items-center text-emerald-800">
-            <span class="text-2xl">🔒</span>
-            <p class="text-xs font-medium leading-normal">Your payment request is fully managed under a cryptographically secured end-to-end sandbox module.</p>
+          <!-- Cryptographic Security Card -->
+          <div class="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 flex gap-3.5 items-start text-emerald-900">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            <p class="text-xs font-medium leading-relaxed">
+              Your payment request is cryptographically protected and processed securely with verified payment gateway channels.
+            </p>
           </div>
         </div>
 

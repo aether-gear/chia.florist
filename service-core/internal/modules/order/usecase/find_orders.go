@@ -66,6 +66,7 @@ type OrderSearchResult struct {
 	Payment     *paymentDomain.Payment
 	ChannelData *paymentDomain.PaymentChannelData
 	Shipment    *shipmentDomain.Shipment
+	Shipments   []shipmentDomain.Shipment
 	Address     *addressDomain.CustomerAddress
 }
 
@@ -147,10 +148,9 @@ func (u *FindOrdersUsecase) Execute(
 		Sorts: sorts,
 	}
 
-	orders, total, err := u.orderRepo.
-		FindOrders(ctx, u.executor,
-			params,
-		)
+	orders, total, err := u.orderRepo.FindOrders(ctx, u.executor,
+		params,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list orders: %w", err)
 	}
@@ -163,26 +163,23 @@ func (u *FindOrdersUsecase) Execute(
 		orderIDs[i] = o.ID
 	}
 
-	orderItems, err := u.orderItemRepo.
-		ListByOrderIDs(ctx, u.executor,
-			orderIDs,
-		)
+	orderItems, err := u.orderItemRepo.ListByOrderIDs(ctx, u.executor,
+		orderIDs,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list order items: %w", err)
 	}
 
-	payments, err := u.paymentRepo.
-		ListByOrderIDs(ctx, u.executor,
-			orderIDs,
-		)
+	payments, err := u.paymentRepo.ListByOrderIDs(ctx, u.executor,
+		orderIDs,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list payments: %w", err)
 	}
 
-	shipments, err := u.shipmentRepo.
-		ListByOrderIDs(ctx, u.executor,
-			orderIDs,
-		)
+	shipments, err := u.shipmentRepo.ListByOrderIDs(ctx, u.executor,
+		orderIDs,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list shipments: %w", err)
 	}
@@ -204,18 +201,17 @@ func (u *FindOrdersUsecase) Execute(
 		paymentIDs = append(paymentIDs, payments[i].ID)
 	}
 
-	channelDataMap, err := u.paymentChannelDataRepo.
-		ListByPaymentIDs(ctx, u.executor,
-			paymentIDs,
-		)
+	channelDataMap, err := u.paymentChannelDataRepo.ListByPaymentIDs(ctx, u.executor,
+		paymentIDs,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list payment channel data: %w", err)
 	}
 
-	shipmentsMap := make(map[uuid.UUID]*shipmentDomain.Shipment)
+	shipmentsMap := make(map[uuid.UUID][]shipmentDomain.Shipment)
 	for i := range shipments {
 		s := shipments[i]
-		shipmentsMap[s.OrderID] = &s
+		shipmentsMap[s.OrderID] = append(shipmentsMap[s.OrderID], s)
 	}
 
 	addressIDs := make([]uuid.UUID, 0, len(orders))
@@ -227,10 +223,9 @@ func (u *FindOrdersUsecase) Execute(
 		}
 	}
 
-	addresses, err := u.addressRepo.
-		ListByIDs(ctx, u.executor,
-			addressIDs,
-		)
+	addresses, err := u.addressRepo.ListByIDs(ctx, u.executor,
+		addressIDs,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list customer addresses: %w", err)
 	}
@@ -255,12 +250,34 @@ func (u *FindOrdersUsecase) Execute(
 			channelData = channelDataMap[payment.ID]
 		}
 
+		orderShipments := shipmentsMap[o.ID]
+		if orderShipments == nil {
+			orderShipments = []shipmentDomain.Shipment{}
+		}
+
+		for j := range orderShipments {
+			var itemIDs []uuid.UUID
+			for _, itm := range items {
+				if itm.ShipmentID != nil &&
+					*itm.ShipmentID == orderShipments[j].ID {
+					itemIDs = append(itemIDs, itm.ID)
+				}
+			}
+			orderShipments[j].ItemIDs = itemIDs
+		}
+
+		var firstShipment *shipmentDomain.Shipment
+		if len(orderShipments) > 0 {
+			firstShipment = &orderShipments[0]
+		}
+
 		results[i] = OrderSearchResult{
 			Order:       o,
 			Items:       items,
 			Payment:     payment,
 			ChannelData: channelData,
-			Shipment:    shipmentsMap[o.ID],
+			Shipment:    firstShipment,
+			Shipments:   orderShipments,
 			Address:     addressesMap[o.AddressID],
 		}
 	}

@@ -40,6 +40,14 @@ type createOrderRequest struct {
 	Shops           []createOrderShopRequest  `json:"shops"`
 }
 
+type shipmentDispatchRequest struct {
+	FulfillmentMethod string   `json:"fulfillment_method"`
+	Courier           string   `json:"courier"`
+	Service           string   `json:"service"`
+	TrackingNumber    *string  `json:"tracking_number"`
+	ItemIDs           []string `json:"item_ids"`
+}
+
 type updateOrderStatusRequest struct {
 	Status string `json:"status"`
 
@@ -51,6 +59,9 @@ type updateOrderStatusRequest struct {
 	// FulfillmentMethod is optional. Chooses who delivers the order: "courier"
 	// or "self_delivery". If not specified, it defaults to "courier".
 	FulfillmentMethod *string `json:"fulfillment_method"`
+
+	// Shipments allows explicit multi-shipment (split shipment) dispatching.
+	Shipments []shipmentDispatchRequest `json:"shipments,omitempty"`
 }
 
 // ---- Response DTOs ----
@@ -71,6 +82,7 @@ type createOrderResponse struct {
 
 type orderItemResponse struct {
 	ID                 string  `json:"id"`
+	ShipmentID         *string `json:"shipment_id,omitempty"`
 	ProductID          *string `json:"product_id,omitempty"`
 	ProductVariantType string  `json:"product_variant_type"`
 	IsCustom           bool    `json:"is_custom"`
@@ -112,6 +124,7 @@ type shipmentEventResponse struct {
 
 type shipmentDetailResponse struct {
 	ID                string                  `json:"id"`
+	OrderID           string                  `json:"order_id"`
 	Status            string                  `json:"status"`
 	FulfillmentMethod string                  `json:"fulfillment_method"`
 	Courier           string                  `json:"courier"`
@@ -120,6 +133,7 @@ type shipmentDetailResponse struct {
 	Cost              int64                   `json:"cost"`
 	CreatedAt         time.Time               `json:"created_at"`
 	Events            []shipmentEventResponse `json:"events,omitempty"`
+	ItemIDs           []string                `json:"item_ids,omitempty"`
 }
 
 type orderAddressResponse struct {
@@ -137,20 +151,23 @@ type orderAddressResponse struct {
 }
 
 type orderResponse struct {
-	ID          string                  `json:"id"`
-	Number      string                  `json:"number"`
-	CustomerID  string                  `json:"customer_id"`
-	AddressID   string                  `json:"address_id"`
-	Status      string                  `json:"status"`
-	Subtotal    int64                   `json:"subtotal"`
-	ShippingFee int64                   `json:"shipping_fee"`
-	Total       int64                   `json:"total"`
-	CreatedAt   time.Time               `json:"created_at"`
-	UpdatedAt   *time.Time              `json:"updated_at,omitempty"`
-	Items       []orderItemResponse     `json:"items"`
-	Payment     *paymentDetailResponse  `json:"payment,omitempty"`
-	Shipment    *shipmentDetailResponse `json:"shipment,omitempty"`
-	Address     *orderAddressResponse   `json:"address,omitempty"`
+	ID                string                   `json:"id"`
+	Number            string                   `json:"number"`
+	CustomerID        string                   `json:"customer_id"`
+	AddressID         string                   `json:"address_id"`
+	Status            string                   `json:"status"`
+	Subtotal          int64                    `json:"subtotal"`
+	ShippingFee       int64                    `json:"shipping_fee"`
+	Total             int64                    `json:"total"`
+	ConfirmedAt       *time.Time               `json:"confirmed_at,omitempty"`
+	HandlingExpiresAt *time.Time               `json:"handling_expires_at,omitempty"`
+	CreatedAt         time.Time                `json:"created_at"`
+	UpdatedAt         *time.Time               `json:"updated_at,omitempty"`
+	Items             []orderItemResponse      `json:"items"`
+	Payment           *paymentDetailResponse   `json:"payment,omitempty"`
+	Shipment          *shipmentDetailResponse  `json:"shipment,omitempty"`
+	Shipments         []shipmentDetailResponse `json:"shipments"`
+	Address           *orderAddressResponse    `json:"address,omitempty"`
 }
 
 type trackingTimelineEventResponse struct {
@@ -165,5 +182,6 @@ type orderTrackingResponse struct {
 	ShipmentID     string                          `json:"shipment_id"`
 	Courier        string                          `json:"courier"`
 	TrackingNumber *string                         `json:"tracking_number,omitempty"`
+	Warning        *string                         `json:"warning,omitempty"`
 	Timeline       []trackingTimelineEventResponse `json:"timeline"`
 }

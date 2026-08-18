@@ -28,11 +28,13 @@ func NewFindShopsUsecase(
 }
 
 type FindShopsInput struct {
-	Page  int
-	Limit int
-	ID    *string
-	Name  *string
-	Sort  string
+	Page           int
+	Limit          int
+	ID             *string
+	Name           *string
+	IsActive       *bool
+	ApprovalStatus *string
+	Sort           string
 }
 
 func (u *FindShopsUsecase) Execute(
@@ -85,9 +87,17 @@ func (u *FindShopsUsecase) Execute(
 		}
 	}
 
+	approvalStatus := input.ApprovalStatus
+	if approvalStatus == nil && input.IsActive != nil && *input.IsActive {
+		approvedStr := string(domain.ShopApprovalStatusApproved)
+		approvalStatus = &approvedStr
+	}
+
 	params := repository.FindShopsParams{
-		ID:   input.ID,
-		Name: input.Name,
+		ID:             input.ID,
+		Name:           input.Name,
+		IsActive:       input.IsActive,
+		ApprovalStatus: approvalStatus,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,
@@ -106,3 +116,4 @@ func (u *FindShopsUsecase) Execute(
 
 	return shops, total, nil
 }
+

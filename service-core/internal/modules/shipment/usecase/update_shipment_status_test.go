@@ -56,6 +56,10 @@ func (m *mockShipmentRepo) GetByOrderID(_ context.Context, _ transaction.Executo
 	return nil, nil
 }
 
+func (m *mockShipmentRepo) ListByOrderID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]domain.Shipment, error) {
+	return nil, nil
+}
+
 func (m *mockShipmentRepo) ListByOrderIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) ([]domain.Shipment, error) {
 	return nil, nil
 }

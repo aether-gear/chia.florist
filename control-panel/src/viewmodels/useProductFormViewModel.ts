@@ -81,16 +81,17 @@ export function useProductFormViewModel() {
 
   const saveProduct = async (
     data: ProductFormValues,
-    inventoriesList: InventorySyncItem[]
+    inventoriesList: InventorySyncItem[],
+    imageFile?: File | null
   ) => {
     setSaving(true);
     setError(null);
     setSuccess(false);
     try {
       const isEdit = !!data.id;
-      
-      // 1. Save product
-      await fetchApi('/products', {
+
+      // 1. Create or update product row in database first
+      const saveRes = await fetchApi('/products', {
         method: 'POST',
         body: JSON.stringify({
           id: data.id || undefined,
@@ -104,17 +105,33 @@ export function useProductFormViewModel() {
         }),
       });
 
-      // 2. Resolve product ID (if creating)
-      let productId = data.id;
-      if (!isEdit) {
-        const searchRes = await fetchApi(`/products?name=${encodeURIComponent(data.name)}&limit=1`);
-        const createdProduct = searchRes?.products?.[0];
-        if (createdProduct && createdProduct.name === data.name) {
-          productId = createdProduct.id;
+      // 2. Resolve product ID
+      let productId = data.id || saveRes?.id || saveRes?.product?.id || saveRes?.data?.id;
+      if (!isEdit && !productId) {
+        const searchRes = await fetchApi(`/products?name=${encodeURIComponent(data.name)}&sort=date:desc&limit=10`);
+        const found = searchRes?.products?.find(
+          (p: any) => p.sku === data.sku || p.name?.toLowerCase() === data.name?.toLowerCase()
+        );
+        if (found) {
+          productId = found.id;
         }
       }
 
-      // 3. Sync inventories
+      // 3. Upload image if attached (product now exists in DB)
+      if (imageFile && productId) {
+        try {
+          const formData = new FormData();
+          formData.append('image', imageFile);
+          await fetchApi(`/products/id/${productId}/images`, {
+            method: 'POST',
+            body: formData,
+          });
+        } catch (imgErr: any) {
+          console.error('Image upload warning:', imgErr);
+        }
+      }
+
+      // 4. Sync shop inventories
       if (productId) {
         await syncInventories(productId, inventoriesList);
       }

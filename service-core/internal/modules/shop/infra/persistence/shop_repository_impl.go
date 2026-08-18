@@ -37,6 +37,7 @@ func (r *shopRepositoryImpl) FindByParams(
 			s.slug,
 			s.description,
 			s.is_active,
+			s.approval_status,
 			s.created_at,
 			s.updated_at
 	`
@@ -63,6 +64,18 @@ func (r *shopRepositoryImpl) FindByParams(
 	if params.Name != nil {
 		conditions = append(conditions, fmt.Sprintf("s.name ILIKE $%d", argPos))
 		args = append(args, "%"+*params.Name+"%")
+		argPos++
+	}
+
+	if params.IsActive != nil {
+		conditions = append(conditions, fmt.Sprintf("s.is_active = $%d", argPos))
+		args = append(args, *params.IsActive)
+		argPos++
+	}
+
+	if params.ApprovalStatus != nil {
+		conditions = append(conditions, fmt.Sprintf("s.approval_status = $%d", argPos))
+		args = append(args, *params.ApprovalStatus)
 		argPos++
 	}
 
@@ -153,6 +166,7 @@ func (r *shopRepositoryImpl) FindByParams(
 			&s.Slug,
 			&s.Description,
 			&s.IsActive,
+			&s.ApprovalStatus,
 			&s.CreatedAt,
 			&s.UpdatedAt,
 		)
@@ -182,10 +196,12 @@ func (r *shopRepositoryImpl) GetByID(
 			slug,
 			description,
 			is_active,
+			approval_status,
 			created_at,
-			updated_at
+			updated_at,
+			deleted_at
 		FROM shops
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -196,8 +212,10 @@ func (r *shopRepositoryImpl) GetByID(
 		&s.Slug,
 		&s.Description,
 		&s.IsActive,
+		&s.ApprovalStatus,
 		&s.CreatedAt,
 		&s.UpdatedAt,
+		&s.DeletedAt,
 	)
 
 	if err != nil {
@@ -226,10 +244,12 @@ func (r *shopRepositoryImpl) FindByIDs(
 			s.slug,
 			s.description,
 			s.is_active,
+			s.approval_status,
 			s.created_at,
-			s.updated_at
+			s.updated_at,
+			s.deleted_at
 		FROM shops s
-		WHERE s.id = ANY($1::uuid[])
+		WHERE s.id = ANY($1::uuid[]) AND s.deleted_at IS NULL
 	`
 
 	shopIDStrings := make([]string, len(ids))
@@ -252,8 +272,10 @@ func (r *shopRepositoryImpl) FindByIDs(
 			&s.Slug,
 			&s.Description,
 			&s.IsActive,
+			&s.ApprovalStatus,
 			&s.CreatedAt,
 			&s.UpdatedAt,
+			&s.DeletedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("mapping shop model to domain failed: %w", err)
@@ -274,6 +296,11 @@ func (r *shopRepositoryImpl) Save(
 	exec transaction.Executor,
 	shop domain.Shop,
 ) error {
+	approvalStatus := shop.ApprovalStatus
+	if approvalStatus == "" {
+		approvalStatus = domain.ShopApprovalStatusPending
+	}
+
 	query := `
 		INSERT INTO shops (
 			id,
@@ -281,16 +308,19 @@ func (r *shopRepositoryImpl) Save(
 			name,
 			description,
 			is_active,
+			approval_status,
 			created_at
 		) VALUES (
-			$1,$2,$3,$4,$5,$6
+			$1,$2,$3,$4,$5,$6,$7
 		)
 		ON CONFLICT (id)
 		DO UPDATE SET
 			slug = EXCLUDED.slug,
 			name = EXCLUDED.name,
 			description = EXCLUDED.description,
-			is_active = EXCLUDED.is_active
+			is_active = EXCLUDED.is_active,
+			approval_status = EXCLUDED.approval_status,
+			updated_at = NOW()
 	`
 
 	_, err := exec.Exec(ctx, query,
@@ -299,6 +329,7 @@ func (r *shopRepositoryImpl) Save(
 		shop.Name,
 		shop.Description,
 		shop.IsActive,
+		approvalStatus,
 		shop.CreatedAt,
 	)
 
@@ -307,3 +338,27 @@ func (r *shopRepositoryImpl) Save(
 	}
 	return nil
 }
+
+func (r *shopRepositoryImpl) Delete(
+	ctx context.Context,
+	exec transaction.Executor,
+	id uuid.UUID,
+) error {
+	query := `
+		UPDATE shops
+		SET
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE
+			id = $1
+			AND deleted_at IS NULL
+	`
+
+	_, err := exec.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete shop failed: %w", err)
+	}
+
+	return nil
+}
+

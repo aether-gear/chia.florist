@@ -36,5 +36,11 @@ type ShopRepository interface {
 	) error
 	// Update(shop domain.Shop) error
 
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		id uuid.UUID,
+	) error
+
 	// GetSupportedCouriers(shopID uuid.UUID) ([]Courier, error)
 }

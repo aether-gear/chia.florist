@@ -1,15 +1,20 @@
 // app/types/cart.ts
 
 export interface BackendCartItem {
-  product_id: string
+  cart_item_id: string
+  product_variant_type: 'standard' | 'custom'
+  product_id: string | null
   shop_id: string
+  shop_name: string
+  shop_slug: string
   name: string
   price: number
-  subtotal: number
   quantity: number
+  subtotal: number
   images: {
-    thumbnail: string
+    thumbnail?: string | null
   }
+  custom_design?: Record<string, any>
 }
 
 export interface BackendCartResponse {
@@ -17,3 +22,4 @@ export interface BackendCartResponse {
   items: BackendCartItem[]
   total: number
 }
+

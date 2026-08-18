@@ -65,11 +65,15 @@ type ProductCatalogResult struct {
 }
 
 type FindProductsInput struct {
-	Page  int
-	Limit int
-	ID    *string
-	Name  *string
-	Sort  string
+	Page            int
+	Limit           int
+	ID              *string
+	Name            *string
+	ShopID          *string
+	ShopSlug        *string
+	Status          *string
+	ExcludeArchived bool
+	Sort            string
 }
 
 func (u *FindProductsUsecase) Execute(
@@ -131,9 +135,20 @@ func (u *FindProductsUsecase) Execute(
 		}
 	}
 
+	var shopUUID *uuid.UUID
+	if input.ShopID != nil && *input.ShopID != "" {
+		if parsed, err := uuid.Parse(*input.ShopID); err == nil {
+			shopUUID = &parsed
+		}
+	}
+
 	params := repository.FindProductParams{
-		ID:   input.ID,
-		Name: input.Name,
+		ID:              input.ID,
+		Name:            input.Name,
+		ShopID:          shopUUID,
+		ShopSlug:        input.ShopSlug,
+		Status:          input.Status,
+		ExcludeArchived: input.ExcludeArchived,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,
@@ -210,10 +225,13 @@ func (u *FindProductsUsecase) Execute(
 		)
 
 		for _, inventory := range inventories {
-			totalStock += inventory.TotalStock
-			reservedStock += inventory.ReservedStock
-
 			if shop, ok := shopsMap[inventory.ShopID]; ok {
+				if !shop.IsOperable() {
+					continue
+				}
+				totalStock += inventory.TotalStock
+				reservedStock += inventory.ReservedStock
+
 				availability = append(availability, ShopAvailabilityResult{
 					ShopName: shop.Name,
 					ShopSlug: shop.Slug,
@@ -225,6 +243,7 @@ func (u *FindProductsUsecase) Execute(
 		result.Inventory.TotalStock = totalStock
 		result.Inventory.ReservedStock = reservedStock
 		result.Availability = availability
+
 
 		images := imagesMap[p.Product.ID]
 		if len(images) > 0 {

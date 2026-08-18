@@ -170,6 +170,7 @@ func (r *cartRepositoryImpl) Save(
 		WHERE deleted_at IS NULL
 			AND product_variant_type = 'standard'
 		DO UPDATE SET
+			shop_id    = EXCLUDED.shop_id,
 			quantity   = EXCLUDED.quantity,
 			updated_at = NOW()
 	`
@@ -186,20 +187,10 @@ func (r *cartRepositoryImpl) Save(
 	    VALUES ($1,$2,'custom',$3,$4,$5)
 	    ON CONFLICT (id)
 	    DO UPDATE SET
+	        shop_id       = EXCLUDED.shop_id,
 	        quantity      = EXCLUDED.quantity,
 	        custom_design = EXCLUDED.custom_design,
 	        updated_at    = NOW()
-	`
-
-	const softDeleteByProductQuery = `
-		UPDATE cart_items
-		SET
-			deleted_at = NOW(),
-			updated_at = NOW()
-		WHERE cart_id = $1
-			AND product_id = $2
-			AND shop_id = $3
-			AND deleted_at IS NULL
 	`
 
 	const softDeleteByIDQuery = `
@@ -213,16 +204,8 @@ func (r *cartRepositoryImpl) Save(
 
 	for _, item := range cart.Items {
 		if item.DeletedAt != nil {
-			if item.ProductVariantType == domain.ProductVariantTypeCustom {
-				if _, err := exec.Exec(ctx, softDeleteByIDQuery, item.ID); err != nil {
-					return fmt.Errorf("soft-delete custom cart item failed: %w", err)
-				}
-			} else {
-				if _, err := exec.Exec(ctx, softDeleteByProductQuery,
-					cart.ID, item.ProductID, item.ShopID,
-				); err != nil {
-					return fmt.Errorf("soft-delete standard cart item failed: %w", err)
-				}
+			if _, err := exec.Exec(ctx, softDeleteByIDQuery, item.ID); err != nil {
+				return fmt.Errorf("soft-delete cart item failed: %w", err)
 			}
 			continue
 		}

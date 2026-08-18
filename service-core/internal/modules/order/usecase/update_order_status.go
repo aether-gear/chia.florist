@@ -77,6 +77,14 @@ func NewUpdateOrderStatusUsecase(
 	}
 }
 
+type ShipmentDispatchInput struct {
+	FulfillmentMethod string      `json:"fulfillment_method"`
+	Courier           string      `json:"courier"`
+	Service           string      `json:"service"`
+	TrackingNumber    *string     `json:"tracking_number"`
+	ItemIDs           []uuid.UUID `json:"item_ids"`
+}
+
 type UpdateOrderStatusInput struct {
 	OrderID uuid.UUID
 	Status  domain.OrderStatus
@@ -88,11 +96,21 @@ type UpdateOrderStatusInput struct {
 	// FulfillmentMethod is an optional override. If not provided, it defaults
 	// to "courier".
 	FulfillmentMethod *string
+
+	// Shipments allows staff to explicitly split/group order items into
+	// specific shipments with separate couriers and tracking numbers.
+	Shipments []ShipmentDispatchInput
+}
+
+type preparedShipment struct {
+	shipment shipmentDomain.Shipment
+	itemIDs  []uuid.UUID
 }
 
 type UpdateOrderStatusResult struct {
-	Order    domain.Order
-	Shipment *shipmentDomain.Shipment
+	Order     domain.Order
+	Shipment  *shipmentDomain.Shipment
+	Shipments []shipmentDomain.Shipment
 }
 
 func (u *UpdateOrderStatusUsecase) Execute(
@@ -215,17 +233,18 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return &result, nil
 
 	case domain.OrderStatusDelivered:
-		shipment, err := u.shipmentRepo.GetByOrderID(ctx, u.executor, order.ID)
+		shipments, err := u.shipmentRepo.ListByOrderID(ctx, u.executor, order.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get shipment: %w", err)
+			return nil, fmt.Errorf("failed to list shipments: %w", err)
 		}
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-			if shipment != nil {
-				if err := shipment.UpdateStatus(shipmentDomain.ShipmentStatusDelivered); err != nil {
+			for i := range shipments {
+				s := shipments[i]
+				if err := s.UpdateStatus(shipmentDomain.ShipmentStatusDelivered); err != nil {
 					return fmt.Errorf("failed to update shipment status: %w", err)
 				}
-				if err := u.shipmentRepo.Update(ctx, exec, *shipment); err != nil {
+				if err := u.shipmentRepo.Update(ctx, exec, s); err != nil {
 					return fmt.Errorf("failed to persist shipment: %w", err)
 				}
 			}
@@ -235,7 +254,12 @@ func (u *UpdateOrderStatusUsecase) Execute(
 			return nil, err
 		}
 
-		result := UpdateOrderStatusResult{Order: *order, Shipment: shipment}
+		var first *shipmentDomain.Shipment
+		if len(shipments) > 0 {
+			first = &shipments[0]
+		}
+
+		result := UpdateOrderStatusResult{Order: *order, Shipment: first, Shipments: shipments}
 		return &result, nil
 
 	case domain.OrderStatusCancelled:
@@ -275,6 +299,11 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, apperrors.NewInvalidInput("order has no items")
 	}
 
+	itemMap := make(map[uuid.UUID]domain.OrderItem, len(items))
+	for _, item := range items {
+		itemMap[item.ID] = item
+	}
+
 	// Resolve customer destination district ID from the order's address
 	customerAddr, err := u.addressRepo.GetByID(ctx, u.executor,
 		order.AddressID,
@@ -307,164 +336,313 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		productMap[p.ID] = p
 	}
 
-	// Group order items by ShopID for per-shop shipment processing
-	type shopGroup struct {
-		shopID uuid.UUID
-		items  []domain.OrderItem
-	}
-	var groups []shopGroup
-	groupMap := make(map[uuid.UUID]int)
-	for _, item := range items {
-		idx, exists := groupMap[item.ShopID]
-		if !exists {
-			groupMap[item.ShopID] = len(groups)
-			groups = append(groups, shopGroup{
-				shopID: item.ShopID,
-				items:  []domain.OrderItem{item},
-			})
-		} else {
-			groups[idx].items = append(groups[idx].items, item)
-		}
-	}
-
-	method := shipmentDomain.FulfillmentMethodCourier
-	if input.FulfillmentMethod != nil && *input.FulfillmentMethod != "" {
-		method = shipmentDomain.FulfillmentMethod(*input.FulfillmentMethod)
-	}
-
 	now := appclock.Now()
-	var shipmentsToCreate []shipmentDomain.Shipment
+	var preparedShipments []preparedShipment
 
-	for idx, group := range groups {
-		first := group.items[0]
-
-		var courierCode, courierService string
-		if method == shipmentDomain.FulfillmentMethodCourier {
-			if first.CourierCode != nil {
-				courierCode = *first.CourierCode
+	if len(input.Shipments) > 0 {
+		// Staff explicitly configured shipment grouping (split / multi shipment)
+		for idx, sInput := range input.Shipments {
+			if len(sInput.ItemIDs) == 0 {
+				return nil, apperrors.NewInvalidInput("each shipment must contain at least one order item")
 			}
-			if first.CourierService != nil {
-				courierService = *first.CourierService
-			}
-			if courierCode == "" || courierService == "" {
-				return nil, apperrors.NewInvalidInput("order items have no courier information")
-			}
-		} else {
-			courierCode = string(shipmentDomain.FulfillmentMethodSelfDelivery)
-			courierService = string(shipmentDomain.FulfillmentMethodSelfDelivery)
-		}
 
-		shopAddr, err := u.shopAddressRepo.GetDefaultByShopID(ctx, u.executor,
-			group.shopID,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get shop address: %w", err)
-		}
-		if shopAddr == nil {
-			return nil, apperrors.NewNotFound("shop address not found")
-		}
-
-		originAreaID, err := strconv.Atoi(shopAddr.Detail.DistrictID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid origin district ID %q: %w", shopAddr.Detail.DistrictID, err)
-		}
-
-		// Calculate total weight and item quantity for this shop's shipment
-		var shopTotalWeightGrams int
-		var shopTotalItemQty int
-		var shopSubtotal int64
-		for _, item := range group.items {
-			qty := item.Quantity
-			if qty <= 0 {
-				qty = 1
-			}
-			weight := DEFAULT_SHIPMENT_WEIGHT_GRAMS
-			if item.ProductID != nil {
-				if p, ok := productMap[*item.ProductID]; ok && p.Weight != nil && *p.Weight > 0 {
-					weight = int(*p.Weight)
+			var shipmentItems []domain.OrderItem
+			for _, itemID := range sInput.ItemIDs {
+				item, ok := itemMap[itemID]
+				if !ok {
+					return nil, apperrors.NewInvalidInput(fmt.Sprintf("order item %s does not belong to this order", itemID))
 				}
-			}
-			shopTotalWeightGrams += weight * qty
-			shopTotalItemQty += qty
-			shopSubtotal += item.Subtotal
-		}
-
-		var trackingNumber *string
-		if method == shipmentDomain.FulfillmentMethodCourier {
-			itemName := first.ProductName
-			if len(group.items) > 1 {
-				itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(group.items)-1)
+				shipmentItems = append(shipmentItems, item)
 			}
 
-			uniqueOrderID := order.Number
-			if len(groups) > 1 {
-				uniqueOrderID = fmt.Sprintf("%s-%d", order.Number, idx+1)
+			first := shipmentItems[0]
+
+			method := shipmentDomain.FulfillmentMethodCourier
+			if sInput.FulfillmentMethod != "" {
+				method = shipmentDomain.FulfillmentMethod(sInput.FulfillmentMethod)
 			}
 
-			orderInput := shipping.CreateOrderInput{
-				OriginAreaID:         originAreaID,
-				DestinationAreaID:    destAreaID,
-				CourierCode:          courierCode,
-				CourierService:       courierService,
-				Weight:               shopTotalWeightGrams,
-				UniqueOrderID:        uniqueOrderID,
-				ItemName:             itemName,
-				ItemPrice:            shopSubtotal,
-				ItemQty:              shopTotalItemQty,
-				ShipperName:          shopAddr.Label,
-				ShipperPhone:         derefPhone(shopAddr.Phone),
-				ShipperAddress:       shopAddr.Detail.FullAddress,
-				ReceiverName:         customerAddr.ReceiverName,
-				ReceiverPhone:        derefPhone(customerAddr.Phone),
-				ReceiverAddress:      customerAddr.Detail.FullAddress,
-				ManualTrackingNumber: input.TrackingNumber,
+			var courierCode, courierService string
+			if method == shipmentDomain.FulfillmentMethodCourier {
+				courierCode = sInput.Courier
+				courierService = sInput.Service
+				if courierCode == "" && first.CourierCode != nil {
+					courierCode = *first.CourierCode
+				}
+				if courierService == "" && first.CourierService != nil {
+					courierService = *first.CourierService
+				}
+				if courierCode == "" || courierService == "" {
+					return nil, apperrors.NewInvalidInput("shipment is missing courier information")
+				}
+			} else {
+				courierCode = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+				courierService = string(shipmentDomain.FulfillmentMethodSelfDelivery)
 			}
 
-			komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
+			shopAddr, err := u.shopAddressRepo.GetDefaultByShopID(ctx, u.executor, first.ShopID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
+				return nil, fmt.Errorf("failed to get shop address: %w", err)
+			}
+			if shopAddr == nil {
+				return nil, apperrors.NewNotFound("shop address not found")
 			}
 
-			tracking := komerceResult.TrackingNumber
-			trackingNumber = &tracking
+			originAreaID, err := strconv.Atoi(shopAddr.Detail.DistrictID)
+			if err != nil {
+				return nil, fmt.Errorf("invalid origin district ID %q: %w", shopAddr.Detail.DistrictID, err)
+			}
+
+			var totalWeightGrams int
+			var totalItemQty int
+			var subtotal int64
+			for _, item := range shipmentItems {
+				qty := item.Quantity
+				if qty <= 0 {
+					qty = 1
+				}
+				weight := DEFAULT_SHIPMENT_WEIGHT_GRAMS
+				if item.ProductID != nil {
+					if p, ok := productMap[*item.ProductID]; ok && p.Weight != nil && *p.Weight > 0 {
+						weight = int(*p.Weight)
+					}
+				}
+				totalWeightGrams += weight * qty
+				totalItemQty += qty
+				subtotal += item.Subtotal
+			}
+
+			trackingNumber := sInput.TrackingNumber
+			if method == shipmentDomain.FulfillmentMethodCourier && (trackingNumber == nil || *trackingNumber == "") {
+				itemName := first.ProductName
+				if len(shipmentItems) > 1 {
+					itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(shipmentItems)-1)
+				}
+
+				uniqueOrderID := order.Number
+				if len(input.Shipments) > 1 {
+					uniqueOrderID = fmt.Sprintf("%s-%d", order.Number, idx+1)
+				}
+
+				orderInput := shipping.CreateOrderInput{
+					OriginAreaID:         originAreaID,
+					DestinationAreaID:    destAreaID,
+					CourierCode:          courierCode,
+					CourierService:       courierService,
+					Weight:               totalWeightGrams,
+					UniqueOrderID:        uniqueOrderID,
+					ItemName:             itemName,
+					ItemPrice:            subtotal,
+					ItemQty:              totalItemQty,
+					ShipperName:          shopAddr.Label,
+					ShipperPhone:         derefPhone(shopAddr.Phone),
+					ShipperAddress:       shopAddr.Detail.FullAddress,
+					ReceiverName:         customerAddr.ReceiverName,
+					ReceiverPhone:        derefPhone(customerAddr.Phone),
+					ReceiverAddress:      customerAddr.Detail.FullAddress,
+					ManualTrackingNumber: sInput.TrackingNumber,
+				}
+
+				komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create shipment order: %w", err)
+				}
+
+				tracking := komerceResult.TrackingNumber
+				trackingNumber = &tracking
+			}
+
+			shipmentCost := first.ShippingFee
+			if shipmentCost == 0 && len(input.Shipments) == 1 {
+				shipmentCost = order.ShippingFee
+			}
+
+			shipment := shipmentDomain.Shipment{
+				ID:                uuid.New(),
+				OrderID:           order.ID,
+				Status:            shipmentDomain.ShipmentStatusCreated,
+				FulfillmentMethod: method,
+				TrackingNumber:    trackingNumber,
+				Courier:           courierCode,
+				Service:           courierService,
+				Cost:              shipmentCost,
+				Weight:            totalWeightGrams,
+				OriginID:          shopAddr.Detail.DistrictID,
+				DestinationID:     customerAddr.Detail.DistrictID,
+				CreatedAt:         now,
+				ItemIDs:           sInput.ItemIDs,
+			}
+
+			if err := shipment.Validate(); err != nil {
+				return nil, apperrors.NewInvalidInput(err.Error())
+			}
+
+			preparedShipments = append(preparedShipments, preparedShipment{
+				shipment: shipment,
+				itemIDs:  sInput.ItemIDs,
+			})
+		}
+	} else {
+		// Fallback / legacy: Group order items by ShopID for per-shop shipment processing
+		type shopGroup struct {
+			shopID uuid.UUID
+			items  []domain.OrderItem
+		}
+		var groups []shopGroup
+		groupMap := make(map[uuid.UUID]int)
+		for _, item := range items {
+			idx, exists := groupMap[item.ShopID]
+			if !exists {
+				groupMap[item.ShopID] = len(groups)
+				groups = append(groups, shopGroup{
+					shopID: item.ShopID,
+					items:  []domain.OrderItem{item},
+				})
+			} else {
+				groups[idx].items = append(groups[idx].items, item)
+			}
 		}
 
-		shipmentCost := first.ShippingFee
-		if shipmentCost == 0 && len(groups) == 1 {
-			shipmentCost = order.ShippingFee
+		method := shipmentDomain.FulfillmentMethodCourier
+		if input.FulfillmentMethod != nil && *input.FulfillmentMethod != "" {
+			method = shipmentDomain.FulfillmentMethod(*input.FulfillmentMethod)
 		}
 
-		shipment := shipmentDomain.Shipment{
-			ID:                uuid.New(),
-			OrderID:           order.ID,
-			Status:            shipmentDomain.ShipmentStatusCreated,
-			FulfillmentMethod: method,
-			TrackingNumber:    trackingNumber,
-			Courier:           courierCode,
-			Service:           courierService,
-			Cost:              shipmentCost,
-			Weight:            shopTotalWeightGrams,
-			OriginID:          shopAddr.Detail.DistrictID,
-			DestinationID:     customerAddr.Detail.DistrictID,
-			CreatedAt:         now,
-		}
+		for idx, group := range groups {
+			first := group.items[0]
 
-		if err := shipment.Validate(); err != nil {
-			return nil, apperrors.NewInvalidInput(err.Error())
-		}
+			var courierCode, courierService string
+			if method == shipmentDomain.FulfillmentMethodCourier {
+				if first.CourierCode != nil {
+					courierCode = *first.CourierCode
+				}
+				if first.CourierService != nil {
+					courierService = *first.CourierService
+				}
+				if courierCode == "" || courierService == "" {
+					return nil, apperrors.NewInvalidInput("order items have no courier information")
+				}
+			} else {
+				courierCode = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+				courierService = string(shipmentDomain.FulfillmentMethodSelfDelivery)
+			}
 
-		shipmentsToCreate = append(shipmentsToCreate, shipment)
+			shopAddr, err := u.shopAddressRepo.GetDefaultByShopID(ctx, u.executor, group.shopID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get shop address: %w", err)
+			}
+			if shopAddr == nil {
+				return nil, apperrors.NewNotFound("shop address not found")
+			}
+
+			originAreaID, err := strconv.Atoi(shopAddr.Detail.DistrictID)
+			if err != nil {
+				return nil, fmt.Errorf("invalid origin district ID %q: %w", shopAddr.Detail.DistrictID, err)
+			}
+
+			var shopTotalWeightGrams int
+			var shopTotalItemQty int
+			var shopSubtotal int64
+			var groupItemIDs []uuid.UUID
+			for _, item := range group.items {
+				groupItemIDs = append(groupItemIDs, item.ID)
+				qty := item.Quantity
+				if qty <= 0 {
+					qty = 1
+				}
+				weight := DEFAULT_SHIPMENT_WEIGHT_GRAMS
+				if item.ProductID != nil {
+					if p, ok := productMap[*item.ProductID]; ok && p.Weight != nil && *p.Weight > 0 {
+						weight = int(*p.Weight)
+					}
+				}
+				shopTotalWeightGrams += weight * qty
+				shopTotalItemQty += qty
+				shopSubtotal += item.Subtotal
+			}
+
+			var trackingNumber *string
+			if method == shipmentDomain.FulfillmentMethodCourier {
+				itemName := first.ProductName
+				if len(group.items) > 1 {
+					itemName = fmt.Sprintf("%s (+%d more)", first.ProductName, len(group.items)-1)
+				}
+
+				uniqueOrderID := order.Number
+				if len(groups) > 1 {
+					uniqueOrderID = fmt.Sprintf("%s-%d", order.Number, idx+1)
+				}
+
+				orderInput := shipping.CreateOrderInput{
+					OriginAreaID:         originAreaID,
+					DestinationAreaID:    destAreaID,
+					CourierCode:          courierCode,
+					CourierService:       courierService,
+					Weight:               shopTotalWeightGrams,
+					UniqueOrderID:        uniqueOrderID,
+					ItemName:             itemName,
+					ItemPrice:            shopSubtotal,
+					ItemQty:              shopTotalItemQty,
+					ShipperName:          shopAddr.Label,
+					ShipperPhone:         derefPhone(shopAddr.Phone),
+					ShipperAddress:       shopAddr.Detail.FullAddress,
+					ReceiverName:         customerAddr.ReceiverName,
+					ReceiverPhone:        derefPhone(customerAddr.Phone),
+					ReceiverAddress:      customerAddr.Detail.FullAddress,
+					ManualTrackingNumber: input.TrackingNumber,
+				}
+
+				komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
+				}
+
+				tracking := komerceResult.TrackingNumber
+				trackingNumber = &tracking
+			}
+
+			shipmentCost := first.ShippingFee
+			if shipmentCost == 0 && len(groups) == 1 {
+				shipmentCost = order.ShippingFee
+			}
+
+			shipment := shipmentDomain.Shipment{
+				ID:                uuid.New(),
+				OrderID:           order.ID,
+				Status:            shipmentDomain.ShipmentStatusCreated,
+				FulfillmentMethod: method,
+				TrackingNumber:    trackingNumber,
+				Courier:           courierCode,
+				Service:           courierService,
+				Cost:              shipmentCost,
+				Weight:            shopTotalWeightGrams,
+				OriginID:          shopAddr.Detail.DistrictID,
+				DestinationID:     customerAddr.Detail.DistrictID,
+				CreatedAt:         now,
+				ItemIDs:           groupItemIDs,
+			}
+
+			if err := shipment.Validate(); err != nil {
+				return nil, apperrors.NewInvalidInput(err.Error())
+			}
+
+			preparedShipments = append(preparedShipments, preparedShipment{
+				shipment: shipment,
+				itemIDs:  groupItemIDs,
+			})
+		}
 	}
 
-	var firstCreated *shipmentDomain.Shipment
+	var createdShipments []shipmentDomain.Shipment
 	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		for i, shipment := range shipmentsToCreate {
-			if err := u.shipmentRepo.Create(ctx, exec, shipment); err != nil {
+		for _, ps := range preparedShipments {
+			if err := u.shipmentRepo.Create(ctx, exec, ps.shipment); err != nil {
 				return fmt.Errorf("failed to persist shipment: %w", err)
 			}
-			if i == 0 {
-				firstCreated = &shipmentsToCreate[0]
+			if err := u.orderItemRepo.AssignShipment(ctx, exec, ps.shipment.ID, ps.itemIDs); err != nil {
+				return fmt.Errorf("failed to link items to shipment: %w", err)
 			}
+			createdShipments = append(createdShipments, ps.shipment)
 		}
 
 		if err := u.orderRepo.UpdateStatus(ctx, exec,
@@ -480,9 +658,15 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, err
 	}
 
+	var firstCreated *shipmentDomain.Shipment
+	if len(createdShipments) > 0 {
+		firstCreated = &createdShipments[0]
+	}
+
 	return &UpdateOrderStatusResult{
-		Order:    *order,
-		Shipment: firstCreated,
+		Order:     *order,
+		Shipment:  firstCreated,
+		Shipments: createdShipments,
 	}, nil
 }
 

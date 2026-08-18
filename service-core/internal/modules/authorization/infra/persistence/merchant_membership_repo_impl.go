@@ -213,3 +213,102 @@ func (r *staffMembershipRepositoryImpl) Save(
 
 	return nil
 }
+
+func (r *staffMembershipRepositoryImpl) ListAccountsByStaffID(
+	ctx context.Context,
+	exec transaction.Executor,
+	staffID uuid.UUID,
+) ([]domain.StaffAccountMember, error) {
+	query := `
+		SELECT
+			a.id AS account_id,
+			u.id AS user_id,
+			a.email,
+			u.name,
+			u.username,
+			u.phone,
+			u.avatar_url,
+			r.id AS role_id,
+			r.code AS role_code,
+			r.name AS role_name,
+			a.last_login_at,
+			sm.created_at
+		FROM staff_memberships sm
+		JOIN accounts a ON a.id = sm.account_id AND a.deleted_at IS NULL
+		JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
+		JOIN roles r ON r.id = sm.role_id
+		WHERE sm.staff_id = $1
+		ORDER BY sm.created_at ASC
+	`
+
+	rows, err := exec.Query(ctx, query, staffID)
+	if err != nil {
+		return nil, fmt.Errorf("query staff accounts by staff id failed: %w", err)
+	}
+	defer rows.Close()
+
+	var members []domain.StaffAccountMember
+	for rows.Next() {
+		var m domain.StaffAccountMember
+		if err := rows.Scan(
+			&m.AccountID,
+			&m.UserID,
+			&m.Email,
+			&m.Name,
+			&m.Username,
+			&m.Phone,
+			&m.AvatarURL,
+			&m.Role.ID,
+			&m.Role.Code,
+			&m.Role.Name,
+			&m.LastLoginAt,
+			&m.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan staff account member failed: %w", err)
+		}
+		members = append(members, m)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate staff account members failed: %w", err)
+	}
+
+	return members, nil
+}
+
+func (r *staffMembershipRepositoryImpl) DeleteByAccountIDAndStaffID(
+	ctx context.Context,
+	exec transaction.Executor,
+	accountID uuid.UUID,
+	staffID uuid.UUID,
+) error {
+	query := `
+		DELETE FROM staff_memberships
+		WHERE account_id = $1 AND staff_id = $2
+	`
+
+	_, err := exec.Exec(ctx, query, accountID, staffID)
+	if err != nil {
+		return fmt.Errorf("delete staff membership failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *staffMembershipRepositoryImpl) DeleteByStaffID(
+	ctx context.Context,
+	exec transaction.Executor,
+	staffID uuid.UUID,
+) error {
+	query := `
+		DELETE FROM staff_memberships
+		WHERE staff_id = $1
+	`
+
+	_, err := exec.Exec(ctx, query, staffID)
+	if err != nil {
+		return fmt.Errorf("delete staff memberships by staff id failed: %w", err)
+	}
+
+	return nil
+}

@@ -11,6 +11,7 @@ import { fetchApi } from '@/lib/api';
 
 const schema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
+  username: z.string().min(3, 'Username must be at least 3 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   logo_url: z.string().url('Must be a valid URL'),
   banner_url: z.string().url('Must be a valid URL'),
@@ -65,10 +66,18 @@ export default function CreateMerchantPage() {
         </div>
         <div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground">Merchant Name</label>
-              <Input {...register('name')} placeholder="e.g. Chia Florist" className="rounded-xl border border-border bg-background" />
-              {errors.name && <p className="text-sm text-rose-500">{errors.name.message}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-foreground">Merchant Name</label>
+                <Input {...register('name')} placeholder="e.g. Chia Florist" className="rounded-xl border border-border bg-background" />
+                {errors.name && <p className="text-sm text-rose-500">{errors.name.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-foreground">Username</label>
+                <Input {...register('username')} placeholder="e.g. chia-florist" className="rounded-xl border border-border bg-background" />
+                {errors.username && <p className="text-sm text-rose-500">{errors.username.message}</p>}
+              </div>
             </div>
 
             <div className="space-y-2">

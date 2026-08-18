@@ -7,21 +7,24 @@ import (
 )
 
 type saveShopRequest struct {
-	ShopID      *string `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	IsActive    string  `json:"is_active"`
+	ShopID         *string `json:"id"`
+	Name           string  `json:"name"`
+	Description    *string `json:"description"`
+	IsActive       *string `json:"is_active"`
+	ApprovalStatus *string `json:"approval_status"`
 }
 
 type getShopResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Slug        string     `json:"slug"`
-	Description *string    `json:"description"`
-	IsActive    bool       `json:"is_active"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   *time.Time `json:"updated_at"`
+	ID             uuid.UUID  `json:"id"`
+	Name           string     `json:"name"`
+	Slug           string     `json:"slug"`
+	Description    *string    `json:"description"`
+	IsActive       bool       `json:"is_active"`
+	ApprovalStatus string     `json:"approval_status"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      *time.Time `json:"updated_at"`
 }
+
 
 type shopAddressResponse struct {
 	ID          uuid.UUID  `json:"id"`

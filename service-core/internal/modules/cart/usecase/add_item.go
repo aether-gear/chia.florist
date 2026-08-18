@@ -8,7 +8,9 @@ import (
 	"service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/cart/repository"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
+	productDomain "service-core/internal/modules/product/domain"
 	productRepo "service-core/internal/modules/product/repository"
+	shopRepo "service-core/internal/modules/shop/repository"
 	transaction "service-core/internal/shared/transaction"
 
 	"github.com/google/uuid"
@@ -20,6 +22,7 @@ type AddItemUsecase struct {
 	cartRepo      repository.CartRepository
 	inventoryRepo inventoryRepo.InventoryRepository
 	productRepo   productRepo.ProductRepository
+	shopRepo      shopRepo.ShopRepository
 }
 
 func NewAddItemUsecase(
@@ -28,6 +31,7 @@ func NewAddItemUsecase(
 	cartRepo repository.CartRepository,
 	inventoryRepo inventoryRepo.InventoryRepository,
 	productRepo productRepo.ProductRepository,
+	shopRepo shopRepo.ShopRepository,
 ) *AddItemUsecase {
 	return &AddItemUsecase{
 		executor:      executor,
@@ -35,6 +39,7 @@ func NewAddItemUsecase(
 		cartRepo:      cartRepo,
 		inventoryRepo: inventoryRepo,
 		productRepo:   productRepo,
+		shopRepo:      shopRepo,
 	}
 }
 
@@ -63,6 +68,14 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewBadRequest(fmt.Sprintf("quantity cannot exceed %d", MaxCartItemQuantity))
 	}
 
+	shop, err := u.shopRepo.GetByID(ctx, u.executor, input.ShopID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve shop: %w", err)
+	}
+	if shop == nil || !shop.IsOperable() {
+		return apperrors.NewConflict("shop is currently inactive or not approved for transactions")
+	}
+
 	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(ctx, u.executor,
 		input.ProductID,
 		input.ShopID,
@@ -80,9 +93,13 @@ func (u *AddItemUsecase) Execute(
 	if err != nil {
 		return fmt.Errorf("failed to load product with inventory: %w", err)
 	}
-	if product == nil {
+	if product == nil || product.Status == productDomain.ProductStatusArchived {
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
+	if product.Status != productDomain.ProductStatusActive {
+		return apperrors.NewConflict(fmt.Sprintf("product %q is currently not available for purchase", product.Name))
+	}
+
 
 	cart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor,
 		input.CustomerID,

@@ -11,7 +11,10 @@ export default defineEventHandler(async (event) => {
   try {
     const response = await $fetch.raw(backendUrl, {
       method: 'GET',
-      headers: cookies ? { cookie: cookies } : {}
+      headers: {
+        'X-Account-Type': 'customer',
+        ...(cookies ? { cookie: cookies } : {})
+      }
     })
 
     const data = response._data
@@ -46,12 +49,17 @@ export default defineEventHandler(async (event) => {
           }
         }
 
+        const thirtyDays = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+        const cookieExpires = rememberMe
+          ? (expires && expires.getTime() > thirtyDays.getTime() ? expires : thirtyDays)
+          : undefined
+
         setCookie(event, name, value, {
           path,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite,
-          expires: rememberMe ? expires : undefined
+          expires: cookieExpires
         })
       }
     }

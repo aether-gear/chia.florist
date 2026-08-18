@@ -3,8 +3,17 @@ package appcookie
 import (
 	"errors"
 	"net/http"
+	"os"
 	"time"
 )
+
+func isSecureCookie() bool {
+	env := os.Getenv("APP_ENV")
+	if env == "production" || env == "staging" || os.Getenv("COOKIE_SECURE") == "true" {
+		return true
+	}
+	return false
+}
 
 var (
 	// ErrNoCookie is returned when
@@ -18,7 +27,7 @@ const (
 	// This cookie represents the user's refresh token
 	// and is used to authenticate the user for
 	// API requests
-	CookieAccess CookieName = "chast"
+	CookieCustomer CookieName = "chast"
 
 	// This cookie represents the user's refresh token
 	// and is used to obtain a new access token when the
@@ -43,7 +52,7 @@ const (
 // Bind sets an HTTP cookie on the response writer
 // with the given name, value, and expiration time
 //
-// The cookie is configured as HttpOnly, Secure,
+// The cookie is configured as HttpOnly, Secure (in production),
 // and uses SameSiteLaxMode by default
 func Bind(
 	w http.ResponseWriter,
@@ -56,7 +65,7 @@ func Bind(
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureCookie(),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  exp,
 	})
@@ -100,11 +109,22 @@ func Clear(
 		Name:     string(name),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureCookie(),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
 	})
+}
+
+// ClearAll removes all authentication cookies from the client.
+//
+// This is used during logout to ensure no stale cookies remain
+// from any application context.
+func ClearAll(w http.ResponseWriter) {
+	Clear(w, CookieCustomer)
+	Clear(w, CookieCustomerRefresh)
+	Clear(w, CookieStaff)
+	Clear(w, CookieStaffRefresh)
 }
 
 // Exists checks whether a cookie with the

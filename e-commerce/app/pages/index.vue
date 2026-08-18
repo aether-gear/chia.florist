@@ -1,53 +1,86 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useCart } from '~/composables/useCart' // <-- INTEGRASI: Ambil useCart untuk kurensi
+import { useCart } from '~/composables/useCart'
 import { productService } from '~/services/productService'
 
 useHead({
-  title: 'Chia Florist - Flower Boards',
+  title: 'Chia Florist - Flower Boards & Custom Simulator',
   meta: [
-    { name: 'description', content: 'We provide customized flower boards for weddings, condolences, graduations, and corporate events.' }
+    {
+      name: 'description',
+      content: 'Pesan papan bunga ucapan pernikahan, duka cita, peresmian gedung, dan wisuda terbaik atau rancang papan bunga Anda sendiri secara real-time di Chia Florist.'
+    }
   ]
 })
 
-// Ambil helper formatRupiah global agar bisa dipakai langsung di template bawah
 const { formatRupiah } = useCart()
 
-// Array gambar background Hero
-const backgrounds = [
-  '/florist.jpg',          // Gambar 01
-  '/flowerist.jpg',          // Gambar 02
-  '/flower.jpg'            // Gambar 03
+// Carousel Slides
+const slides = [
+  {
+    image: '/florist.jpg',
+    title: 'Papan Bunga Elegan untuk Momen Berharga',
+    subtitle: 'Rangkaian bunga segar dan material tahan cuaca untuk pernikahan, duka cita, & peresmian.',
+    ctaText: 'Lihat Katalog',
+    ctaLink: '/catalog',
+    ctaVariant: 'primary' as const
+  },
+  {
+    image: '/flowerist.jpg',
+    title: 'Desain Papan Bunga Kustom Real-Time',
+    subtitle: 'Kreasikan susunan busa, teks ucapan, dan dekorasi bunga langsung di browser Anda.',
+    ctaText: 'Coba Simulator',
+    ctaLink: '/products/custom',
+    ctaVariant: 'primary' as const
+  },
+  {
+    image: '/flower.jpg',
+    title: 'Pengantaran Tepat Waktu Langsung ke Lokasi',
+    subtitle: 'Armada kami siap mengantarkan pesanan bunga papan Anda ke seluruh gedung dan venue acara.',
+    ctaText: 'Pesan Sekarang',
+    ctaLink: '/catalog',
+    ctaVariant: 'primary' as const
+  }
 ]
 
-// State untuk indeks background yang sedang aktif
 const currentIndex = ref(0)
 let intervalTimer: any = null
 
-// Fungsi untuk mengganti background saat diklik
-const changeBg = (index: number) => {
-  currentIndex.value = index
-  resetTimer() 
+const nextSlide = () => {
+  currentIndex.value = (currentIndex.value + 1) % slides.length
+  resetTimer()
 }
 
-// Logic Auto Switch setiap 5 detik
+const prevSlide = () => {
+  currentIndex.value = (currentIndex.value - 1 + slides.length) % slides.length
+  resetTimer()
+}
+
+const goToSlide = (index: number) => {
+  currentIndex.value = index
+  resetTimer()
+}
+
 const startTimer = () => {
+  if (intervalTimer) clearInterval(intervalTimer)
   intervalTimer = setInterval(() => {
-    currentIndex.value = (currentIndex.value + 1) % backgrounds.length
+    currentIndex.value = (currentIndex.value + 1) % slides.length
   }, 5000)
 }
 
 const resetTimer = () => {
-  if (intervalTimer) clearInterval(intervalTimer)
   startTimer()
 }
 
 const productOfferings = ref<any[]>([])
 const isLoading = ref(false)
+const hasError = ref(false)
 
 onMounted(async () => {
   startTimer()
   isLoading.value = true
+  hasError.value = false
+
   try {
     const list = await productService.getCatalogProducts()
     productOfferings.value = [
@@ -57,21 +90,43 @@ onMounted(async () => {
         slug: p.slug || '',
         price: p.price,
         image: p.image,
-        isAvailable: p.isAvailable
+        isAvailable: p.isAvailable,
+        rating: p.rating || 4.8,
+        reviews: p.reviews || 120
       })),
-      { id: 'custom', name: 'Custom Board Simulator', slug: 'custom', price: 150000, image: '/images/custom-preview.png', isAvailable: true }
+      {
+        id: 'custom',
+        name: 'Custom Board Simulator',
+        slug: 'custom',
+        price: 150000,
+        image: '/images/custom-preview.png',
+        isAvailable: true,
+        rating: 5.0,
+        reviews: 89,
+        isCustomRoute: true
+      }
     ]
   } catch (err) {
     console.error('Failed to load homepage offerings:', err)
+    hasError.value = true
+    // Fallback item so the user can still access custom simulator
+    productOfferings.value = [
+      {
+        id: 'custom',
+        name: 'Custom Board Simulator',
+        slug: 'custom',
+        price: 150000,
+        image: '/images/custom-preview.png',
+        isAvailable: true,
+        rating: 5.0,
+        reviews: 89,
+        isCustomRoute: true
+      }
+    ]
   } finally {
     isLoading.value = false
   }
 })
-
-const getProductImageBySlug = (slug: string) => {
-  const prod = productOfferings.value.find(p => p.slug === slug)
-  return prod?.image || ''
-}
 
 onUnmounted(() => {
   if (intervalTimer) clearInterval(intervalTimer)
@@ -79,315 +134,302 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-full bg-white-base text-brand font-brand">
-    
-    <div class="relative min-h-screen flex items-center justify-center overflow-hidden">
-      <div class="absolute inset-0 z-0">
-        <img 
-          v-for="(bg, index) in backgrounds" 
+  <div class="w-full bg-white text-gray-900 font-brand">
+
+    <!-- HERO BANNER CAROUSEL (Tokopedia-Style Contained Width) -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+      <div 
+        class="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs border border-gray-100 bg-gray-900 aspect-[16/8] sm:aspect-[21/9] min-h-[220px] max-h-[420px]"
+        @mouseenter="() => intervalTimer && clearInterval(intervalTimer)"
+        @mouseleave="startTimer"
+      >
+        <!-- Slides -->
+        <div 
+          v-for="(slide, index) in slides" 
           :key="index"
-          :src="bg" 
-          alt="Florist Background" 
           :class="[
-            'absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out',
-            currentIndex === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
-          ]" 
-        />
-        <div class="absolute inset-0 bg-black/40 z-20"></div>
-      </div>
-
-      <div class="relative z-30 text-center px-4 max-w-4xl mx-auto mt-20">
-        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight drop-shadow-lg">
-          Beautiful Flower Boards
-          <span class="block">for Every Special Moment</span>
-        </h1>
-        
-        <p class="text-lg md:text-xl text-gray-200 mb-10 max-w-2xl mx-auto drop-shadow-md leading-relaxed">
-          We provide customized flower boards for weddings, condolences, graduations, and corporate events. Designed with care and delivered on time to make every moment memorable.
-        </p>
-        
-        <div class="mt-10 flex flex-wrap justify-center gap-4">
-          <NuxtLink 
-            to="/catalog" 
-            class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-3 px-8 rounded-xl transition shadow-md text-sm text-center"
-          >
-            View Products
-          </NuxtLink>
-
-          <!-- <NuxtLink 
-            to="/catalog" 
-            class="border-2 border-white hover:bg-white/10 text-white font-bold py-3 px-8 rounded-xl transition text-sm text-center flex items-center justify-center gap-2"
-          >
-            <span>View Products</span>
-          </NuxtLink> -->
-        </div>
-      </div>
-
-      <div class="absolute right-8 top-1/2 transform -translate-y-1/2 flex flex-col gap-6 z-30 hidden lg:flex">
-        <span 
-          v-for="(bg, index) in backgrounds" 
-          :key="index"
-          @click="changeBg(index)"
-          :class="[
-            'font-bold cursor-pointer transition-all duration-300 transform',
-            currentIndex === index 
-              ? 'text-yellow-400 text-lg scale-110' 
-              : 'text-white/60 hover:text-white text-sm hover:scale-105'
+            'absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out',
+            currentIndex === index ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
           ]"
         >
-          0{{ index + 1 }}
-        </span>
-      </div>
-    </div>
+          <!-- Background Image -->
+          <img 
+            :src="slide.image" 
+            :alt="slide.title" 
+            class="absolute inset-0 w-full h-full object-cover"
+          />
+          <!-- Dark Contrast Gradient Overlay -->
+          <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent z-10"></div>
 
-    <section class="max-w-7xl mx-auto px-8 py-24 grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-      <div>
-        <h2 class="text-3xl md:text-4xl font-bold text-accent leading-tight max-w-sm">
-          We Help Choose The Perfect Flower Board
-        </h2>
-      </div>
-      <div>
-        <p class="text-gray-600 text-sm md:text-base leading-relaxed">
-          Our flower boards are designed to suit various occasions, from joyful celebrations to heartfelt condolences. Each arrangement is crafted to deliver your message with elegance and meaning.
-        </p>
-      </div>
-    </section>
+          <!-- Slide Content (Without Pill Badge above Header) -->
+          <div class="relative z-20 h-full flex flex-col justify-center max-w-xl p-6 sm:p-10 lg:p-12 text-white">
+            <h1 class="text-xl sm:text-3xl lg:text-4xl font-extrabold leading-tight mb-1.5 sm:mb-3 drop-shadow-sm line-clamp-2">
+              {{ slide.title }}
+            </h1>
 
-    <section class="max-w-7xl mx-auto px-8 pb-24 grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div class="bg-white-base border border-gray-100 p-8 rounded-lg shadow-sm hover:shadow-md transition">
-        <div class="text-accent mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-4 text-gray-800">Wedding Flower Board</h3>
-        <p class="text-gray-500 text-sm leading-relaxed">Bring the beauty of nature to your outdoor spaces with our wide selection of outdoor plants</p>
-      </div>
+            <p class="text-xs sm:text-sm text-gray-200 mb-4 sm:mb-6 line-clamp-2 max-w-md hidden sm:block">
+              {{ slide.subtitle }}
+            </p>
 
-      <div class="bg-accent text-white-base p-8 rounded-lg shadow-md transition transform hover:scale-105">
-        <div class="text-white-base mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-4">Condolence Flower Board</h3>
-        <p class="text-gray-200 text-sm leading-relaxed">Bring a touch of greenery to your living spaces with our collection of indoor plants, perfect for purifying the air and adding a natural touch to your home.</p>
-      </div>
-
-      <div class="bg-white-base border border-gray-100 p-8 rounded-lg shadow-sm hover:shadow-md transition">
-        <div class="text-accent mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10M20 7v10M12 4v16m0-4h4m-4-8h4m-4 4H8m0-4h4" />
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-4 text-gray-800">Celebration Flower Board</h3>
-        <p class="text-gray-500 text-sm leading-relaxed">Add a touch of style to your indoor or outdoor spaces with our collection of pots plants, available in a variety of sizes and designs to fit any decor</p>
-      </div>
-    </section>
-
-    <section class="max-w-7xl mx-auto px-8 py-20">
-      <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">What We Offer To You</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-        
-        <div v-for="(item, idx) in productOfferings" :key="idx" class="bg-white-base rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition">
-          <div class="h-64 relative bg-gray-50">
-            <div v-if="item.id === 'custom'" class="w-full h-full bg-[#1b4332] flex items-center justify-center">
-              <span class="text-white-base text-4xl font-bold">?</span>
-            </div>
-            <img v-else :src="item.image" :alt="item.name" class="w-full h-full object-cover" />
-            <span v-if="!item.isAvailable" class="absolute top-3 right-3 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-lg border border-red-200 shadow-sm z-20">
-              Sold Out
-            </span>
-          </div>
-          <div class="p-4 flex flex-col gap-3">
-            <h3 class="font-bold text-gray-800">{{ item.name }}</h3>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <span class="text-gray-400 text-xs line-through" v-if="item.id !== 'custom'">{{ formatRupiah(item.price + 35000) }}</span>
-                <span class="text-accent font-bold text-base">{{ formatRupiah(item.price) }}</span>
-              </div>
-              <NuxtLink 
-                v-if="item.isAvailable" 
-                :to="`/products/${item.slug || item.id}`" 
-                class="bg-accent text-white-base text-xs px-3 py-1.5 rounded hover:bg-accent/90 transition"
+            <div>
+              <CButton 
+                :to="slide.ctaLink" 
+                variant="primary" 
+                size="md"
+                class="shadow-md"
               >
-                Buy
-              </NuxtLink>
-              <button 
-                v-else 
-                disabled 
-                class="bg-gray-100 text-gray-400 text-xs px-3 py-1.5 rounded cursor-not-allowed border border-gray-200"
+                <span>{{ slide.ctaText }}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </CButton>
+            </div>
+          </div>
+        </div>
+
+        <!-- Left Arrow Button -->
+        <button 
+          @click="prevSlide" 
+          aria-label="Previous Slide"
+          class="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 hover:bg-white text-gray-800 flex items-center justify-center shadow-md backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+
+        <!-- Right Arrow Button -->
+        <button 
+          @click="nextSlide" 
+          aria-label="Next Slide"
+          class="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 hover:bg-white text-gray-800 flex items-center justify-center shadow-md backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+
+        <!-- Pagination Dots -->
+        <div class="absolute bottom-3 sm:bottom-4 right-4 sm:right-6 z-20 flex items-center gap-1.5 sm:gap-2">
+          <button 
+            v-for="(slide, index) in slides" 
+            :key="index"
+            @click="goToSlide(index)"
+            :aria-label="`Go to slide ${index + 1}`"
+            :class="[
+              'h-2 rounded-full transition-all duration-300 cursor-pointer',
+              currentIndex === index 
+                ? 'w-6 bg-[#4ade80]' 
+                : 'w-2 bg-white/60 hover:bg-white'
+            ]"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- HORIZONTALLY SCROLLABLE SHORTCUT BUTTONS -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex items-center gap-3 sm:gap-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-1">
+        
+        <!-- Button 1: Katalog Papan Bunga (Light Gray Button) -->
+        <NuxtLink
+          to="/catalog"
+          class="flex items-center gap-3.5 px-5 py-3.5 bg-gray-100 hover:bg-gray-200/80 active:scale-[0.99] border border-gray-200/80 rounded-2xl shadow-2xs hover:shadow-xs transition-all shrink-0 min-w-[250px] sm:min-w-[280px] group cursor-pointer text-left"
+        >
+          <div class="w-11 h-11 rounded-xl bg-white text-[#1b4332] flex items-center justify-center shrink-0 border border-gray-200 shadow-2xs group-hover:scale-105 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h2 class="text-sm sm:text-base font-bold text-gray-800 group-hover:text-gray-900 transition-colors">
+              Katalog Papan Bunga
+            </h2>
+            <p class="text-xs text-gray-500 truncate mt-0.5">
+              Pilihan bunga papan siap pesan
+            </p>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 group-hover:text-gray-700 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </NuxtLink>
+
+        <!-- Button 2: Custom Board Simulator (Light Green Pastel Opacity 50 Button) -->
+        <NuxtLink
+          to="/products/custom"
+          class="flex items-center gap-3.5 px-5 py-3.5 bg-[#4ade80]/50 hover:bg-[#4ade80]/65 active:scale-[0.99] border border-[#4ade80]/70 rounded-2xl shadow-2xs hover:shadow-xs transition-all shrink-0 min-w-[250px] sm:min-w-[280px] group cursor-pointer text-left"
+        >
+          <div class="w-11 h-11 rounded-xl bg-white text-[#245842] flex items-center justify-center shrink-0 border border-[#4ade80]/40 shadow-2xs group-hover:scale-105 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h2 class="text-sm sm:text-base font-bold text-[#245842] group-hover:text-[#1b4332] transition-colors">
+              Custom Board Simulator
+            </h2>
+            <p class="text-xs text-[#245842]/80 truncate mt-0.5">
+              Desain kustom interaktif 2D
+            </p>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#245842]/70 group-hover:text-[#245842] group-hover:translate-x-0.5 transition-all shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </NuxtLink>
+
+      </div>
+    </section>
+
+    <!-- FEATURED PRODUCTS GRID (With pb-40 / 10rem bottom padding) -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-40">
+      
+      <!-- Section Header -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-8 pb-4 border-b border-gray-100 gap-4">
+        <div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            Koleksi Produk Pilihan
+          </h2>
+          <p class="text-xs sm:text-sm text-gray-500 mt-1">
+            Papan bunga berkualitas tinggi siap rangkai dan kirim cepat ke lokasi tujuan.
+          </p>
+        </div>
+        <div>
+          <NuxtLink 
+            to="/catalog" 
+            class="text-xs sm:text-sm font-bold text-[#1b4332] hover:text-[#143326] flex items-center gap-1 transition-colors"
+          >
+            <span>Lihat Semua Produk</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </NuxtLink>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="isLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div v-for="n in 4" :key="n" class="bg-gray-50 border border-gray-100 rounded-2xl p-4 animate-pulse space-y-4">
+          <div class="aspect-[4/3] bg-gray-200 rounded-xl w-full"></div>
+          <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+          <div class="h-8 bg-gray-200 rounded-xl w-full"></div>
+        </div>
+      </div>
+
+      <!-- Products Grid -->
+      <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div 
+          v-for="item in productOfferings" 
+          :key="item.id"
+          class="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all duration-300 flex flex-col justify-between cursor-pointer"
+          @click="navigateTo(item.id === 'custom' || item.isCustomRoute ? '/products/custom' : `/products/${item.slug || item.id}`)"
+        >
+          <div>
+            <!-- Product Image -->
+            <div class="aspect-[4/3] relative bg-gray-50 overflow-hidden">
+              <img 
+                :src="item.image || '/images/custom-preview.png'" 
+                :alt="item.name" 
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+              />
+              
+              <!-- Badges -->
+              <span 
+                v-if="item.id === 'custom' || item.isCustomRoute" 
+                class="absolute top-2.5 left-2.5 bg-[#1b4332] text-white text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-lg border border-[#143326] shadow-2xs z-10"
+              >
+                Interactive 2D
+              </span>
+
+              <span 
+                v-if="item.status === 'inactive'" 
+                class="absolute top-2.5 right-2.5 bg-amber-100 text-amber-900 text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-lg border border-amber-200 shadow-2xs z-10"
+              >
+                Preview Only
+              </span>
+              <span 
+                v-else-if="!item.isAvailable" 
+                class="absolute top-2.5 right-2.5 bg-red-100 text-red-800 text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-lg border border-red-200 shadow-2xs z-10"
               >
                 Sold Out
-              </button>
+              </span>
             </div>
-          </div>
-        </div>
 
-      </div>
-    </section>
+            <!-- Product Info -->
+            <div class="p-3.5 sm:p-4 space-y-2">
+              <!-- Rating & Reviews -->
+              <div class="flex items-center gap-1 text-[11px] text-yellow-500 font-bold">
+                <span>⭐ {{ item.rating ? item.rating.toFixed(1) : '4.8' }}</span>
+                <span class="text-gray-300">|</span>
+                <span class="text-gray-400 font-normal">({{ item.reviews || 80 }})</span>
+              </div>
 
-    <section class="max-w-7xl mx-auto px-8 py-20 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-      <div class="h-[450px]">
-        <img src="/images/florist.jpg" alt="Gallery preview" class="w-full h-full object-cover rounded-xl shadow-sm" />
-      </div>
-      <div class="grid grid-cols-2 gap-8">
-        
-        <div class="space-y-2">
-          <div class="text-accent">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h4 class="font-bold text-gray-800">Quality Product</h4>
-          <p class="text-xs text-gray-500 leading-relaxed">Our flowers are of the highest quality, carefully selected and sourced from reputable</p>
-        </div>
+              <!-- Product Name -->
+              <h3 class="font-bold text-gray-900 text-xs sm:text-sm line-clamp-2 group-hover:text-[#1b4332] transition-colors leading-snug">
+                {{ item.name }}
+              </h3>
 
-        <div class="space-y-2">
-          <div class="text-accent">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <h4 class="font-bold text-gray-800">Always Fresh</h4>
-          <p class="text-xs text-gray-500 leading-relaxed">Our flowers are always fresh, handpicked and delivered promptly for maximum longevity and enjoyment.</p>
-        </div>
-
-        <div class="space-y-2">
-          <div class="text-accent">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h4 class="font-bold text-gray-800">Work Smart</h4>
-          <p class="text-xs text-gray-500 leading-relaxed">We work smart, using innovative techniques and technology to streamline our processes</p>
-        </div>
-
-        <div class="space-y-2">
-          <div class="text-accent">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.121 14.121L19 19m-4.879-4.879l-1.414-1.414M12 10.586l-1.414-1.414M9.879 9.879L5 5m4.879 4.879l1.414 1.414M12 10.586l1.414 1.414M9.879 9.879L5 19" />
-            </svg>
-          </div>
-          <h4 class="font-bold text-gray-800">Excellent Service</h4>
-          <p class="text-xs text-gray-500 leading-relaxed">We pride ourselves on providing excellent service, going above and beyond to meet our customers' needs</p>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- <section class="max-w-7xl mx-auto px-8 py-20">
-      <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">Our Gallery View</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-        <div class="h-[600px] rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
-          <img 
-            v-if="getProductImageBySlug('graduate')" 
-            :src="getProductImageBySlug('graduate')" 
-            alt="Graduate Gallery" 
-            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-          />
-          <div v-else class="text-center text-gray-400 p-6">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span class="text-xs font-black uppercase tracking-wider block">Graduate</span>
-          </div>
-        </div>
-
-        <div class="md:col-span-2 grid grid-cols-2 grid-rows-2 gap-6 h-[600px]">
-          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
-            <img 
-              v-if="getProductImageBySlug('wedding')" 
-              :src="getProductImageBySlug('wedding')" 
-              alt="Wedding Gallery" 
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-            />
-            <div v-else class="text-center text-gray-400 p-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span class="text-[10px] font-black uppercase tracking-wider block">Wedding</span>
+              <!-- Price Display -->
+              <div>
+                <p class="text-[10px] text-gray-400 font-medium">Harga mulai dari</p>
+                <p class="text-sm sm:text-base font-extrabold text-[#1b4332]">
+                  {{ formatRupiah(item.price) }}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
-            <img 
-              v-if="getProductImageBySlug('birthday')" 
-              :src="getProductImageBySlug('birthday')" 
-              alt="Birthday Gallery" 
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-            />
-            <div v-else class="text-center text-gray-400 p-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span class="text-[10px] font-black uppercase tracking-wider block">Birthday</span>
-            </div>
-          </div>
+          <!-- Action Button -->
+          <div class="p-3.5 sm:p-4 pt-0">
+            <CButton
+              v-if="item.isAvailable && item.status !== 'inactive'"
+              :to="item.id === 'custom' || item.isCustomRoute ? '/products/custom' : `/products/${item.slug || item.id}`"
+              :variant="item.id === 'custom' || item.isCustomRoute ? 'primary' : 'secondary'"
+              size="sm"
+              class="w-full"
+              @click.stop
+            >
+              {{ item.id === 'custom' || item.isCustomRoute ? 'Desain Sekarang' : 'Lihat Detail' }}
+            </CButton>
 
-          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
-            <img 
-              v-if="getProductImageBySlug('anniversary')" 
-              :src="getProductImageBySlug('anniversary')" 
-              alt="Anniversary Gallery" 
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-            />
-            <div v-else class="text-center text-gray-400 p-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span class="text-[10px] font-black uppercase tracking-wider block">Anniversary</span>
-            </div>
-          </div>
+            <CButton
+              v-else-if="item.status === 'inactive'"
+              :to="`/products/${item.slug || item.id}`"
+              variant="outline"
+              size="sm"
+              class="w-full text-amber-800 border-amber-300 hover:bg-amber-50"
+              @click.stop
+            >
+              Lihat Preview
+            </CButton>
 
-          <div class="rounded-xl overflow-hidden shadow-sm relative group bg-gray-200 flex items-center justify-center">
-            <img 
-              v-if="getProductImageBySlug('condolences')" 
-              :src="getProductImageBySlug('condolences')" 
-              alt="Condolences Gallery" 
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-            />
-            <div v-else class="text-center text-gray-400 p-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span class="text-[10px] font-black uppercase tracking-wider block">Condolences</span>
-            </div>
+            <CButton
+              v-else
+              disabled
+              variant="outline"
+              size="sm"
+              class="w-full opacity-60 cursor-not-allowed"
+            >
+              Habis Terjual
+            </CButton>
           </div>
         </div>
       </div>
-    </section> -->
 
-    <section class="max-w-7xl mx-auto px-8 py-20">
-      <h2 class="text-3xl md:text-4xl font-bold text-center text-accent mb-12">What Do They Say About Us</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        <div class="bg-white-base p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
-          <div class="flex items-center gap-4 mb-6">
-            <img src="/images/ilham.jpeg" alt="Ilham" class="w-12 h-12 rounded-full object-cover" />
-            <h4 class="font-bold text-gray-800">Ilham Priambodo</h4>
-          </div>
-          <p class="text-gray-500 text-sm leading-relaxed">"Highly recommend this website for quality flowers and plants. Great prices, timely delivery and excellent customer service."</p>
-        </div>
-
-        <div class="bg-white-base p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
-          <div class="flex items-center gap-4 mb-6">
-            <img src="/images/rafata.jpeg" alt="Rafata" class="w-12 h-12 rounded-full object-cover" />
-            <h4 class="font-bold text-gray-800">Rafata Alfatih</h4>
-          </div>
-          <p class="text-gray-500 text-sm leading-relaxed">"Great service, beautiful flowers, timely delivery. Highly recommend."</p>
-        </div>
-
-        <div class="bg-white-base p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
-          <div class="flex items-center gap-4 mb-6">
-            <img src="/images/rayhan.jpeg" alt="Rayhan" class="w-12 h-12 rounded-full object-cover" />
-            <h4 class="font-bold text-gray-800">Rayhan Shidqi</h4>
-          </div>
-          <p class="text-gray-500 text-sm leading-relaxed">"I am very happy with my purchase from this website, the plants were healthy and arrived on time."</p>
-        </div>
-
+      <!-- Bottom View All Button -->
+      <div class="mt-12 text-center">
+        <CButton 
+          to="/catalog" 
+          variant="outline" 
+          size="md"
+        >
+          <span>Lihat Semua Produk di Katalog</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </CButton>
       </div>
+
     </section>
 
   </div>

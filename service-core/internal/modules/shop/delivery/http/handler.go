@@ -16,6 +16,7 @@ type ShopHandler struct {
 	findShops        *usecase.FindShopsUsecase
 	getShop          *usecase.GetShopUsecase
 	createShop       *usecase.SaveShopUsecase
+	deleteShop       *usecase.DeleteShopUsecase
 	getShopAddresses *usecase.GetShopAddressesUsecase
 	getShopCouriers  *usecase.GetShopCouriersUsecase
 	getShopProducts  *usecase.GetShopProductsUsecase
@@ -25,6 +26,7 @@ func NewShopHandler(
 	findShops *usecase.FindShopsUsecase,
 	getShop *usecase.GetShopUsecase,
 	createShop *usecase.SaveShopUsecase,
+	deleteShop *usecase.DeleteShopUsecase,
 	getShopAddresses *usecase.GetShopAddressesUsecase,
 	getShopCouriers *usecase.GetShopCouriersUsecase,
 	getShopProducts *usecase.GetShopProductsUsecase,
@@ -33,6 +35,7 @@ func NewShopHandler(
 		findShops:        findShops,
 		getShop:          getShop,
 		createShop:       createShop,
+		deleteShop:       deleteShop,
 		getShopAddresses: getShopAddresses,
 		getShopCouriers:  getShopCouriers,
 		getShopProducts:  getShopProducts,
@@ -52,6 +55,8 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 	name := apphttp.Query(r, "name")
 	id := apphttp.Query(r, "id")
 	sort := apphttp.Query(r, "sort")
+	activeParam := apphttp.Query(r, "active")
+	approvalParam := apphttp.Query(r, "approval_status")
 
 	input := usecase.FindShopsInput{
 		Page:  page,
@@ -64,6 +69,14 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 	if id != "" {
 		input.ID = &id
 	}
+	if activeParam != "" {
+		if activeBool, err := strconv.ParseBool(activeParam); err == nil {
+			input.IsActive = &activeBool
+		}
+	}
+	if approvalParam != "" {
+		input.ApprovalStatus = &approvalParam
+	}
 
 	shops, total, err := h.findShops.Execute(r.Context(), input)
 	if err != nil {
@@ -73,13 +86,14 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 	var shopsResponse []getShopResponse
 	for _, shop := range shops {
 		s := getShopResponse{
-			ID:          shop.ID,
-			Name:        shop.Name,
-			Slug:        shop.Slug,
-			Description: shop.Description,
-			IsActive:    shop.IsActive,
-			CreatedAt:   shop.CreatedAt,
-			UpdatedAt:   shop.UpdatedAt,
+			ID:             shop.ID,
+			Name:           shop.Name,
+			Slug:           shop.Slug,
+			Description:    shop.Description,
+			IsActive:       shop.IsActive,
+			ApprovalStatus: string(shop.ApprovalStatus),
+			CreatedAt:      shop.CreatedAt,
+			UpdatedAt:      shop.UpdatedAt,
 		}
 
 		shopsResponse = append(shopsResponse, s)
@@ -109,13 +123,14 @@ func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error 
 
 	response := map[string]getShopResponse{
 		"shop": {
-			ID:          result.ID,
-			Name:        result.Name,
-			Slug:        result.Slug,
-			Description: result.Description,
-			IsActive:    result.IsActive,
-			CreatedAt:   result.CreatedAt,
-			UpdatedAt:   result.UpdatedAt,
+			ID:             result.ID,
+			Name:           result.Name,
+			Slug:           result.Slug,
+			Description:    result.Description,
+			IsActive:       result.IsActive,
+			ApprovalStatus: string(result.ApprovalStatus),
+			CreatedAt:      result.CreatedAt,
+			UpdatedAt:      result.UpdatedAt,
 		},
 	}
 
@@ -139,7 +154,7 @@ func (h *ShopHandler) SaveShop(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	var shopID *uuid.UUID
-	if req.ShopID != nil {
+	if req.ShopID != nil && *req.ShopID != "" {
 		parsed, err := uuid.Parse(*req.ShopID)
 		if err != nil {
 			return apperrors.NewBadRequest("invalid shop id")
@@ -148,20 +163,24 @@ func (h *ShopHandler) SaveShop(w http.ResponseWriter, r *http.Request) error {
 		shopID = &parsed
 	}
 
-	var parsedIsActive bool
-	parsedIsActive, err := strconv.ParseBool(req.IsActive)
-	if err != nil {
-		return apperrors.NewBadRequest("invalid active status")
+	var isActivePtr *bool
+	if req.IsActive != nil && *req.IsActive != "" {
+		parsedIsActive, err := strconv.ParseBool(*req.IsActive)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid active status")
+		}
+		isActivePtr = &parsedIsActive
 	}
 
 	input := usecase.SaveShopInput{
-		ID:          shopID,
-		Name:        req.Name,
-		Description: req.Description,
-		IsActive:    parsedIsActive,
+		ID:             shopID,
+		Name:           req.Name,
+		Description:    req.Description,
+		IsActive:       isActivePtr,
+		ApprovalStatus: req.ApprovalStatus,
 	}
 
-	err = h.createShop.Execute(
+	err := h.createShop.Execute(
 		r.Context(),
 		*actor,
 		input,
@@ -177,6 +196,7 @@ func (h *ShopHandler) SaveShop(w http.ResponseWriter, r *http.Request) error {
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
+
 
 func (h *ShopHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) error {
 	shopID, err := apphttp.ParamUUID(r, "shopID")
@@ -276,5 +296,28 @@ func (h *ShopHandler) GetShopProducts(w http.ResponseWriter, r *http.Request) er
 		"shop_id":  shopID,
 		"products": products,
 	})
+	return nil
+}
+
+func (h *ShopHandler) DeleteShop(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	shopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	if err := h.deleteShop.Execute(r.Context(), *actor, shopID); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "shop successfully deleted",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }

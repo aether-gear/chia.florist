@@ -36,6 +36,25 @@ type StaffMembershipRepository interface {
 		exec transaction.Executor,
 		membership domain.StaffMembership,
 	) error
+
+	ListAccountsByStaffID(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+	) ([]domain.StaffAccountMember, error)
+
+	DeleteByAccountIDAndStaffID(
+		ctx context.Context,
+		exec transaction.Executor,
+		accountID uuid.UUID,
+		staffID uuid.UUID,
+	) error
+
+	DeleteByStaffID(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+	) error
 }
 
 type RoleRepository interface {

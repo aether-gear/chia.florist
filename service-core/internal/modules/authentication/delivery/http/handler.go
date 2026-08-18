@@ -184,7 +184,7 @@ func (h *authHandler) SignInEmail(w http.ResponseWriter, r *http.Request) error 
 	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
-		appcookie.CookieAccess,
+		appcookie.CookieCustomer,
 		tokens.AccessToken.Token,
 		accessExpiry,
 	)
@@ -279,7 +279,7 @@ func (h *authHandler) VerifyAccount(w http.ResponseWriter, r *http.Request) erro
 	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
-		appcookie.CookieAccess,
+		appcookie.CookieCustomer,
 		tokens.AccessToken.Token,
 		tokens.AccessToken.ExpiresAt,
 	)
@@ -371,13 +371,30 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if authCtx.CustomerID != nil {
-		appcookie.Clear(w, appcookie.CookieAccess)
-		appcookie.Clear(w, appcookie.CookieCustomerRefresh)
-	} else if authCtx.StaffID != nil {
-		appcookie.Clear(w, appcookie.CookieStaff)
-		appcookie.Clear(w, appcookie.CookieStaffRefresh)
+	appcookie.Clear(w, appcookie.CookieCustomer)
+	appcookie.Clear(w, appcookie.CookieCustomerRefresh)
+
+	response := map[string]string{
+		"message": "logout success",
 	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *authHandler) LogoutStaff(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+
+	err := h.logout.Execute(r.Context(), *authCtx)
+	if err != nil {
+		return err
+	}
+
+	appcookie.Clear(w, appcookie.CookieStaff)
+	appcookie.Clear(w, appcookie.CookieStaffRefresh)
 
 	response := map[string]string{
 		"message": "logout success",
@@ -505,7 +522,7 @@ func (h *authHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) err
 	// so it can be used for authenticated API requests
 	appcookie.Bind(
 		w,
-		appcookie.CookieAccess,
+		appcookie.CookieCustomer,
 		result.AccessToken.Token,
 		result.AccessToken.ExpiresAt,
 	)
@@ -670,7 +687,7 @@ func (h *authHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	appcookie.Clear(w, appcookie.CookieAccess)
+	appcookie.Clear(w, appcookie.CookieCustomer)
 	appcookie.Clear(w, appcookie.CookieCustomerRefresh)
 
 	response := map[string]string{

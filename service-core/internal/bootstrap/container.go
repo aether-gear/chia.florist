@@ -11,6 +11,7 @@ import (
 	mailerSvc "service-core/internal/shared/mailer"
 	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
+	"service-core/internal/infra/shipping"
 	"service-core/internal/shared/transaction"
 
 	auditInfra "service-core/internal/modules/audit/infra"
@@ -101,9 +102,13 @@ type Container struct {
 	ResetPassword         authenUsecase.ResetPasswordUsecase
 	DeleteCustomerAccount customerUsecase.DeleteCustomerAccountUsecase
 
-	FindStaff       staffUsecase.FindStaffUsecase
-	CreateStaff     staffUsecase.CreateStaffUsecase
-	AddStaffAccount staffUsecase.AddStaffAccountUsecase
+	FindStaff          staffUsecase.FindStaffUsecase
+	CreateStaff        staffUsecase.CreateStaffUsecase
+	AddStaffAccount    staffUsecase.AddStaffAccountUsecase
+	ListStaffAccounts  staffUsecase.ListStaffAccountsUsecase
+	UpdateStaff        staffUsecase.UpdateStaffUsecase
+	DeleteStaff        staffUsecase.DeleteStaffUsecase
+	RemoveStaffAccount staffUsecase.RemoveStaffAccountUsecase
 
 	GetCart          cartUsecase.GetCartUsecase
 	AddItem          cartUsecase.AddItemUsecase
@@ -111,6 +116,7 @@ type Container struct {
 	UpdateItem       cartUsecase.UpdateItemUsecase
 	RemoveItem       cartUsecase.RemoveItemUsecase
 	RemoveCustomItem cartUsecase.RemoveCustomItemUsecase
+	ChangeItemShop   cartUsecase.ChangeItemShopUsecase
 	Checkout         cartUsecase.CheckoutUsecase
 
 	ListLocations locationUsecase.ListLocationUsecase
@@ -127,10 +133,13 @@ type Container struct {
 
 	ListShopAddresses addressUsecase.ListShopAddressesUsecase
 	SaveShopAddress   addressUsecase.CreateShopAddressUsecase
+	UpdateShopAddress addressUsecase.UpdateShopAddressUsecase
+	DeleteShopAddress addressUsecase.DeleteShopAddressUsecase
 
-	FindShops shopUsecase.FindShopsUsecase
-	GetShop   shopUsecase.GetShopUsecase
-	SaveShop  shopUsecase.SaveShopUsecase
+	FindShops  shopUsecase.FindShopsUsecase
+	GetShop    shopUsecase.GetShopUsecase
+	SaveShop   shopUsecase.SaveShopUsecase
+	DeleteShop shopUsecase.DeleteShopUsecase
 
 	GetShopAddresses shopUsecase.GetShopAddressesUsecase
 	GetShopCouriers  shopUsecase.GetShopCouriersUsecase
@@ -453,8 +462,43 @@ func NewContainer(cfg Config,
 				accountRepo,
 				pwHasher,
 				userRepo,
+				staffRepo,
 				membershipRepo,
 				roleRepo,
+				auditLogger,
+			),
+		ListStaffAccounts: *staffUsecase.
+			NewListStaffAccountsUsecase(
+				infra.TransactionExecutor,
+				staffRepo,
+				membershipRepo,
+				auditLogger,
+			),
+		UpdateStaff: *staffUsecase.
+			NewUpdateStaffUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				staffRepo,
+				membershipRepo,
+				auditLogger,
+			),
+		DeleteStaff: *staffUsecase.
+			NewDeleteStaffUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				staffRepo,
+				membershipRepo,
+				userDeletionSvc,
+				auditLogger,
+			),
+		RemoveStaffAccount: *staffUsecase.
+			NewRemoveStaffAccountUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				staffRepo,
+				membershipRepo,
+				accountRepo,
+				sessionRepo,
 				auditLogger,
 			),
 
@@ -548,6 +592,7 @@ func NewContainer(cfg Config,
 				inventoryRepo,
 				productRepo,
 				productImageRepo,
+				shopRepo,
 				infra.StorageProvider,
 				infra.TransactionExecutor,
 			),
@@ -558,12 +603,14 @@ func NewContainer(cfg Config,
 				cartRepo,
 				inventoryRepo,
 				productRepo,
+				shopRepo,
 			),
 		AddCustomItem: *cartUsecase.
 			NewAddCustomItemUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				cartRepo,
+				shopRepo,
 			),
 		UpdateItem: *cartUsecase.
 			NewUpdateItemUsecase(
@@ -584,6 +631,14 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				cartRepo,
+			),
+		ChangeItemShop: *cartUsecase.
+			NewChangeItemShopUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				cartRepo,
+				shopRepo,
+				inventoryRepo,
 			),
 		Checkout: *cartUsecase.
 			NewCheckoutUsecase(
@@ -651,6 +706,17 @@ func NewContainer(cfg Config,
 				addressShopRepo,
 				infra.TransactionExecutor,
 			),
+		UpdateShopAddress: *addressUsecase.
+			NewUpdateShopAddressUsecase(
+				addressShopRepo,
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+			),
+		DeleteShopAddress: *addressUsecase.
+			NewDeleteShopAddressUsecase(
+				addressShopRepo,
+				infra.TransactionExecutor,
+			),
 
 		FindShops: *shopUsecase.
 			NewFindShopsUsecase(
@@ -666,6 +732,11 @@ func NewContainer(cfg Config,
 			NewSaveShopUsecase(
 				shopRepo,
 				slugGen,
+				infra.TransactionExecutor,
+			),
+		DeleteShop: *shopUsecase.
+			NewDeleteShopUsecase(
+				shopRepo,
 				infra.TransactionExecutor,
 			),
 
@@ -857,6 +928,7 @@ func NewContainer(cfg Config,
 				shipmentEventRepo,
 				infra.LogisticsProvider,
 				addressRepo,
+				shipping.NewTrackingCache(shipping.DefaultTrackingCacheTTL),
 			),
 		ExpireUnfulfilledOrders: *orderUsecase.NewExpireUnfulfilledOrdersUsecase(
 			orderRepo,

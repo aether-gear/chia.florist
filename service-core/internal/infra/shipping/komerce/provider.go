@@ -160,9 +160,10 @@ func (p *komerceProvider) CreateOrder(
 }
 
 type trackWaybillRequestBody struct {
-	AWB       string  `json:"awb"`
-	Courier   string  `json:"courier"`
-	LastPhone *string `json:"last_phone_number,omitempty"`
+	AWB             string  `json:"awb"`
+	Courier         string  `json:"courier"`
+	LastPhone       *string `json:"last_phone,omitempty"`
+	LastPhoneNumber *string `json:"last_phone_number,omitempty"`
 }
 
 type trackWaybillResponse struct {
@@ -189,9 +190,10 @@ func (p *komerceProvider) TrackShipment(
 ) ([]shipping.TrackingEvent, error) {
 	endpoint := "/api/v1/track/waybill"
 	reqBody := trackWaybillRequestBody{
-		AWB:       input.TrackingNumber,
-		Courier:   input.Courier,
-		LastPhone: input.LastPhone,
+		AWB:             input.TrackingNumber,
+		Courier:         normalizeCourierCode(input.Courier),
+		LastPhone:       input.LastPhone,
+		LastPhoneNumber: input.LastPhone,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -224,7 +226,8 @@ func (p *komerceProvider) TrackShipment(
 	}
 
 	if result.Meta.Code != 200 {
-		return nil, fmt.Errorf("rejected (%d): %s", result.Meta.Code, result.Meta.Message)
+		appErr := mapKomerceError(result.Meta.Code, result.Meta.Message)
+		return nil, appErr
 	}
 
 	var events []shipping.TrackingEvent
@@ -239,4 +242,40 @@ func (p *komerceProvider) TrackShipment(
 	}
 
 	return events, nil
+}
+
+func normalizeCourierCode(courier string) string {
+	c := strings.ToLower(strings.TrimSpace(courier))
+	switch {
+	case strings.Contains(c, "spx") || strings.Contains(c, "shopee"):
+		return "spx"
+	case strings.Contains(c, "jne"):
+		return "jne"
+	case strings.Contains(c, "j&t") || strings.Contains(c, "jnt"):
+		return "jnt"
+	case strings.Contains(c, "sicepat"):
+		return "sicepat"
+	case strings.Contains(c, "pos"):
+		return "pos"
+	case strings.Contains(c, "tiki"):
+		return "tiki"
+	case strings.Contains(c, "ninja"):
+		return "ninja"
+	case strings.Contains(c, "lion"):
+		return "lion"
+	case strings.Contains(c, "wahana"):
+		return "wahana"
+	case strings.Contains(c, "idexpress") || strings.Contains(c, "ide"):
+		return "ide"
+	case strings.Contains(c, "sentral"):
+		return "sentral"
+	case strings.Contains(c, "rex"):
+		return "rex"
+	default:
+		fields := strings.Fields(c)
+		if len(fields) > 0 {
+			return fields[0]
+		}
+		return c
+	}
 }

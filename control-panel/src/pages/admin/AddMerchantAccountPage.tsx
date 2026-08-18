@@ -5,17 +5,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// Removed Card component imports since sections are now borderless and backgroundless
 import { Loader2, Users } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 const schema = z.object({
   merchantId: z.string().min(1, 'Merchant ID is required'),
   email: z.string().email('Must be a valid email'),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone: z.string().min(5, 'Phone number is required'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -39,10 +35,7 @@ export default function AddMerchantAccountPage() {
       reset({
         merchantId: paramMerchantId,
         email: '',
-        name: '',
-        username: '',
         password: '',
-        phone: ''
       });
     }
   }, [paramMerchantId, reset]);
@@ -57,10 +50,7 @@ export default function AddMerchantAccountPage() {
         method: 'POST',
         body: JSON.stringify({
           email: data.email,
-          name: data.name,
-          username: data.username,
           password: data.password,
-          phone: data.phone,
         }),
       });
       setSuccess(response?.message || 'Account successfully added!');
@@ -87,7 +77,7 @@ export default function AddMerchantAccountPage() {
       <div className="space-y-6">
         <div className="pb-4 border-b border-border/60 mb-6">
           <h3 className="font-bold font-display tracking-tight text-lg text-foreground">Account Details</h3>
-          <p className="text-muted-foreground text-sm">Enter the credentials and contact info for the new user.</p>
+          <p className="text-muted-foreground text-sm">Enter the email credentials for the staff account.</p>
         </div>
         <div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -97,32 +87,10 @@ export default function AddMerchantAccountPage() {
               {errors.merchantId && <p className="text-sm text-rose-500">{errors.merchantId.message}</p>}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Full Name</label>
-                <Input {...register('name')} placeholder="John Doe" className="rounded-xl border border-border bg-background" />
-                {errors.name && <p className="text-sm text-rose-500">{errors.name.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Username</label>
-                <Input {...register('username')} placeholder="johndoe" className="rounded-xl border border-border bg-background" />
-                {errors.username && <p className="text-sm text-rose-500">{errors.username.message}</p>}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Email Address</label>
-                <Input type="email" {...register('email')} placeholder="john@example.com" className="rounded-xl border border-border bg-background" />
-                {errors.email && <p className="text-sm text-rose-500">{errors.email.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Phone Number</label>
-                <Input {...register('phone')} placeholder="+62..." className="rounded-xl border border-border bg-background" />
-                {errors.phone && <p className="text-sm text-rose-500">{errors.phone.message}</p>}
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Email Address</label>
+              <Input type="email" {...register('email')} placeholder="john@example.com" className="rounded-xl border border-border bg-background" />
+              {errors.email && <p className="text-sm text-rose-500">{errors.email.message}</p>}
             </div>
 
             <div className="space-y-2">

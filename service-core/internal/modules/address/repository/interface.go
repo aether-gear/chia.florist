@@ -112,7 +112,21 @@ type ShopAddressRepository interface {
 		address domain.ShopAddress,
 	) error
 
-	// Update(address domain.ShopAddress) error
+	Update(
+		ctx context.Context,
+		exec transaction.Executor,
+		address domain.ShopAddress,
+	) error
 
-	// SetDefault(shopID string, addressID string) error
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		addressID uuid.UUID,
+	) error
+
+	UnsetActiveByShopID(
+		ctx context.Context,
+		exec transaction.Executor,
+		shopID uuid.UUID,
+	) error
 }

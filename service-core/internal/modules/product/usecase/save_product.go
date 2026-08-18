@@ -61,13 +61,18 @@ func (u *SaveProductUsecase) Execute(
 		productID = *input.ID
 	}
 
+	prodStatus := domain.ProductStatus(input.Status)
+	if prodStatus == "" {
+		prodStatus = domain.ProductStatusActive
+	}
+
 	product := &domain.Product{
 		ID:          productID,
 		SKU:         input.SKU,
 		Name:        input.Name,
 		Slug:        u.slugGen.Generate(input.Name),
 		Description: input.Description,
-		Status:      domain.ProductStatus(input.Status),
+		Status:      prodStatus,
 		Price:       input.Price,
 		Weight:      input.Weight,
 		CreatedAt:   now,

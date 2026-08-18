@@ -28,6 +28,7 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 		SELECT
 			id,
 			order_id,
+			shipment_id,
 			product_variant_type,
 			shop_id,
 			shop_name,
@@ -56,6 +57,7 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
+			&item.ShipmentID,
 			&item.ProductVariantType,
 			&item.ShopID,
 			&item.ShopName,
@@ -86,6 +88,7 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 		INSERT INTO order_items (
 			id,
 			order_id,
+			shipment_id,
 			product_variant_type,
 			shop_id,
 			shop_name,
@@ -98,10 +101,11 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 			courier_service,
 			shipping_fee_total
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		ON CONFLICT (id)
 		DO UPDATE SET
 			order_id = EXCLUDED.order_id,
+			shipment_id = EXCLUDED.shipment_id,
 			product_variant_type = EXCLUDED.product_variant_type,
 			shop_id = EXCLUDED.shop_id,
 			shop_name = EXCLUDED.shop_name,
@@ -128,6 +132,7 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 		_, err := exec.Exec(ctx, query,
 			item.ID,
 			item.OrderID,
+			item.ShipmentID,
 			variantType,
 			item.ShopID,
 			item.ShopName,
@@ -161,6 +166,7 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 		SELECT
 			id,
 			order_id,
+			shipment_id,
 			product_variant_type,
 			shop_id,
 			shop_name,
@@ -194,6 +200,7 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
+			&item.ShipmentID,
 			&item.ProductVariantType,
 			&item.ShopID,
 			&item.ShopName,
@@ -215,3 +222,91 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 	return items, nil
 }
 
+func (r *orderItemRepositoryImpl) ListByShipmentID(
+	ctx context.Context,
+	exec transaction.Executor,
+	shipmentID uuid.UUID,
+) ([]domain.OrderItem, error) {
+	query := `
+		SELECT
+			id,
+			order_id,
+			shipment_id,
+			product_variant_type,
+			shop_id,
+			shop_name,
+			product_id,
+			product_name,
+			quantity,
+			unit_price,
+			subtotal,
+			courier_code,
+			courier_service,
+			shipping_fee_total
+		FROM
+			order_items
+		WHERE
+			shipment_id = $1
+	`
+
+	rows, err := exec.Query(ctx, query, shipmentID)
+	if err != nil {
+		return nil, fmt.Errorf("query order items by shipment id failed: %w", err)
+	}
+	defer rows.Close()
+
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.OrderItem, error) {
+		var item domain.OrderItem
+		err := row.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ShipmentID,
+			&item.ProductVariantType,
+			&item.ShopID,
+			&item.ShopName,
+			&item.ProductID,
+			&item.ProductName,
+			&item.Quantity,
+			&item.UnitPrice,
+			&item.Subtotal,
+			&item.CourierCode,
+			&item.CourierService,
+			&item.ShippingFee,
+		)
+		return item, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan order items failed: %w", err)
+	}
+
+	return items, nil
+}
+
+func (r *orderItemRepositoryImpl) AssignShipment(
+	ctx context.Context,
+	exec transaction.Executor,
+	shipmentID uuid.UUID,
+	itemIDs []uuid.UUID,
+) error {
+	if len(itemIDs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE order_items
+		SET shipment_id = $1
+		WHERE id = ANY($2::uuid[])
+	`
+
+	itemIDStrings := make([]string, len(itemIDs))
+	for i, id := range itemIDs {
+		itemIDStrings[i] = id.String()
+	}
+
+	_, err := exec.Exec(ctx, query, shipmentID, itemIDStrings)
+	if err != nil {
+		return fmt.Errorf("assign shipment to order items failed: %w", err)
+	}
+
+	return nil
+}

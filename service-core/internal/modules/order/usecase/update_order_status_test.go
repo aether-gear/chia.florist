@@ -103,7 +103,15 @@ func (m *uosMockOrderItemRepo) ListByOrderIDs(_ context.Context, _ transaction.E
 	return nil, nil
 }
 
+func (m *uosMockOrderItemRepo) ListByShipmentID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItem, error) {
+	return nil, nil
+}
+
 func (m *uosMockOrderItemRepo) SaveBulk(_ context.Context, _ transaction.Executor, _ []orderDomain.OrderItem) error {
+	return nil
+}
+
+func (m *uosMockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ []uuid.UUID) error {
 	return nil
 }
 
@@ -187,6 +195,7 @@ func (m *uosMockPaymentRepo) ListPastDuePending(_ context.Context, _ transaction
 
 type uosMockShipmentRepo struct {
 	shipment         *shipmentDomain.Shipment
+	shipments        []shipmentDomain.Shipment
 	createdShipment  *shipmentDomain.Shipment
 	createdShipments []shipmentDomain.Shipment
 	updatedShipment  *shipmentDomain.Shipment
@@ -200,6 +209,16 @@ func (m *uosMockShipmentRepo) GetByID(_ context.Context, _ transaction.Executor,
 func (m *uosMockShipmentRepo) GetByOrderID(_ context.Context, _ transaction.Executor, orderID uuid.UUID) (*shipmentDomain.Shipment, error) {
 	if m.shipment != nil && m.shipment.OrderID == orderID {
 		return m.shipment, nil
+	}
+	return nil, m.err
+}
+
+func (m *uosMockShipmentRepo) ListByOrderID(_ context.Context, _ transaction.Executor, orderID uuid.UUID) ([]shipmentDomain.Shipment, error) {
+	if len(m.shipments) > 0 {
+		return m.shipments, nil
+	}
+	if m.shipment != nil && m.shipment.OrderID == orderID {
+		return []shipmentDomain.Shipment{*m.shipment}, nil
 	}
 	return nil, m.err
 }
@@ -297,6 +316,18 @@ func (m *uosMockShopAddressRepo) FindByShopID(_ context.Context, _ transaction.E
 }
 
 func (m *uosMockShopAddressRepo) Create(_ context.Context, _ transaction.Executor, _ addressDomain.ShopAddress) error {
+	return nil
+}
+
+func (m *uosMockShopAddressRepo) Update(_ context.Context, _ transaction.Executor, _ addressDomain.ShopAddress) error {
+	return nil
+}
+
+func (m *uosMockShopAddressRepo) Delete(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *uosMockShopAddressRepo) UnsetActiveByShopID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
 
@@ -1322,5 +1353,124 @@ func TestUpdateOrderStatus_Shipped_MultiShopShipment(t *testing.T) {
 
 	if shipmentRepo.createdShipments[0].Courier != courier1 || shipmentRepo.createdShipments[1].Courier != courier2 {
 		t.Errorf("expected courier %s and %s, got %s and %s", courier1, courier2, shipmentRepo.createdShipments[0].Courier, shipmentRepo.createdShipments[1].Courier)
+	}
+}
+
+func TestUpdateOrderStatus_ShippedExplicitMultiShipment(t *testing.T) {
+	orderID := uuid.New()
+	addressID := uuid.New()
+	shopID := uuid.New()
+	order := &orderDomain.Order{
+		ID:          orderID,
+		Number:      "ORD-SPLIT-1",
+		Status:      orderDomain.OrderStatusProcessing,
+		AddressID:   addressID,
+		ShippingFee: 20000,
+	}
+
+	itemID1 := uuid.New()
+	itemID2 := uuid.New()
+	itemID3 := uuid.New()
+
+	items := []orderDomain.OrderItem{
+		{
+			ID:          itemID1,
+			OrderID:     orderID,
+			ShopID:      shopID,
+			ProductName: "Product A",
+			Quantity:    1,
+		},
+		{
+			ID:          itemID2,
+			OrderID:     orderID,
+			ShopID:      shopID,
+			ProductName: "Product B",
+			Quantity:    1,
+		},
+		{
+			ID:          itemID3,
+			OrderID:     orderID,
+			ShopID:      shopID,
+			ProductName: "Product C",
+			Quantity:    1,
+		},
+	}
+
+	custAddr := &addressDomain.CustomerAddress{
+		ID:           addressID,
+		ReceiverName: "Alice",
+		Detail: addressDomain.AddressDetail{
+			DistrictID:  "456",
+			FullAddress: "Cust Address",
+		},
+	}
+
+	shopAddr := &addressDomain.ShopAddress{
+		ShopID: shopID,
+		Label:  "Main Shop",
+		Detail: addressDomain.AddressDetail{
+			DistrictID:  "123",
+			FullAddress: "Shop Address",
+		},
+	}
+
+	shipmentRepo := &uosMockShipmentRepo{}
+	track1 := "TRACK-JNE-1"
+	track2 := "TRACK-SICEPAT-2"
+
+	usecase := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		&uosMockOrderRepo{order: order},
+		&uosMockOrderItemRepo{items: items},
+		&uosMockInventoryRepo{},
+		&uosMockPaymentRepo{},
+		&uosMockProductRepo{},
+		shipmentRepo,
+		&uosMockAddressRepo{addr: custAddr},
+		&uosMockShopAddressRepo{addr: shopAddr},
+		&uosMockLogisticsProvider{},
+		&uosMockAuditLogger{},
+	)
+
+	res, err := usecase.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusShipped,
+		Shipments: []ShipmentDispatchInput{
+			{
+				FulfillmentMethod: "courier",
+				Courier:           "jne",
+				Service:           "reg",
+				TrackingNumber:    &track1,
+				ItemIDs:           []uuid.UUID{itemID1, itemID2},
+			},
+			{
+				FulfillmentMethod: "courier",
+				Courier:           "sicepat",
+				Service:           "sunt",
+				TrackingNumber:    &track2,
+				ItemIDs:           []uuid.UUID{itemID3},
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if res.Order.Status != orderDomain.OrderStatusShipped {
+		t.Errorf("expected status Shipped, got %s", res.Order.Status)
+	}
+
+	if len(res.Shipments) != 2 {
+		t.Fatalf("expected 2 shipments created, got %d", len(res.Shipments))
+	}
+
+	if *res.Shipments[0].TrackingNumber != track1 {
+		t.Errorf("expected tracking 1 %s, got %v", track1, res.Shipments[0].TrackingNumber)
+	}
+
+	if *res.Shipments[1].TrackingNumber != track2 {
+		t.Errorf("expected tracking 2 %s, got %v", track2, res.Shipments[1].TrackingNumber)
 	}
 }

@@ -18,6 +18,8 @@ type AddressHandler struct {
 	deleteCustomerAddress *usecase.DeleteCustomerAddressUsecase
 	listShopAddresses     *usecase.ListShopAddressesUsecase
 	createShopAddress     *usecase.CreateShopAddressUsecase
+	updateShopAddress     *usecase.UpdateShopAddressUsecase
+	deleteShopAddress     *usecase.DeleteShopAddressUsecase
 }
 
 func NewAddressHandler(
@@ -26,6 +28,8 @@ func NewAddressHandler(
 	deleteCustomerAddress *usecase.DeleteCustomerAddressUsecase,
 	listShopAddresses *usecase.ListShopAddressesUsecase,
 	createShopAddress *usecase.CreateShopAddressUsecase,
+	updateShopAddress *usecase.UpdateShopAddressUsecase,
+	deleteShopAddress *usecase.DeleteShopAddressUsecase,
 ) *AddressHandler {
 	return &AddressHandler{
 		listCustomerAddresses: listCustomerAddresses,
@@ -33,6 +37,8 @@ func NewAddressHandler(
 		deleteCustomerAddress: deleteCustomerAddress,
 		listShopAddresses:     listShopAddresses,
 		createShopAddress:     createShopAddress,
+		updateShopAddress:     updateShopAddress,
+		deleteShopAddress:     deleteShopAddress,
 	}
 }
 
@@ -283,6 +289,99 @@ func (h *AddressHandler) CreateShopAddress(w http.ResponseWriter, r *http.Reques
 
 	response := map[string]string{
 		"message": "address successfully created",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) UpdateShopAddress(w http.ResponseWriter, r *http.Request) error {
+	var req createShopAddressRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	if req.ProvinceID == "" {
+		return apperrors.NewBadRequest("invalid province id")
+	}
+	if req.DistrictID == "" {
+		return apperrors.NewBadRequest("invalid district id")
+	}
+	if req.CityID == "" {
+		return apperrors.NewBadRequest("invalid city id")
+	}
+	if req.VillageID == "" {
+		return apperrors.NewBadRequest("invalid village id")
+	}
+	if req.FullAddress == "" {
+		return apperrors.NewBadRequest("invalid full address")
+	}
+	if req.PostalCode == "" {
+		return apperrors.NewBadRequest("invalid postal code")
+	}
+
+	parsedShopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	parsedAddressID, err := apphttp.ParamUUID(r, "addressID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid address id")
+	}
+
+	var parsedIsActive bool
+	parsedIsActive, err = strconv.ParseBool(req.IsActive)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid active status")
+	}
+
+	input := usecase.UpdateShopAddressInput{
+		ID:          parsedAddressID,
+		ShopID:      parsedShopID,
+		Label:       req.Label,
+		Phone:       req.Phone,
+		IsActive:    &parsedIsActive,
+		ProvinceID:  req.ProvinceID,
+		CityID:      req.CityID,
+		DistrictID:  req.DistrictID,
+		VillageID:   req.VillageID,
+		FullAddress: req.FullAddress,
+		PostalCode:  req.PostalCode,
+	}
+
+	err = h.updateShopAddress.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "address successfully updated",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *AddressHandler) DeleteShopAddress(w http.ResponseWriter, r *http.Request) error {
+	parsedShopID, err := apphttp.ParamUUID(r, "shopID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	parsedAddressID, err := apphttp.ParamUUID(r, "addressID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid address id")
+	}
+
+	err = h.deleteShopAddress.Execute(r.Context(), parsedShopID, parsedAddressID)
+	if err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "address successfully deleted",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

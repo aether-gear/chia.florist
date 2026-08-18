@@ -69,6 +69,10 @@ func (aM *jwtAuthenticator) RequireAuth(
 				}
 			}
 
+			if !isValidCookieForAuth(cookie, authCtx) {
+				return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+			}
+
 			r = r.WithContext(domain.WithAuthContext(
 				r.Context(),
 				authCtx,
@@ -111,6 +115,10 @@ func (aM *jwtAuthenticator) RequireAnyAuth(
 					}
 				}
 
+				if !isValidCookieForAuth(cookie, authCtx) {
+					continue
+				}
+
 				r = r.WithContext(domain.WithAuthContext(
 					r.Context(),
 					authCtx,
@@ -124,6 +132,76 @@ func (aM *jwtAuthenticator) RequireAnyAuth(
 	}
 }
 
+func (aM *jwtAuthenticator) RequireMultiAuth(
+	exec transaction.Executor,
+	tran transaction.Transactor,
+	cookies ...appcookie.CookieName,
+) commonmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			var collected []*domain.AuthContext
+
+			for _, cookie := range cookies {
+				var authCtx *domain.AuthContext
+
+				token, err := appcookie.Extract(r, cookie)
+				if err == nil {
+					authCtx, err = aM.
+						authenticate(r.Context(), exec, token)
+				}
+
+				if err != nil {
+					var refreshErr error
+					authCtx, refreshErr = aM.
+						trySilentRefresh(
+							r.Context(),
+							exec,
+							tran,
+							w,
+							r,
+							cookie,
+						)
+					if refreshErr != nil {
+						continue
+					}
+				}
+
+				if !isValidCookieForAuth(cookie, authCtx) {
+					continue
+				}
+
+				collected = append(collected, authCtx)
+			}
+
+			if len(collected) == 0 {
+				return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
+			}
+
+			ctx := domain.WithMultiAuthContext(r.Context(), collected)
+			ctx = domain.WithAuthContext(ctx, collected[0])
+
+			return next(w, r.WithContext(ctx))
+		}
+	}
+}
+
+func isValidCookieForAuth(
+	cookie appcookie.CookieName,
+	authCtx *domain.AuthContext,
+) bool {
+	if authCtx == nil {
+		return false
+	}
+	switch cookie {
+	case appcookie.CookieCustomer:
+		return authCtx.CustomerID != nil
+	case appcookie.CookieStaff:
+		return authCtx.StaffID != nil
+	default:
+		return true
+	}
+}
+
 func (aM *jwtAuthenticator) trySilentRefresh(
 	ctx context.Context,
 	exec transaction.Executor,
@@ -134,7 +212,7 @@ func (aM *jwtAuthenticator) trySilentRefresh(
 ) (*domain.AuthContext, error) {
 	var refreshCookie appcookie.CookieName
 	switch cookieName {
-	case appcookie.CookieAccess:
+	case appcookie.CookieCustomer:
 		refreshCookie = appcookie.CookieCustomerRefresh
 	case appcookie.CookieStaff:
 		refreshCookie = appcookie.CookieStaffRefresh

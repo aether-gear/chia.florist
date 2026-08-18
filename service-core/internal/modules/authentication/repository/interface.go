@@ -148,6 +148,12 @@ type Authenticator interface {
 		tran transaction.Transactor,
 		cookies ...appcookie.CookieName,
 	) appmiddleware.Middleware
+
+	RequireMultiAuth(
+		exec transaction.Executor,
+		tran transaction.Transactor,
+		cookies ...appcookie.CookieName,
+	) appmiddleware.Middleware
 }
 
 type OAuthConnectionRepository interface {

@@ -73,17 +73,17 @@ func NewRouteChains(c *Container) *RouteChains {
 	return &RouteChains{
 		Core: buildChain(),
 		CoreAuth: buildChain(
-			c.Authenticator.RequireAnyAuth(
+			c.Authenticator.RequireMultiAuth(
 				c.DBExecutor,
 				c.DBTransactor,
-				appcookie.CookieAccess,
+				appcookie.CookieCustomer,
 				appcookie.CookieStaff,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(
 				authendomain.AccountTypeStaff,
 				authendomain.AccountTypeCustomer,
 			),
+			c.Authorizer.LoadActor(c.DBExecutor),
 		),
 		StaffOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -91,8 +91,9 @@ func NewRouteChains(c *Container) *RouteChains {
 				c.DBTransactor,
 				appcookie.CookieStaff,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
+			c.Authorizer.LoadActor(c.DBExecutor),
+			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaff, authorzDomain.RoleStaffAdmin),
 		),
 		StaffAdminOnly: buildChain(
 			c.Authenticator.RequireAuth(
@@ -100,18 +101,18 @@ func NewRouteChains(c *Container) *RouteChains {
 				c.DBTransactor,
 				appcookie.CookieStaff,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeStaff),
+			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireStaffRole(authorzDomain.RoleStaffAdmin),
 		),
 		CustomerOnly: buildChain(
 			c.Authenticator.RequireAuth(
 				c.DBExecutor,
 				c.DBTransactor,
-				appcookie.CookieAccess,
+				appcookie.CookieCustomer,
 			),
-			c.Authorizer.LoadActor(c.DBExecutor),
 			c.Authorizer.RequireAccountType(authendomain.AccountTypeCustomer),
+			c.Authorizer.LoadActor(c.DBExecutor),
 		),
 	}
 }
@@ -155,6 +156,10 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.AddStaffAccount,
 			&c.CreateStaff,
 			&c.FindStaff,
+			&c.ListStaffAccounts,
+			&c.UpdateStaff,
+			&c.DeleteStaff,
+			&c.RemoveStaffAccount,
 		)
 
 		customerHandler = customerH.NewCustomerHandler(
@@ -168,6 +173,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.UpdateItem,
 			&c.RemoveItem,
 			&c.RemoveCustomItem,
+			&c.ChangeItemShop,
 			&c.Checkout,
 		)
 
@@ -187,6 +193,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.DeleteUserAddress,
 			&c.ListShopAddresses,
 			&c.SaveShopAddress,
+			&c.UpdateShopAddress,
+			&c.DeleteShopAddress,
 		)
 
 		paymentHandler = paymentH.NewPaymentHandler(
@@ -202,6 +210,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.FindShops,
 			&c.GetShop,
 			&c.SaveShop,
+			&c.DeleteShop,
 			&c.GetShopAddresses,
 			&c.GetShopCouriers,
 			&c.GetShopProducts,
@@ -269,14 +278,14 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/products", func(r chi.Router) {
 			r.Get("/", chains.Core(productHandler.FindProducts))
-			r.Post("/", chains.StaffAdminOnly(productHandler.SaveProduct))
+			r.Post("/", chains.StaffOnly(productHandler.SaveProduct))
 			r.Get("/stats", chains.StaffAdminOnly(productHandler.GetProductStats))
 
 			r.Get("/{slug}", chains.Core(productHandler.GetProduct))
 
 			r.Route("/id/{id}", func(r chi.Router) {
 				r.Delete("/", chains.StaffAdminOnly(productHandler.DeleteProduct))
-				r.Post("/images", chains.StaffAdminOnly(productHandler.AddProductImages))
+				r.Post("/images", chains.StaffOnly(productHandler.AddProductImages))
 			})
 		})
 
@@ -291,8 +300,10 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Post("/forgot-password/verify", chains.Core(authHandler.VerifyPasswordReset))
 			r.Post("/forgot-password/reset", chains.Core(authHandler.ResetPassword))
 
-			r.Post("/logout", chains.CoreAuth(authHandler.Logout))
-			r.Get("/me", chains.CoreAuth(authHandler.Me))
+			r.Post("/logout", chains.CustomerOnly(authHandler.Logout))
+			r.Post("/staff/logout", chains.StaffOnly(authHandler.LogoutStaff))
+			r.Get("/me", chains.CustomerOnly(authHandler.Me))
+			r.Get("/staff/me", chains.StaffOnly(authHandler.Me))
 
 			r.Get("/google/login", chains.Core(authHandler.GoogleLogin))
 			r.Get("/google/callback", chains.Core(authHandler.GoogleCallback))
@@ -302,7 +313,14 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/", chains.StaffAdminOnly(staffHandler.FindStaff))
 			r.Post("/", chains.StaffAdminOnly(staffHandler.CreateStaff))
 			r.Route("/{staffID}", func(r chi.Router) {
-				r.Post("/accounts", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+				r.Put("/", chains.StaffAdminOnly(staffHandler.UpdateStaff))
+				r.Delete("/", chains.StaffAdminOnly(staffHandler.DeleteStaff))
+
+				r.Route("/accounts", func(r chi.Router) {
+					r.Get("/", chains.StaffAdminOnly(staffHandler.ListStaffAccounts))
+					r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
+					r.Delete("/{accountID}", chains.StaffAdminOnly(staffHandler.RemoveStaffAccount))
+				})
 			})
 		})
 
@@ -313,6 +331,8 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/profile", func(r chi.Router) {
 			r.Get("/", chains.CoreAuth(userHandler.GetCurrentProfile))
 			r.Put("/", chains.CoreAuth(userHandler.UpdateCurrentProfile))
+			r.Get("/staff", chains.StaffOnly(userHandler.GetCurrentProfile))
+			r.Put("/staff", chains.StaffOnly(userHandler.UpdateCurrentProfile))
 			r.Delete("/", chains.CustomerOnly(authHandler.DeleteAccount))
 		})
 
@@ -327,6 +347,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", chains.CustomerOnly(cartHandler.AddItem))
 				r.Put("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.UpdateItem))
+				r.Patch("/{cartItemID}/shop", chains.CustomerOnly(cartHandler.ChangeItemShop))
 				r.Delete("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.RemoveItem))
 				r.Delete("/custom/{cartItemID}", chains.CustomerOnly(cartHandler.RemoveCustomItem))
 			})
@@ -371,14 +392,17 @@ func NewRouter(c *Container) *chi.Mux {
 
 		r.Route("/shops", func(r chi.Router) {
 			r.Get("/", chains.Core(shopHandler.FindShops))
-			r.Post("/", chains.Core(shopHandler.SaveShop))
+			r.Post("/", chains.StaffOnly(shopHandler.SaveShop))
 
 			r.Route("/{shopID}", func(r chi.Router) {
 				r.Get("/", chains.Core(shopHandler.GetShopByID))
+				r.Delete("/", chains.StaffAdminOnly(shopHandler.DeleteShop))
 
 				r.Route("/addresses", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopAddresses))
 					r.Post("/", chains.StaffOnly(addressHandler.CreateShopAddress))
+					r.Put("/{addressID}", chains.StaffOnly(addressHandler.UpdateShopAddress))
+					r.Delete("/{addressID}", chains.StaffOnly(addressHandler.DeleteShopAddress))
 				})
 
 				r.Route("/couriers", func(r chi.Router) {
@@ -388,12 +412,9 @@ func NewRouter(c *Container) *chi.Mux {
 
 				r.Route("/products", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopProducts))
-					r.Post("/{productID}/inventories",
-						chains.StaffOnly(inventoryHandler.AddInventory))
-					r.Put("/{productID}/inventories",
-						chains.StaffOnly(inventoryHandler.UpdateInventory))
-					r.Delete("/{productID}/inventories",
-						chains.StaffOnly(inventoryHandler.RemoveInventory))
+					r.Post("/{productID}/inventories", chains.StaffOnly(inventoryHandler.AddInventory))
+					r.Put("/{productID}/inventories", chains.StaffOnly(inventoryHandler.UpdateInventory))
+					r.Delete("/{productID}/inventories", chains.StaffOnly(inventoryHandler.RemoveInventory))
 				})
 			})
 		})
@@ -421,6 +442,7 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/orders", func(r chi.Router) {
 			r.Get("/", chains.StaffOnly(orderHandler.FindOrders))
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
+			r.Get("/{orderID}/tracking", chains.StaffOnly(orderHandler.GetOrderTrackingForStaff))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
 		})
 

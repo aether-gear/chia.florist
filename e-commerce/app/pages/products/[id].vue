@@ -1,30 +1,42 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useCart } from '~/composables/useCart'
 import { useProductViewModel } from '~/composables/viewmodels/useProductViewModel'
+import { useStoreSelection } from '~/composables/useStoreSelection'
+import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { bootstrapConfig } from '~/utils/bootstrap'
 
 const route = useRoute()
 const productId = computed(() => route.params.id as string)
 const { addToCart, formatRupiah } = useCart()
-
-const showToast = ref(false)
-const toastInfo = ref({
-  name: '',
-  image: '',
-  quantity: 1,
-  size: ''
-})
-let toastTimeout: ReturnType<typeof setTimeout> | null = null
-
-onUnmounted(() => {
-  if (toastTimeout) clearTimeout(toastTimeout)
-})
+const storeSelection = useStoreSelection()
+const globalAlert = useGlobalAlert()
 
 const { currentProduct, isLoading, error, fetchProductById } = useProductViewModel()
 
+// Shops metadata map
+const shopsList = ref<{ id: string; name: string; slug: string }[]>([])
+const selectedShopSlug = ref('')
+
+const fetchShops = async () => {
+  try {
+    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string; slug: string }[] }>('/shops?active=true')
+    if (res && Array.isArray(res.shops)) {
+      shopsList.value = res.shops
+    }
+  } catch (e) {
+    console.error('Failed to fetch shops for product detail:', e)
+  }
+}
+
 watch(productId, (newId) => {
+  if (newId === 'custom') {
+    navigateTo('/products/custom', { replace: true })
+    return
+  }
   if (newId) {
+    fetchShops()
     fetchProductById(newId)
   }
 }, { immediate: true })
@@ -36,14 +48,89 @@ const selectedColor = ref('')
 const selectedSize = ref('1.8m') // Default ukuran tengah standar
 const quantity = ref(1)
 
+// Filter only branches with active stock (> 0) for this product
+const inStockBranches = computed(() => {
+  const avail = (product.value as any)?.availability
+  if (Array.isArray(avail)) {
+    return avail.filter((a: any) => a.stock > 0)
+  }
+  return []
+})
+
+const selectAvailableBranchForProduct = () => {
+  const availableList = inStockBranches.value
+  if (!availableList || availableList.length === 0) {
+    selectedShopSlug.value = ''
+    return
+  }
+
+  const globalSlug = storeSelection.selectedShop.value?.slug
+  // Only pre-select IF the customer has a global store selected AND that store has stock > 0 for this product
+  if (globalSlug) {
+    const globalMatch = availableList.find((a: any) => a.name === globalSlug)
+    if (globalMatch) {
+      selectedShopSlug.value = globalMatch.name
+      return
+    }
+  }
+
+  // If no global store is selected, or if the global store is out of stock for this product:
+  // DO NOT auto-select any branch for the user! Keep selection empty.
+  selectedShopSlug.value = ''
+}
+
 watch(product, (newProduct) => {
   if (newProduct) {
     activeImage.value = newProduct.images[0] || ''
     selectedColor.value = newProduct.colors[0] || ''
     selectedSize.value = '1.8m'
     quantity.value = 1
+
+    selectAvailableBranchForProduct()
   }
 }, { immediate: true })
+
+// Watch global store selection and refresh product detail with store context
+watch(storeSelection.selectedShop, (newShop) => {
+  if (productId.value && productId.value !== 'custom') {
+    fetchProductById(productId.value, newShop?.id)
+  }
+  if (product.value) {
+    selectAvailableBranchForProduct()
+  }
+})
+
+const branchWarning = ref<string | null>(null)
+
+const handleSelectFulfillingBranch = (avail: { name: string; stock: number }) => {
+  // Do not allow selecting empty/out-of-stock shops
+  if (!avail || avail.stock <= 0) return
+
+  branchWarning.value = null
+  selectedShopSlug.value = avail.name
+  const matched = shopsList.value.find(s => s.slug === avail.name)
+  if (matched && storeSelection.selectedShop.value?.id !== matched.id) {
+    storeSelection.selectShop(matched)
+  }
+}
+
+// Helper to resolve chosen shop_id
+const resolvedShopId = computed(() => {
+  if (selectedShopSlug.value) {
+    const match = shopsList.value.find(s => s.slug === selectedShopSlug.value)
+    if (match) return match.id
+  }
+  return ''
+})
+
+// Helper to compute active stock level for selected branch
+const selectedBranchStock = computed(() => {
+  if (selectedShopSlug.value && (product.value as any)?.availability) {
+    const match = (product.value as any).availability.find((a: any) => a.name === selectedShopSlug.value)
+    if (match) return match.stock
+  }
+  return 0
+})
 
 // FIX DINAMIS: Kalkulasi perubahan harga berdasarkan modifikasi ukuran (Size)
 const displayPrice = computed(() => {
@@ -60,6 +147,12 @@ const displayPrice = computed(() => {
 
 const handleAddToCart = () => {
   if (!product.value) return
+  if (!selectedShopSlug.value || !resolvedShopId.value) {
+    branchWarning.value = 'Please select a fulfilling store branch above before adding to cart.'
+    return
+  }
+  branchWarning.value = null
+
   addToCart({
     id: product.value.id,
     name: product.value.name,
@@ -67,26 +160,28 @@ const handleAddToCart = () => {
     image: activeImage.value,
     size: selectedSize.value,
     color: selectedColor.value,
-    shopId: product.value.shopId || '99ef0062-1040-4574-a4be-0123abce5670',
+    shopId: resolvedShopId.value,
     isCustom: false
   }, quantity.value)
   
-  toastInfo.value = {
-    name: product.value.name,
-    image: activeImage.value || '/images/birthday.jpeg',
-    quantity: quantity.value,
-    size: selectedSize.value
-  }
-  showToast.value = true
-  if (toastTimeout) clearTimeout(toastTimeout)
-  toastTimeout = setTimeout(() => {
-    showToast.value = false
-  }, 4000)
+  globalAlert.showSuccess(
+    'Added to Cart',
+    `${product.value.name} (Qty: ${quantity.value}) has been added to your shopping cart.`,
+    [
+      { label: 'View Cart', onClick: () => navigateTo('/cart') },
+      { label: 'Continue' }
+    ]
+  )
 }
 
 const handleBuyNow = () => {
   if (!product.value) return
-  const shopId = product.value.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
+  if (!selectedShopSlug.value || !resolvedShopId.value) {
+    branchWarning.value = 'Please select a fulfilling store branch above before proceeding.'
+    return
+  }
+  branchWarning.value = null
+
   navigateTo({
     path: '/checkout',
     query: {
@@ -98,7 +193,7 @@ const handleBuyNow = () => {
       size: selectedSize.value,
       color: selectedColor.value,
       qty: quantity.value.toString(),
-      shopId: shopId
+      shopId: resolvedShopId.value
     }
   })
 }
@@ -123,6 +218,15 @@ useHead({
       <button @click="fetchProductById(productId)" class="bg-[#1b4332] text-white px-5 py-2.5 rounded-xl hover:bg-[#143326] transition font-semibold text-xs cursor-pointer">
         Try Again
       </button>
+    </div>
+
+    <div v-else-if="product && product.status === 'archived'" class="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center animate-fade-in">
+      <span class="text-4xl">📦</span>
+      <h3 class="text-lg font-bold text-gray-800">Product No Longer Available</h3>
+      <p class="text-gray-500 text-sm max-w-md">This item has been archived and is no longer listed in our store catalog.</p>
+      <NuxtLink to="/catalog" class="bg-[#1b4332] text-white px-5 py-2.5 rounded-xl hover:bg-[#143326] transition font-semibold text-xs inline-block">
+        Back to Catalog
+      </NuxtLink>
     </div>
 
     <div v-else-if="product" class="animate-fade-in">
@@ -155,17 +259,34 @@ useHead({
         <div class="md:col-span-5 space-y-6">
           <div>
             <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ product.name }}</h1>
-            <p class="text-sm text-gray-400 mt-2">
-              ({{ product.reviews || 150 }} Reviews) | 
-              <span v-if="product.available !== false" class="text-green-600 font-medium">Available</span>
-              <span class="text-red-600 font-medium" v-else>Sold Out</span>
-            </p>
+            <div class="flex items-center gap-3 mt-2 flex-wrap">
+              <span class="text-sm text-gray-400">⭐ 4.8 ({{ product.reviews || 150 }} Reviews)</span>
+              <span class="text-gray-200">|</span>
+              <span v-if="product.status === 'inactive'" class="text-amber-800 font-extrabold text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                Preview Only — Not For Sale
+              </span>
+              <span v-else-if="selectedShopSlug && selectedBranchStock > 0" class="text-emerald-700 font-extrabold text-xs bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                <span>📦</span> In Stock ({{ selectedBranchStock }} available)
+              </span>
+              <span v-else-if="selectedShopSlug && selectedBranchStock <= 0" class="text-red-700 font-extrabold text-xs bg-red-50 px-3 py-1 rounded-full border border-red-200">
+                Sold Out at Selected Store
+              </span>
+              <span v-else class="text-amber-700 font-extrabold text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                📍 Select Fulfilling Branch Below
+              </span>
+            </div>
           </div>
 
           <div class="text-3xl font-extrabold text-gray-900">
             {{ formatRupiah(displayPrice) }}
           </div>
           <p class="text-gray-600 text-sm leading-relaxed border-b border-gray-100 pb-6">{{ product.description }}</p>
+
+          <!-- Inactive Product Notice Banner -->
+          <div v-if="product.status === 'inactive'" class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-800 flex items-center gap-2">
+            <span class="text-base">ℹ️</span>
+            <span>This product is currently available for preview only and cannot be ordered online at this time.</span>
+          </div>
 
           <div class="space-y-3">
             <label class="text-sm font-semibold text-gray-800">Colours:</label>
@@ -194,29 +315,75 @@ useHead({
             </div>
           </div>
 
+          <!-- Store / Branch Availability Selection (In-Stock Branches Only) -->
+          <div v-if="inStockBranches.length > 0 && product.status !== 'inactive'" class="space-y-3 pt-2">
+            <label class="text-sm font-semibold text-gray-800 flex items-center justify-between">
+              <span>Fulfilling Branch:</span>
+              <span class="text-xs font-normal text-gray-500">Available in-stock stores</span>
+            </label>
+            <div class="space-y-2">
+              <div 
+                v-for="avail in inStockBranches" 
+                :key="avail.name"
+                @click="handleSelectFulfillingBranch(avail)"
+                :class="[
+                  selectedShopSlug === avail.name ? 'border-[#1b4332] bg-emerald-50/60 ring-1 ring-[#1b4332] cursor-pointer' : 
+                  'border-gray-200 bg-white hover:border-emerald-300 cursor-pointer'
+                ]"
+                class="p-3 rounded-xl border flex items-center justify-between transition-all group"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="text-sm">🏪</span>
+                  <span class="text-xs font-bold text-gray-800 group-hover:text-emerald-800 transition-colors">{{ avail.slug }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-emerald-700">
+                    {{ avail.stock }} in stock
+                  </span>
+                  <span v-if="selectedShopSlug === avail.name" class="text-xs font-bold text-[#1b4332]">✓</span>
+                </div>
+              </div>
+            </div>
+            <!-- Inline Warning Below Branch List -->
+            <div 
+              v-if="branchWarning || !selectedShopSlug" 
+              class="mt-2.5 p-3 rounded-xl flex items-center gap-2 text-xs font-semibold transition-all"
+              :class="branchWarning ? 'bg-red-50 text-red-700 border border-red-200 shadow-2xs' : 'bg-amber-50 text-amber-800 border border-amber-200/80'"
+            >
+              <span class="text-sm font-bold">⚠️</span>
+              <span>{{ branchWarning || 'Please select a fulfilling store branch above to check stock and purchase.' }}</span>
+            </div>
+          </div>
+
+          <!-- Out of Stock Message if no branches have inventory -->
+          <div v-else-if="product && product.status !== 'inactive' && (product.available === false || inStockBranches.length === 0)" class="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-700 flex items-center gap-2">
+            <span class="text-base">🚫</span>
+            <span>This product is currently out of stock across all store branches.</span>
+          </div>
+
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-100">
             <div class="flex border border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 justify-between items-center w-full sm:w-auto">
-              <button @click="quantity > 1 ? quantity-- : null" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">-</button>
+              <button @click="quantity > 1 ? quantity-- : null" :disabled="product.status === 'inactive'" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50">-</button>
               <span class="px-4 py-2.5 font-semibold text-gray-800 text-sm select-none">{{ quantity }}</span>
-              <button @click="quantity++" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600">+</button>
+              <button @click="quantity++" :disabled="product.status === 'inactive'" class="px-4 py-2.5 hover:bg-gray-200 transition font-bold text-gray-600 disabled:opacity-50">+</button>
             </div>
 
             <div class="flex-1 flex gap-3 w-full">
               <button 
-                :disabled="!product.available"
-                @click="product.available && handleAddToCart()" 
-                :class="[!product.available ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 bg-gray-50' : 'border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 cursor-pointer']"
+                :disabled="!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)"
+                @click="handleAddToCart()" 
+                :class="[(!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 bg-gray-50' : 'border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 cursor-pointer']"
                 class="flex-1 font-bold py-3 rounded-xl transition text-sm"
               >
-                Add to Cart
+                {{ product.status === 'inactive' ? 'Not For Sale' : (selectedShopSlug && selectedBranchStock <= 0) ? 'Out of Stock' : 'Add to Cart' }}
               </button>
               <button 
-                :disabled="!product.available"
-                @click="product.available && handleBuyNow()" 
-                :class="[!product.available ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'bg-[#1b4332] hover:bg-[#143326] text-white cursor-pointer']"
+                :disabled="!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)"
+                @click="handleBuyNow()" 
+                :class="[(!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'bg-[#1b4332] hover:bg-[#143326] text-white cursor-pointer']"
                 class="flex-1 font-bold py-3 rounded-xl transition shadow-sm text-sm"
               >
-                Buy Now
+                {{ product.status === 'inactive' ? 'Preview Only' : 'Buy Now' }}
               </button>
             </div>
           </div>
@@ -241,168 +408,5 @@ useHead({
         </div>
       </div>
     </div>
-    
-    <!-- Toast Notification -->
-    <Transition name="toast">
-      <div v-if="showToast" class="cart-toast" role="alert">
-        <div class="toast-body">
-          <div class="toast-icon-check">✓</div>
-          <div class="toast-img-wrap">
-            <img :src="toastInfo.image" class="toast-img" />
-          </div>
-          <div class="toast-details">
-            <h4 class="toast-title">Added to Cart!</h4>
-            <p class="toast-name">{{ toastInfo.name }}</p>
-            <p class="toast-meta">Qty: {{ toastInfo.quantity }} | Size: {{ toastInfo.size }}</p>
-          </div>
-        </div>
-        <div class="toast-actions">
-          <NuxtLink to="/cart" class="btn-toast-view">View Cart</NuxtLink>
-          <button @click="showToast = false" class="btn-toast-close">×</button>
-        </div>
-      </div>
-    </Transition>
   </div>
 </template>
-
-<style scoped>
-/* Custom Toast Notification */
-.cart-toast {
-  position: fixed;
-  top: 90px;
-  right: 24px;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 360px;
-  max-width: calc(100vw - 48px);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(27, 67, 50, 0.15);
-  border-radius: 20px;
-  padding: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-.toast-body {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.toast-icon-check {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(27, 67, 50, 0.1);
-  color: #1b4332;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.toast-img-wrap {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  flex-shrink: 0;
-}
-
-.toast-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.toast-details {
-  flex-grow: 1;
-  min-width: 0;
-}
-
-.toast-title {
-  font-size: 14px;
-  font-weight: 800;
-  color: #1b4332;
-  margin: 0;
-}
-
-.toast-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #111827;
-  margin: 2px 0 0 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.toast-meta {
-  font-size: 11px;
-  color: #6b7280;
-  margin: 2px 0 0 0;
-  font-weight: 500;
-}
-
-.toast-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-top: 1px dashed rgba(27, 67, 50, 0.1);
-  padding-top: 12px;
-}
-
-.btn-toast-view {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1b4332;
-  text-decoration: none;
-  background: rgba(27, 67, 50, 0.05);
-  padding: 6px 14px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.btn-toast-view:hover {
-  background: #1b4332;
-  color: #ffffff;
-}
-
-.btn-toast-close {
-  background: transparent;
-  border: none;
-  font-size: 16px;
-  color: #9ca3af;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  line-height: 1;
-}
-
-.btn-toast-close:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #374151;
-}
-
-/* Toast Transition */
-.toast-enter-active, .toast-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.toast-enter-from {
-  transform: translateX(120%) scale(0.9);
-  opacity: 0;
-}
-.toast-leave-to {
-  transform: translateX(120%) scale(0.9);
-  opacity: 0;
-}
-</style>

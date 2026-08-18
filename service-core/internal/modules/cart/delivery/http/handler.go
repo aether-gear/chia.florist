@@ -21,6 +21,7 @@ type CartHandler struct {
 	updateItem       *usecase.UpdateItemUsecase
 	removeItem       *usecase.RemoveItemUsecase
 	removeCustomItem *usecase.RemoveCustomItemUsecase
+	changeItemShop   *usecase.ChangeItemShopUsecase
 	checkout         *usecase.CheckoutUsecase
 }
 
@@ -31,6 +32,7 @@ func NewCartHandler(
 	updateItem *usecase.UpdateItemUsecase,
 	removeItem *usecase.RemoveItemUsecase,
 	removeCustomItem *usecase.RemoveCustomItemUsecase,
+	changeItemShop *usecase.ChangeItemShopUsecase,
 	checkout *usecase.CheckoutUsecase,
 ) *CartHandler {
 	return &CartHandler{
@@ -40,6 +42,7 @@ func NewCartHandler(
 		updateItem:       updateItem,
 		removeItem:       removeItem,
 		removeCustomItem: removeCustomItem,
+		changeItemShop:   changeItemShop,
 		checkout:         checkout,
 	}
 }
@@ -65,6 +68,14 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 	items := make([]cartItemView, 0, len(result.Cart.Items))
 
 	for _, item := range result.Cart.Items {
+		var shopName, shopSlug string
+		if result.Shops != nil {
+			if s, ok := result.Shops[item.ShopID]; ok {
+				shopName = s.Name
+				shopSlug = s.Slug
+			}
+		}
+
 		// Compute custom product price dynamically by backend-side
 		if item.ProductVariantType == domain.ProductVariantTypeCustom {
 			var price int64
@@ -96,6 +107,8 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 				CartItemID:         item.ID,
 				ProductVariantType: string(item.ProductVariantType),
 				ShopID:             item.ShopID,
+				ShopName:           shopName,
+				ShopSlug:           shopSlug,
 				Name:               "(Custom Board)",
 				Price:              price,
 				Quantity:           item.Quantity,
@@ -130,6 +143,8 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 			ProductVariantType: string(item.ProductVariantType),
 			ProductID:          item.ProductID,
 			ShopID:             item.ShopID,
+			ShopName:           shopName,
+			ShopSlug:           shopSlug,
 			Name:               productData.Product.Name,
 			Price:              price,
 			Quantity:           quantity,
@@ -300,6 +315,48 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 
 	response := map[string]string{
 		"message": "item removed",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *CartHandler) ChangeItemShop(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	cartItemID, err := apphttp.ParamUUID(r, "cartItemID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid cart item id")
+	}
+
+	var req changeItemShopRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	newShopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid target shop id")
+	}
+
+	input := usecase.ChangeItemShopInput{
+		CustomerID: *authCtx.CustomerID,
+		CartItemID: cartItemID,
+		NewShopID:  newShopID,
+	}
+
+	if err := h.changeItemShop.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "item shop updated",
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, response)

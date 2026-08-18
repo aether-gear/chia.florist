@@ -60,9 +60,11 @@ func Logging(log applogger.Logger) Middleware {
 				}
 
 			} else {
-				// Mute successful logs for admin polling
-				// api audit and health routes to keep the console clean
-				if !strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/health" {
+				warningMsg := rw.Header().Get("X-Warning")
+				if warningMsg != "" {
+					fields = append(fields, applogger.Field{Key: "warning", Value: warningMsg})
+					log.Warn(r.Context(), "request completed with warning", fields...)
+				} else if !strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/health" {
 					log.Info(r.Context(), "request success", fields...)
 				}
 			}
