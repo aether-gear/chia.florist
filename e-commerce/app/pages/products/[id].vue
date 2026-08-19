@@ -5,7 +5,7 @@ import { useCart } from '~/composables/useCart'
 import { useProductViewModel } from '~/composables/viewmodels/useProductViewModel'
 import { useStoreSelection } from '~/composables/useStoreSelection'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
-import { bootstrapConfig } from '~/utils/bootstrap'
+import { productService } from '~/services/productService'
 
 const route = useRoute()
 const productId = computed(() => route.params.id as string)
@@ -13,10 +13,33 @@ const { addToCart, formatRupiah } = useCart()
 const storeSelection = useStoreSelection()
 const globalAlert = useGlobalAlert()
 
-const { currentProduct, isLoading, error, fetchProductById } = useProductViewModel()
+// Redirect if custom
+if (productId.value === 'custom') {
+  await navigateTo('/products/custom', { replace: true })
+}
+
+// Server-side pre-fetching for SEO & fast first paint
+const { data: ssrProductData } = await useAsyncData(`product-detail-${productId.value}`, async () => {
+  if (!productId.value || productId.value === 'custom') return null
+  try {
+    const [activeList, prod] = await Promise.all([
+      storeSelection.fetchActiveShops(),
+      productService.getProductById(productId.value, storeSelection.selectedShop.value?.id)
+    ])
+    return {
+      shops: activeList || [],
+      product: prod || null
+    }
+  } catch (err) {
+    console.error('Failed to load product detail on SSR:', err)
+    return null
+  }
+})
+
+const { currentProduct: vmProduct, isLoading: isVmLoading, error: vmError, fetchProductById } = useProductViewModel()
 
 // Shops metadata map
-const shopsList = ref<{ id: string; name: string; slug: string }[]>([])
+const shopsList = ref<{ id: string; name: string; slug: string }[]>(ssrProductData.value?.shops || [])
 const selectedShopSlug = ref('')
 
 const fetchShops = async () => {
@@ -30,6 +53,11 @@ const fetchShops = async () => {
   }
 }
 
+// Product computed falls back to SSR preloaded data if ViewModel hasn't fetched yet
+const product = computed(() => vmProduct.value || ssrProductData.value?.product || null)
+const isLoading = computed(() => isVmLoading.value && !product.value)
+const error = computed(() => vmError.value && !product.value ? vmError.value : null)
+
 watch(productId, (newId) => {
   if (newId === 'custom') {
     navigateTo('/products/custom', { replace: true })
@@ -39,12 +67,10 @@ watch(productId, (newId) => {
     fetchShops()
     fetchProductById(newId)
   }
-}, { immediate: true })
+})
 
-const product = computed(() => currentProduct.value)
-
-const activeImage = ref('')
-const selectedColor = ref('')
+const activeImage = ref(product.value?.images?.[0] || '')
+const selectedColor = ref(product.value?.colors?.[0] || '')
 const selectedSize = ref('1.8m') // Default ukuran tengah standar
 const quantity = ref(1)
 
@@ -81,8 +107,8 @@ const selectAvailableBranchForProduct = () => {
 
 watch(product, (newProduct) => {
   if (newProduct) {
-    activeImage.value = newProduct.images[0] || ''
-    selectedColor.value = newProduct.colors[0] || ''
+    if (!activeImage.value) activeImage.value = newProduct.images[0] || ''
+    if (!selectedColor.value) selectedColor.value = newProduct.colors[0] || ''
     selectedSize.value = '1.8m'
     quantity.value = 1
 
@@ -98,6 +124,87 @@ watch(storeSelection.selectedShop, (newShop) => {
   if (product.value) {
     selectAvailableBranchForProduct()
   }
+})
+
+// Dynamic SEO and OpenGraph for product page
+const pageTitle = computed(() => product.value ? `${product.value.name} — Chia Florist` : 'Flower Board Details — Chia Florist')
+const pageDescription = computed(() => product.value?.description || 'Beli papan bunga ucapan premium berkualitas terbaik di Chia Florist.')
+const pageImage = computed(() => product.value?.images?.[0] || 'https://chiaflorist.com/florist.jpg')
+
+useHead({
+  title: pageTitle,
+  meta: [
+    { name: 'description', content: pageDescription },
+    { property: 'og:title', content: pageTitle },
+    { property: 'og:description', content: pageDescription },
+    { property: 'og:type', content: 'product' },
+    { property: 'og:image', content: pageImage },
+    { property: 'og:url', content: computed(() => `https://chiaflorist.com/products/${productId.value}`) },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: pageTitle },
+    { name: 'twitter:description', content: pageDescription },
+    { name: 'twitter:image', content: pageImage },
+    { name: 'robots', content: 'index, follow' }
+  ],
+  link: [
+    { rel: 'canonical', href: computed(() => `https://chiaflorist.com/products/${productId.value}`) }
+  ],
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: computed(() => {
+        if (!product.value) return '{}'
+        return JSON.stringify({
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'Product',
+              '@id': `https://chiaflorist.com/products/${productId.value}#product`,
+              'name': product.value.name,
+              'description': product.value.description,
+              'image': product.value.images || [pageImage.value],
+              'sku': product.value.sku || `CHIA-${product.value.id}`,
+              'offers': {
+                '@type': 'Offer',
+                'url': `https://chiaflorist.com/products/${productId.value}`,
+                'priceCurrency': 'IDR',
+                'price': product.value.price,
+                'itemCondition': 'https://schema.org/NewCondition',
+                'availability': product.value.available ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                'seller': {
+                  '@type': 'Organization',
+                  'name': 'Chia Florist'
+                }
+              }
+            },
+            {
+              '@type': 'BreadcrumbList',
+              'itemListElement': [
+                {
+                  '@type': 'ListItem',
+                  'position': 1,
+                  'name': 'Home',
+                  'item': 'https://chiaflorist.com/'
+                },
+                {
+                  '@type': 'ListItem',
+                  'position': 2,
+                  'name': 'Catalog',
+                  'item': 'https://chiaflorist.com/catalog'
+                },
+                {
+                  '@type': 'ListItem',
+                  'position': 3,
+                  'name': product.value.name,
+                  'item': `https://chiaflorist.com/products/${productId.value}`
+                }
+              ]
+            }
+          ]
+        })
+      })
+    }
+  ]
 })
 
 const branchWarning = ref<string | null>(null)

@@ -4,11 +4,60 @@ import { useCart } from '~/composables/useCart'
 import { productService } from '~/services/productService'
 
 useHead({
-  title: 'Chia Florist - Flower Boards & Custom Simulator',
+  title: 'Chia Florist — Papan Bunga & Custom Simulator Online',
   meta: [
     {
       name: 'description',
       content: 'Pesan papan bunga ucapan pernikahan, duka cita, peresmian gedung, dan wisuda terbaik atau rancang papan bunga Anda sendiri secara real-time di Chia Florist.'
+    },
+    { property: 'og:title', content: 'Chia Florist — Papan Bunga & Custom Simulator Online' },
+    { property: 'og:description', content: 'Pesan papan bunga ucapan pernikahan, duka cita, peresmian gedung, dan wisuda terbaik atau rancang papan bunga Anda sendiri secara real-time di Chia Florist.' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://chiaflorist.com/' },
+    { property: 'og:image', content: 'https://chiaflorist.com/florist.jpg' },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: 'Chia Florist — Papan Bunga & Custom Simulator Online' },
+    { name: 'twitter:description', content: 'Pesan papan bunga ucapan pernikahan, duka cita, peresmian gedung, dan wisuda terbaik di Chia Florist.' }
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://chiaflorist.com/' }
+  ],
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'Florist',
+            '@id': 'https://chiaflorist.com/#organization',
+            'name': 'Chia Florist',
+            'url': 'https://chiaflorist.com/',
+            'logo': 'https://chiaflorist.com/images/logo.png',
+            'description': 'Penyedia papan bunga ucapan dan buket bunga segar berkualitas tinggi dengan layanan custom simulator online.',
+            'telephone': '+62-817-523-4999',
+            'address': {
+              '@type': 'PostalAddress',
+              'streetAddress': 'Jl. Argotirto No 06 RT 04 RW 02 Kp. Air Terjun Kel. Sungai Daeng',
+              'addressLocality': 'Kab. Bangka Barat',
+              'addressRegion': 'Kep. Bangka Belitung',
+              'postalCode': '33311',
+              'addressCountry': 'ID'
+            }
+          },
+          {
+            '@type': 'WebSite',
+            '@id': 'https://chiaflorist.com/#website',
+            'url': 'https://chiaflorist.com/',
+            'name': 'Chia Florist',
+            'potentialAction': {
+              '@type': 'SearchAction',
+              'target': 'https://chiaflorist.com/search?q={search_term_string}',
+              'query-input': 'required name=search_term_string'
+            }
+          }
+        ]
+      })
     }
   ]
 })
@@ -79,19 +128,38 @@ const resetTimer = () => {
   startTimer()
 }
 
-const productOfferings = ref<any[]>([])
-const isLoading = ref(false)
-const hasError = ref(false)
+export interface HomeOfferingProduct {
+  id: string
+  name: string
+  slug: string
+  price: number
+  image: string
+  isAvailable: boolean
+  rating: number
+  reviews: number
+  status?: string
+  isCustomRoute?: boolean
+}
 
-onMounted(async () => {
-  startTimer()
-  isLoading.value = true
-  hasError.value = false
+const customOfferingCard: HomeOfferingProduct = {
+  id: 'custom',
+  name: 'Custom Board Simulator',
+  slug: 'custom',
+  price: 150000,
+  image: '/images/custom-preview.png',
+  isAvailable: true,
+  rating: 5.0,
+  reviews: 89,
+  status: 'active',
+  isCustomRoute: true
+}
 
+// Server-rendered product offerings via useAsyncData for SEO crawlers
+const { data: offeringsData, status, error: fetchError } = await useAsyncData<HomeOfferingProduct[]>('home-products', async () => {
   try {
     const list = await productService.getCatalogProducts()
-    productOfferings.value = [
-      ...list.map(p => ({
+    return [
+      ...list.map((p): HomeOfferingProduct => ({
         id: p.id,
         name: p.name,
         slug: p.slug || '',
@@ -99,40 +167,24 @@ onMounted(async () => {
         image: p.image,
         isAvailable: p.isAvailable,
         rating: p.rating || 4.8,
-        reviews: p.reviews || 120
+        reviews: p.reviews || 120,
+        status: p.status || (p.isAvailable ? 'active' : 'inactive'),
+        isCustomRoute: p.isCustomRoute || p.id === 'custom'
       })),
-      {
-        id: 'custom',
-        name: 'Custom Board Simulator',
-        slug: 'custom',
-        price: 150000,
-        image: '/images/custom-preview.png',
-        isAvailable: true,
-        rating: 5.0,
-        reviews: 89,
-        isCustomRoute: true
-      }
+      customOfferingCard
     ]
   } catch (err) {
-    console.error('Failed to load homepage offerings:', err)
-    hasError.value = true
-    // Fallback item so the user can still access custom simulator
-    productOfferings.value = [
-      {
-        id: 'custom',
-        name: 'Custom Board Simulator',
-        slug: 'custom',
-        price: 150000,
-        image: '/images/custom-preview.png',
-        isAvailable: true,
-        rating: 5.0,
-        reviews: 89,
-        isCustomRoute: true
-      }
-    ]
-  } finally {
-    isLoading.value = false
+    console.error('Failed to load homepage offerings during SSR:', err)
+    return [customOfferingCard]
   }
+})
+
+const productOfferings = computed(() => offeringsData.value || [customOfferingCard])
+const isLoading = computed(() => status.value === 'pending')
+const hasError = computed(() => Boolean(fetchError.value && productOfferings.value.length <= 1))
+
+onMounted(() => {
+  startTimer()
 })
 
 onUnmounted(() => {

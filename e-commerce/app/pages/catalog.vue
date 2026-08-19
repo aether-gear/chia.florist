@@ -1,26 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { useCart } from '~/composables/useCart' // Import useCart untuk mengambil formatRupiah global
+import { useCart } from '~/composables/useCart'
 import { useProductViewModel } from '~/composables/viewmodels/useProductViewModel'
-import { bootstrapConfig } from '~/utils/bootstrap'
+import { useStoreSelection } from '~/composables/useStoreSelection'
+import { productService } from '~/services/productService'
 
-useHead({
-  title: 'Our Collection - Chia Florist',
-  meta: [
-    { name: 'description', content: 'Explore our premium selection of pre-designed flower boards or launch our custom game simulator.' }
-  ]
-})
-
-// Ambil helper formatRupiah dari global useCart composable
 const { formatRupiah } = useCart()
+const storeSelection = useStoreSelection()
 
 // Initialize product ViewModel (MVVM Architecture)
-const { catalogProducts, isLoading, error, fetchCatalogProducts, page, limit, total, totalPages } = useProductViewModel()
+const { catalogProducts, isLoading: isVmLoading, error, fetchCatalogProducts, page, limit, total, totalPages } = useProductViewModel()
 
 const searchQuery = ref('')
 const selectedSort = ref('date:desc')
 const selectedShop = ref('')
-const shops = ref<{ id: string; name: string; slug: string }[]>([])
 
 const sortOptions = [
   { value: 'date:desc', label: 'Newest First' },
@@ -35,9 +28,53 @@ const sortOptions = [
   { value: 'weight:asc', label: 'Weight (Low to High)' }
 ]
 
-import { useStoreSelection } from '~/composables/useStoreSelection'
+// Server-side pre-fetch for initial catalog and shops
+const { data: initialData, status: initialStatus } = await useAsyncData('catalog-page-init', async () => {
+  try {
+    const [activeShops, paginatedRes] = await Promise.all([
+      storeSelection.fetchActiveShops(),
+      productService.getPaginatedCatalogProducts({
+        sort: 'date:desc',
+        limit: 20
+      })
+    ])
+    return {
+      shops: activeShops || [],
+      products: paginatedRes?.products || []
+    }
+  } catch (err) {
+    console.error('Failed to load initial catalog on SSR:', err)
+    return {
+      shops: [],
+      products: []
+    }
+  }
+})
 
-const storeSelection = useStoreSelection()
+const shops = ref<{ id: string; name: string; slug: string }[]>(initialData.value?.shops || [])
+
+// Interactive simulator card runs client-side and should always be present
+const customSimulatorCard = {
+  id: 'custom',
+  name: 'Custom Board Simulator',
+  price: 150000,
+  rating: 5.0,
+  reviews: 89,
+  image: '/images/custom-preview.png',
+  tag: 'Interactive Game',
+  desc: 'Design your own professional flower board in real-time! Choose your custom layout, foam colors, and fonts.',
+  isCustomRoute: true,
+  isAvailable: true
+}
+
+const displayProducts = computed(() => {
+  const currentList = catalogProducts.value?.length > 0
+    ? catalogProducts.value
+    : (initialData.value?.products || [])
+  return [...currentList, customSimulatorCard]
+})
+
+const isLoading = computed(() => isVmLoading.value)
 
 const fetchShopsList = async () => {
   try {
@@ -72,15 +109,16 @@ const handleShopDropdownChange = (slug: string) => {
 }
 
 onMounted(() => {
-  fetchShopsList()
-  loadProducts()
+  if (shops.value.length === 0) {
+    fetchShopsList()
+  }
 })
 
 // Sync local dropdown with global store selection
 watch(storeSelection.selectedShop, (newShop) => {
   selectedShop.value = newShop?.slug || ''
   loadProducts()
-}, { immediate: true })
+})
 
 // Reload products when sort selection changes
 watch(selectedSort, () => {
@@ -96,24 +134,50 @@ watch(searchQuery, () => {
   }, 400)
 })
 
-// Interactive simulator card runs client-side and should always be present
-const customSimulatorCard = {
-  id: 'custom',
-  name: 'Custom Board Simulator',
-  price: 150000, // Nominal Rupiah murni agar tidak ter-render Rp150
-  rating: 5.0,
-  reviews: 89,
-  image: '/images/custom-preview.png',
-  tag: 'Interactive Game',
-  desc: 'Design your own professional flower board in real-time! Choose your custom layout, foam colors, and fonts.',
-  isCustomRoute: true,
-  isAvailable: true
-}
-
-// Combine dynamic products with the simulator game card
-const displayProducts = computed(() => {
-  const products = catalogProducts.value || []
-  return [...products, customSimulatorCard]
+useHead({
+  title: 'Our Collection — Chia Florist',
+  meta: [
+    { name: 'description', content: 'Explore our handcrafted selection of flower greeting boards, congratulations bouquets, and custom real-time design simulator.' },
+    { property: 'og:title', content: 'Our Collection — Chia Florist' },
+    { property: 'og:description', content: 'Explore our handcrafted selection of flower greeting boards, congratulations bouquets, and custom real-time design simulator.' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://chiaflorist.com/catalog' },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: 'Our Collection — Chia Florist' },
+    { name: 'twitter:description', content: 'Explore our premium selection of flower greeting boards at Chia Florist.' }
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://chiaflorist.com/catalog' }
+  ],
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: computed(() => JSON.stringify({
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'CollectionPage',
+            '@id': 'https://chiaflorist.com/catalog',
+            'url': 'https://chiaflorist.com/catalog',
+            'name': 'Chia Florist Floral Catalog',
+            'description': 'Katalog lengkap papan bunga ucapan pernikahan, duka cita, peresmian, dan wisuda.'
+          },
+          {
+            '@type': 'ItemList',
+            'numberOfItems': displayProducts.value.length,
+            'itemListElement': displayProducts.value.map((item, idx) => ({
+              '@type': 'ListItem',
+              'position': idx + 1,
+              'name': item.name,
+              'url': item.isCustomRoute || item.id === 'custom'
+                ? 'https://chiaflorist.com/products/custom'
+                : `https://chiaflorist.com/products/${(item as any).slug || item.id}`
+            }))
+          }
+        ]
+      }))
+    }
+  ]
 })
 
 // Navigation logic to product details or simulator

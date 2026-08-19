@@ -6,6 +6,7 @@ import type { CatalogProduct } from '~/types/product'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useCart } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
+import { filterCatalogProductsByQuery } from '~/utils/searchMatcher'
 
 const authVm = useAuthViewModel()
 const cart = useCart()
@@ -98,19 +99,13 @@ watch(searchQuery, (newQuery) => {
 
   debounceTimeout = setTimeout(async () => {
     try {
-      const apiResults = await productService.getCatalogProducts({
-        name: query
-      })
-
-      const matchesCustom = customSimulatorCard.name.toLowerCase().includes(query.toLowerCase()) ||
-                            'custom'.includes(query.toLowerCase()) ||
-                            'simulator'.includes(query.toLowerCase())
-
-      if (matchesCustom) {
-        searchResults.value = [customSimulatorCard, ...apiResults]
-      } else {
-        searchResults.value = apiResults
-      }
+      const apiResults = await productService.getCatalogProducts()
+      searchResults.value = filterCatalogProductsByQuery(
+        apiResults,
+        query,
+        true,
+        customSimulatorCard
+      )
     } catch (err) {
       console.error('Search failed:', err)
       searchResults.value = []
@@ -135,6 +130,14 @@ const closeSearch = () => {
   isSearchOpen.value = false
   searchQuery.value = ''
   searchResults.value = []
+}
+
+const goToDedicatedSearch = () => {
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim()
+    closeSearch()
+    navigateTo(`/search?q=${encodeURIComponent(q)}`)
+  }
 }
 
 // Close mobile menu on route change
@@ -481,6 +484,7 @@ watch(() => route.path, () => {
                 <input
                   ref="searchInput"
                   v-model="searchQuery"
+                  @keydown.enter="goToDedicatedSearch"
                   type="text"
                   placeholder="Search flower boards, hand bouquets..."
                   class="w-full bg-surface text-sm text-gray-800 px-5 py-3.5 pr-10 rounded-2xl outline-none border border-transparent focus:border-[#1b4332] focus:bg-white transition-all shadow-inner"
@@ -489,6 +493,17 @@ watch(() => route.path, () => {
                   ✕
                 </span>
               </div>
+              <p class="text-[10px] text-gray-400 mt-2 flex items-center justify-between">
+                <span>Press <strong>Enter ↵</strong> for full search page</span>
+                <NuxtLink
+                  v-if="searchQuery"
+                  :to="`/search?q=${encodeURIComponent(searchQuery)}`"
+                  @click="closeSearch"
+                  class="text-emerald-700 hover:underline font-bold"
+                >
+                  View all results →
+                </NuxtLink>
+              </p>
             </div>
 
             <div class="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
@@ -523,11 +538,28 @@ watch(() => route.path, () => {
                     <p class="text-[11px] font-semibold text-[#1b4332] mt-1">Starting From {{ formatRupiah(product.price) }}</p>
                   </div>
                 </NuxtLink>
+
+                <div class="pt-2">
+                  <NuxtLink
+                    :to="`/search?q=${encodeURIComponent(searchQuery)}`"
+                    @click="closeSearch"
+                    class="block text-center py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#1b4332] text-xs font-bold transition"
+                  >
+                    Open dedicated search page for "{{ searchQuery }}" →
+                  </NuxtLink>
+                </div>
               </div>
 
-              <div v-else-if="searchQuery && searchResults.length === 0" class="h-full flex flex-col items-center justify-center py-12 text-gray-400">
-                <p class="text-3xl mb-2">🔍</p>
+              <div v-else-if="searchQuery && searchResults.length === 0" class="h-full flex flex-col items-center justify-center py-12 text-gray-400 space-y-3">
+                <p class="text-3xl">🔍</p>
                 <p class="text-xs font-bold">No products match "{{ searchQuery }}"</p>
+                <NuxtLink
+                  :to="`/search?q=${encodeURIComponent(searchQuery)}`"
+                  @click="closeSearch"
+                  class="text-xs text-emerald-700 underline font-bold"
+                >
+                  Search on dedicated page
+                </NuxtLink>
               </div>
 
               <div v-else class="h-full flex flex-col items-center justify-center py-12 text-gray-300">
