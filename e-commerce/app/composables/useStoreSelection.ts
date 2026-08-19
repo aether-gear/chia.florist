@@ -12,6 +12,7 @@ export interface Shop {
 
 const STORAGE_KEY = 'chia-selected-shop'
 let isInitialized = false
+let fetchActiveShopsPromise: Promise<Shop[]> | null = null
 
 export const useStoreSelection = () => {
   const selectedShop = useState<Shop | null>('chia-selected-shop-state', () => null)
@@ -43,21 +44,34 @@ export const useStoreSelection = () => {
     }, { deep: true })
   }
 
-  const fetchActiveShops = async (): Promise<Shop[]> => {
-    if (activeShops.value.length > 0) return activeShops.value
-    isLoadingShops.value = true
-    try {
-      const res = await bootstrapConfig.fetchApi<{ shops: Shop[] }>('/shops?active=true')
-      if (res && Array.isArray(res.shops)) {
-        activeShops.value = res.shops
-        return res.shops
-      }
-    } catch (err) {
-      console.error('Failed to fetch active shops:', err)
-    } finally {
-      isLoadingShops.value = false
+  const fetchActiveShops = (force = false): Promise<Shop[]> => {
+    if (!force && activeShops.value.length > 0) {
+      return Promise.resolve(activeShops.value)
     }
-    return []
+
+    if (!force && fetchActiveShopsPromise) {
+      return fetchActiveShopsPromise
+    }
+
+    isLoadingShops.value = true
+
+    fetchActiveShopsPromise = (async () => {
+      try {
+        const res = await bootstrapConfig.fetchApi<{ shops: Shop[] }>('/shops?active=true')
+        if (res && Array.isArray(res.shops)) {
+          activeShops.value = res.shops
+          return res.shops
+        }
+      } catch (err) {
+        console.error('Failed to fetch active shops:', err)
+      } finally {
+        isLoadingShops.value = false
+        fetchActiveShopsPromise = null
+      }
+      return activeShops.value
+    })()
+
+    return fetchActiveShopsPromise
   }
 
   const selectShop = (shop: Shop | null) => {

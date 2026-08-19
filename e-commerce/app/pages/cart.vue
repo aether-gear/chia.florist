@@ -3,6 +3,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCart } from '~/composables/useCart'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 useHead({
   title: 'Your Shopping Cart - Chia Florist'
@@ -18,14 +19,16 @@ const activeShops = storeSelection.activeShops
 
 const isPageLoading = ref(true)
 const isTransferringId = ref<string | null>(null)
-const productAvailabilityMap = ref<Record<string, { slug: string; name: string; stock: number }[]>>({})
+const productAvailabilityMap = useState<Record<string, { slug: string; name: string; stock: number }[]>>('chia-product-availability-map', () => ({}))
+const fetchingIdentifiers = new Set<string>()
 
 const fetchCartItemsAvailability = async () => {
   const standardItems = cart.value.filter(i => !i.isCustom && (i.slug || i.id))
-  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.id))]
+  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.id).filter(Boolean))]
 
-  for (const identifier of uniqueIdentifiers) {
-    if (identifier && !productAvailabilityMap.value[identifier]) {
+  const promises = uniqueIdentifiers.map(async (identifier) => {
+    if (identifier && !productAvailabilityMap.value[identifier] && !fetchingIdentifiers.has(identifier)) {
+      fetchingIdentifiers.add(identifier)
       try {
         const prod = await productService.getProductById(identifier)
         if (prod && (prod as any).availability) {
@@ -35,16 +38,21 @@ const fetchCartItemsAvailability = async () => {
         }
       } catch (e) {
         console.error(`Failed to fetch availability for product ${identifier}`, e)
+      } finally {
+        fetchingIdentifiers.delete(identifier)
       }
     }
-  }
+  })
+
+  await Promise.all(promises)
 }
+
+let cartWatchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   try {
     storeSelection.fetchActiveShops()
-    await flushCart()
-    await loadCart(true)
+    await loadCart()
     await fetchCartItemsAvailability()
   } finally {
     isPageLoading.value = false
@@ -52,8 +60,11 @@ onMounted(async () => {
 })
 
 watch(cart, () => {
-  fetchCartItemsAvailability()
-})
+  if (cartWatchDebounce) clearTimeout(cartWatchDebounce)
+  cartWatchDebounce = setTimeout(() => {
+    fetchCartItemsAvailability()
+  }, 200)
+}, { deep: false })
 
 const getAvailableShopsForItem = (item: any) => {
   if (item.isCustom) {
@@ -77,7 +88,7 @@ const handleTransferItemShop = async (cartItemId: string, targetShopId: string) 
     const matchedShop = activeShops.value.find(s => s.id === targetShopId)
     globalAlert.showSuccess('Branch Transferred', `Item transferred to ${matchedShop?.name || 'new store branch'}!`)
   } catch (err: any) {
-    globalAlert.showError('Transfer Failed', err.message || 'Failed to transfer item to new shop branch.')
+    globalAlert.showError('Transfer Failed', mapErrorMessage(err, 'Failed to transfer item to new shop branch.'))
   } finally {
     isTransferringId.value = null
   }
@@ -140,7 +151,7 @@ const handleRemove = async (id: string, size?: string, color?: string) => {
     globalAlert.showSuccess('Item Removed', 'The product has been removed from your cart.')
   } catch (e) {
     console.error('Remove failed:', e)
-    globalAlert.showError('Remove Failed', 'Could not remove item. Please try again.')
+    globalAlert.showError('Remove Failed', mapErrorMessage(e, 'Could not remove item. Please try again.'))
   } finally {
     isRemovingAny.value = false
     activeRemovingId.value = null

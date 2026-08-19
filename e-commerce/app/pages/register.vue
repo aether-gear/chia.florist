@@ -3,6 +3,7 @@ import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 definePageMeta({
   layout: 'auth'
@@ -105,7 +106,7 @@ const handleRegister = async () => {
       activePanel.value = 'verify'
     }
   } catch (err: any) {
-    errorMessage.value = err.data?.message || 'Registration failed. Please check your input details.'
+    errorMessage.value = mapErrorMessage(err, 'Registration failed. Please check your input details.')
   }
 }
 
@@ -123,7 +124,7 @@ const handleVerify = async () => {
       navigateTo('/')
     }
   } catch (err: any) {
-    errorMessage.value = err.data?.message || 'Verification failed. Please try again.'
+    errorMessage.value = mapErrorMessage(err, 'Verification failed. Please try again.')
   }
 }
 

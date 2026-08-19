@@ -1,5 +1,6 @@
 // app/utils/bootstrap.ts
 import { triggerSessionExpired } from '~/composables/useSessionState'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 export const bootstrapConfig = {
   /**
@@ -41,6 +42,9 @@ export const bootstrapConfig = {
         ...options
       })
     } catch (err: any) {
+      if (err && typeof err === 'object') {
+        err.friendlyMessage = mapErrorMessage(err)
+      }
       if (import.meta.client && (err.status === 401 || err.status === 403)) {
         triggerSessionExpired()
       }
