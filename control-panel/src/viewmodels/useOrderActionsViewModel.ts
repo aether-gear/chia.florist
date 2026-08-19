@@ -117,10 +117,33 @@ export function useOrderActionsViewModel() {
     );
   };
 
+  const dispatchShopShipment = async (
+    orderId: string,
+    payload: {
+      shop_id: string;
+      fulfillment_method: string;
+      courier: string;
+      service: string;
+      tracking_number?: string;
+      item_ids: string[];
+    }
+  ) => {
+    return handleAction(
+      `/orders/${orderId}/shipments`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      'Shipment dispatched successfully.',
+      'Failed to dispatch shipment.'
+    );
+  };
+
   return {
     submitting,
     fetchOrderTracking,
     updateOrderStatus,
+    dispatchShopShipment,
     updateShipmentStatus,
     updateShipmentDetails,
   };

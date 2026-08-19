@@ -36,6 +36,7 @@ export const ShopOrdersTab: React.FC<ShopOrdersTabProps> = ({ shopId, shopName }
     submitting,
     fetchOrderTracking,
     updateOrderStatus,
+    dispatchShopShipment,
     updateShipmentStatus,
     updateShipmentDetails,
   } = useOrderActionsViewModel();
@@ -58,6 +59,21 @@ export const ShopOrdersTab: React.FC<ShopOrdersTabProps> = ({ shopId, shopName }
 
   const handleDispatchOrder = async (orderId: string, shipments: ShipmentDispatchPayload[]) => {
     await updateOrderStatus(orderId, 'shipped', undefined, undefined, shipments);
+    refresh();
+  };
+
+  const handleDispatchShopShipment = async (
+    orderId: string,
+    payload: {
+      shop_id: string;
+      fulfillment_method: string;
+      courier: string;
+      service: string;
+      tracking_number?: string;
+      item_ids: string[];
+    }
+  ) => {
+    await dispatchShopShipment(orderId, payload);
     refresh();
   };
 
@@ -142,9 +158,11 @@ export const ShopOrdersTab: React.FC<ShopOrdersTabProps> = ({ shopId, shopName }
           <OrderDetailInspector
             order={selectedOrder}
             submitting={submitting}
+            shopId={shopId}
             onClose={() => setSelectedOrderId(null)}
             onStartProcessing={handleStartProcessing}
             onDispatchOrder={handleDispatchOrder}
+            onDispatchShopShipment={handleDispatchShopShipment}
             onUpdateShipmentStatus={handleUpdateShipmentStatus}
             onUpdateWaybill={handleUpdateWaybill}
             fetchOrderTracking={fetchOrderTracking}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Plus, Trash2, Boxes, Store } from 'lucide-react';
+import { Truck, Plus, Trash2, Boxes, Store, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -20,59 +20,113 @@ export interface ShipmentGroupForm {
 export interface ShipmentDispatchSectionProps {
   order: Order;
   submitting: boolean;
-  onDispatchOrder: (orderId: string, shipments: ShipmentDispatchPayload[]) => Promise<void>;
+  shopId?: string;
+  onDispatchOrder?: (orderId: string, shipments: ShipmentDispatchPayload[]) => Promise<void>;
+  onDispatchShopShipment?: (
+    orderId: string,
+    payload: {
+      shop_id: string;
+      fulfillment_method: string;
+      courier: string;
+      service: string;
+      tracking_number?: string;
+      item_ids: string[];
+    }
+  ) => Promise<void>;
 }
 
 export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = ({
   order,
   submitting,
+  shopId,
   onDispatchOrder,
+  onDispatchShopShipment,
 }) => {
   const [shipmentGroups, setShipmentGroups] = useState<ShipmentGroupForm[]>([]);
 
+  // Filter items if shop-scoped
+  const relevantItems = shopId
+    ? order.items.filter((item) => item.shop_id === shopId)
+    : order.items;
+
+  const unshippedItems = relevantItems.filter((item) => !item.shipment_id);
+  const allShopItemsDispatched = shopId && relevantItems.length > 0 && unshippedItems.length === 0;
+
   // Initialize shipment groups from order items
   useEffect(() => {
-    if (order && order.status === 'processing') {
-      const shopMap = new Map<string, { shop_name: string; items: typeof order.items }>();
-      order.items.forEach((item) => {
-        const shopId = item.shop_id || 'default-shop';
-        const existing = shopMap.get(shopId) || { shop_name: item.shop_name || 'Shop', items: [] };
-        existing.items.push(item);
-        shopMap.set(shopId, existing);
-      });
-
-      const initialGroups: ShipmentGroupForm[] = [];
-      let groupIndex = 1;
-      shopMap.forEach((shopData, shopId) => {
-        const firstItem = shopData.items[0];
-        initialGroups.push({
-          id: `shipment-shop-${shopId}-${Date.now()}-${groupIndex}`,
-          shop_id: shopId,
-          shop_name: shopData.shop_name,
-          fulfillment_method: 'courier',
-          courier: firstItem?.courier_code || 'JNE',
-          service: firstItem?.courier_service || 'REG',
-          tracking_number: '',
-          item_ids: shopData.items.map((i) => i.id),
+    if (order && (order.status === 'processing' || order.status === 'confirmed')) {
+      if (shopId) {
+        // Single shop mode: group all unshipped items for this shop
+        if (unshippedItems.length === 0) {
+          setShipmentGroups([]);
+          return;
+        }
+        const firstItem = unshippedItems[0];
+        setShipmentGroups([
+          {
+            id: `shipment-shop-${shopId}-${Date.now()}`,
+            shop_id: shopId,
+            shop_name: firstItem?.shop_name || 'Shop',
+            fulfillment_method: 'courier',
+            courier: firstItem?.courier_code || 'JNE',
+            service: firstItem?.courier_service || 'REG',
+            tracking_number: '',
+            item_ids: unshippedItems.map((i) => i.id),
+          },
+        ]);
+      } else {
+        // Multi-shop / admin mode
+        const shopMap = new Map<string, { shop_name: string; items: typeof order.items }>();
+        order.items.forEach((item) => {
+          const sId = item.shop_id || 'default-shop';
+          const existing = shopMap.get(sId) || { shop_name: item.shop_name || 'Shop', items: [] };
+          existing.items.push(item);
+          shopMap.set(sId, existing);
         });
-        groupIndex++;
-      });
 
-      setShipmentGroups(initialGroups);
+        const initialGroups: ShipmentGroupForm[] = [];
+        let groupIndex = 1;
+        shopMap.forEach((shopData, sId) => {
+          const firstItem = shopData.items[0];
+          initialGroups.push({
+            id: `shipment-shop-${sId}-${Date.now()}-${groupIndex}`,
+            shop_id: sId,
+            shop_name: shopData.shop_name,
+            fulfillment_method: 'courier',
+            courier: firstItem?.courier_code || 'JNE',
+            service: firstItem?.courier_service || 'REG',
+            tracking_number: '',
+            item_ids: shopData.items.map((i) => i.id),
+          });
+          groupIndex++;
+        });
+
+        setShipmentGroups(initialGroups);
+      }
     } else {
       setShipmentGroups([]);
     }
-  }, [order.id, order.status]);
+  }, [order.id, order.status, shopId, order.items]);
+
+  if (allShopItemsDispatched) {
+    return (
+      <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-950 dark:text-emerald-200 text-xs flex items-center gap-2">
+        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <span>All items from your shop have been dispatched for this order.</span>
+      </div>
+    );
+  }
 
   const handleAddShipmentGroup = (targetShopId?: string) => {
-    const shopItems = targetShopId ? order.items.filter((i) => i.shop_id === targetShopId) : order.items;
+    const sId = shopId || targetShopId;
+    const shopItems = sId ? order.items.filter((i) => i.shop_id === sId) : order.items;
     const firstItem = shopItems[0] || order.items[0];
 
     setShipmentGroups((prev) => [
       ...prev,
       {
         id: `shipment-${Date.now()}-${prev.length + 1}`,
-        shop_id: targetShopId || firstItem?.shop_id,
+        shop_id: sId || firstItem?.shop_id,
         shop_name: firstItem?.shop_name || 'Shop',
         fulfillment_method: 'courier',
         courier: firstItem?.courier_code || 'JNE',
@@ -121,9 +175,35 @@ export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = (
 
   const handleDispatch = async () => {
     if (shipmentGroups.length === 0) {
-      alert('At least one shipment is required to dispatch the order.');
+      alert('At least one shipment is required to dispatch.');
       return;
     }
+
+    if (shopId && onDispatchShopShipment) {
+      // Single-shop dispatch lane
+      const group = shipmentGroups[0];
+      if (group.item_ids.length === 0) {
+        alert('Please select at least one item to dispatch.');
+        return;
+      }
+      if (group.fulfillment_method === 'courier' && !group.tracking_number.trim()) {
+        alert('Please enter a waybill tracking number.');
+        return;
+      }
+
+      await onDispatchShopShipment(order.id, {
+        shop_id: shopId,
+        fulfillment_method: group.fulfillment_method,
+        courier: group.courier,
+        service: group.service,
+        tracking_number: group.tracking_number.trim() || undefined,
+        item_ids: group.item_ids,
+      });
+      return;
+    }
+
+    // Superadmin multi-shop dispatch
+    if (!onDispatchOrder) return;
 
     const allAssignedItemIds = shipmentGroups.flatMap((g) => g.item_ids);
     const unassignedItems = order.items.filter((item) => !allAssignedItemIds.includes(item.id));
@@ -160,27 +240,34 @@ export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="space-y-0.5">
           <h5 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-            <Truck className="h-4 w-4 text-primary" /> Dispatch Shipping & Assign Courier
+            <Truck className="h-4 w-4 text-primary" />{' '}
+            {shopId ? 'Dispatch Shop Package' : 'Dispatch Shipping & Assign Courier'}
           </h5>
           <p className="text-xs text-muted-foreground">
-            Shipments are grouped by shop warehouse by default. You can split products into additional shipments if needed.
+            {shopId
+              ? 'Assign courier and tracking number for products fulfilled by your shop.'
+              : 'Shipments are grouped by shop warehouse by default. You can split products into additional shipments if needed.'}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => handleAddShipmentGroup()}
-          className="rounded-xl text-xs h-8 gap-1 self-start sm:self-auto border-primary/40 text-primary hover:bg-primary/5 cursor-pointer"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add Split Shipment
-        </Button>
+        {!shopId && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleAddShipmentGroup()}
+            className="rounded-xl text-xs h-8 gap-1 self-start sm:self-auto border-primary/40 text-primary hover:bg-primary/5 cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Split Shipment
+          </Button>
+        )}
       </div>
 
       {/* Shipment Groups List */}
       <div className="space-y-4">
         {shipmentGroups.map((group, groupIdx) => {
-          const shopItems = group.shop_id ? order.items.filter((i) => i.shop_id === group.shop_id) : order.items;
+          const shopItems = group.shop_id
+            ? order.items.filter((i) => i.shop_id === group.shop_id && !i.shipment_id)
+            : order.items.filter((i) => !i.shipment_id);
 
           return (
             <div key={group.id} className="border border-border/80 rounded-xl p-4 bg-muted/10 space-y-4 relative">
@@ -189,7 +276,9 @@ export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = (
                   <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center">
                     {groupIdx + 1}
                   </span>
-                  <span className="text-xs font-bold text-foreground">Shipment #{groupIdx + 1}</span>
+                  <span className="text-xs font-bold text-foreground">
+                    {shopId ? 'Shop Package' : `Shipment #${groupIdx + 1}`}
+                  </span>
                   {group.shop_name && (
                     <span className="inline-flex items-center gap-1 text-[11px] bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md font-medium">
                       <Store className="h-3 w-3" /> {group.shop_name}
@@ -201,7 +290,7 @@ export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = (
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {shipmentGroups.length > 1 && (
+                  {!shopId && shipmentGroups.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -314,6 +403,9 @@ export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = (
                         className="rounded-xl h-8 text-xs bg-background"
                       />
                     </div>
+                    <div className="sm:col-span-2 text-[11px] text-muted-foreground bg-muted/30 p-2.5 rounded-lg border border-border/40">
+                      <span className="font-semibold text-foreground">Note:</span> If this courier is unsupported by automated sync, enter the tracking number here and update checkpoints manually once in transit.
+                    </div>
                   </>
                 )}
               </div>
@@ -327,7 +419,10 @@ export const ShipmentDispatchSection: React.FC<ShipmentDispatchSectionProps> = (
         onClick={handleDispatch}
         className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold h-9 w-full shadow-sm cursor-pointer"
       >
-        <Truck className="h-4 w-4 mr-1.5" /> Dispatch {shipmentGroups.length > 1 ? `${shipmentGroups.length} Shipments` : 'Shipment'} & Mark Shipped
+        <Truck className="h-4 w-4 mr-1.5" />{' '}
+        {shopId
+          ? 'Dispatch Shop Package'
+          : `Dispatch ${shipmentGroups.length > 1 ? `${shipmentGroups.length} Shipments` : 'Shipment'} & Mark Shipped`}
       </Button>
     </div>
   );

@@ -27,9 +27,21 @@ import ShipmentDispatchSection from './ShipmentDispatchSection';
 export interface OrderDetailInspectorProps {
   order: Order | null;
   submitting: boolean;
+  shopId?: string;
   onClose?: () => void;
   onStartProcessing: (orderId: string) => Promise<void>;
-  onDispatchOrder: (orderId: string, shipments: ShipmentDispatchPayload[]) => Promise<void>;
+  onDispatchOrder?: (orderId: string, shipments: ShipmentDispatchPayload[]) => Promise<void>;
+  onDispatchShopShipment?: (
+    orderId: string,
+    payload: {
+      shop_id: string;
+      fulfillment_method: string;
+      courier: string;
+      service: string;
+      tracking_number?: string;
+      item_ids: string[];
+    }
+  ) => Promise<void>;
   onUpdateShipmentStatus: (shipmentId: string, status: string) => Promise<void>;
   onUpdateWaybill: (
     shipmentId: string,
@@ -49,9 +61,11 @@ const formatCurrency = (amount: number) => {
 export const OrderDetailInspector: React.FC<OrderDetailInspectorProps> = ({
   order,
   submitting,
+  shopId,
   onClose,
   onStartProcessing,
   onDispatchOrder,
+  onDispatchShopShipment,
   onUpdateShipmentStatus,
   onUpdateWaybill,
   fetchOrderTracking,
@@ -229,181 +243,211 @@ export const OrderDetailInspector: React.FC<OrderDetailInspectorProps> = ({
 
         {/* CASE C: PROCESSING - MULTI / SPLIT SHIPMENT DISPATCH */}
         {order.status === 'processing' && (
-          <ShipmentDispatchSection order={order} submitting={submitting} onDispatchOrder={onDispatchOrder} />
+          <ShipmentDispatchSection
+            order={order}
+            submitting={submitting}
+            shopId={shopId}
+            onDispatchOrder={onDispatchOrder}
+            onDispatchShopShipment={onDispatchShopShipment}
+          />
         )}
 
-        {/* CASE D: SHIPPED - IN TRANSIT LOGISTICS */}
-        {order.status === 'shipped' && currentShipments.length > 0 && (
-          <div className="border border-border/80 bg-background p-5 rounded-xl space-y-5">
-            <div className="space-y-1">
-              <h5 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <Layers className="h-4 w-4 text-primary" /> Active Logistics & Shipment Status
-              </h5>
-              <p className="text-xs text-muted-foreground">
-                Manage waybill information and post transit timeline updates per package.
-              </p>
-            </div>
+        {/* ACTIVE LOGISTICS & SHIPMENT STATUS */}
+        {(order.status === 'shipped' || (order.status === 'processing' && currentShipments.length > 0)) &&
+          currentShipments.length > 0 && (
+            <div className="border border-border/80 bg-background p-5 rounded-xl space-y-5">
+              <div className="space-y-1">
+                <h5 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <Layers className="h-4 w-4 text-primary" /> Active Logistics & Shipment Status
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  Manage waybill information and post transit timeline updates per package.
+                </p>
+              </div>
 
-            {/* Shipments List */}
-            <div className="space-y-4">
-              {currentShipments.map((shipment, sIdx) => {
-                const isEditing = editingShipmentId === shipment.id;
-                const isSelectedForTimeline = activeShipmentId === shipment.id;
+              {/* Shipments List */}
+              <div className="space-y-4">
+                {currentShipments.map((shipment, sIdx) => {
+                  const isEditing = editingShipmentId === shipment.id;
+                  const isSelectedForTimeline = activeShipmentId === shipment.id;
 
-                const assignedItems = order.items.filter(
-                  (item) => item.shipment_id === shipment.id || shipment.item_ids?.includes(item.id)
-                );
+                  const assignedItems = order.items.filter(
+                    (item) => item.shipment_id === shipment.id || shipment.item_ids?.includes(item.id)
+                  );
 
-                return (
-                  <div
-                    key={shipment.id}
-                    className={`border rounded-xl p-4 transition-all ${
-                      isSelectedForTimeline ? 'border-primary/60 bg-muted/20' : 'border-border/60 bg-muted/5'
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-border/40">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-foreground">
-                            Package #{sIdx + 1}: {shipment.courier.toUpperCase()} {shipment.service.toUpperCase()}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">
-                            {shipment.status}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">
-                          Waybill:{' '}
-                          <strong className="font-mono text-foreground">
-                            {shipment.tracking_number || 'Self Delivery'}
-                          </strong>{' '}
-                          · {assignedItems.length} item{assignedItems.length !== 1 ? 's' : ''}
-                        </div>
-                      </div>
+                  const isMyShopShipment = !shopId || assignedItems.some((i) => i.shop_id === shopId);
 
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (isEditing) {
-                              setEditingShipmentId(null);
-                            } else {
-                              handleStartEditingWaybill(shipment);
-                            }
-                          }}
-                          className="text-xs text-primary hover:bg-primary/5 rounded-lg flex items-center gap-1 h-7 cursor-pointer"
-                        >
-                          <Edit3 className="h-3 w-3" /> {isEditing ? 'Cancel' : 'Edit Waybill'}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {isEditing ? (
-                      /* EDIT WAYBILL SUB-FORM */
-                      <div className="space-y-3 p-3 mt-3 border border-border/40 rounded-xl bg-background">
-                        <h6 className="text-xs font-bold text-foreground">Edit Shipping Waybill</h6>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-muted-foreground uppercase">Courier</label>
-                            <Input
-                              value={editCourier}
-                              onChange={(e) => setEditCourier(e.target.value)}
-                              className="h-8 text-xs rounded-lg"
-                            />
+                  return (
+                    <div
+                      key={shipment.id}
+                      className={`border rounded-xl p-4 transition-all ${
+                        isSelectedForTimeline ? 'border-primary/60 bg-muted/20' : 'border-border/60 bg-muted/5'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-border/40">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-foreground">
+                              Package #{sIdx + 1}: {shipment.courier.toUpperCase()} {shipment.service.toUpperCase()}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">
+                              {shipment.status}
+                            </span>
+                            {!isMyShopShipment && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground">
+                                Other Shop
+                              </span>
+                            )}
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-muted-foreground uppercase">Service</label>
-                            <Input
-                              value={editService}
-                              onChange={(e) => setEditService(e.target.value)}
-                              className="h-8 text-xs rounded-lg"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-muted-foreground uppercase">
-                              Tracking No
-                            </label>
-                            <Input
-                              value={editTracking}
-                              onChange={(e) => setEditTracking(e.target.value)}
-                              className="h-8 text-xs rounded-lg"
-                            />
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            Waybill:{' '}
+                            <strong className="font-mono text-foreground">
+                              {shipment.tracking_number || 'Self Delivery'}
+                            </strong>{' '}
+                            · {assignedItems.length} item{assignedItems.length !== 1 ? 's' : ''}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          disabled={submitting}
-                          onClick={() => handleSaveWaybill(shipment.id)}
-                          className="h-8 text-xs rounded-lg w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2 font-semibold cursor-pointer"
-                        >
-                          Save Waybill Changes
-                        </Button>
-                      </div>
-                    ) : (
-                      /* TRANSIT STATE SELECTOR */
-                      <div className="space-y-3 mt-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-muted-foreground">New Transit Status</label>
-                            <Select
-                              value={transitStatus}
-                              onValueChange={(val) => {
-                                setActiveShipmentId(shipment.id);
-                                setTransitStatus(val);
+
+                        {isMyShopShipment && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (isEditing) {
+                                  setEditingShipmentId(null);
+                                } else {
+                                  handleStartEditingWaybill(shipment);
+                                }
                               }}
+                              className="text-xs text-primary hover:bg-primary/5 rounded-lg flex items-center gap-1 h-7 cursor-pointer"
                             >
-                              <SelectTrigger className="rounded-xl h-8 text-xs bg-background">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="packed">Packed</SelectItem>
-                                <SelectItem value="labelled">Labelled</SelectItem>
-                                <SelectItem value="picked_up">Picked Up</SelectItem>
-                                <SelectItem value="in_transit">In Transit</SelectItem>
-                                <SelectItem value="out_for_delivery">Out For Delivery</SelectItem>
-                                <SelectItem value="delivered">Delivered (Fulfillment Complete)</SelectItem>
-                                <SelectItem value="failed">Failed Delivery</SelectItem>
-                                <SelectItem value="returned">Returned to Shop</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              <Edit3 className="h-3 w-3" /> {isEditing ? 'Cancel' : 'Edit Waybill'}
+                            </Button>
                           </div>
-                          <div className="space-y-1.5 sm:col-span-2">
-                            <label className="text-[11px] font-semibold text-muted-foreground">Location (Optional)</label>
-                            <Input
-                              value={transitLocation}
-                              onChange={(e) => setTransitLocation(e.target.value)}
-                              placeholder="Warehouse, Hub City, etc."
-                              className="rounded-xl h-8 text-xs bg-background"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] font-semibold text-muted-foreground">
-                            Description/Note (Optional)
-                          </label>
-                          <Input
-                            value={transitDescription}
-                            onChange={(e) => setTransitDescription(e.target.value)}
-                            placeholder="E.g. Package hand over to courier JNE"
-                            className="rounded-xl h-8 text-xs bg-background"
-                          />
-                        </div>
-                        <Button
-                          disabled={submitting}
-                          onClick={() => onUpdateShipmentStatus(shipment.id, transitStatus)}
-                          className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold h-8 w-full cursor-pointer"
-                        >
-                          Update Package #{sIdx + 1} Status
-                        </Button>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+
+                      {isMyShopShipment ? (
+                        isEditing ? (
+                          /* EDIT WAYBILL SUB-FORM */
+                          <div className="space-y-3 p-3 mt-3 border border-border/40 rounded-xl bg-background">
+                            <h6 className="text-xs font-bold text-foreground">Edit Shipping Waybill</h6>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase">
+                                  Courier
+                                </label>
+                                <Input
+                                  value={editCourier}
+                                  onChange={(e) => setEditCourier(e.target.value)}
+                                  className="h-8 text-xs rounded-lg"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase">
+                                  Service
+                                </label>
+                                <Input
+                                  value={editService}
+                                  onChange={(e) => setEditService(e.target.value)}
+                                  className="h-8 text-xs rounded-lg"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase">
+                                  Tracking No
+                                </label>
+                                <Input
+                                  value={editTracking}
+                                  onChange={(e) => setEditTracking(e.target.value)}
+                                  className="h-8 text-xs rounded-lg"
+                                />
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              disabled={submitting}
+                              onClick={() => handleSaveWaybill(shipment.id)}
+                              className="h-8 text-xs rounded-lg w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2 font-semibold cursor-pointer"
+                            >
+                              Save Waybill Changes
+                            </Button>
+                          </div>
+                        ) : (
+                          /* TRANSIT STATE SELECTOR */
+                          <div className="space-y-3 mt-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-semibold text-muted-foreground">
+                                  New Transit Status
+                                </label>
+                                <Select
+                                  value={transitStatus}
+                                  onValueChange={(val) => {
+                                    setActiveShipmentId(shipment.id);
+                                    setTransitStatus(val);
+                                  }}
+                                >
+                                  <SelectTrigger className="rounded-xl h-8 text-xs bg-background">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="packed">Packed</SelectItem>
+                                    <SelectItem value="labelled">Labelled</SelectItem>
+                                    <SelectItem value="picked_up">Picked Up</SelectItem>
+                                    <SelectItem value="in_transit">In Transit</SelectItem>
+                                    <SelectItem value="out_for_delivery">Out For Delivery</SelectItem>
+                                    <SelectItem value="delivered">Delivered (Fulfillment Complete)</SelectItem>
+                                    <SelectItem value="failed">Failed Delivery</SelectItem>
+                                    <SelectItem value="returned">Returned to Shop</SelectItem>
+                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5 sm:col-span-2">
+                                <label className="text-[11px] font-semibold text-muted-foreground">
+                                  Location (Optional)
+                                </label>
+                                <Input
+                                  value={transitLocation}
+                                  onChange={(e) => setTransitLocation(e.target.value)}
+                                  placeholder="Warehouse, Hub City, etc."
+                                  className="rounded-xl h-8 text-xs bg-background"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-semibold text-muted-foreground">
+                                Description/Note (Optional)
+                              </label>
+                              <Input
+                                value={transitDescription}
+                                onChange={(e) => setTransitDescription(e.target.value)}
+                                placeholder="E.g. Package hand over to courier JNE"
+                                className="rounded-xl h-8 text-xs bg-background"
+                              />
+                            </div>
+                            <Button
+                              disabled={submitting}
+                              onClick={() => onUpdateShipmentStatus(shipment.id, transitStatus)}
+                              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold h-8 w-full cursor-pointer"
+                            >
+                              Update Package #{sIdx + 1} Status
+                            </Button>
+                          </div>
+                        )
+                      ) : (
+                        <div className="mt-2 text-[11px] text-muted-foreground italic">
+                          This package is fulfilled and managed by another store branch.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* CASE E: DELIVERED */}
         {order.status === 'delivered' && (
@@ -445,11 +489,24 @@ export const OrderDetailInspector: React.FC<OrderDetailInspectorProps> = ({
                   const matchedShipmentIndex = currentShipments.findIndex(
                     (s) => s.id === item.shipment_id || s.item_ids?.includes(item.id)
                   );
+                  const isMyItem = shopId ? item.shop_id === shopId : false;
 
                   return (
-                    <tr key={item.id} className="text-foreground hover:bg-muted/10">
+                    <tr
+                      key={item.id}
+                      className={`text-foreground hover:bg-muted/10 transition-colors ${
+                        isMyItem ? 'bg-primary/5 font-medium' : ''
+                      }`}
+                    >
                       <td className="p-3">
-                        <div className="font-semibold text-foreground">{item.product_name}</div>
+                        <div className="font-semibold text-foreground flex items-center gap-1.5 flex-wrap">
+                          <span>{item.product_name}</span>
+                          {isMyItem && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/15 text-primary">
+                              Your Shop
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-muted-foreground">Shop: {item.shop_name}</div>
                         {item.courier_code && (
                           <div className="text-[10px] text-muted-foreground uppercase">
@@ -627,9 +684,19 @@ export const OrderDetailInspector: React.FC<OrderDetailInspectorProps> = ({
             </div>
 
             {liveTracking?.warning && (
-              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium leading-relaxed">
+              <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-medium leading-relaxed">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
-                <span>{liveTracking.warning}</span>
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-foreground">Manual Status Updates Required</div>
+                  <p>
+                    {liveTracking.warning.toLowerCase().includes('unsupported') ||
+                    liveTracking.warning.toLowerCase().includes('not supported') ||
+                    liveTracking.warning.toLowerCase().includes('invalid') ||
+                    liveTracking.warning.toLowerCase().includes('unavailable')
+                      ? 'Live tracking is not supported for this courier. Please update the package transit status manually using the shipment timeline controls.'
+                      : liveTracking.warning}
+                  </p>
+                </div>
               </div>
             )}
 
