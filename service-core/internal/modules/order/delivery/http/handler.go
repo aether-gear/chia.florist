@@ -1,8 +1,10 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"slices"
+	"strings"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
@@ -218,7 +220,7 @@ func (h *orderHandler) resolveShopFilter(r *http.Request) (*uuid.UUID, bool, err
 
 	if targetSlug != "" {
 		if h.getShop == nil {
-			return nil, false, nil
+			return nil, true, apperrors.NewInternal(errors.New("shop filter service unavailable"))
 		}
 		shop, err := h.getShop.GetBySlug(r.Context(), targetSlug)
 		if err != nil {
@@ -286,8 +288,16 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 
 	if status != "" {
 		input.Status = &status
-	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
-		input.Status = &statuses
+	} else if statusesParam := apphttp.Query(r, "statuses"); statusesParam != "" {
+		var parsedStatuses []string
+		parts := strings.Split(statusesParam, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				parsedStatuses = append(parsedStatuses, trimmed)
+			}
+		}
+		input.Statuses = parsedStatuses
 	}
 
 	shopID, shopSpecified, err := h.resolveShopFilter(r)
@@ -717,31 +727,30 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 			return apperrors.NewNotFound("order not found")
 		}
 
-		hasAccess := false
-		var matchedShopID uuid.UUID
+		uniqueShops := make(map[uuid.UUID]bool)
 		for _, item := range existingOrder.Items {
 			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderUpdateStatus) {
-				hasAccess = true
-				matchedShopID = item.ShopID
-				break
+				uniqueShops[item.ShopID] = true
 			}
 		}
-		if !hasAccess {
+		if len(uniqueShops) == 0 {
 			return apperrors.NewForbidden("forbidden: missing order:update_status permission for this shop's order")
 		}
 
-		if shopRules, exists := actor.Rules[matchedShopID]; exists && shopRules != nil {
-			if allowedRaw, ok := shopRules["allowed_statuses"]; ok {
-				allowedList := parseStringSlice(allowedRaw)
-				if len(allowedList) > 0 && !slices.Contains(allowedList, req.Status) {
-					return apperrors.NewForbidden("forbidden: status transition to '" + req.Status + "' is not allowed by staff rule")
+		for shopID := range uniqueShops {
+			if shopRules, exists := actor.Rules[shopID]; exists && shopRules != nil {
+				if allowedRaw, ok := shopRules["allowed_statuses"]; ok {
+					allowedList := parseStringSlice(allowedRaw)
+					if len(allowedList) > 0 && !slices.Contains(allowedList, req.Status) {
+						return apperrors.NewForbidden("forbidden: status transition to '" + req.Status + "' is not allowed by staff rule")
+					}
 				}
-			}
 
-			if maxRaw, ok := shopRules["max_order_amount"]; ok {
-				maxAmount := parseFloat64(maxRaw)
-				if maxAmount > 0 && float64(existingOrder.Order.Total) > maxAmount {
-					return apperrors.NewForbidden("forbidden: order total amount exceeds staff rule limit")
+				if maxRaw, ok := shopRules["max_order_amount"]; ok {
+					maxAmount := parseFloat64(maxRaw)
+					if maxAmount > 0 && float64(existingOrder.Order.Total) > maxAmount {
+						return apperrors.NewForbidden("forbidden: order total amount exceeds staff rule limit")
+					}
 				}
 			}
 		}
@@ -860,6 +869,26 @@ func (h *orderHandler) GetOrderTrackingForStaff(w http.ResponseWriter, r *http.R
 	orderID, err := uuid.Parse(orderIDStr)
 	if err != nil {
 		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		existingOrder, err := h.getOrder.Execute(r.Context(), usecase.GetOrderInput{
+			OrderID: orderID,
+		})
+		if err != nil || existingOrder == nil {
+			return apperrors.NewNotFound("order not found")
+		}
+
+		hasAccess := false
+		for _, item := range existingOrder.Items {
+			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderRead) {
+				hasAccess = true
+				break
+			}
+		}
+		if !hasAccess {
+			return apperrors.NewForbidden("forbidden: missing order:read permission for this shop's order")
+		}
 	}
 
 	input := usecase.GetOrderTrackingInput{

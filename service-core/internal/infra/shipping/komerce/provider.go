@@ -162,6 +162,39 @@ func (p *komerceProvider) CreateOrder(
 	}, nil
 }
 
+func (p *komerceProvider) CancelOrder(
+	ctx context.Context,
+	komerceOrderNo string,
+) error {
+	if strings.TrimSpace(komerceOrderNo) == "" {
+		return nil
+	}
+
+	endpoint := "/order/api/v1/orders/cancel"
+	reqBody := map[string]string{
+		"order_no": komerceOrderNo,
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal cancel request: %w", err)
+	}
+
+	url := p.orderBaseURL + endpoint
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build cancel request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", p.apiKey)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("cancel request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
 type trackWaybillRequestBody struct {
 	AWB             string  `json:"awb"`
 	Courier         string  `json:"courier"`

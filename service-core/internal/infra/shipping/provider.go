@@ -102,6 +102,11 @@ type LogisticsProvider interface {
 		input CreateOrderInput,
 	) (*CreateOrderResult, error)
 
+	CancelOrder(
+		ctx context.Context,
+		komerceOrderNo string,
+	) error
+
 	TrackShipment(
 		ctx context.Context,
 		input TrackShipmentInput,

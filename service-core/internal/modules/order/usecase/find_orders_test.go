@@ -210,3 +210,37 @@ func TestFindOrdersUsecase_ShopFilter(t *testing.T) {
 		t.Errorf("expected 2 ShopIDs, got %d", len(mockOrderRepo.capturedParams.ShopIDs))
 	}
 }
+
+func TestFindOrdersUsecase_StatusFilter_ClearsSingleStatusWhenStatusesProvided(t *testing.T) {
+	mockOrderRepo := &foMockOrderRepo{}
+	uc := NewFindOrdersUsecase(
+		&foMockExecutor{},
+		mockOrderRepo,
+		&foMockOrderItemRepo{},
+		&foMockPaymentRepo{},
+		&foMockPaymentChannelDataRepo{},
+		&foMockShipmentRepo{},
+		&foMockAddressRepo{},
+	)
+
+	statusStr := "pending"
+	statuses := []string{"pending", "confirmed"}
+	input := FindOrdersInput{
+		Page:     1,
+		Limit:    10,
+		Status:   &statusStr,
+		Statuses: statuses,
+	}
+
+	_, _, err := uc.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mockOrderRepo.capturedParams.Status != nil {
+		t.Errorf("expected Status to be nil when Statuses slice is provided, got %v", *mockOrderRepo.capturedParams.Status)
+	}
+	if len(mockOrderRepo.capturedParams.Statuses) != 2 {
+		t.Errorf("expected Statuses slice length 2, got %d", len(mockOrderRepo.capturedParams.Statuses))
+	}
+}

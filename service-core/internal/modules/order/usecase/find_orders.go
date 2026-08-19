@@ -137,13 +137,18 @@ func (u *FindOrdersUsecase) Execute(
 		}
 	}
 
+	var statusParam *string
+	if len(statuses) == 0 {
+		statusParam = input.Status
+	}
+
 	params := repository.FindOrderParams{
 		ID:         input.ID,
 		Number:     input.Number,
 		CustomerID: input.CustomerID,
 		ShopID:     input.ShopID,
 		ShopIDs:    input.ShopIDs,
-		Status:     input.Status,
+		Status:     statusParam,
 		Statuses:   statuses,
 		Pagination: query.Pagination{
 			Page:  input.Page,
