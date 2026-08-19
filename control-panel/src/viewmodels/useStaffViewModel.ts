@@ -6,8 +6,12 @@ import type {
   AddStaffAccountPayload,
   CreateStaffPayload,
   UpdateStaffPayload,
+  StaffShopPermission,
+  SaveStaffShopPermissionPayload,
+  StaffShopPermissionsResponse,
 } from '../models/Staff';
 import { fetchApi } from '../lib/api';
+
 
 export function useStaffViewModel() {
   const [data, setData] = useState<StaffListResponse | null>(null);
@@ -144,6 +148,31 @@ export function useStaffViewModel() {
     return res;
   };
 
+  const fetchStaffShopPermissions = useCallback(async (staffId: string): Promise<StaffShopPermission[]> => {
+    try {
+      const res: StaffShopPermissionsResponse = await fetchApi(`/staff/${staffId}/shops`);
+      return res.permissions || [];
+    } catch (err) {
+      console.error(`Failed to fetch shop permissions for staff ${staffId}`, err);
+      return [];
+    }
+  }, []);
+
+  const saveStaffShopPermission = async (staffId: string, payload: SaveStaffShopPermissionPayload) => {
+    const res = await fetchApi(`/staff/${staffId}/shops`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res;
+  };
+
+  const deleteStaffShopPermission = async (staffId: string, shopId: string) => {
+    const res = await fetchApi(`/staff/${staffId}/shops/${shopId}`, {
+      method: 'DELETE',
+    });
+    return res;
+  };
+
   return {
     data,
     staff: data?.staff || [],
@@ -157,6 +186,9 @@ export function useStaffViewModel() {
     setLimit,
     refresh: fetchStaff,
     fetchStaffAccounts,
+    fetchStaffShopPermissions,
+    saveStaffShopPermission,
+    deleteStaffShopPermission,
     addStaffAccount,
     removeStaffAccount,
     createStaff,
@@ -165,3 +197,4 @@ export function useStaffViewModel() {
     deleteStaff,
   };
 }
+

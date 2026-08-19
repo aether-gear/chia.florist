@@ -65,3 +65,27 @@ export interface UpdateStaffPayload {
   logo_url?: string;
   banner_url?: string;
 }
+
+export interface StaffShopPermission {
+  id: string;
+  staff_id: string;
+  shop_id: string;
+  shop_name?: string;
+  permissions: string[];
+  rules?: Record<string, any>;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SaveStaffShopPermissionPayload {
+  shop_id: string;
+  permissions: string[];
+  rules?: Record<string, any>;
+}
+
+export interface StaffShopPermissionsResponse {
+  staff_id: string;
+  total: number;
+  permissions: StaffShopPermission[];
+}
+
