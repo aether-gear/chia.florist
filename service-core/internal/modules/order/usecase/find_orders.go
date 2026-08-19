@@ -3,7 +3,9 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	addressDomain "service-core/internal/modules/address/domain"
 	addressRepo "service-core/internal/modules/address/repository"
@@ -59,6 +61,8 @@ type FindOrdersInput struct {
 	ShopIDs    []uuid.UUID
 	Status     *string
 	Statuses   []string
+	FromDate   *time.Time
+	ToDate     *time.Time
 	Sort       string
 }
 
@@ -150,6 +154,8 @@ func (u *FindOrdersUsecase) Execute(
 		ShopIDs:    input.ShopIDs,
 		Status:     statusParam,
 		Statuses:   statuses,
+		FromDate:   input.FromDate,
+		ToDate:     input.ToDate,
 		Pagination: query.Pagination{
 			Page:  input.Page,
 			Limit: input.Limit,
@@ -195,6 +201,12 @@ func (u *FindOrdersUsecase) Execute(
 
 	itemsMap := make(map[uuid.UUID][]domain.OrderItem)
 	for _, item := range orderItems {
+		if input.ShopID != nil && item.ShopID != *input.ShopID {
+			continue
+		}
+		if len(input.ShopIDs) > 0 && !slices.Contains(input.ShopIDs, item.ShopID) {
+			continue
+		}
 		itemsMap[item.OrderID] = append(itemsMap[item.OrderID], item)
 	}
 
@@ -264,6 +276,7 @@ func (u *FindOrdersUsecase) Execute(
 			orderShipments = []shipmentDomain.Shipment{}
 		}
 
+		var filteredShipments []shipmentDomain.Shipment
 		for j := range orderShipments {
 			var itemIDs []uuid.UUID
 			for _, itm := range items {
@@ -272,12 +285,15 @@ func (u *FindOrdersUsecase) Execute(
 					itemIDs = append(itemIDs, itm.ID)
 				}
 			}
-			orderShipments[j].ItemIDs = itemIDs
+			if len(itemIDs) > 0 || (input.ShopID == nil && len(input.ShopIDs) == 0) {
+				orderShipments[j].ItemIDs = itemIDs
+				filteredShipments = append(filteredShipments, orderShipments[j])
+			}
 		}
 
 		var firstShipment *shipmentDomain.Shipment
-		if len(orderShipments) > 0 {
-			firstShipment = &orderShipments[0]
+		if len(filteredShipments) > 0 {
+			firstShipment = &filteredShipments[0]
 		}
 
 		results[i] = OrderSearchResult{
@@ -286,7 +302,7 @@ func (u *FindOrdersUsecase) Execute(
 			Payment:     payment,
 			ChannelData: channelData,
 			Shipment:    firstShipment,
-			Shipments:   orderShipments,
+			Shipments:   filteredShipments,
 			Address:     addressesMap[o.AddressID],
 		}
 	}

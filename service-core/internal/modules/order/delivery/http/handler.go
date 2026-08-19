@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
@@ -196,6 +197,10 @@ func (h *orderHandler) resolveShopFilter(r *http.Request) (*uuid.UUID, bool, err
 	shopSlug := apphttp.Query(r, "shop_slug")
 	shopParam := apphttp.Query(r, "shop")
 
+	if shopIDStr == "all" || shopSlug == "all" || shopParam == "all" {
+		return nil, false, nil
+	}
+
 	targetIDStr := ""
 	targetSlug := ""
 
@@ -219,6 +224,9 @@ func (h *orderHandler) resolveShopFilter(r *http.Request) (*uuid.UUID, bool, err
 	}
 
 	if targetSlug != "" {
+		if targetSlug == "all" {
+			return nil, false, nil
+		}
 		if h.getShop == nil {
 			return nil, true, apperrors.NewInternal(errors.New("shop filter service unavailable"))
 		}
@@ -298,6 +306,29 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 			}
 		}
 		input.Statuses = parsedStatuses
+	}
+
+	fromDateStr := apphttp.Query(r, "from_date")
+	if fromDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			input.FromDate = &t
+		} else if t, err := time.Parse("2006-01-02", fromDateStr); err == nil {
+			input.FromDate = &t
+		} else {
+			return apperrors.NewBadRequest("invalid from_date format")
+		}
+	}
+
+	toDateStr := apphttp.Query(r, "to_date")
+	if toDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			input.ToDate = &t
+		} else if t, err := time.Parse("2006-01-02", toDateStr); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Nanosecond)
+			input.ToDate = &endOfDay
+		} else {
+			return apperrors.NewBadRequest("invalid to_date format")
+		}
 	}
 
 	shopID, shopSpecified, err := h.resolveShopFilter(r)
@@ -391,15 +422,35 @@ func (h *orderHandler) GetOrder(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if actor.StaffID != nil && !actor.IsSuperAdmin() {
-		hasAccess := false
+		var permittedItems []orderDomain.OrderItem
 		for _, item := range result.Items {
 			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderRead) {
-				hasAccess = true
-				break
+				permittedItems = append(permittedItems, item)
 			}
 		}
-		if !hasAccess {
+		if len(permittedItems) == 0 {
 			return apperrors.NewForbidden("forbidden: missing order:read permission for this shop's order")
+		}
+		result.Items = permittedItems
+
+		var permittedShipments []shipmentDomain.Shipment
+		for _, s := range result.Shipments {
+			hasItem := false
+			for _, itm := range permittedItems {
+				if itm.ShipmentID != nil && *itm.ShipmentID == s.ID {
+					hasItem = true
+					break
+				}
+			}
+			if hasItem {
+				permittedShipments = append(permittedShipments, s)
+			}
+		}
+		result.Shipments = permittedShipments
+		if len(permittedShipments) > 0 {
+			result.Shipment = &permittedShipments[0]
+		} else {
+			result.Shipment = nil
 		}
 	}
 
@@ -449,8 +500,39 @@ func (h *orderHandler) ListMyOrders(w http.ResponseWriter, r *http.Request) erro
 
 	if status != "" {
 		input.Status = &status
-	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
-		input.Status = &statuses
+	} else if statusesParam := apphttp.Query(r, "statuses"); statusesParam != "" {
+		var parsedStatuses []string
+		parts := strings.Split(statusesParam, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				parsedStatuses = append(parsedStatuses, trimmed)
+			}
+		}
+		input.Statuses = parsedStatuses
+	}
+
+	fromDateStr := apphttp.Query(r, "from_date")
+	if fromDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			input.FromDate = &t
+		} else if t, err := time.Parse("2006-01-02", fromDateStr); err == nil {
+			input.FromDate = &t
+		} else {
+			return apperrors.NewBadRequest("invalid from_date format")
+		}
+	}
+
+	toDateStr := apphttp.Query(r, "to_date")
+	if toDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			input.ToDate = &t
+		} else if t, err := time.Parse("2006-01-02", toDateStr); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Nanosecond)
+			input.ToDate = &endOfDay
+		} else {
+			return apperrors.NewBadRequest("invalid to_date format")
+		}
 	}
 
 	shopID, shopSpecified, err := h.resolveShopFilter(r)

@@ -312,6 +312,18 @@ func (r *orderRepositoryImpl) FindOrders(
 		argPos++
 	}
 
+	if params.FromDate != nil {
+		conditions = append(conditions, fmt.Sprintf("o.created_at >= $%d", argPos))
+		args = append(args, *params.FromDate)
+		argPos++
+	}
+
+	if params.ToDate != nil {
+		conditions = append(conditions, fmt.Sprintf("o.created_at <= $%d", argPos))
+		args = append(args, *params.ToDate)
+		argPos++
+	}
+
 	if len(conditions) > 0 {
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}

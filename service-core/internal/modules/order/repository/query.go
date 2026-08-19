@@ -2,6 +2,7 @@ package repository
 
 import (
 	"encoding/json"
+	"time"
 
 	query "service-core/internal/shared/query"
 
@@ -109,6 +110,8 @@ type FindOrderParams struct {
 	ShopIDs    []uuid.UUID
 	Status     *string
 	Statuses   []string
+	FromDate   *time.Time
+	ToDate     *time.Time
 
 	Pagination query.Pagination
 	Sorts      query.Sorts
