@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchApi } from '../lib/api';
 
-export function useShopViewModel() {
+export function useShopViewModel(initialShopId?: string) {
   const [shops, setShops] = useState<any[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(15);
-  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(initialShopId || null);
   const [selectedShopInfo, setSelectedShopInfo] = useState<any | null>(null);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [couriers, setCouriers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   
-  const [loading, setLoading] = useState<boolean>(true);
-  const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(!initialShopId);
+  const [detailsLoading, setDetailsLoading] = useState<boolean>(Boolean(initialShopId));
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
@@ -33,6 +33,8 @@ export function useShopViewModel() {
       setLoading(false);
     }
   }, [page, limit]);
+
+  const activeShopIdRef = useRef<string | null>(null);
 
   const fetchShopDetails = useCallback(async (id: string) => {
     try {
@@ -56,12 +58,72 @@ export function useShopViewModel() {
     }
   }, []);
 
+  const loadShopById = useCallback(async (id: string) => {
+    if (!id) {
+      activeShopIdRef.current = null;
+      setSelectedShopId(null);
+      setSelectedShopInfo(null);
+      setAddresses([]);
+      setCouriers([]);
+      setProducts([]);
+      return;
+    }
+
+    activeShopIdRef.current = id;
+    setSelectedShopId(id);
+    setDetailsLoading(true);
+    setDetailsError(null);
+
+    try {
+      let shopErrorMsg: string | null = null;
+      const [shopRes, addrRes, courRes, prodRes] = await Promise.all([
+        fetchApi(`/shops/${id}`).catch(e => {
+          console.error('Failed to fetch shop info', e);
+          shopErrorMsg = e?.message || 'Failed to load shop details.';
+          return null;
+        }),
+        fetchApi(`/shops/${id}/addresses`).catch(e => { console.error('Failed to fetch addresses', e); return null; }),
+        fetchApi(`/shops/${id}/couriers`).catch(e => { console.error('Failed to fetch couriers', e); return null; }),
+        fetchApi(`/shops/${id}/products`).catch(e => { console.error('Failed to fetch products', e); return null; })
+      ]);
+
+      // Only apply state if this is still the active shop request
+      if (activeShopIdRef.current === id) {
+        const shopData = shopRes?.shop || (shopRes && shopRes.id ? shopRes : null);
+        if (shopData) {
+          setSelectedShopInfo(shopData);
+          if (shopData.id) {
+            setSelectedShopId(shopData.id);
+          }
+        } else {
+          setDetailsError(shopErrorMsg || 'Failed to load shop details.');
+        }
+
+        setAddresses(addrRes?.addresses || []);
+        setCouriers(courRes?.couriers || []);
+        setProducts(prodRes?.products || []);
+      }
+    } catch (err: any) {
+      if (activeShopIdRef.current === id) {
+        setDetailsError(err.message || 'Failed to fetch shop details');
+      }
+    } finally {
+      if (activeShopIdRef.current === id) {
+        setDetailsLoading(false);
+      }
+    }
+  }, []);
+
   const selectShop = useCallback((shop: any) => {
-    setSelectedShopInfo(shop);
     if (shop?.id) {
+      activeShopIdRef.current = shop.id;
+      setSelectedShopId(shop.id);
+      setSelectedShopInfo(shop);
       fetchShopDetails(shop.id);
     } else {
+      activeShopIdRef.current = null;
       setSelectedShopId(null);
+      setSelectedShopInfo(null);
       setAddresses([]);
       setCouriers([]);
       setProducts([]);
@@ -69,8 +131,10 @@ export function useShopViewModel() {
   }, [fetchShopDetails]);
 
   useEffect(() => {
-    fetchShops();
-  }, [fetchShops]);
+    if (!initialShopId) {
+      fetchShops();
+    }
+  }, [initialShopId, fetchShops]);
 
   const createAddress = async (shopId: string, data: any) => {
     const targetId = shopId || selectedShopId;
@@ -264,6 +328,7 @@ export function useShopViewModel() {
     removeInventory,
     selectShop,
     fetchShopDetails,
+    loadShopById,
     refresh: fetchShops
   };
 }

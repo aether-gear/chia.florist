@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   MapPin,
   Truck,
@@ -56,6 +57,12 @@ import AddressFormSheet from '../../components/shops/AddressFormSheet';
 import Breadcrumb from '../../components/Breadcrumb';
 
 export default function ShopManagementPage() {
+  const { shopId: urlShopId } = useParams<{ shopId?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const activeTab = searchParams.get('tab') || 'info';
+
   const { isAdmin } = useAuthMeViewModel();
   const {
     shops,
@@ -78,8 +85,21 @@ export default function ShopManagementPage() {
     deleteShop,
     removeInventory,
     selectShop,
+    loadShopById,
     refresh,
-  } = useShopViewModel();
+  } = useShopViewModel(urlShopId);
+
+  // Sync state with URL parameter on mount or URL change
+  useEffect(() => {
+    if (urlShopId) {
+      loadShopById(urlShopId);
+    } else {
+      selectShop(null);
+    }
+  }, [urlShopId, loadShopById, selectShop]);
+
+  const isDetailView = Boolean(urlShopId || selectedShopId);
+  const currentShopId = urlShopId || selectedShopId || '';
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -238,7 +258,7 @@ export default function ShopManagementPage() {
     try {
       await deleteShop(selectedShopId);
       setIsDeleteShopOpen(false);
-      selectShop(null);
+      navigate('/shop');
     } catch (err: any) {
       setDeleteShopError(err.message || 'Failed to delete shop');
     } finally {
@@ -247,7 +267,15 @@ export default function ShopManagementPage() {
   };
 
   const handleOpenDetails = (shop: any) => {
-    selectShop(shop);
+    navigate(`/shop/${shop.id}?tab=${searchParams.get('tab') || 'info'}`);
+  };
+
+  const handleBackToList = () => {
+    navigate('/shop');
+  };
+
+  const handleTabChange = (newTab: string) => {
+    setSearchParams({ tab: newTab }, { replace: true });
   };
 
   const getApprovalBadge = (status?: string) => {
@@ -286,7 +314,7 @@ export default function ShopManagementPage() {
   return (
     <div className="flex-col md:flex">
       <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12">
-        {!selectedShopId ? (
+        {!isDetailView ? (
           /* View 1: Store Locations List View */
           <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
             <div className="flex items-center justify-between space-y-2">
@@ -416,8 +444,8 @@ export default function ShopManagementPage() {
             {/* Global Breadcrumb Navigation */}
             <Breadcrumb
               items={[
-                { label: 'Shop Management', onClick: () => selectShop(null) },
-                { label: 'Store Locations', onClick: () => selectShop(null) },
+                { label: 'Shop Management', onClick: handleBackToList },
+                { label: 'Store Locations', onClick: handleBackToList },
                 { label: selectedShopInfo?.name || 'Shop Details' },
               ]}
             />
@@ -491,7 +519,7 @@ export default function ShopManagementPage() {
             )}
 
             {!detailsLoading && selectedShopInfo && (
-              <Tabs defaultValue="products" className="space-y-6 pt-2">
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 pt-2">
                 <TabsList className="grid grid-cols-2 sm:grid-cols-5 max-w-2xl bg-muted/50 p-1 rounded-xl border border-border/60">
                   <TabsTrigger
                     value="info"
@@ -813,7 +841,7 @@ export default function ShopManagementPage() {
 
                 {/* Orders Tab */}
                 <TabsContent value="orders" className="space-y-4 pt-2">
-                  <ShopOrdersTab shopId={selectedShopId} shopName={selectedShopInfo?.name} />
+                  <ShopOrdersTab shopId={currentShopId} shopName={selectedShopInfo?.name} />
                 </TabsContent>
               </Tabs>
             )}

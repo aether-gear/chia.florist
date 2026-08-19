@@ -8,7 +8,6 @@ import {
   Sheet,
   SheetContent,
 } from '../ui/sheet';
-import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
 
 interface InventoryFormSheetProps {
@@ -31,7 +30,6 @@ export default function InventoryFormSheet({
   onSuccess,
 }: InventoryFormSheetProps) {
   const isEdit = Boolean(product);
-  const { updateInventory } = useShopViewModel();
 
   // Common form states
   const [stock, setStock] = useState<string>('');
@@ -91,7 +89,10 @@ export default function InventoryFormSheet({
     try {
       if (isEdit && product) {
         // Edit Mode: PUT /shops/{shopID}/products/{productID}/inventories
-        await updateInventory(shopId, product.id, Number(stock));
+        await fetchApi(`/shops/${shopId}/products/${product.id}/inventories`, {
+          method: 'PUT',
+          body: JSON.stringify({ stock: Number(stock) }),
+        });
       } else {
         // Add Mode: POST /shops/{shopID}/products/{productID}/inventories
         await fetchApi(`/shops/${shopId}/products/${selectedProductId}/inventories`, {

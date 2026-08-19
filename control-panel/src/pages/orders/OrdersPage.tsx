@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart3 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -45,13 +45,17 @@ export default function OrdersPage() {
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [shopsList, setShopsList] = useState<ShopOption[]>([]);
+  const shopsFetchedRef = useRef(false);
 
   useEffect(() => {
+    if (shopsFetchedRef.current) return;
+    shopsFetchedRef.current = true;
+
     fetchApi('/shops?limit=100')
       .then((res) => {
         if (res?.shops && res.shops.length > 0) {
           setShopsList(res.shops);
-          if (!isAdmin && !shopFilter) {
+          if (!isAdmin) {
             const firstShop = res.shops[0];
             setShopFilter(firstShop.slug || firstShop.id);
           }
@@ -60,7 +64,7 @@ export default function OrdersPage() {
       .catch((err) => {
         console.error('Failed to load shops for order filter', err);
       });
-  }, [isAdmin, shopFilter, setShopFilter]);
+  }, [isAdmin, setShopFilter]);
 
   const selectedOrder = data?.orders.find((o) => o.id === selectedOrderId) || null;
 
