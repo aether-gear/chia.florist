@@ -1,16 +1,25 @@
 export interface OrderItem {
   id: string;
   shipment_id?: string | null;
-  product_id: string;
+  product_id?: string | null;
+  product_variant_type?: string;
+  is_custom?: boolean;
   product_name: string;
   quantity: number;
   unit_price: number;
   subtotal: number;
   shop_id: string;
   shop_name: string;
-  courier_code?: string;
-  courier_service?: string;
+  courier_code?: string | null;
+  courier_service?: string | null;
   shipping_fee: number;
+}
+
+export interface PaymentChannelData {
+  channel_type: string;
+  display_name: string;
+  action_url?: string | null;
+  expires_at?: string | null;
 }
 
 export interface OrderPayment {
@@ -18,7 +27,8 @@ export interface OrderPayment {
   status: string;
   provider: string;
   amount: number;
-  expires_at: string;
+  expires_at?: string | null;
+  channel_data?: PaymentChannelData | null;
   created_at: string;
 }
 
@@ -61,7 +71,8 @@ export interface OrderAddress {
 export interface Order {
   id: string;
   number: string;
-  user_id: string;
+  customer_id?: string;
+  user_id?: string;
   address_id: string;
   status: string;
   subtotal: number;

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchApi } from '../lib/api';
 import type { OrdersResponse } from '../models/Order';
 
-export function useOrdersViewModel() {
+export function useOrdersViewModel(fixedShopId?: string) {
   const [data, setData] = useState<OrdersResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isSwitchingCategory, setIsSwitchingCategory] = useState<boolean>(false);
@@ -13,10 +13,14 @@ export function useOrdersViewModel() {
   const [sort, setSort] = useState<string>('latest:desc');
   const [searchNumber, setSearchNumber] = useState<string>('');
   const [statusFilter, setStatusFilterState] = useState<string>('');
-  const [shopFilter, setShopFilterState] = useState<string>('');
+  const [shopFilter, setShopFilterState] = useState<string>(fixedShopId || '');
+  const [fromDate, setFromDateState] = useState<string>('');
+  const [toDate, setToDateState] = useState<string>('');
 
   const activeRequestId = useRef<number>(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const effectiveShop = fixedShopId !== undefined ? fixedShopId : shopFilter;
 
   const fetchOrders = useCallback(async (
     targetPage: number,
@@ -24,7 +28,9 @@ export function useOrdersViewModel() {
     targetSort: string,
     targetSearch: string,
     targetStatus: string,
-    targetShop: string
+    targetShop: string,
+    targetFromDate: string,
+    targetToDate: string
   ) => {
     const requestId = ++activeRequestId.current;
     try {
@@ -45,6 +51,12 @@ export function useOrdersViewModel() {
       if (targetShop && targetShop !== 'all') {
         queryParams.append('shop', targetShop);
       }
+      if (targetFromDate) {
+        queryParams.append('from_date', targetFromDate);
+      }
+      if (targetToDate) {
+        queryParams.append('to_date', targetToDate);
+      }
 
       const response = await fetchApi(`/orders?${queryParams.toString()}`);
       if (requestId === activeRequestId.current) {
@@ -64,6 +76,14 @@ export function useOrdersViewModel() {
     }
   }, []);
 
+  // Update shop state if fixedShopId prop changes
+  useEffect(() => {
+    if (fixedShopId !== undefined) {
+      setShopFilterState(fixedShopId);
+      setPage(1);
+    }
+  }, [fixedShopId]);
+
   // Throttled category switching with a locked spinner window
   const setStatusFilter = useCallback((newStatus: string) => {
     setStatusFilterState(newStatus);
@@ -78,30 +98,45 @@ export function useOrdersViewModel() {
     const minThrottleDelay = new Promise(resolve => setTimeout(resolve, 350));
 
     debounceTimerRef.current = setTimeout(async () => {
-      const fetchPromise = fetchOrders(1, limit, sort, searchNumber, newStatus, shopFilter);
+      const fetchPromise = fetchOrders(1, limit, sort, searchNumber, newStatus, effectiveShop, fromDate, toDate);
       await Promise.all([fetchPromise, minThrottleDelay]);
     }, 50);
-  }, [limit, sort, searchNumber, shopFilter, fetchOrders]);
+  }, [limit, sort, searchNumber, effectiveShop, fromDate, toDate, fetchOrders]);
 
   const setShopFilter = useCallback((newShop: string) => {
+    if (fixedShopId !== undefined) return;
     setShopFilterState(newShop);
     setLoading(true);
     setPage(1);
-    fetchOrders(1, limit, sort, searchNumber, statusFilter, newShop);
-  }, [limit, sort, searchNumber, statusFilter, fetchOrders]);
+    fetchOrders(1, limit, sort, searchNumber, statusFilter, newShop, fromDate, toDate);
+  }, [fixedShopId, limit, sort, searchNumber, statusFilter, fromDate, toDate, fetchOrders]);
+
+  const setFromDate = useCallback((date: string) => {
+    setFromDateState(date);
+    setLoading(true);
+    setPage(1);
+    fetchOrders(1, limit, sort, searchNumber, statusFilter, effectiveShop, date, toDate);
+  }, [limit, sort, searchNumber, statusFilter, effectiveShop, toDate, fetchOrders]);
+
+  const setToDate = useCallback((date: string) => {
+    setToDateState(date);
+    setLoading(true);
+    setPage(1);
+    fetchOrders(1, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, date);
+  }, [limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, fetchOrders]);
 
   useEffect(() => {
-    fetchOrders(page, limit, sort, searchNumber, statusFilter, shopFilter);
+    fetchOrders(page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate);
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [page, limit, sort, searchNumber, shopFilter]);
+  }, [page, limit, sort, searchNumber, effectiveShop, fromDate, toDate, fetchOrders]);
 
   const refresh = useCallback(() => {
-    return fetchOrders(page, limit, sort, searchNumber, statusFilter, shopFilter);
-  }, [fetchOrders, page, limit, sort, searchNumber, statusFilter, shopFilter]);
+    return fetchOrders(page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate);
+  }, [fetchOrders, page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate]);
 
   return {
     data,
@@ -113,13 +148,18 @@ export function useOrdersViewModel() {
     sort,
     searchNumber,
     statusFilter,
-    shopFilter,
+    shopFilter: effectiveShop,
+    fromDate,
+    toDate,
+    isShopLocked: fixedShopId !== undefined,
     setPage,
     setLimit,
     setSort,
     setSearchNumber,
     setStatusFilter,
     setShopFilter,
+    setFromDate,
+    setToDate,
     refresh,
   };
 }

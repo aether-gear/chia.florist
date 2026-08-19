@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
+  ShoppingBag,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -21,6 +22,7 @@ import { Label } from '../../components/ui/label';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import ShopOrdersTab from '../../components/shops/ShopOrdersTab';
 import {
   Sheet,
   SheetContent,
@@ -490,12 +492,18 @@ export default function ShopManagementPage() {
 
             {!detailsLoading && selectedShopInfo && (
               <Tabs defaultValue="products" className="space-y-6 pt-2">
-                <TabsList className="grid grid-cols-2 sm:grid-cols-4 max-w-xl bg-muted/50 p-1 rounded-xl border border-border/60">
+                <TabsList className="grid grid-cols-2 sm:grid-cols-5 max-w-2xl bg-muted/50 p-1 rounded-xl border border-border/60">
                   <TabsTrigger
                     value="info"
                     className="flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg text-xs font-medium"
                   >
                     <Info className="h-3.5 w-3.5" /> General
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="orders"
+                    className="flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg text-xs font-medium"
+                  >
+                    <ShoppingBag className="h-3.5 w-3.5" /> Orders
                   </TabsTrigger>
                   <TabsTrigger
                     value="products"
@@ -801,6 +809,11 @@ export default function ShopManagementPage() {
                       </DataCardList>
                     </div>
                   </div>
+                </TabsContent>
+
+                {/* Orders Tab */}
+                <TabsContent value="orders" className="space-y-4 pt-2">
+                  <ShopOrdersTab shopId={selectedShopId} shopName={selectedShopInfo?.name} />
                 </TabsContent>
               </Tabs>
             )}
