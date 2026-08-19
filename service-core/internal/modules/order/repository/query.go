@@ -105,6 +105,8 @@ type FindOrderParams struct {
 	ID         *uuid.UUID
 	Number     *string
 	CustomerID *uuid.UUID
+	ShopID     *uuid.UUID
+	ShopIDs    []uuid.UUID
 	Status     *string
 	Statuses   []string
 

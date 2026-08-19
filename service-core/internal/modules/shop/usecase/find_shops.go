@@ -35,6 +35,7 @@ type FindShopsInput struct {
 	ID             *string
 	ShopIDs        []uuid.UUID
 	Name           *string
+	Slug           *string
 	IsActive       *bool
 	ApprovalStatus *string
 	Sort           string
@@ -100,6 +101,7 @@ func (u *FindShopsUsecase) Execute(
 		ID:             input.ID,
 		ShopIDs:        input.ShopIDs,
 		Name:           input.Name,
+		Slug:           input.Slug,
 		IsActive:       input.IsActive,
 		ApprovalStatus: approvalStatus,
 		Pagination: query.Pagination{

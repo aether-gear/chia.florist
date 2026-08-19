@@ -17,6 +17,7 @@ type FindShopsParams struct {
 	ID             *string
 	ShopIDs        []uuid.UUID
 	Name           *string
+	Slug           *string
 	IsActive       *bool
 	ApprovalStatus *string
 

@@ -79,6 +79,12 @@ func (r *shopRepositoryImpl) FindByParams(
 		argPos++
 	}
 
+	if params.Slug != nil {
+		conditions = append(conditions, fmt.Sprintf("s.slug = $%d", argPos))
+		args = append(args, *params.Slug)
+		argPos++
+	}
+
 	if params.IsActive != nil {
 		conditions = append(conditions, fmt.Sprintf("s.is_active = $%d", argPos))
 		args = append(args, *params.IsActive)
@@ -235,6 +241,50 @@ func (r *shopRepositoryImpl) GetByID(
 			return nil, nil
 		}
 		return nil, fmt.Errorf("query shop by id failed: %w", err)
+	}
+
+	return &s, nil
+}
+
+func (r *shopRepositoryImpl) GetBySlug(
+	ctx context.Context,
+	exec transaction.Executor,
+	slug string,
+) (*domain.Shop, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			slug,
+			description,
+			is_active,
+			approval_status,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM shops
+		WHERE slug = $1 AND deleted_at IS NULL
+		LIMIT 1
+	`
+
+	var s domain.Shop
+	err := exec.QueryRow(ctx, query, slug).Scan(
+		&s.ID,
+		&s.Name,
+		&s.Slug,
+		&s.Description,
+		&s.IsActive,
+		&s.ApprovalStatus,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+		&s.DeletedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query shop by slug failed: %w", err)
 	}
 
 	return &s, nil

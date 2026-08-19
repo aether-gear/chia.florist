@@ -72,6 +72,12 @@ func NewRouteChains(c *Container) *RouteChains {
 
 	return &RouteChains{
 		Core: buildChain(
+			c.Authenticator.OptionalAuth(
+				c.DBExecutor,
+				c.DBTransactor,
+				appcookie.CookieCustomer,
+				appcookie.CookieStaff,
+			),
 			c.Authorizer.OptionalLoadActor(c.DBExecutor),
 		),
 
@@ -239,6 +245,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.CreateOrder,
 			&c.UpdateOrderStatus,
 			&c.GetOrderTracking,
+			&c.GetShop,
 		)
 
 		auditHandler = auditH.NewAuditHandler(
@@ -409,7 +416,6 @@ func NewRouter(c *Container) *chi.Mux {
 		r.Route("/shops", func(r chi.Router) {
 			r.Get("/", chains.Core(shopHandler.FindShops))
 			r.Post("/", chains.StaffAdminOnly(shopHandler.SaveShop))
-
 
 			r.Route("/{shopID}", func(r chi.Router) {
 				r.Get("/", chains.Core(shopHandler.GetShopByID))

@@ -2,15 +2,18 @@ package http
 
 import (
 	"net/http"
+	"slices"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	authenDomain "service-core/internal/modules/authentication/domain"
+	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	orderDomain "service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/usecase"
 	paymentDomain "service-core/internal/modules/payment/domain"
 	shipmentDomain "service-core/internal/modules/shipment/domain"
+	shopUsecase "service-core/internal/modules/shop/usecase"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -22,6 +25,7 @@ type orderHandler struct {
 	createOrder       *usecase.CreateOrderUsecase
 	updateOrderStatus *usecase.UpdateOrderStatusUsecase
 	getOrderTracking  *usecase.GetOrderTrackingUsecase
+	getShop           *shopUsecase.GetShopUsecase
 }
 
 func NewOrderHandler(
@@ -30,6 +34,7 @@ func NewOrderHandler(
 	createOrder *usecase.CreateOrderUsecase,
 	updateOrderStatus *usecase.UpdateOrderStatusUsecase,
 	getOrderTracking *usecase.GetOrderTrackingUsecase,
+	getShop *shopUsecase.GetShopUsecase,
 ) *orderHandler {
 	return &orderHandler{
 		findOrders:        findOrders,
@@ -37,6 +42,7 @@ func NewOrderHandler(
 		createOrder:       createOrder,
 		updateOrderStatus: updateOrderStatus,
 		getOrderTracking:  getOrderTracking,
+		getShop:           getShop,
 	}
 }
 
@@ -183,6 +189,50 @@ func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 	}
 }
 
+func (h *orderHandler) resolveShopFilter(r *http.Request) (*uuid.UUID, bool, error) {
+	shopIDStr := apphttp.Query(r, "shop_id")
+	shopSlug := apphttp.Query(r, "shop_slug")
+	shopParam := apphttp.Query(r, "shop")
+
+	targetIDStr := ""
+	targetSlug := ""
+
+	if shopIDStr != "" {
+		targetIDStr = shopIDStr
+	} else if shopSlug != "" {
+		targetSlug = shopSlug
+	} else if shopParam != "" {
+		if parsed, err := uuid.Parse(shopParam); err == nil {
+			return &parsed, true, nil
+		}
+		targetSlug = shopParam
+	}
+
+	if targetIDStr != "" {
+		id, err := uuid.Parse(targetIDStr)
+		if err != nil {
+			return nil, true, apperrors.NewBadRequest("invalid shop id")
+		}
+		return &id, true, nil
+	}
+
+	if targetSlug != "" {
+		if h.getShop == nil {
+			return nil, false, nil
+		}
+		shop, err := h.getShop.GetBySlug(r.Context(), targetSlug)
+		if err != nil {
+			return nil, true, err
+		}
+		if shop == nil {
+			return nil, true, nil
+		}
+		return &shop.ID, true, nil
+	}
+
+	return nil, false, nil
+}
+
 func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error {
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
@@ -240,6 +290,51 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 		input.Status = &statuses
 	}
 
+	shopID, shopSpecified, err := h.resolveShopFilter(r)
+	if err != nil {
+		return err
+	}
+	if shopSpecified {
+		if shopID == nil {
+			apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+				"orders": []orderResponse{},
+				"page":   page,
+				"limit":  limit,
+				"total":  0,
+			})
+			return nil
+		}
+		input.ShopID = shopID
+	}
+
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		allAssigned := actor.GetAssignedShopIDs()
+		var assignedIDs []uuid.UUID
+		for _, sID := range allAssigned {
+			if actor.HasPermission(sID, authzDomain.PermissionOrderRead) {
+				assignedIDs = append(assignedIDs, sID)
+			}
+		}
+
+		if len(assignedIDs) == 0 {
+			apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+				"orders": []orderResponse{},
+				"page":   page,
+				"limit":  limit,
+				"total":  0,
+			})
+			return nil
+		}
+
+		if input.ShopID != nil {
+			if !actor.HasPermission(*input.ShopID, authzDomain.PermissionOrderRead) {
+				return apperrors.NewForbidden("forbidden: missing order:read permission for this shop")
+			}
+		} else {
+			input.ShopIDs = assignedIDs
+		}
+	}
+
 	orders, total, err := h.findOrders.Execute(r.Context(), input)
 	if err != nil {
 		return err
@@ -283,6 +378,19 @@ func (h *orderHandler) GetOrder(w http.ResponseWriter, r *http.Request) error {
 	}
 	if result == nil {
 		return apperrors.NewNotFound("order not found")
+	}
+
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		hasAccess := false
+		for _, item := range result.Items {
+			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderRead) {
+				hasAccess = true
+				break
+			}
+		}
+		if !hasAccess {
+			return apperrors.NewForbidden("forbidden: missing order:read permission for this shop's order")
+		}
 	}
 
 	resp := buildOrderResponse(usecase.OrderSearchResult{
@@ -333,6 +441,23 @@ func (h *orderHandler) ListMyOrders(w http.ResponseWriter, r *http.Request) erro
 		input.Status = &status
 	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
 		input.Status = &statuses
+	}
+
+	shopID, shopSpecified, err := h.resolveShopFilter(r)
+	if err != nil {
+		return err
+	}
+	if shopSpecified {
+		if shopID == nil {
+			apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+				"orders": []orderResponse{},
+				"page":   page,
+				"limit":  limit,
+				"total":  0,
+			})
+			return nil
+		}
+		input.ShopID = shopID
 	}
 
 	orders, total, err := h.findOrders.Execute(r.Context(), input)
@@ -584,6 +709,44 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		return apperrors.NewBadRequest("status is required")
 	}
 
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		existingOrder, err := h.getOrder.Execute(r.Context(), usecase.GetOrderInput{
+			OrderID: orderID,
+		})
+		if err != nil || existingOrder == nil {
+			return apperrors.NewNotFound("order not found")
+		}
+
+		hasAccess := false
+		var matchedShopID uuid.UUID
+		for _, item := range existingOrder.Items {
+			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderUpdateStatus) {
+				hasAccess = true
+				matchedShopID = item.ShopID
+				break
+			}
+		}
+		if !hasAccess {
+			return apperrors.NewForbidden("forbidden: missing order:update_status permission for this shop's order")
+		}
+
+		if shopRules, exists := actor.Rules[matchedShopID]; exists && shopRules != nil {
+			if allowedRaw, ok := shopRules["allowed_statuses"]; ok {
+				allowedList := parseStringSlice(allowedRaw)
+				if len(allowedList) > 0 && !slices.Contains(allowedList, req.Status) {
+					return apperrors.NewForbidden("forbidden: status transition to '" + req.Status + "' is not allowed by staff rule")
+				}
+			}
+
+			if maxRaw, ok := shopRules["max_order_amount"]; ok {
+				maxAmount := parseFloat64(maxRaw)
+				if maxAmount > 0 && float64(existingOrder.Order.Total) > maxAmount {
+					return apperrors.NewForbidden("forbidden: order total amount exceeds staff rule limit")
+				}
+			}
+		}
+	}
+
 	var shipmentsInput []usecase.ShipmentDispatchInput
 	if len(req.Shipments) > 0 {
 		for _, sReq := range req.Shipments {
@@ -737,4 +900,33 @@ func (h *orderHandler) GetOrderTrackingForStaff(w http.ResponseWriter, r *http.R
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
+}
+
+func parseStringSlice(val any) []string {
+	var result []string
+	switch v := val.(type) {
+	case []string:
+		return v
+	case []any:
+		for _, elem := range v {
+			if s, ok := elem.(string); ok {
+				result = append(result, s)
+			}
+		}
+	}
+	return result
+}
+
+func parseFloat64(val any) float64 {
+	switch v := val.(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int:
+		return float64(v)
+	}
+	return 0
 }

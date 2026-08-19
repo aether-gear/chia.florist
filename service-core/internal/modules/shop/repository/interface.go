@@ -22,6 +22,12 @@ type ShopRepository interface {
 		id uuid.UUID,
 	) (*domain.Shop, error)
 
+	GetBySlug(
+		ctx context.Context,
+		exec transaction.Executor,
+		slug string,
+	) (*domain.Shop, error)
+
 	FindByIDs(
 		ctx context.Context,
 		exec transaction.Executor,

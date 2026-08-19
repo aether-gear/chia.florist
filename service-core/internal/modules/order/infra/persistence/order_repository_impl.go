@@ -284,6 +284,20 @@ func (r *orderRepositoryImpl) FindOrders(
 		argPos++
 	}
 
+	if len(params.ShopIDs) > 0 {
+		shopIDStrings := make([]string, len(params.ShopIDs))
+		for i, id := range params.ShopIDs {
+			shopIDStrings[i] = id.String()
+		}
+		conditions = append(conditions, fmt.Sprintf("EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.shop_id = ANY($%d::uuid[]))", argPos))
+		args = append(args, shopIDStrings)
+		argPos++
+	} else if params.ShopID != nil {
+		conditions = append(conditions, fmt.Sprintf("EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.shop_id = $%d)", argPos))
+		args = append(args, *params.ShopID)
+		argPos++
+	}
+
 	if len(params.Statuses) > 0 {
 		placeholders := make([]string, len(params.Statuses))
 		for i, s := range params.Statuses {

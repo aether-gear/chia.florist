@@ -55,6 +55,8 @@ type FindOrdersInput struct {
 	ID         *uuid.UUID
 	Number     *string
 	CustomerID *uuid.UUID
+	ShopID     *uuid.UUID
+	ShopIDs    []uuid.UUID
 	Status     *string
 	Statuses   []string
 	Sort       string
@@ -139,6 +141,8 @@ func (u *FindOrdersUsecase) Execute(
 		ID:         input.ID,
 		Number:     input.Number,
 		CustomerID: input.CustomerID,
+		ShopID:     input.ShopID,
+		ShopIDs:    input.ShopIDs,
 		Status:     input.Status,
 		Statuses:   statuses,
 		Pagination: query.Pagination{

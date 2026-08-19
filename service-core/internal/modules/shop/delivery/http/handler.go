@@ -6,6 +6,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	"service-core/internal/modules/shop/usecase"
 
@@ -80,7 +81,14 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 
 	actor, ok := authzSvc.GetActor(r.Context())
 	if ok && actor.StaffID != nil && !actor.IsSuperAdmin() {
-		assignedIDs := actor.GetAssignedShopIDs()
+		allAssigned := actor.GetAssignedShopIDs()
+		var assignedIDs []uuid.UUID
+		for _, sID := range allAssigned {
+			if actor.HasPermission(sID, authzDomain.PermissionShopView) || actor.HasPermission(sID, authzDomain.PermissionOrderRead) {
+				assignedIDs = append(assignedIDs, sID)
+			}
+		}
+
 		if len(assignedIDs) == 0 {
 			res := listShopsResponse{
 				Page:  page,

@@ -162,6 +162,12 @@ type Authenticator interface {
 		tran transaction.Transactor,
 		cookies ...appcookie.CookieName,
 	) appmiddleware.Middleware
+
+	OptionalAuth(
+		exec transaction.Executor,
+		tran transaction.Transactor,
+		cookies ...appcookie.CookieName,
+	) appmiddleware.Middleware
 }
 
 type OAuthConnectionRepository interface {
