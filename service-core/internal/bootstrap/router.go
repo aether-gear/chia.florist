@@ -71,7 +71,10 @@ func NewRouteChains(c *Container) *RouteChains {
 	}
 
 	return &RouteChains{
-		Core: buildChain(),
+		Core: buildChain(
+			c.Authorizer.OptionalLoadActor(c.DBExecutor),
+		),
+
 		CoreAuth: buildChain(
 			c.Authenticator.RequireMultiAuth(
 				c.DBExecutor,
@@ -404,8 +407,9 @@ func NewRouter(c *Container) *chi.Mux {
 		}
 
 		r.Route("/shops", func(r chi.Router) {
-			r.Get("/", chains.StaffOnly(shopHandler.FindShops))
+			r.Get("/", chains.Core(shopHandler.FindShops))
 			r.Post("/", chains.StaffAdminOnly(shopHandler.SaveShop))
+
 
 			r.Route("/{shopID}", func(r chi.Router) {
 				r.Get("/", chains.Core(shopHandler.GetShopByID))
