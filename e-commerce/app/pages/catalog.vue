@@ -41,9 +41,9 @@ const storeSelection = useStoreSelection()
 
 const fetchShopsList = async () => {
   try {
-    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string; slug: string }[] }>('/shops?active=true')
-    if (res && Array.isArray(res.shops)) {
-      shops.value = res.shops
+    const activeList = await storeSelection.fetchActiveShops()
+    if (activeList) {
+      shops.value = activeList
     }
   } catch (e) {
     console.error('Failed to fetch shops list:', e)

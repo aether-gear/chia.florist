@@ -12,6 +12,7 @@ import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { triggerAuthAlert } from '~/composables/useSessionState'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 useHead({
   title: 'Secure Checkout - Chia Florist',
@@ -20,16 +21,20 @@ useHead({
   ]
 })
 
+import { useStoreSelection } from '~/composables/useStoreSelection'
+
 const route = useRoute()
 const { cart, orders, loadCart, flushCart, cartSubtotal, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
 const authVm = useAuthViewModel()
+const storeSelection = useStoreSelection()
 const globalAlert = useGlobalAlert()
 
 // State Management untuk Checkout & Shipping
 const checkoutData = ref<CheckoutResponse | null>(null)
 const isLoadingCheckout = ref(false)
 const isLoadingCalculate = ref(false)
+const isInitialMountComplete = ref(false)
 const discount = ref(0)
 const selectedAddressId = ref('')
 const isProcessing = ref(false)
@@ -45,12 +50,10 @@ const paymentInfoState = useState<any>('last-payment-info', () => null)
 
 const fetchShops = async () => {
   try {
-    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string }[] }>('/shops')
-    if (res && res.shops) {
-      res.shops.forEach(s => {
-        shopsMap.value[s.id] = s.name
-      })
-    }
+    const shops = await storeSelection.fetchActiveShops()
+    shops.forEach(s => {
+      shopsMap.value[s.id] = s.name
+    })
   } catch (err) {
     console.error('Failed to fetch shops:', err)
   }
@@ -340,6 +343,9 @@ onMounted(async () => {
     navigateTo('/cart')
   } finally {
     isLoadingCheckout.value = false
+    setTimeout(() => {
+      isInitialMountComplete.value = true
+    }, 100)
   }
 })
 
@@ -476,7 +482,7 @@ let addressTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan alamat untuk kalkulasi ulang ongkir
 watch(selectedAddressId, (newId, oldId) => {
-  if (newId && newId !== oldId && !isLoadingCheckout.value) {
+  if (isInitialMountComplete.value && newId && newId !== oldId && !isLoadingCheckout.value) {
     isLoadingCalculate.value = true
     if (addressTimeout) {
       clearTimeout(addressTimeout)
@@ -491,7 +497,7 @@ let paymentMethodTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan metode pembayaran untuk kalkulasi ulang ongkir
 watch(selectedPaymentMethodId, (newId, oldId) => {
-  if (newId && newId !== oldId && !isLoadingCheckout.value) {
+  if (isInitialMountComplete.value && newId && newId !== oldId && !isLoadingCheckout.value) {
     isLoadingCalculate.value = true
     if (paymentMethodTimeout) {
       clearTimeout(paymentMethodTimeout)
@@ -694,7 +700,7 @@ const handlePlaceOrder = async () => {
     navigateTo(`/payment?orderId=${result.order_id}`)
   } catch (err: any) {
     console.error('Checkout processing error:', err)
-    globalAlert.showError('Checkout Failed', err.data?.message || err.message || 'Failed to process checkout. Please try again.')
+    globalAlert.showError('Checkout Failed', mapErrorMessage(err, 'Failed to process checkout. Please try again.'))
   } finally {
     isProcessing.value = false
   }

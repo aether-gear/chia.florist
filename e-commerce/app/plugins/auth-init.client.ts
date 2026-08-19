@@ -55,8 +55,8 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         )
       }
 
-    } else if (isLoggedIn.value === 'true' || rememberMe.value === 'true' || !isLoggedIn.value) {
-      // Attempt session restore for email/password or persistent sessions
+    } else if (isLoggedIn.value === 'true' || rememberMe.value === 'true') {
+      // Attempt session restore for authenticated or remembered sessions
       try {
         await authVm.fetchCurrentUser()
 

@@ -4,6 +4,9 @@ import { authService } from '~/services/authService'
 import { supabaseService } from '~/services/supabaseService'
 import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest, UpdateProfileRequest } from '~/types/auth'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
+
+let fetchCurrentUserPromise: Promise<void> | null = null
 
 export const useAuthViewModel = () => {
   const currentUser = useState<UserMe | null>('auth_currentUser', () => null)
@@ -26,13 +29,24 @@ export const useAuthViewModel = () => {
   const isAuthenticated = computed(() => currentUser.value !== null)
 
   /**
-   * Safe method to fetch the current logged-in user.
+   * Safe method to fetch the current logged-in user with in-flight deduplication.
    */
-  const fetchCurrentUser = async (cookieHeader?: string) => {
+  const fetchCurrentUser = (cookieHeader?: string, force = false): Promise<void> => {
+    // If already loaded and not forcing, reuse existing session
+    if (!force && isInitialized.value && currentUser.value) {
+      return Promise.resolve()
+    }
+
+    if (!force && fetchCurrentUserPromise) {
+      return fetchCurrentUserPromise
+    }
+
     isLoading.value = true
     error.value = null
-    try {
-      const response = await authService.getMe(cookieHeader)
+
+    fetchCurrentUserPromise = (async () => {
+      try {
+        const response = await authService.getMe(cookieHeader)
       if (response && response.is_authenticated && response.account_type === 'customer') {
         const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
@@ -100,13 +114,17 @@ export const useAuthViewModel = () => {
     } catch (err: any) {
       clearLocalSession()
       currentUser.value = null
-      error.value = err.data?.message || err.message || 'Failed to fetch user state'
+      error.value = mapErrorMessage(err, 'Gagal memuat status pengguna. Silakan coba lagi.')
       console.warn('Failed to fetch user state:', err)
     } finally {
       isLoading.value = false
       isInitialized.value = true
+      fetchCurrentUserPromise = null
     }
-  }
+  })()
+
+  return fetchCurrentUserPromise
+}
 
   /**
    * Authenticate user.
@@ -169,7 +187,7 @@ export const useAuthViewModel = () => {
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Login failed. Please check your credentials.'
+      error.value = mapErrorMessage(err, 'Masuk gagal. Silakan periksa kredensial Anda.')
       currentUser.value = null
       throw err
     } finally {
@@ -213,7 +231,7 @@ export const useAuthViewModel = () => {
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Google Login failed. Please try again.'
+      error.value = mapErrorMessage(err, 'Masuk dengan Google gagal. Silakan coba lagi.')
       currentUser.value = null
       throw err
     } finally {
@@ -245,7 +263,7 @@ export const useAuthViewModel = () => {
       }
       throw new Error('Registration did not return a verification challenge.')
     } catch (err: any) {
-      error.value = err.data?.message || 'Registration failed. Please check the inputs.'
+      error.value = mapErrorMessage(err, 'Pendaftaran gagal. Silakan periksa data yang Anda masukkan.')
       throw err
     } finally {
       isLoading.value = false
@@ -325,7 +343,7 @@ export const useAuthViewModel = () => {
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'OTP Verification failed. Please check the code.'
+      error.value = mapErrorMessage(err, 'Verifikasi OTP gagal. Silakan periksa kode yang Anda masukkan.')
       throw err
     } finally {
       isLoading.value = false
@@ -396,7 +414,7 @@ export const useAuthViewModel = () => {
       }
       return { success: false, message: 'Update failed: Empty response' }
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to update profile'
+      error.value = mapErrorMessage(err, 'Gagal memperbarui profil.')
       return { success: false, message: error.value }
     } finally {
       isLoading.value = false
@@ -419,7 +437,7 @@ export const useAuthViewModel = () => {
       const response = await authService.forgotPassword({ email })
       return response
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to request password reset.'
+      error.value = mapErrorMessage(err, 'Gagal mengirim permintaan reset kata sandi.')
       throw err
     } finally {
       isLoading.value = false
@@ -436,7 +454,7 @@ export const useAuthViewModel = () => {
       const response = await authService.verifyForgotPassword({ challenge_id: challengeIdVal, otp })
       return response
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'OTP Verification failed.'
+      error.value = mapErrorMessage(err, 'Verifikasi kode gagal. Silakan periksa kode yang Anda masukkan.')
       throw err
     } finally {
       isLoading.value = false
@@ -453,7 +471,7 @@ export const useAuthViewModel = () => {
       const response = await authService.resetPassword({ challenge_id: challengeIdVal, new_password: newPassword })
       return response
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to reset password.'
+      error.value = mapErrorMessage(err, 'Gagal mereset kata sandi. Silakan coba lagi.')
       throw err
     } finally {
       isLoading.value = false

@@ -4,6 +4,7 @@ import { useCart } from '~/composables/useCart'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { formatRupiah } from '~/utils/formatter'
 import { orderService } from '~/services/orderService'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 useHead({
   title: 'Secure Payment - Chia Florist'
@@ -149,7 +150,7 @@ onMounted(async () => {
       }
     } catch (err: any) {
       console.error('Failed to load payment details:', err)
-      errorMsg.value = err.data?.message || err.message || 'Failed to load payment details. Please check your login session.'
+      errorMsg.value = mapErrorMessage(err, 'Failed to load payment details. Please check your login session.')
     } finally {
       isLoading.value = false
     }
@@ -290,8 +291,8 @@ const handleCheckPayment = async () => {
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
-    checkError.value = err.data?.message || err.message || 'Verification failed. Please try again.'
-    globalAlert.showError('Verification Error', checkError.value || 'Failed to check status')
+    checkError.value = mapErrorMessage(err, 'Verification failed. Please try again.')
+    globalAlert.showError('Verification Error', checkError.value)
   } finally {
     isChecking.value = false
   }

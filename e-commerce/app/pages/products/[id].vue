@@ -21,9 +21,9 @@ const selectedShopSlug = ref('')
 
 const fetchShops = async () => {
   try {
-    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string; slug: string }[] }>('/shops?active=true')
-    if (res && Array.isArray(res.shops)) {
-      shopsList.value = res.shops
+    const activeList = await storeSelection.fetchActiveShops()
+    if (activeList) {
+      shopsList.value = activeList
     }
   } catch (e) {
     console.error('Failed to fetch shops for product detail:', e)
@@ -211,13 +211,12 @@ useHead({
       <p class="text-gray-500 font-medium animate-pulse text-sm">Loading product details...</p>
     </div>
 
-    <div v-else-if="error" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-      <span class="text-4xl">⚠️</span>
-      <h3 class="text-lg font-bold text-gray-800">Unable to load product</h3>
-      <p class="text-gray-500 text-sm max-w-md text-center">{{ error }}</p>
-      <button @click="fetchProductById(productId)" class="bg-[#1b4332] text-white px-5 py-2.5 rounded-xl hover:bg-[#143326] transition font-semibold text-xs cursor-pointer">
-        Try Again
-      </button>
+    <div v-else-if="error" class="min-h-[400px]">
+      <CErrorDisplay 
+        :status-code="404" 
+        title="Produk Tidak Ditemukan"
+        :message="error" 
+      />
     </div>
 
     <div v-else-if="product && product.status === 'archived'" class="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center animate-fade-in">

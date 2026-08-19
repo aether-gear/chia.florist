@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { orderService } from '~/services/orderService'
 import type { BackendOrder, GetOrderTrackingTimelineResponse } from '~/types/order'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 export type OrderTab = 'all' | 'pending' | 'processing' | 'shipping' | 'completed' | 'cancelled'
 
@@ -202,7 +203,7 @@ export const useOrders = () => {
       orders.value      = fetchedOrders
       totalOrders.value = res.total ?? fetchedOrders.length
     } catch (err: any) {
-      error.value = err?.data?.message || err?.message || 'Failed to load orders'
+      error.value = mapErrorMessage(err, 'Gagal memuat pesanan. Silakan coba lagi.')
       orders.value      = []
       totalOrders.value = 0
     } finally {
@@ -247,7 +248,7 @@ export const useOrders = () => {
       const res = await orderService.getOrderTrackingTimeline(orderId)
       trackingData.value = res
     } catch (err: any) {
-      trackingError.value = err?.data?.message || err?.message || 'Failed to load tracking timeline'
+      trackingError.value = mapErrorMessage(err, 'Gagal memuat data pelacakan pengiriman.')
       trackingData.value = null
     } finally {
       isTrackingLoading.value = false

@@ -2,23 +2,46 @@
 import { ref } from 'vue'
 import { addressService } from '~/services/addressService'
 import type { UserAddress } from '~/types/address'
+import { mapErrorMessage } from '~/utils/errorMessages'
+
+let fetchAddressesPromise: Promise<void> | null = null
+
+// Memory caches for location dropdowns
+const cachedProvinces = ref<any[] | null>(null)
+const cachedCities = new Map<string, any[]>()
+const cachedDistricts = new Map<string, any[]>()
+const cachedVillages = new Map<string, any[]>()
 
 export const useAddress = () => {
-  const addresses = ref<UserAddress[]>([])
-  const isLoading = ref(false)
+  const addresses = useState<UserAddress[]>('chia-user-addresses-state', () => [])
+  const isLoading = useState<boolean>('chia-user-addresses-loading', () => false)
   const error = ref<string | null>(null)
 
-  const fetchAddresses = async () => {
+  const fetchAddresses = (force = false): Promise<void> => {
+    if (!force && addresses.value.length > 0) {
+      return Promise.resolve()
+    }
+
+    if (!force && fetchAddressesPromise) {
+      return fetchAddressesPromise
+    }
+
     isLoading.value = true
     error.value = null
-    try {
-      const response = await addressService.listAddresses()
-      addresses.value = response.addresses || []
-    } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to load addresses'
-    } finally {
-      isLoading.value = false
-    }
+
+    fetchAddressesPromise = (async () => {
+      try {
+        const response = await addressService.listAddresses()
+        addresses.value = response.addresses || []
+      } catch (err: any) {
+        error.value = mapErrorMessage(err, 'Gagal memuat daftar alamat.')
+      } finally {
+        isLoading.value = false
+        fetchAddressesPromise = null
+      }
+    })()
+
+    return fetchAddressesPromise
   }
 
   const saveAddress = async (address: UserAddress) => {
@@ -26,10 +49,10 @@ export const useAddress = () => {
     error.value = null
     try {
       const res = await addressService.saveAddress(address)
-      await fetchAddresses()
+      await fetchAddresses(true)
       return { success: true, message: res.message }
     } catch (err: any) {
-      const errMsg = err.data?.message || err.message || 'Failed to save address'
+      const errMsg = mapErrorMessage(err, 'Gagal menyimpan alamat. Silakan coba lagi.')
       error.value = errMsg
       return { success: false, message: errMsg }
     } finally {
@@ -42,10 +65,10 @@ export const useAddress = () => {
     error.value = null
     try {
       const res = await addressService.deleteAddress(addressId)
-      await fetchAddresses()
+      await fetchAddresses(true)
       return { success: true, message: res.message }
     } catch (err: any) {
-      const errMsg = err.data?.message || err.message || 'Failed to delete address'
+      const errMsg = mapErrorMessage(err, 'Gagal menghapus alamat. Silakan coba lagi.')
       error.value = errMsg
       return { success: false, message: errMsg }
     } finally {
@@ -53,11 +76,15 @@ export const useAddress = () => {
     }
   }
 
-  // Location loaders
+  // Location loaders with caching
   const loadProvinces = async () => {
+    if (cachedProvinces.value && cachedProvinces.value.length > 0) {
+      return cachedProvinces.value
+    }
     try {
       const res = await addressService.getProvinces()
-      return res.provinces || []
+      cachedProvinces.value = res.provinces || []
+      return cachedProvinces.value
     } catch (err) {
       console.error('Error fetching provinces:', err)
       return []
@@ -66,9 +93,14 @@ export const useAddress = () => {
 
   const loadCities = async (provId: string) => {
     if (!provId) return []
+    if (cachedCities.has(provId)) {
+      return cachedCities.get(provId)!
+    }
     try {
       const res = await addressService.getCities(provId)
-      return res.cities || []
+      const list = res.cities || []
+      cachedCities.set(provId, list)
+      return list
     } catch (err) {
       console.error('Error fetching cities:', err)
       return []
@@ -77,9 +109,14 @@ export const useAddress = () => {
 
   const loadDistricts = async (cityId: string) => {
     if (!cityId) return []
+    if (cachedDistricts.has(cityId)) {
+      return cachedDistricts.get(cityId)!
+    }
     try {
       const res = await addressService.getDistricts(cityId)
-      return res.districts || []
+      const list = res.districts || []
+      cachedDistricts.set(cityId, list)
+      return list
     } catch (err) {
       console.error('Error fetching districts:', err)
       return []
@@ -88,9 +125,14 @@ export const useAddress = () => {
 
   const loadVillages = async (distId: string) => {
     if (!distId) return []
+    if (cachedVillages.has(distId)) {
+      return cachedVillages.get(distId)!
+    }
     try {
       const res = await addressService.getVillages(distId)
-      return res.villages || []
+      const list = res.villages || []
+      cachedVillages.set(distId, list)
+      return list
     } catch (err) {
       console.error('Error fetching villages:', err)
       return []

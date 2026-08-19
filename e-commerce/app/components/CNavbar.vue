@@ -12,12 +12,11 @@ const cart = useCart()
 const route = useRoute()
 const { addresses, fetchAddresses } = useAddress()
 
-// Watch authentication status to load user addresses
-watch(() => authVm.isAuthenticated.value, (isAuth) => {
-  if (isAuth) {
+const ensureAddressesLoaded = () => {
+  if (authVm.isAuthenticated.value && addresses.value.length === 0) {
     fetchAddresses().catch((err) => console.warn('Failed to load user addresses for navbar:', err))
   }
-}, { immediate: true })
+}
 
 // Get primary/default user address
 const defaultAddress = computed(() => {
@@ -48,6 +47,7 @@ let profileCloseTimeout: ReturnType<typeof setTimeout> | null = null
 const openProfileDropdown = () => {
   if (profileCloseTimeout) clearTimeout(profileCloseTimeout)
   isProfileOpen.value = true
+  ensureAddressesLoaded()
 }
 
 const closeProfileDropdown = () => {
@@ -58,6 +58,9 @@ const closeProfileDropdown = () => {
 
 const toggleProfileDropdown = () => {
   isProfileOpen.value = !isProfileOpen.value
+  if (isProfileOpen.value) {
+    ensureAddressesLoaded()
+  }
 }
 
 // --- SEARCH STATE & LOGIC ---

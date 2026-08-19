@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { cartService } from '~/services/cartService'
 import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Global
+import { logError } from '~/utils/errorMessages'
 
 import { migrateToV3, calculateDesignChecksum, normalizeHexColor } from '~/features/custom-product/migrate'
 import type {
@@ -265,6 +266,10 @@ export const useCart = () => {
       return Promise.resolve()
     }
 
+    if (!force && cart.value.length > 0) {
+      return Promise.resolve()
+    }
+
     if (!force && loadCartPromise) return loadCartPromise
 
     isLoadingCart.value = true
@@ -350,7 +355,7 @@ export const useCart = () => {
           }
         }
       } catch (err) {
-        console.error('Failed to load cart from backend:', err)
+        logError('useCart', err)
       } finally {
         isLoadingCart.value = false
         loadCartPromise = null
@@ -365,17 +370,20 @@ export const useCart = () => {
     cartWatcherInitialized = true
     watch(isLoggedIn, (newVal) => {
       if (newVal === 'true') {
-        loadCart(true)
+        loadCart(false)
       } else {
         cart.value = cart.value.filter(i => i.isCustom)
         localStorage.removeItem('chia-florist-cart-cache')
       }
-    }, { immediate: true })
+    }, { immediate: false })
   }
 
   const flushCart = async () => {
     if (isLoggedIn.value !== 'true') return
-    const updatePromises = Object.keys(pendingUpdates).map(async (productId) => {
+    const pendingKeys = Object.keys(pendingUpdates)
+    if (pendingKeys.length === 0) return
+
+    const updatePromises = pendingKeys.map(async (productId) => {
       const pending = pendingUpdates[productId]
       if (!pending) return
       clearTimeout(pending.timeoutId ?? undefined)
@@ -385,7 +393,7 @@ export const useCart = () => {
       try {
         await cartService.updateItem(shopId, productId, qty)
       } catch (err) {
-        console.error(err)
+        logError('useCart', err)
       }
     })
     await Promise.all(updatePromises)

@@ -10,6 +10,7 @@ import { supabaseService } from '~/services/supabaseService'
 import { orderService } from '~/services/orderService'
 import type { UserAddress } from '~/types/address'
 import type { BackendOrder } from '~/types/order'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 useHead({ title: 'My Profile - Chia Florist' })
 
@@ -380,10 +381,10 @@ const handleUpdateProfile = async () => {
     if (res.success) {
       globalAlert.showSuccess('Profile Updated', 'Your profile has been updated successfully!')
     } else {
-      globalAlert.showError('Update Failed', res.message || 'Failed to update profile.')
+      globalAlert.showError('Update Failed', mapErrorMessage(res.message, 'Failed to update profile.'))
     }
   } catch (err: any) {
-    globalAlert.showError('Update Failed', err.message || 'An error occurred while updating profile.')
+    globalAlert.showError('Update Failed', mapErrorMessage(err, 'An error occurred while updating profile.'))
   }
 }
 
@@ -487,7 +488,7 @@ const handleSaveAddress = async () => {
     editingAddress.value = null
     globalAlert.showSuccess('Address Saved', 'Shipping address has been saved.')
   } else {
-    addressFormError.value = result.message || 'Failed to save address.'
+    addressFormError.value = mapErrorMessage(result.message, 'Failed to save address.')
   }
 }
   const handleDeleteAddress = async (id: string) => {
@@ -496,7 +497,7 @@ const handleSaveAddress = async () => {
     if (result.success) {
       globalAlert.showSuccess('Address Deleted', 'Shipping address has been removed.')
     } else {
-      globalAlert.showError('Delete Failed', result.message || 'Failed to delete address.')
+      globalAlert.showError('Delete Failed', mapErrorMessage(result.message, 'Failed to delete address.'))
     }
   }
 }
@@ -530,7 +531,6 @@ watch(activeOrderStatus, (status) => {
 // Logout
 const handleLogout = async () => {
   await authVm.logout()
-  globalAlert.showInfo('Signed Out', 'You have been successfully signed out.')
 }
 
 const selectedOrder = ref<BackendOrder | null>(null)
@@ -620,7 +620,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
-    globalAlert.showError('Verification Failed', err.data?.message || err.message || 'Failed to check payment status. Please try again.')
+    globalAlert.showError('Verification Failed', mapErrorMessage(err, 'Failed to check payment status. Please try again.'))
   } finally {
     isCheckingPayment.value = false
   }

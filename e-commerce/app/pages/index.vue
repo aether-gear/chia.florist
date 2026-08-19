@@ -61,8 +61,15 @@ const goToSlide = (index: number) => {
   resetTimer()
 }
 
+const stopTimer = () => {
+  if (intervalTimer) {
+    clearInterval(intervalTimer)
+    intervalTimer = null
+  }
+}
+
 const startTimer = () => {
-  if (intervalTimer) clearInterval(intervalTimer)
+  stopTimer()
   intervalTimer = setInterval(() => {
     currentIndex.value = (currentIndex.value + 1) % slides.length
   }, 5000)
@@ -129,7 +136,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (intervalTimer) clearInterval(intervalTimer)
+  stopTimer()
 })
 </script>
 
@@ -140,7 +147,7 @@ onUnmounted(() => {
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
       <div 
         class="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs border border-gray-100 bg-gray-900 aspect-[16/8] sm:aspect-[21/9] min-h-[220px] max-h-[420px]"
-        @mouseenter="() => intervalTimer && clearInterval(intervalTimer)"
+        @mouseenter="stopTimer"
         @mouseleave="startTimer"
       >
         <!-- Slides -->

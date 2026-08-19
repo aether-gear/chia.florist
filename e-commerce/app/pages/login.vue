@@ -2,6 +2,7 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 definePageMeta({
   layout: 'auth'
@@ -101,7 +102,7 @@ const handleLogin = async () => {
       navigateTo('/')
     }
   } catch (err: any) {
-    if (err.status === 403 && err.data?.message === 'email not verified') {
+    if (err.status === 403 && (err.data?.message === 'email not verified' || err.data?.message?.includes('not verified'))) {
       if (import.meta.client) {
         localStorage.setItem('register_email', email.value)
       }
@@ -111,7 +112,7 @@ const handleLogin = async () => {
         navigateTo('/register?verify=true')
       }, 1200)
     } else {
-      errorMessage.value = err.data?.message || 'Login failed. Please check your credentials.'
+      errorMessage.value = mapErrorMessage(err, 'Login failed. Please check your credentials.')
     }
   }
 }
@@ -139,7 +140,7 @@ const handleForgotPasswordRequest = async () => {
     }
     viewMode.value = 'forgot_verify'
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'Failed to request password reset.'
+    errorMessage.value = mapErrorMessage(err, 'Failed to request password reset.')
   }
 }
 
@@ -158,7 +159,7 @@ const handleForgotPasswordVerify = async () => {
     }
     viewMode.value = 'forgot_reset'
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'Verification failed.'
+    errorMessage.value = mapErrorMessage(err, 'Verification failed.')
   }
 }
 
@@ -181,7 +182,7 @@ const handleForgotPasswordReset = async () => {
     newPassword.value = ''
     focusPasswordInput()
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'Failed to reset password.'
+    errorMessage.value = mapErrorMessage(err, 'Failed to reset password.')
   }
 }
 
