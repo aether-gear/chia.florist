@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/repository"
 	query "service-core/internal/shared/query"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
 )
+
 
 type FindShopsUsecase struct {
 	executor transaction.Executor
@@ -31,6 +33,7 @@ type FindShopsInput struct {
 	Page           int
 	Limit          int
 	ID             *string
+	ShopIDs        []uuid.UUID
 	Name           *string
 	IsActive       *bool
 	ApprovalStatus *string
@@ -95,6 +98,7 @@ func (u *FindShopsUsecase) Execute(
 
 	params := repository.FindShopsParams{
 		ID:             input.ID,
+		ShopIDs:        input.ShopIDs,
 		Name:           input.Name,
 		IsActive:       input.IsActive,
 		ApprovalStatus: approvalStatus,
@@ -111,9 +115,10 @@ func (u *FindShopsUsecase) Execute(
 		return nil, 0, fmt.Errorf("failed to load shops: %w", err)
 	}
 	if len(shops) == 0 {
-		return nil, 0, apperrors.NewNotFound("shops not available at the moment")
+		return []domain.Shop{}, 0, nil
 	}
 
 	return shops, total, nil
 }
+
 

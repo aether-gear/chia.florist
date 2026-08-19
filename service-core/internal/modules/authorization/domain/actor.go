@@ -23,8 +23,10 @@ type Actor struct {
 
 	StaffID *uuid.UUID
 
-	Roles       []Role
-	Permissions []Permission
+	Roles []Role
+
+	Permissions map[uuid.UUID][]string
+	Rules       map[uuid.UUID]map[string]any
 }
 
 func (a *Actor) HasRole(role RoleCode) bool {
@@ -35,4 +37,38 @@ func (a *Actor) HasRole(role RoleCode) bool {
 	}
 
 	return false
+}
+
+func (a *Actor) IsSuperAdmin() bool {
+	return a.HasRole(RoleStaffAdmin)
+}
+
+func (a *Actor) HasPermission(shopID uuid.UUID, permission string) bool {
+	if a.IsSuperAdmin() {
+		return true
+	}
+	if a.Permissions == nil {
+		return false
+	}
+	perms, exists := a.Permissions[shopID]
+	if !exists {
+		return false
+	}
+	for _, p := range perms {
+		if p == permission {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Actor) GetAssignedShopIDs() []uuid.UUID {
+	if a.Permissions == nil {
+		return nil
+	}
+	ids := make([]uuid.UUID, 0, len(a.Permissions))
+	for shopID := range a.Permissions {
+		ids = append(ids, shopID)
+	}
+	return ids
 }

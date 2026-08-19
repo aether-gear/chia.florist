@@ -6,12 +6,12 @@ import (
 	applimiter "service-core/internal/common/limiter"
 	applogger "service-core/internal/common/logger"
 
+	"service-core/internal/infra/shipping"
 	appconfig "service-core/internal/shared/config"
 	imgSvc "service-core/internal/shared/image"
 	mailerSvc "service-core/internal/shared/mailer"
 	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
-	"service-core/internal/infra/shipping"
 	"service-core/internal/shared/transaction"
 
 	auditInfra "service-core/internal/modules/audit/infra"
@@ -109,6 +109,10 @@ type Container struct {
 	UpdateStaff        staffUsecase.UpdateStaffUsecase
 	DeleteStaff        staffUsecase.DeleteStaffUsecase
 	RemoveStaffAccount staffUsecase.RemoveStaffAccountUsecase
+
+	ListStaffPermissions  staffUsecase.ListStaffPermissionsUsecase
+	SaveStaffPermission   staffUsecase.SaveStaffPermissionUsecase
+	DeleteStaffPermission staffUsecase.DeleteStaffPermissionUsecase
 
 	GetCart          cartUsecase.GetCartUsecase
 	AddItem          cartUsecase.AddItemUsecase
@@ -238,6 +242,7 @@ func NewContainer(cfg Config,
 		staffRepo               = staffPersistence.NewStaffRepositoryImpl()
 		customerRepo            = customerPersistence.NewCustomerRepositoryImpl()
 		membershipRepo          = authorPersistence.NewStaffMembershipRepositoryImpl()
+		staffPermRepo           = authorPersistence.NewStaffPermissionRepositoryImpl()
 		roleRepo                = authorPersistence.NewRoleRepositoryImpl()
 		orderRepo               = orderPersistence.NewOrderRepositoryImpl()
 		orderItemRepo           = orderPersistence.NewOrderItemRepositoryImpl()
@@ -263,7 +268,9 @@ func NewContainer(cfg Config,
 		actorSvc = authorSvc.NewActorService(
 			accountRepo,
 			membershipRepo,
+			staffPermRepo,
 		)
+
 		userDeletionSvc = authenSvc.NewUserDeletionService(
 			accountRepo,
 			oauthRepo,
@@ -501,6 +508,18 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				auditLogger,
 			),
+		ListStaffPermissions: *staffUsecase.NewListStaffPermissionsUsecase(
+			infra.TransactionExecutor,
+			staffPermRepo,
+		),
+		SaveStaffPermission: *staffUsecase.NewSaveStaffPermissionUsecase(
+			infra.TransactionProvider,
+			staffPermRepo,
+		),
+		DeleteStaffPermission: *staffUsecase.NewDeleteStaffPermissionUsecase(
+			infra.TransactionProvider,
+			staffPermRepo,
+		),
 
 		RegisterCustomer: *authenUsecase.
 			NewRegisterCustomerUsecase(

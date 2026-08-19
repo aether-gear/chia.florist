@@ -78,7 +78,24 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 		input.ApprovalStatus = &approvalParam
 	}
 
+	actor, ok := authzSvc.GetActor(r.Context())
+	if ok && actor.StaffID != nil && !actor.IsSuperAdmin() {
+		assignedIDs := actor.GetAssignedShopIDs()
+		if len(assignedIDs) == 0 {
+			res := listShopsResponse{
+				Page:  page,
+				Limit: limit,
+				Total: 0,
+				Shops: []getShopResponse{},
+			}
+			apphttp.WriteJSON(w, http.StatusOK, res)
+			return nil
+		}
+		input.ShopIDs = assignedIDs
+	}
+
 	shops, total, err := h.findShops.Execute(r.Context(), input)
+
 	if err != nil {
 		return err
 	}

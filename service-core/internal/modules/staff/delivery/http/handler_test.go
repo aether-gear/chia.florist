@@ -247,9 +247,10 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, userDeletionSvc, audit)
 	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, sessionRepo, audit)
 
-	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC)
+	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC, nil, nil, nil)
 	return handler, sRepo, mRepo
 }
+
 
 func withActorContext(r *http.Request, accountID, staffID uuid.UUID) *http.Request {
 	actor := &authzDomain.Actor{

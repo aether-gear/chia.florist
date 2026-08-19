@@ -61,6 +61,18 @@ func (r *shopRepositoryImpl) FindByParams(
 		argPos++
 	}
 
+	if len(params.ShopIDs) > 0 {
+		shopIDStrings := make([]string, len(params.ShopIDs))
+		for i, id := range params.ShopIDs {
+			shopIDStrings[i] = id.String()
+		}
+		conditions = append(conditions, fmt.Sprintf("s.id = ANY($%d::uuid[])", argPos))
+		args = append(args, shopIDStrings)
+		argPos++
+	}
+
+
+
 	if params.Name != nil {
 		conditions = append(conditions, fmt.Sprintf("s.name ILIKE $%d", argPos))
 		args = append(args, "%"+*params.Name+"%")

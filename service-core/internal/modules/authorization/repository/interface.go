@@ -78,6 +78,9 @@ type Authorizer interface {
 	LoadActor(
 		exec transaction.Executor,
 	) appmiddleware.Middleware
+	OptionalLoadActor(
+		exec transaction.Executor,
+	) appmiddleware.Middleware
 
 	RequireAccountType(
 		allowedTypes ...authendomain.AccountType,
@@ -85,4 +88,35 @@ type Authorizer interface {
 	RequireStaffRole(
 		allowedRoles ...domain.RoleCode,
 	) appmiddleware.Middleware
+	RequirePermission(
+		permission string,
+	) appmiddleware.Middleware
+}
+
+type StaffPermissionRepository interface {
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		permission domain.StaffPermission,
+	) error
+
+	GetByStaffIDAndShopID(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+		shopID uuid.UUID,
+	) (*domain.StaffPermission, error)
+
+	ListByStaffID(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+	) ([]domain.StaffPermission, error)
+
+	Delete(
+		ctx context.Context,
+		exec transaction.Executor,
+		staffID uuid.UUID,
+		shopID uuid.UUID,
+	) error
 }

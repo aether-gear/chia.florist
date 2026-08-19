@@ -1,6 +1,10 @@
 package repository
 
-import query "service-core/internal/shared/query"
+import (
+	query "service-core/internal/shared/query"
+
+	"github.com/google/uuid"
+)
 
 var (
 	ShopSortLatest query.SortKey = "latest"
@@ -11,6 +15,7 @@ var (
 
 type FindShopsParams struct {
 	ID             *string
+	ShopIDs        []uuid.UUID
 	Name           *string
 	IsActive       *bool
 	ApprovalStatus *string
@@ -18,4 +23,5 @@ type FindShopsParams struct {
 	Pagination query.Pagination
 	Sorts      query.Sorts
 }
+
 

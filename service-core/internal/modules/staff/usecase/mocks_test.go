@@ -296,3 +296,45 @@ func (m *mockUserDeletionService) DeleteUserRecord(ctx context.Context, exec tra
 var _ authenRepo.UserDeletionService = (*mockUserDeletionService)(nil)
 
 var errMock = errors.New("mock error")
+
+type mockStaffPermissionRepo struct {
+	items []authzDomain.StaffPermission
+}
+
+func (m *mockStaffPermissionRepo) Save(ctx context.Context, exec transaction.Executor, p authzDomain.StaffPermission) error {
+	m.items = append(m.items, p)
+	return nil
+}
+
+func (m *mockStaffPermissionRepo) GetByStaffIDAndShopID(ctx context.Context, exec transaction.Executor, staffID, shopID uuid.UUID) (*authzDomain.StaffPermission, error) {
+	for _, p := range m.items {
+		if p.StaffID == staffID && p.ShopID == shopID {
+			return &p, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockStaffPermissionRepo) ListByStaffID(ctx context.Context, exec transaction.Executor, staffID uuid.UUID) ([]authzDomain.StaffPermission, error) {
+	var result []authzDomain.StaffPermission
+	for _, p := range m.items {
+		if p.StaffID == staffID {
+			result = append(result, p)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockStaffPermissionRepo) Delete(ctx context.Context, exec transaction.Executor, staffID, shopID uuid.UUID) error {
+	var updated []authzDomain.StaffPermission
+	for _, p := range m.items {
+		if p.StaffID == staffID && p.ShopID == shopID {
+			continue
+		}
+		updated = append(updated, p)
+	}
+	m.items = updated
+	return nil
+}
+
+var _ authzRepo.StaffPermissionRepository = (*mockStaffPermissionRepo)(nil)

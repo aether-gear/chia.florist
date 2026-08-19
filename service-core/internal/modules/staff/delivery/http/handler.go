@@ -14,13 +14,16 @@ import (
 )
 
 type staffHandler struct {
-	addStaffAccount    *usecase.AddStaffAccountUsecase
-	createStaff        *usecase.CreateStaffUsecase
-	findStaff          *usecase.FindStaffUsecase
-	listStaffAccounts  *usecase.ListStaffAccountsUsecase
-	updateStaff        *usecase.UpdateStaffUsecase
-	deleteStaff        *usecase.DeleteStaffUsecase
-	removeStaffAccount *usecase.RemoveStaffAccountUsecase
+	addStaffAccount       *usecase.AddStaffAccountUsecase
+	createStaff           *usecase.CreateStaffUsecase
+	findStaff             *usecase.FindStaffUsecase
+	listStaffAccounts     *usecase.ListStaffAccountsUsecase
+	updateStaff           *usecase.UpdateStaffUsecase
+	deleteStaff           *usecase.DeleteStaffUsecase
+	removeStaffAccount    *usecase.RemoveStaffAccountUsecase
+	listStaffPermissions  *usecase.ListStaffPermissionsUsecase
+	saveStaffPermission   *usecase.SaveStaffPermissionUsecase
+	deleteStaffPermission *usecase.DeleteStaffPermissionUsecase
 }
 
 func NewStaffHandler(
@@ -31,15 +34,21 @@ func NewStaffHandler(
 	updateStaff *usecase.UpdateStaffUsecase,
 	deleteStaff *usecase.DeleteStaffUsecase,
 	removeStaffAccount *usecase.RemoveStaffAccountUsecase,
+	listStaffPermissions *usecase.ListStaffPermissionsUsecase,
+	saveStaffPermission *usecase.SaveStaffPermissionUsecase,
+	deleteStaffPermission *usecase.DeleteStaffPermissionUsecase,
 ) *staffHandler {
 	return &staffHandler{
-		addStaffAccount:    addStaffAccount,
-		createStaff:        createStaff,
-		findStaff:          findStaff,
-		listStaffAccounts:  listStaffAccounts,
-		updateStaff:        updateStaff,
-		deleteStaff:        deleteStaff,
-		removeStaffAccount: removeStaffAccount,
+		addStaffAccount:       addStaffAccount,
+		createStaff:           createStaff,
+		findStaff:             findStaff,
+		listStaffAccounts:     listStaffAccounts,
+		updateStaff:           updateStaff,
+		deleteStaff:           deleteStaff,
+		removeStaffAccount:    removeStaffAccount,
+		listStaffPermissions:  listStaffPermissions,
+		saveStaffPermission:   saveStaffPermission,
+		deleteStaffPermission: deleteStaffPermission,
 	}
 }
 
@@ -209,13 +218,13 @@ func (h *staffHandler) ListStaffAccounts(w http.ResponseWriter, r *http.Request)
 	results := make([]staffAccountResponse, 0, len(accounts))
 	for _, m := range accounts {
 		results = append(results, staffAccountResponse{
-			AccountID:   m.AccountID,
-			UserID:      m.UserID,
-			Email:       m.Email,
-			Name:        m.Name,
-			Username:    m.Username,
-			Phone:       m.Phone,
-			AvatarURL:   m.AvatarURL,
+			AccountID: m.AccountID,
+			UserID:    m.UserID,
+			Email:     m.Email,
+			Name:      m.Name,
+			Username:  m.Username,
+			Phone:     m.Phone,
+			AvatarURL: m.AvatarURL,
 			Role: staffAccountRoleResponse{
 				ID:   m.Role.ID,
 				Code: string(m.Role.Code),
@@ -358,3 +367,93 @@ func (h *staffHandler) RemoveStaffAccount(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
+func (h *staffHandler) ListStaffPermissions(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	perms, err := h.listStaffPermissions.Execute(r.Context(), staffID)
+	if err != nil {
+		return err
+	}
+
+	res := listStaffPermissionsResponse{
+		StaffID:     staffID,
+		Total:       len(perms),
+		Permissions: make([]staffPermissionResponse, 0, len(perms)),
+	}
+
+	for _, p := range perms {
+		res.Permissions = append(res.Permissions, staffPermissionResponse{
+			ID:          p.ID,
+			StaffID:     p.StaffID,
+			ShopID:      p.ShopID,
+			ShopName:    p.ShopName,
+			Permissions: p.Permissions,
+			Rules:       p.Rules,
+			CreatedAt:   p.CreatedAt,
+			UpdatedAt:   p.UpdatedAt,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, res)
+	return nil
+}
+
+func (h *staffHandler) SaveStaffPermission(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	var req saveStaffPermissionRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	if req.ShopID == uuid.Nil {
+		return apperrors.NewBadRequest("shop_id is required")
+	}
+
+	input := usecase.SaveStaffPermissionParams{
+		StaffID:     staffID,
+		ShopID:      req.ShopID,
+		Permissions: req.Permissions,
+		Rules:       req.Rules,
+	}
+
+	if err := h.saveStaffPermission.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "staff shop permission successfully updated",
+	})
+	return nil
+}
+
+func (h *staffHandler) DeleteStaffPermission(w http.ResponseWriter, r *http.Request) error {
+	staffIDStr := chi.URLParam(r, "staffID")
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid staff id")
+	}
+
+	shopIDStr := chi.URLParam(r, "shopID")
+	shopID, err := uuid.Parse(shopIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	if err := h.deleteStaffPermission.Execute(r.Context(), staffID, shopID); err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "staff shop permission successfully deleted",
+	})
+	return nil
+}
