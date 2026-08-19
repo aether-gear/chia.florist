@@ -29,6 +29,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { useOrdersViewModel } from '../../viewmodels/useOrdersViewModel';
 import { useOrderActionsViewModel, type ShipmentDispatchPayload, type OrderTrackingResponse } from '../../viewmodels/useOrderActionsViewModel';
 import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
+import { fetchApi } from '../../lib/api';
 import EmptyState from '../../components/EmptyState';
 import SearchInput from '../../components/SearchInput';
 import StatusBadge from '../../components/StatusBadge';
@@ -61,10 +62,12 @@ export default function OrdersPage() {
     sort,
     searchNumber,
     statusFilter,
+    shopFilter,
     setPage,
     setSort,
     setSearchNumber,
     setStatusFilter,
+    setShopFilter,
     refresh
   } = useOrdersViewModel();
 
@@ -77,6 +80,23 @@ export default function OrdersPage() {
   } = useOrderActionsViewModel();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [shopsList, setShopsList] = useState<Array<{ id: string; name: string; slug?: string }>>([]);
+
+  useEffect(() => {
+    fetchApi('/shops?limit=100')
+      .then(res => {
+        if (res?.shops && res.shops.length > 0) {
+          setShopsList(res.shops);
+          if (!isAdmin && !shopFilter) {
+            const firstShop = res.shops[0];
+            setShopFilter(firstShop.slug || firstShop.id);
+          }
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load shops for order filter', err);
+      });
+  }, [isAdmin, shopFilter, setShopFilter]);
 
   // Multi-shipment dispatch state (for processing -> shipped)
   const [shipmentGroups, setShipmentGroups] = useState<ShipmentGroupForm[]>([]);
@@ -467,6 +487,62 @@ export default function OrdersPage() {
             <p className="text-muted-foreground text-sm">Manage fulfillment, check payment updates, and inspect order status logs.</p>
           </div>
 
+          {/* Assigned Shops Segmented Switcher */}
+          {shopsList.length > 0 && (
+            <div className="flex flex-col gap-2.5 p-4 rounded-2xl border border-border/60 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Store className="w-3.5 h-3.5 text-primary" />
+                  {isAdmin ? 'Shops Overview' : 'Your Assigned Shops'}
+                </span>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {shopsList.length} {shopsList.length === 1 ? 'Shop Assigned' : 'Shops Assigned'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto pt-0.5 pb-0.5 scrollbar-none">
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setShopFilter('all')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 border ${
+                      (shopFilter || 'all') === 'all'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                        : 'bg-background hover:bg-muted text-muted-foreground border-border/80'
+                    }`}
+                  >
+                    All Shops
+                  </button>
+                )}
+                {shopsList.map((shop) => {
+                  const shopKey = shop.slug || shop.id;
+                  const isSelected = shopFilter === shopKey || (!shopFilter && shopsList.length === 1 && shopKey === (shopsList[0].slug || shopsList[0].id));
+                  return (
+                    <button
+                      key={shop.id}
+                      type="button"
+                      onClick={() => setShopFilter(shopKey)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 border flex items-center gap-2 ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                          : 'bg-background hover:bg-muted text-muted-foreground border-border/80'
+                      }`}
+                    >
+                      <Store className="w-3.5 h-3.5 text-current shrink-0" />
+                      <span>{shop.name}</span>
+                      {shop.slug && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                          isSelected ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {shop.slug}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Full-width Search and Status Filter Tabs */}
           <div className={`flex flex-col gap-4 items-start w-full ${
             selectedOrderId ? 'hidden lg:flex' : 'flex'
@@ -485,6 +561,7 @@ export default function OrdersPage() {
 
               {/* Right Side: Refresh */}
               <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+
                 <Button
                   variant="outline"
                   onClick={() => refresh()}

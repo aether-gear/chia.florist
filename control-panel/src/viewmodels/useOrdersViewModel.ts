@@ -13,6 +13,7 @@ export function useOrdersViewModel() {
   const [sort, setSort] = useState<string>('latest:desc');
   const [searchNumber, setSearchNumber] = useState<string>('');
   const [statusFilter, setStatusFilterState] = useState<string>('');
+  const [shopFilter, setShopFilterState] = useState<string>('');
 
   const activeRequestId = useRef<number>(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -22,7 +23,8 @@ export function useOrdersViewModel() {
     targetLimit: number,
     targetSort: string,
     targetSearch: string,
-    targetStatus: string
+    targetStatus: string,
+    targetShop: string
   ) => {
     const requestId = ++activeRequestId.current;
     try {
@@ -39,6 +41,9 @@ export function useOrdersViewModel() {
       }
       if (targetStatus && targetStatus !== 'all') {
         queryParams.append('status', targetStatus);
+      }
+      if (targetShop && targetShop !== 'all') {
+        queryParams.append('shop', targetShop);
       }
 
       const response = await fetchApi(`/orders?${queryParams.toString()}`);
@@ -73,23 +78,30 @@ export function useOrdersViewModel() {
     const minThrottleDelay = new Promise(resolve => setTimeout(resolve, 350));
 
     debounceTimerRef.current = setTimeout(async () => {
-      const fetchPromise = fetchOrders(1, limit, sort, searchNumber, newStatus);
+      const fetchPromise = fetchOrders(1, limit, sort, searchNumber, newStatus, shopFilter);
       await Promise.all([fetchPromise, minThrottleDelay]);
     }, 50);
-  }, [limit, sort, searchNumber, fetchOrders]);
+  }, [limit, sort, searchNumber, shopFilter, fetchOrders]);
+
+  const setShopFilter = useCallback((newShop: string) => {
+    setShopFilterState(newShop);
+    setLoading(true);
+    setPage(1);
+    fetchOrders(1, limit, sort, searchNumber, statusFilter, newShop);
+  }, [limit, sort, searchNumber, statusFilter, fetchOrders]);
 
   useEffect(() => {
-    fetchOrders(page, limit, sort, searchNumber, statusFilter);
+    fetchOrders(page, limit, sort, searchNumber, statusFilter, shopFilter);
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [page, limit, sort, searchNumber]);
+  }, [page, limit, sort, searchNumber, shopFilter]);
 
   const refresh = useCallback(() => {
-    return fetchOrders(page, limit, sort, searchNumber, statusFilter);
-  }, [fetchOrders, page, limit, sort, searchNumber, statusFilter]);
+    return fetchOrders(page, limit, sort, searchNumber, statusFilter, shopFilter);
+  }, [fetchOrders, page, limit, sort, searchNumber, statusFilter, shopFilter]);
 
   return {
     data,
@@ -101,11 +113,13 @@ export function useOrdersViewModel() {
     sort,
     searchNumber,
     statusFilter,
+    shopFilter,
     setPage,
     setLimit,
     setSort,
     setSearchNumber,
     setStatusFilter,
+    setShopFilter,
     refresh,
   };
 }
