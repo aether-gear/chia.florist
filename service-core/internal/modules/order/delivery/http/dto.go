@@ -48,6 +48,15 @@ type shipmentDispatchRequest struct {
 	ItemIDs           []string `json:"item_ids"`
 }
 
+type dispatchShopShipmentRequest struct {
+	ShopID            string   `json:"shop_id"`
+	FulfillmentMethod string   `json:"fulfillment_method"`
+	Courier           string   `json:"courier"`
+	Service           string   `json:"service"`
+	TrackingNumber    *string  `json:"tracking_number"`
+	ItemIDs           []string `json:"item_ids"`
+}
+
 type updateOrderStatusRequest struct {
 	Status string `json:"status"`
 

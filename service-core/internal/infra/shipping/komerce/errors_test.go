@@ -18,10 +18,10 @@ func TestMapKomerceError(t *testing.T) {
 		{400, "API key is required", apperrors.ErrTypeUnauthorized, 401, ""},
 		{400, "Data waybill not found", apperrors.ErrTypeNotFound, 404, ""},
 		{400, "Resi tidak ditemukan", apperrors.ErrTypeNotFound, 404, ""},
-		{400, "Courier is not supported", apperrors.ErrTypeBadRequest, 400, "external service is having a problem with processing current request"},
+		{400, "Courier is not supported", apperrors.ErrTypeBadRequest, 400, "Komerce API error (400): Courier is not supported"},
 		{429, "Too Many Requests", apperrors.ErrTypeTooManyRequests, 429, ""},
 		{500, "Internal Server Error", apperrors.ErrTypeInternal, 500, ""},
-		{400, "General invalid param", apperrors.ErrTypeBadRequest, 400, "external service is having a problem with processing current request"},
+		{400, "General invalid param", apperrors.ErrTypeBadRequest, 400, "Komerce API error (400): General invalid param"},
 	}
 
 	for _, tt := range tests {

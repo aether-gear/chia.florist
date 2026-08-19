@@ -244,6 +244,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetOrder,
 			&c.CreateOrder,
 			&c.UpdateOrderStatus,
+			&c.DispatchShopShipment,
 			&c.GetOrderTracking,
 			&c.GetShop,
 		)
@@ -468,6 +469,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
 			r.Get("/{orderID}/tracking", chains.StaffOnly(orderHandler.GetOrderTrackingForStaff))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
+			r.Post("/{orderID}/shipments", chains.StaffOnly(orderHandler.DispatchOrderShipment))
 		})
 
 		r.Route("/shipments", func(r chi.Router) {

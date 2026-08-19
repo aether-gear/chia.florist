@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	apperrors "service-core/internal/common/errors"
 	shipping "service-core/internal/infra/shipping"
 	config "service-core/internal/shared/config"
 )
@@ -28,13 +27,13 @@ func NewKomerceProvider(
 	cfg config.KomerceConfig,
 ) (shipping.LogisticsProvider, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
-		return nil, fmt.Errorf("komerce: api key is required")
+		return nil, ErrAPIKeyRequired
 	}
 	if strings.TrimSpace(cfg.OrderBaseURL) == "" {
-		return nil, fmt.Errorf("komerce: order base URL is required")
+		return nil, ErrOrderBaseURLRequired
 	}
 	if strings.TrimSpace(cfg.TrackBaseURL) == "" {
-		return nil, fmt.Errorf("komerce: track base URL is required")
+		return nil, ErrTrackBaseURLRequired
 	}
 
 	return &komerceProvider{
@@ -83,7 +82,7 @@ func (p *komerceProvider) CreateOrder(
 	input shipping.CreateOrderInput,
 ) (*shipping.CreateOrderResult, error) {
 	if !isValidKomerceCourier(input.CourierCode) {
-		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+		return nil, ErrInvalidCourierCode(input.CourierCode)
 	}
 
 	endpoint := "/order/api/v1/orders/store"
@@ -126,33 +125,23 @@ func (p *komerceProvider) CreateOrder(
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= http.StatusBadRequest {
-		switch resp.StatusCode {
-		case http.StatusBadRequest, http.StatusUnprocessableEntity:
-			return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
-
-		case http.StatusUnauthorized:
-			return nil, apperrors.NewUnauthorized("invalid or missing API key")
-
-		case http.StatusInternalServerError:
-			return nil, fmt.Errorf("provider service unavailable")
-
-		default:
-			return nil, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
-		}
-	}
-
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
 	var result createOrderResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+	if err := json.Unmarshal(respBody, &result); err == nil && (result.Meta.Code != 0 || result.Meta.Message != "") {
+		if result.Meta.Code != 200 {
+			return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
+		}
 	}
 
-	if result.Meta.Code != 200 {
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, ErrHTTPStatus(resp.StatusCode, string(respBody))
+	}
+
+	if result.Meta.Code != 200 && result.Meta.Code != 0 {
 		return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
 	}
 
@@ -225,7 +214,7 @@ func (p *komerceProvider) TrackShipment(
 	input shipping.TrackShipmentInput,
 ) ([]shipping.TrackingEvent, error) {
 	if !isValidKomerceCourier(input.Courier) {
-		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+		return nil, ErrInvalidCourierCode(input.Courier)
 	}
 
 	endpoint := "/api/v1/track/waybill"
@@ -254,38 +243,24 @@ func (p *komerceProvider) TrackShipment(
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= http.StatusBadRequest {
-		switch resp.StatusCode {
-		case http.StatusBadRequest, http.StatusUnprocessableEntity:
-			return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
-
-		case http.StatusUnauthorized:
-			return nil, apperrors.NewUnauthorized("invalid or missing API key")
-
-		case http.StatusNotFound:
-			return nil, apperrors.NewNotFound("tracking number not found or not yet scanned by courier")
-
-		case http.StatusTooManyRequests:
-			return nil, apperrors.NewTooManyRequests("Komerce API rate limit exceeded")
-
-		default:
-			return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
-		}
-	}
-
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
 	var result trackWaybillResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, apperrors.NewBadRequest("external service is having a problem with processing current request")
+	if err := json.Unmarshal(respBody, &result); err == nil && (result.Meta.Code != 0 || result.Meta.Message != "") {
+		if result.Meta.Code != 200 {
+			return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
+		}
 	}
 
-	if result.Meta.Code != 200 {
-		appErr := mapKomerceError(result.Meta.Code, result.Meta.Message)
-		return nil, appErr
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, ErrHTTPStatus(resp.StatusCode, string(respBody))
+	}
+
+	if result.Meta.Code != 200 && result.Meta.Code != 0 {
+		return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
 	}
 
 	var events []shipping.TrackingEvent

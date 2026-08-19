@@ -164,9 +164,9 @@ func (u *GetOrderTrackingUsecase) Execute(
 
 			fetchedEvents, err := u.logisticsProvider.TrackShipment(ctx, trackInput)
 			if err != nil {
-				msg := fmt.Sprintf("External courier tracking lookup warning for AWB %s (%s): %v", *shipment.TrackingNumber, shipment.Courier, err)
+				msg := fmt.Sprintf("Live courier tracking is unavailable for %s (AWB: %s). Manual status updates are required.", shipment.Courier, *shipment.TrackingNumber)
 				warningMsg = &msg
-				log.Printf("[GetOrderTracking Warning] %s", msg)
+				log.Printf("[GetOrderTracking Warning] %s (detail: %v)", msg, err)
 				// Fail-safe: if external provider returns rate limit (429) or error, try returning stale cached events if available
 				if staleEvents, staleHit := u.trackingCache.GetStale(shipment.Courier, *shipment.TrackingNumber); staleHit {
 					externalEvents = staleEvents

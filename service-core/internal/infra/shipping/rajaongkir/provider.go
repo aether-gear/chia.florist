@@ -3,7 +3,6 @@ package rajaongkir
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	apperrors "service-core/internal/common/errors"
 	"service-core/internal/infra/shipping"
 	locationDomain "service-core/internal/modules/location/domain"
 	config "service-core/internal/shared/config"
@@ -34,7 +32,7 @@ func NewRajaOngkirProvider(
 		strings.TrimSpace(cfg.ShippingCostKey) == "" ||
 		strings.TrimSpace(cfg.PaymentKey) == "" {
 
-		return nil, fmt.Errorf("raja ongkir: server key is required")
+		return nil, ErrServerKeyRequired
 	}
 
 	// Allow an explicit URL override
@@ -87,18 +85,7 @@ func (s *RajaOngkirProvider) CalculateRates(
 	}
 
 	if resp.Meta.Code != 200 {
-		if resp.Meta.Code == 422 {
-			return nil, apperrors.NewInvalidInput("The selected courier option is invalid or no longer supported")
-		}
-		if resp.Meta.Code == 404 {
-			return nil, apperrors.NewBadRequest("Shipping is currently unavailable for this destination using the selected courier")
-		}
-		if resp.Meta.Code == 400 ||
-			resp.Meta.Message == "Missing Params" {
-			return nil, apperrors.NewInternal(errors.New("Missing params"))
-		}
-
-		return nil, errors.New(resp.Meta.Message)
+		return nil, mapRajaOngkirError(resp.Meta.Code, resp.Meta.Message)
 	}
 
 	var costOptions []shipping.RateOption

@@ -23,12 +23,13 @@ import (
 )
 
 type orderHandler struct {
-	findOrders        *usecase.FindOrdersUsecase
-	getOrder          *usecase.GetOrderUsecase
-	createOrder       *usecase.CreateOrderUsecase
-	updateOrderStatus *usecase.UpdateOrderStatusUsecase
-	getOrderTracking  *usecase.GetOrderTrackingUsecase
-	getShop           *shopUsecase.GetShopUsecase
+	findOrders           *usecase.FindOrdersUsecase
+	getOrder             *usecase.GetOrderUsecase
+	createOrder          *usecase.CreateOrderUsecase
+	updateOrderStatus    *usecase.UpdateOrderStatusUsecase
+	dispatchShopShipment *usecase.DispatchShopShipmentUsecase
+	getOrderTracking     *usecase.GetOrderTrackingUsecase
+	getShop              *shopUsecase.GetShopUsecase
 }
 
 func NewOrderHandler(
@@ -36,16 +37,18 @@ func NewOrderHandler(
 	getOrder *usecase.GetOrderUsecase,
 	createOrder *usecase.CreateOrderUsecase,
 	updateOrderStatus *usecase.UpdateOrderStatusUsecase,
+	dispatchShopShipment *usecase.DispatchShopShipmentUsecase,
 	getOrderTracking *usecase.GetOrderTrackingUsecase,
 	getShop *shopUsecase.GetShopUsecase,
 ) *orderHandler {
 	return &orderHandler{
-		findOrders:        findOrders,
-		getOrder:          getOrder,
-		createOrder:       createOrder,
-		updateOrderStatus: updateOrderStatus,
-		getOrderTracking:  getOrderTracking,
-		getShop:           getShop,
+		findOrders:           findOrders,
+		getOrder:             getOrder,
+		createOrder:          createOrder,
+		updateOrderStatus:    updateOrderStatus,
+		dispatchShopShipment: dispatchShopShipment,
+		getOrderTracking:     getOrderTracking,
+		getShop:              getShop,
 	}
 }
 
@@ -876,6 +879,76 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		Shipment:  result.Shipment,
 		Shipments: result.Shipments,
 	})
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+// DispatchOrderShipment handles POST /orders/{orderID}/shipments — staff-only.
+// Creates a shipment for a specific shop's order items.
+func (h *orderHandler) DispatchOrderShipment(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.Type != authenDomain.AccountTypeStaff {
+		return apperrors.NewForbidden("forbidden: staff account required")
+	}
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	var req dispatchShopShipmentRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	shopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	if len(req.ItemIDs) == 0 {
+		return apperrors.NewBadRequest("item_ids is required and must not be empty")
+	}
+
+	var itemUUIDs []uuid.UUID
+	for _, idStr := range req.ItemIDs {
+		parsed, err := uuid.Parse(idStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid item id in item_ids")
+		}
+		itemUUIDs = append(itemUUIDs, parsed)
+	}
+
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		if !actor.HasPermission(shopID, authzDomain.PermissionOrderUpdateStatus) {
+			return apperrors.NewForbidden("forbidden: missing order:update_status permission for this shop")
+		}
+	}
+
+	res, err := h.dispatchShopShipment.Execute(r.Context(), usecase.DispatchShopShipmentInput{
+		OrderID:           orderID,
+		ShopID:            shopID,
+		FulfillmentMethod: req.FulfillmentMethod,
+		Courier:           req.Courier,
+		Service:           req.Service,
+		TrackingNumber:    req.TrackingNumber,
+		ItemIDs:           itemUUIDs,
+	})
+	if err != nil {
+		return err
+	}
+
+	resp := map[string]any{
+		"order_id":          res.Order.ID.String(),
+		"order_status":      string(res.Order.Status),
+		"shipment_id":       res.Shipment.ID.String(),
+		"all_items_shipped": res.AllItemsShipped,
+	}
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil

@@ -171,6 +171,7 @@ type Container struct {
 	FindOrders              orderUsecase.FindOrdersUsecase
 	GetOrder                orderUsecase.GetOrderUsecase
 	UpdateOrderStatus       orderUsecase.UpdateOrderStatusUsecase
+	DispatchShopShipment    orderUsecase.DispatchShopShipmentUsecase
 	GetOrderTracking        orderUsecase.GetOrderTrackingUsecase
 	ExpireUnfulfilledOrders orderUsecase.ExpireUnfulfilledOrdersUsecase
 
@@ -932,6 +933,19 @@ func NewContainer(cfg Config,
 				orderItemRepo,
 				inventoryRepo,
 				paymentRepo,
+				productRepo,
+				shipmentRepo,
+				addressRepo,
+				addressShopRepo,
+				infra.LogisticsProvider,
+				auditLogger,
+			),
+		DispatchShopShipment: *orderUsecase.
+			NewDispatchShopShipmentUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
 				productRepo,
 				shipmentRepo,
 				addressRepo,
