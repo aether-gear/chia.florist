@@ -14,6 +14,10 @@ import { triggerAuthAlert } from '~/composables/useSessionState'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
 
+definePageMeta({
+  middleware: 'auth'
+})
+
 useHead({
   title: 'Secure Checkout - Chia Florist',
   meta: [
@@ -223,7 +227,9 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
 // Muat data checkout saat halaman dibuka
 onMounted(async () => {
-  await authVm.fetchCurrentUser()
+  if (!authVm.isInitialized.value) {
+    await authVm.fetchCurrentUser()
+  }
   await fetchShops()
   if (!authVm.isAuthenticated.value) {
     triggerAuthAlert('warning', 'Please sign in to proceed with checkout.')

@@ -5,7 +5,8 @@ import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
 
 definePageMeta({
-  layout: 'auth'
+  layout: 'auth',
+  middleware: 'guest'
 })
 
 useHead({ 
@@ -36,6 +37,14 @@ watch(successMessage, (msg) => {
     globalAlert.showSuccess('Success', msg)
   }
 })
+
+// Immediately redirect if already authenticated
+watch(() => authVm.isAuthenticated.value, (isAuth) => {
+  if (isAuth) {
+    navigateTo('/')
+  }
+})
+
 const viewMode = ref<'login' | 'forgot_request' | 'forgot_verify' | 'forgot_reset'>('login')
 
 const forgotEmail = ref('')
@@ -45,6 +54,11 @@ const newPassword = ref('')
 const showNewPassword = ref(false)
 
 onMounted(() => {
+  if (authVm.isAuthenticated.value) {
+    navigateTo('/')
+    return
+  }
+
   nextTick(() => {
     emailInputRef.value?.focus()
   })
@@ -98,7 +112,8 @@ const handleLogin = async () => {
       password: password.value
     }, rememberMe.value)
 
-    if (success) {
+    if (success && authVm.isAuthenticated.value) {
+      await nextTick()
       navigateTo('/')
     }
   } catch (err: any) {

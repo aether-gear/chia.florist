@@ -7,16 +7,17 @@ export default defineNuxtRouteMiddleware(async (_to, _from) => {
   const isLoggedIn = useCookie('is_logged_in')
   const rememberMe = useCookie('remember_me')
 
+  // Check if session might exist and needs initialization
   if (!authVm.isInitialized.value && (isLoggedIn.value === 'true' || rememberMe.value === 'true')) {
     try {
       await authVm.fetchCurrentUser()
     } catch (err) {
-      console.warn('Auth middleware session check error:', err)
+      console.warn('Guest middleware session check error:', err)
     }
   }
 
-  if (!authVm.isAuthenticated.value) {
-    return navigateTo('/login')
+  // If already authenticated, redirect to home
+  if (authVm.isAuthenticated.value) {
+    return navigateTo('/')
   }
 })
-

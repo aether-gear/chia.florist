@@ -12,6 +12,10 @@ import type { UserAddress } from '~/types/address'
 import type { BackendOrder } from '~/types/order'
 import { mapErrorMessage } from '~/utils/errorMessages'
 
+definePageMeta({
+  middleware: 'auth'
+})
+
 useHead({ title: 'My Profile - Chia Florist' })
 
 const authVm = useAuthViewModel()
@@ -410,7 +414,9 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(async () => {
-  await authVm.fetchCurrentUser()
+  if (!authVm.isInitialized.value) {
+    await authVm.fetchCurrentUser()
+  }
   if (!authVm.isAuthenticated.value) {
     navigateTo('/login')
   } else {

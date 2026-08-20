@@ -19,7 +19,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       sessionStorage.removeItem('google_auth_pending')
 
       try {
-        await authVm.fetchCurrentUser()
+        await authVm.fetchCurrentUser(undefined, true)
 
         if (authVm.isAuthenticated.value) {
           showSuccess(
@@ -58,7 +58,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     } else if (isLoggedIn.value === 'true' || rememberMe.value === 'true') {
       // Attempt session restore for authenticated or remembered sessions
       try {
-        await authVm.fetchCurrentUser()
+        await authVm.fetchCurrentUser(undefined, true)
 
         if (authVm.isAuthenticated.value) {
           await cartVm.loadCart(true)
@@ -75,6 +75,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         }
         authVm.clearLocalSession()
       }
+    } else {
+      // Unauthenticated visitor: initialize state immediately without calling /auth/me
+      await authVm.fetchCurrentUser()
     }
   }
 })
+

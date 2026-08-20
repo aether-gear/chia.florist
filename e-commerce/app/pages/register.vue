@@ -6,7 +6,8 @@ import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
 
 definePageMeta({
-  layout: 'auth'
+  layout: 'auth',
+  middleware: 'guest'
 })
 
 useHead({ 
@@ -19,6 +20,13 @@ useHead({
 const route = useRoute()
 const authVm = useAuthViewModel()
 const globalAlert = useGlobalAlert()
+
+// Immediately redirect if already authenticated
+watch(() => authVm.isAuthenticated.value, (isAuth) => {
+  if (isAuth) {
+    navigateTo('/')
+  }
+})
 
 // 2-Step Registration Flow: 'initial' (Choose Google or Enter Email) -> 'form' (Account Details without Google)
 const registerStep = ref<'initial' | 'form'>('initial')
@@ -38,6 +46,11 @@ const errorMessage = ref('')
 const registrationEmail = computed(() => authVm.registrationEmail.value)
 
 onMounted(() => {
+  if (authVm.isAuthenticated.value) {
+    navigateTo('/')
+    return
+  }
+
   nextTick(() => {
     emailInputRef.value?.focus()
   })
@@ -120,7 +133,8 @@ const handleVerify = async () => {
 
   try {
     const success = await authVm.verifyOtp(otpCode.value)
-    if (success) {
+    if (success && authVm.isAuthenticated.value) {
+      await nextTick()
       navigateTo('/')
     }
   } catch (err: any) {

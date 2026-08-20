@@ -7,6 +7,7 @@ import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
 
 let fetchCurrentUserPromise: Promise<void> | null = null
+let currentFetchSeq = 0
 
 export const useAuthViewModel = () => {
   const currentUser = useState<UserMe | null>('auth_currentUser', () => null)
@@ -32,99 +33,125 @@ export const useAuthViewModel = () => {
    * Safe method to fetch the current logged-in user with in-flight deduplication.
    */
   const fetchCurrentUser = (cookieHeader?: string, force = false): Promise<void> => {
-    // If already loaded and not forcing, reuse existing session
-    if (!force && isInitialized.value && currentUser.value) {
+    // If already initialized and not forcing, reuse existing session
+    if (!force && isInitialized.value) {
       return Promise.resolve()
     }
 
+    // In client environment: if not forced and there is no indication that a session exists,
+    // mark as initialized and unauthenticated without hitting /auth/me
+    if (!force && import.meta.client && !cookieHeader) {
+      const isLoggedIn = useCookie('is_logged_in')
+      const rememberMe = useCookie('remember_me')
+      const isGooglePending = sessionStorage.getItem('google_auth_pending') === '1'
+
+      if (isLoggedIn.value !== 'true' && rememberMe.value !== 'true' && !isGooglePending) {
+        currentUser.value = null
+        isInitialized.value = true
+        return Promise.resolve()
+      }
+    }
+
+    // If not forcing and a request is already in flight, return existing promise
     if (!force && fetchCurrentUserPromise) {
       return fetchCurrentUserPromise
     }
 
+    // Force supersedes any in-flight request
+    const thisFetchSeq = ++currentFetchSeq
     isLoading.value = true
     error.value = null
 
-    fetchCurrentUserPromise = (async () => {
+    const promise = (async () => {
       try {
         const response = await authService.getMe(cookieHeader)
-      if (response && response.is_authenticated && response.account_type === 'customer') {
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
 
-        isLoggedIn.value = 'true'
+        // Ignore response if superseded by a newer forced request
+        if (thisFetchSeq !== currentFetchSeq) return
 
-        let profileDetails: any = null
-        try {
-          const profileRes = await authService.getProfile(cookieHeader)
-          if (profileRes && profileRes.profile) {
-            profileDetails = profileRes.profile
-          }
-        } catch (profileErr) {
-          console.warn('Failed to fetch profile details from Golang backend:', profileErr)
-        }
+        if (response && response.is_authenticated && response.account_type === 'customer') {
+          const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+          const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
 
-        let avatarUrlVal: string | null = profileDetails?.AvatarURL || null
-        if (import.meta.client) {
+          isLoggedIn.value = 'true'
+
+          let profileDetails: any = null
           try {
-            const urls = await supabaseService.getAvatarUrls(profileDetails?.user_id || response.account_id)
-            if (urls) {
-              avatarUrlVal = urls.signedUrl || urls.publicUrl
+            const profileRes = await authService.getProfile(cookieHeader)
+            if (profileRes && profileRes.profile) {
+              profileDetails = profileRes.profile
             }
-          } catch (avatarErr) {
-            console.warn('Failed to load user avatar from Supabase:', avatarErr)
+          } catch (profileErr) {
+            console.warn('Failed to fetch profile details from Golang backend:', profileErr)
           }
-        }
 
-        if (profileDetails) {
-          userProfile.value = {
-            id: profileDetails.user_id,
-            name: profileDetails.Name || 'Customer',
-            username: profileDetails.Username || 'customer',
-            email: userProfile.value?.email || '',
-            phone: profileDetails.Phone || '',
-            last_login_at: profileDetails.LastLoginAt || new Date().toISOString(),
-            avatarUrl: avatarUrlVal
+          // Do not treat external Google avatar as app profile image; only use Supabase avatar
+          let avatarUrlVal: string | null = null
+          if (import.meta.client) {
+            try {
+              const urls = await supabaseService.getAvatarUrls(profileDetails?.user_id || response.account_id)
+              if (urls) {
+                avatarUrlVal = urls.signedUrl || urls.publicUrl
+              }
+            } catch (avatarErr) {
+              console.warn('Failed to load user avatar from Supabase:', avatarErr)
+            }
           }
-        } else if (!userProfile.value) {
-          userProfile.value = {
-            id: response.account_id,
-            name: 'Customer',
-            username: 'customer',
-            phone: '',
-            last_login_at: new Date().toISOString(),
-            avatarUrl: avatarUrlVal
+
+          if (profileDetails) {
+            userProfile.value = {
+              id: profileDetails.user_id,
+              name: profileDetails.Name || 'Customer',
+              username: profileDetails.Username || 'customer',
+              email: userProfile.value?.email || '',
+              phone: profileDetails.Phone || '',
+              last_login_at: profileDetails.LastLoginAt || new Date().toISOString(),
+              avatarUrl: avatarUrlVal
+            }
+          } else if (!userProfile.value) {
+            userProfile.value = {
+              id: response.account_id,
+              name: 'Customer',
+              username: 'customer',
+              phone: '',
+              last_login_at: new Date().toISOString(),
+              avatarUrl: avatarUrlVal
+            }
+          } else {
+            // Re-create object to guarantee Vue reactivity triggers across all components
+            userProfile.value = {
+              ...userProfile.value,
+              id: response.account_id,
+              avatarUrl: avatarUrlVal
+            }
           }
+
+          currentUser.value = { ...(userProfile.value as UserMe) }
         } else {
-          // Re-create object to guarantee Vue reactivity triggers across all components
-          userProfile.value = {
-            ...userProfile.value,
-            id: response.account_id,
-            avatarUrl: avatarUrlVal
+          clearLocalSession()
+          currentUser.value = null
+          if (response && response.message && response.message !== 'Unauthorized') {
+            error.value = response.message
           }
         }
-
-        currentUser.value = { ...(userProfile.value as UserMe) }
-      } else {
+      } catch (err: any) {
+        if (thisFetchSeq !== currentFetchSeq) return
         clearLocalSession()
         currentUser.value = null
-        if (response && response.message) {
-          error.value = response.message
+        error.value = mapErrorMessage(err, 'Gagal memuat status pengguna. Silakan coba lagi.')
+        console.warn('Failed to fetch user state:', err)
+      } finally {
+        if (thisFetchSeq === currentFetchSeq) {
+          isLoading.value = false
+          isInitialized.value = true
+          fetchCurrentUserPromise = null
         }
       }
-    } catch (err: any) {
-      clearLocalSession()
-      currentUser.value = null
-      error.value = mapErrorMessage(err, 'Gagal memuat status pengguna. Silakan coba lagi.')
-      console.warn('Failed to fetch user state:', err)
-    } finally {
-      isLoading.value = false
-      isInitialized.value = true
-      fetchCurrentUserPromise = null
-    }
-  })()
+    })()
 
-  return fetchCurrentUserPromise
-}
+    fetchCurrentUserPromise = promise
+    return promise
+  }
 
   /**
    * Authenticate user.
@@ -150,8 +177,8 @@ export const useAuthViewModel = () => {
         if (import.meta.client) {
           localStorage.removeItem('chia-florist-cart-cache')
         }
-        // Fetch profile to populate global user state
-        await fetchCurrentUser()
+        // Force fetch profile to establish global user state
+        await fetchCurrentUser(undefined, true)
 
         if (!isAuthenticated.value) {
           clearLocalSession()
@@ -208,8 +235,8 @@ export const useAuthViewModel = () => {
         if (import.meta.client) {
           localStorage.removeItem('chia-florist-cart-cache')
         }
-        // Fetch profile to populate global user state
-        await fetchCurrentUser()
+        // Force fetch profile to populate global user state
+        await fetchCurrentUser(undefined, true)
 
         if (!isAuthenticated.value) {
           clearLocalSession()
@@ -316,8 +343,8 @@ export const useAuthViewModel = () => {
         challengeId.value = null
         registrationEmail.value = null
 
-        // Fetch profile to verify session permissions
-        await fetchCurrentUser()
+        // Force fetch profile to verify session permissions
+        await fetchCurrentUser(undefined, true)
 
         if (!isAuthenticated.value) {
           clearLocalSession()
@@ -333,7 +360,8 @@ export const useAuthViewModel = () => {
           username,
           email,
           phone,
-          last_login_at: new Date().toISOString()
+          last_login_at: new Date().toISOString(),
+          avatarUrl: currentUser.value?.avatarUrl || null
         }
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'

@@ -46,9 +46,13 @@ export const bootstrapConfig = {
         err.friendlyMessage = mapErrorMessage(err)
       }
       if (import.meta.client && (err.status === 401 || err.status === 403)) {
-        triggerSessionExpired()
+        const isLoggedIn = useCookie('is_logged_in')
+        if (isLoggedIn.value === 'true') {
+          triggerSessionExpired()
+        }
       }
       throw err
     }
   }
 }
+

@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+definePageMeta({
+  middleware: 'guest'
+})
+
 useHead({ title: 'Redirecting to Verification - Chia Florist' })
 onMounted(() => {
   navigateTo('/register?verify=true')
