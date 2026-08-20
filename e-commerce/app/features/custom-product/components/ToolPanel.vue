@@ -15,6 +15,17 @@ const { formatRupiah } = useCart()
 <template>
   <aside class="dr-panel">
 
+    <!-- Mobile Drawer Header -->
+    <div class="dr-panel-mobile-header">
+      <div class="dr-panel-drag-handle"></div>
+      <div class="dr-panel-mobile-title-row">
+        <span class="dr-panel-mobile-title">
+          {{ TOOL_TABS.find(t => t.id === design.activeTab)?.label || 'Tool Settings' }}
+        </span>
+        <button @click="design.activeTab = null" class="dr-panel-close-btn" title="Close Panel">✕</button>
+      </div>
+    </div>
+
     <!-- Tab content area -->
     <div class="tab-body">
 

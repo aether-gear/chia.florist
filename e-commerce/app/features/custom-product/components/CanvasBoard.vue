@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, nextTick } from 'vue'
 import type { CanvasImage, BrushStroke } from '../types'
 import { useCart } from '~/composables/useCart'
 
@@ -23,21 +23,27 @@ const scalerTransform = computed(() => {
 // Cursor for chess-bg in 3D mode
 const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
 
+onMounted(() => {
+  nextTick(() => props.design.updateScale())
+  setTimeout(() => props.design.updateScale(), 50)
+  setTimeout(() => props.design.updateScale(), 200)
+})
 </script>
 
 <template>
-  <div class="dr-canvas-area" :ref="(el) => { (design as any).containerRef = el }">
+  <div class="dr-canvas-area" :ref="(el) => { (design as any).containerRef = el; design.updateScale(); }">
     <div
       class="chess-bg"
       :class="{ 'chess-bg--3d': design.is3DMode }"
       :style="chessCursor ? { cursor: chessCursor } : {}"
       @dragover.prevent
       @mousedown="design.is3DMode ? design.start3DDrag($event) : undefined"
+      @touchstart="design.is3DMode ? design.start3DDrag($event) : undefined"
     >
       <!-- 📦 FLOATING ELEMENT COUNT CHIP (Top-Left) -->
       <div class="canvas-info-chip">
         <span v-if="!design.is3DMode">{{ design.elements.length }} element{{ design.elements.length !== 1 ? 's' : '' }}</span>
-        <span v-if="design.is3DMode" class="ci-hint" style="color: #7c3aed; font-weight: 700;">⬡ 3D Preview Mode</span>
+        <span v-if="design.is3DMode" class="ci-hint" style="color: #7c3aed; font-weight: 700;">⬡ 3D Preview</span>
       </div>
 
       <!-- ⬡ 3D TOGGLE BUTTON -->
@@ -58,7 +64,8 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
 
       <!-- 🔒 3D MODE BADGE -->
       <div v-if="design.is3DMode" class="badge-3d-mode">
-        🎲 Drag to rotate · Front view only · Click "Edit Mode" to resume editing
+        <span class="hidden sm:inline">🎲 Drag to rotate · Front view only · Click "Edit Mode" to resume editing</span>
+        <span class="sm:hidden">🎲 Drag to rotate 3D view</span>
       </div>
 
       <!-- Board scaler: sized to match scale -->
@@ -195,6 +202,7 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
             width: design.boardW + 'px', height: design.boardH + 'px',
             transform: `scale(${design.boardScale})`, transformOrigin: 'top left',
             cursor: design.is3DMode ? 'inherit' : (design.isBrushMode ? 'crosshair' : 'default'),
+            touchAction: 'none',
             ...design.boardBorderStyle,
             ...design.boardCornerStyle,
           }"
@@ -231,8 +239,10 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
           </div>
 
           <!-- ── SECTION DIVIDER (drag to resize) ── -->
-          <div class="section-divider" :style="{ top: design.upperH + 'px', '--dc': design.border.color || '#ccc' }"
-            @mousedown.stop="!design.is3DMode && design.startDragDiv($event)" @click.stop>
+          <div class="section-divider" :style="{ top: design.upperH + 'px', '--dc': design.border.color || '#ccc', touchAction: 'none' }"
+            @mousedown.stop="!design.is3DMode && design.startDragDiv($event)"
+            @touchstart.stop="!design.is3DMode && design.startDragDiv($event)"
+            @click.stop>
             <div class="div-track" :style="!design.border.center ? { opacity: 0.6 } : { display: 'none' }"/>
             <div v-if="design.border.center" :style="{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }">
               <div :style="design.centerBorderStyle"></div>
@@ -285,8 +295,10 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
                 zIndex: (el as CanvasImage).zIndex ?? (idx + 10), overflow: 'hidden',
                 borderRadius: (el as CanvasImage).frame === 'circle' ? '50%' : (el as CanvasImage).frame === 'square' ? '4px' : '0',
                 pointerEvents: design.is3DMode ? 'none' : (design.isBrushMode ? 'none' : 'auto'), cursor: 'grab',
+                touchAction: 'none'
               }"
-              @mousedown.stop="!design.is3DMode && design.startDragEl($event, el.id)">
+              @mousedown.stop="!design.is3DMode && design.startDragEl($event, el.id)"
+              @touchstart.stop="!design.is3DMode && design.startDragEl($event, el.id)">
               <img :src="(el as CanvasImage).src" draggable="false"
                 :style="{
                   width: '100%', height: '100%', objectFit: 'cover', display: 'block',
@@ -306,8 +318,10 @@ const chessCursor = computed(() => props.design.is3DMode ? 'grab' : undefined)
                 transform: `translate(-50%,-50%) rotate(${(el as BrushStroke).rotation}deg)`,
                 zIndex: (el as BrushStroke).zIndex ?? (idx + 10), color: (el as BrushStroke).color,
                 pointerEvents: design.is3DMode ? 'none' : 'auto', cursor: design.isBrushMode ? 'crosshair' : 'pointer',
+                touchAction: 'none'
               }"
-              @mousedown.stop="!design.is3DMode && design.handleBrushMousedown($event, el.id)">
+              @mousedown.stop="!design.is3DMode && design.handleBrushMousedown($event, el.id)"
+              @touchstart.stop="!design.is3DMode && design.handleBrushMousedown($event, el.id)">
               <!-- Flower SVG -->
               <svg v-if="(el as BrushStroke).brushType === 'flower'" viewBox="-20 -20 40 40" width="100%" height="100%">
                 <ellipse cx="0" cy="-10" rx="5" ry="9" fill="currentColor" opacity="0.92" transform="rotate(0,0,0)"/>

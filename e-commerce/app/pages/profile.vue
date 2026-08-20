@@ -1,6 +1,6 @@
 <!-- app/pages/profile.vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useAddress } from '~/composables/useAddress'
 import { useOrders } from '~/composables/useOrders'
@@ -68,10 +68,17 @@ const cropFilename = ref('avatar.jpg')
 const cropMime     = ref('image/jpeg')
 const cropImgEl    = ref<HTMLImageElement | null>(null)
 
-// Container dimensions (fixed, matches template)
-const CONT_W = 440
-const CONT_H = 320
-const MIN_CROP = 40
+// Container dimensions (responsive to screen width)
+const contW = ref(440)
+const contH = ref(320)
+const MIN_CROP = 36
+
+const updateCropperContainerSize = () => {
+  if (typeof window === 'undefined') return
+  const maxW = Math.min(window.innerWidth - 48, 440)
+  contW.value = Math.max(260, Math.round(maxW))
+  contH.value = Math.round(contW.value * 0.72)
+}
 
 // Natural image size
 const naturalW = ref(0)
@@ -84,8 +91,8 @@ const imgX = ref(0)  // pan offset from container centre
 const imgY = ref(0)
 
 const scale = computed(() => baseScale.value * cropZoom.value)
-const maxImgDX = computed(() => Math.max(0, (naturalW.value * scale.value - CONT_W) / 2))
-const maxImgDY = computed(() => Math.max(0, (naturalH.value * scale.value - CONT_H) / 2))
+const maxImgDX = computed(() => Math.max(0, (naturalW.value * scale.value - contW.value) / 2))
+const maxImgDY = computed(() => Math.max(0, (naturalH.value * scale.value - contH.value) / 2))
 
 const imgDisplayStyle = computed(() => ({
   width: `${naturalW.value * scale.value}px`,
@@ -107,10 +114,10 @@ function clampImg() {
 }
 
 // Crop box (in container pixel coords)
-const cbX = ref(60)
-const cbY = ref(40)
-const cbW = ref(CONT_W - 120)
-const cbH = ref(CONT_H - 80)
+const cbX = ref(40)
+const cbY = ref(30)
+const cbW = ref(200)
+const cbH = ref(200)
 
 // Computed: the four clipping rects that dim outside the crop box
 const dimTop    = computed(() => ({ top: 0, left: 0, width: '100%', height: `${cbY.value}px` }))
@@ -128,22 +135,24 @@ const initCbW = ref(0); const initCbH = ref(0)
 const lastPanX = ref(0); const lastPanY = ref(0)
 
 function onImgLoad(e: Event) {
+  updateCropperContainerSize()
   const img = e.target as HTMLImageElement
   naturalW.value = img.naturalWidth
   naturalH.value = img.naturalHeight
   // Fill container: zoom=1 means image fills every pixel, overflow is clipped
-  baseScale.value = Math.max(CONT_W / img.naturalWidth, CONT_H / img.naturalHeight)
+  baseScale.value = Math.max(contW.value / img.naturalWidth, contH.value / img.naturalHeight)
   cropZoom.value = 1
   imgX.value = 0; imgY.value = 0
   // Square crop box, 75% of shorter container side, centred
-  const side = Math.round(Math.min(CONT_W, CONT_H) * 0.75)
+  const side = Math.round(Math.min(contW.value, contH.value) * 0.75)
   cbW.value = side; cbH.value = side
-  cbX.value = Math.round((CONT_W - side) / 2)
-  cbY.value = Math.round((CONT_H - side) / 2)
+  cbX.value = Math.round((contW.value - side) / 2)
+  cbY.value = Math.round((contH.value - side) / 2)
 }
 
 function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
   e.stopPropagation()
+  if (e.cancelable) e.preventDefault()
   const cx = e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0)
   const cy = e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0)
   dragMode.value = mode
@@ -176,8 +185,8 @@ function onGlobalMove(cx: number, cy: number) {
   let nx = initCbX.value, ny = initCbY.value, nw = initCbW.value, nh = initCbH.value
 
   if (m === 'move') {
-    nx = Math.max(0, Math.min(CONT_W - nw, nx + dx))
-    ny = Math.max(0, Math.min(CONT_H - nh, ny + dy))
+    nx = Math.max(0, Math.min(contW.value - nw, nx + dx))
+    ny = Math.max(0, Math.min(contH.value - nh, ny + dy))
   } else {
     // Compute raw side length (always square: W === H)
     let rawSide: number = nw
@@ -199,8 +208,8 @@ function onGlobalMove(cx: number, cy: number) {
 
     // Clamp position to container, re-enforce square after clamping
     nx = Math.max(0, nx); ny = Math.max(0, ny)
-    if (nx + nw > CONT_W) { nw = CONT_W - nx; nh = nw }
-    if (ny + nh > CONT_H) { nh = CONT_H - ny; nw = nh }
+    if (nx + nw > contW.value) { nw = contW.value - nx; nh = nw }
+    if (ny + nh > contH.value) { nh = contH.value - ny; nw = nh }
   }
 
   cbX.value = nx; cbY.value = ny; cbW.value = nw; cbH.value = nh
@@ -208,14 +217,20 @@ function onGlobalMove(cx: number, cy: number) {
 
 function onMouseMove(e: MouseEvent)  { onGlobalMove(e.clientX, e.clientY) }
 function onMouseUp()                  { dragMode.value = null }
-function onTouchMoveCrop(e: TouchEvent) { const touch = e.touches[0]; if (e.touches.length === 1 && touch) { e.preventDefault(); onGlobalMove(touch.clientX, touch.clientY) } }
+function onTouchMoveCrop(e: TouchEvent) {
+  const touch = e.touches[0]
+  if (e.touches.length === 1 && touch) {
+    if (e.cancelable) e.preventDefault()
+    onGlobalMove(touch.clientX, touch.clientY)
+  }
+}
 function onTouchEndCrop()             { dragMode.value = null }
 
 function onCropZoomChange() {
   clampImg()
   // keep crop box inside container
-  if (cbX.value + cbW.value > CONT_W) cbW.value = CONT_W - cbX.value
-  if (cbY.value + cbH.value > CONT_H) cbH.value = CONT_H - cbY.value
+  if (cbX.value + cbW.value > contW.value) cbW.value = contW.value - cbX.value
+  if (cbY.value + cbH.value > contH.value) cbH.value = contH.value - cbY.value
 }
 
 function cancelCrop() {
@@ -271,6 +286,7 @@ const handleFileUpload = (event: Event) => {
 
   const reader = new FileReader()
   reader.onload = (e) => {
+    updateCropperContainerSize()
     cropSrc.value = e.target?.result as string
     showCropper.value = true
   }
@@ -293,8 +309,8 @@ const performCropAndUpload = async () => {
 
   const s = scale.value
   // Image top-left corner in container coords
-  const imgLeft = CONT_W / 2 - (naturalW.value * s) / 2 + imgX.value
-  const imgTop  = CONT_H / 2 - (naturalH.value * s) / 2 + imgY.value
+  const imgLeft = contW.value / 2 - (naturalW.value * s) / 2 + imgX.value
+  const imgTop  = contH.value / 2 - (naturalH.value * s) / 2 + imgY.value
 
   // Crop box in source image coordinates
   const srcX = (cbX.value - imgLeft) / s
@@ -414,6 +430,8 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(async () => {
+  updateCropperContainerSize()
+  window.addEventListener('resize', updateCropperContainerSize)
   if (!authVm.isInitialized.value) {
     await authVm.fetchCurrentUser()
   }
@@ -422,6 +440,10 @@ onMounted(async () => {
   } else {
     await loadProfilePicture()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateCropperContainerSize)
 })
 
 // Chained location selections
@@ -634,20 +656,32 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50/50 py-12 font-sans">
-    <div class="max-w-7xl mx-auto px-8 sm:px-10">
+  <div class="min-h-screen bg-gray-50/50 py-6 sm:py-12 font-sans">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
-      <nav class="flex text-sm text-gray-400 mb-8 gap-2">
+      <nav class="flex text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 gap-2">
         <NuxtLink to="/" class="hover:text-[#1b4332]">Home</NuxtLink>
         <span>/</span>
         <span class="text-gray-900 font-medium">My Profile</span>
       </nav>
 
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <!-- Mobile Horizontal Tab Switcher (Visible on mobile/tablet) -->
+      <div class="lg:hidden mb-6 bg-white p-1.5 rounded-2xl shadow-xs border border-gray-100 grid grid-cols-3 gap-1">
+        <button 
+          v-for="tab in [{id:'personal', label:'Profile'}, {id:'addresses', label:'Addresses'}, {id:'orders', label:'Orders'}]"
+          :key="tab.id"
+          @click="activeTab = tab.id"
+          :class="['py-2.5 px-2 rounded-xl text-xs font-bold text-center transition-all cursor-pointer', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:bg-gray-50']"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
         
         <aside class="lg:col-span-1 space-y-6">
-          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex flex-col items-center text-center mb-8">
+          <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100">
+            <div class="flex flex-col items-center text-center mb-6 lg:mb-8">
               <!-- Interactive Avatar Container -->
               <div 
                 class="relative group cursor-pointer w-20 h-20 mb-4 rounded-full overflow-hidden border border-gray-200 shadow-sm flex items-center justify-center bg-gray-100" 
@@ -677,22 +711,31 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <h2 class="font-bold text-gray-900 leading-tight">{{ user.name }}</h2>
               <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Silver Member</p>
             </div>
-            <nav class="space-y-1">
+
+            <!-- Desktop Sidebar Tabs -->
+            <nav class="hidden lg:block space-y-1">
               <button 
                 v-for="tab in [{id:'personal', label:'Personal Information'}, {id:'addresses', label:'Shipping Addresses'}, {id:'orders', label:'Order Tracking'}]"
                 :key="tab.id"
                 @click="activeTab = tab.id"
-                :class="['w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50']"
+                :class="['w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50']"
               >
                 {{ tab.label }}
               </button>
               
               <div class="pt-4 mt-4 border-t border-gray-100">
-                <button @click="handleLogout" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all flex items-center gap-2">
+                <button @click="handleLogout" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all flex items-center gap-2 cursor-pointer">
                   Logout
                 </button>
               </div>
             </nav>
+
+            <!-- Mobile Logout Quick Button -->
+            <div class="lg:hidden pt-4 border-t border-gray-100">
+              <button @click="handleLogout" class="w-full text-center py-2 px-3 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-all cursor-pointer">
+                Logout
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -700,18 +743,18 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           
           <!-- Personal tab -->
           <div v-if="activeTab === 'personal'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade">
-            <div class="px-8 py-6 border-b border-gray-50">
-              <h3 class="font-bold text-gray-900 text-lg">Edit Profile</h3>
-              <p class="text-xs text-gray-400 mt-1">Manage your personal details and contact information.</p>
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-50">
+              <h3 class="font-bold text-gray-900 text-base sm:text-lg">Edit Profile</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Manage your personal details and contact information.</p>
             </div>
             
-            <div class="p-8 space-y-6">
+            <div class="p-5 sm:p-8 space-y-6">
               <!-- PROFILE PICTURE SECTION -->
               <div class="border-b border-gray-100 pb-6 space-y-4">
                 <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Profile Picture</h4>
-                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
                   <!-- Image Preview -->
-                  <div class="w-24 h-24 rounded-full overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center text-3xl text-gray-400 relative">
+                  <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center text-3xl text-gray-400 relative flex-shrink-0">
                     <img v-if="avatarUrl" :src="avatarUrl" class="w-full h-full object-cover" alt="Profile picture" />
                     <span v-else>👤</span>
                     <div v-if="isUploading" class="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -721,10 +764,10 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
                   <div class="space-y-3 flex-1">
                     <div class="flex flex-wrap gap-2">
-                      <button @click="triggerFileSelect" :disabled="isUploading" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50 cursor-pointer">
+                      <button @click="triggerFileSelect" :disabled="isUploading" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50 cursor-pointer">
                         Upload New Photo
                       </button>
-                      <button v-if="avatarUrl" @click="handleRemovePicture" :disabled="isUploading" class="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer">
+                      <button v-if="avatarUrl" @click="handleRemovePicture" :disabled="isUploading" class="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer">
                         Remove Photo
                       </button>
                     </div>
@@ -732,15 +775,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   </div>
                 </div>
 
-
-                
                 <!-- Upload Error -->
                 <div v-if="uploadError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
                   ⚠️ {{ uploadError }}
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div class="space-y-1.5">
                   <label class="text-xs font-bold text-gray-500">Full Name</label>
                   <input type="text" v-model="user.name" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
@@ -764,7 +805,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
               
               <div class="flex justify-end">
-                <button @click="handleUpdateProfile" :disabled="authVm.isLoading.value" class="bg-[#1b4332] hover:bg-[#143326] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-sm transition disabled:opacity-50 flex items-center gap-2 cursor-pointer">
+                <button @click="handleUpdateProfile" :disabled="authVm.isLoading.value" class="w-full sm:w-auto bg-[#1b4332] hover:bg-[#143326] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">
                   <span v-if="authVm.isLoading.value" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                   <span>Save Changes</span>
                 </button>
@@ -774,17 +815,17 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Shipping Addresses tab -->
           <div v-if="activeTab === 'addresses'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade">
-            <div class="px-8 py-6 border-b border-gray-50 flex justify-between items-center">
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-50 flex flex-wrap gap-3 justify-between items-center">
               <div>
-                <h3 class="font-bold text-gray-900 text-lg">Shipping Addresses</h3>
-                <p class="text-xs text-gray-400 mt-1">Manage your delivery addresses for secure checkout.</p>
+                <h3 class="font-bold text-gray-900 text-base sm:text-lg">Shipping Addresses</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Manage your delivery addresses for secure checkout.</p>
               </div>
               <button @click="initAddressForm()" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
                 + Add New Address
               </button>
             </div>
 
-            <div class="p-8 space-y-6">
+            <div class="p-5 sm:p-8 space-y-6">
               <!-- Loading -->
               <div v-if="addressVm.isLoading.value" class="flex flex-col items-center justify-center py-12 space-y-4">
                 <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#1b4332]"></div>
@@ -803,7 +844,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <div 
                   v-for="addr in addressVm.addresses.value" 
                   :key="addr.address_id" 
-                  :class="['border rounded-2xl p-6 relative flex flex-col justify-between transition-all duration-300', addr.is_default ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-gray-300 bg-white']"
+                  :class="['border rounded-2xl p-5 sm:p-6 relative flex flex-col justify-between transition-all duration-300', addr.is_default ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-gray-300 bg-white']"
                 >
                   <div>
                     <div class="flex items-center gap-2 mb-3">
@@ -834,8 +875,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Orders tab -->
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
-            <!-- Shopee Category Tabs Bar (Compact) -->
-            <div class="bg-white border border-gray-100 p-1.5 rounded-2xl shadow-xs grid grid-cols-3 sm:grid-cols-6 gap-1 text-center font-medium">
+            <!-- Shopee Category Tabs Bar (Scrollable on mobile, Grid on tablet/desktop) -->
+            <div class="bg-white border border-gray-100 p-1.5 rounded-2xl shadow-xs flex overflow-x-auto sm:grid sm:grid-cols-6 gap-1 text-center font-medium scrollbar-none">
               <button 
                 v-for="status in [
                   { id: 'all', label: 'All' },
@@ -847,7 +888,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 ]"
                 :key="status.id"
                 @click="activeOrderStatus = status.id as any"
-                :class="['py-2 px-1 text-xs rounded-xl transition-all font-bold cursor-pointer', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50']"
+                :class="['py-2 px-3 sm:px-1 text-xs rounded-xl transition-all font-bold cursor-pointer whitespace-nowrap flex-shrink-0 sm:flex-shrink', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50']"
               >
                 {{ status.label }}
               </button>
@@ -873,34 +914,34 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <div 
                   v-for="order in ordersVm.orders.value" 
                   :key="order.id" 
-                  class="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4 hover:shadow-md transition duration-300"
+                  class="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 hover:shadow-md transition duration-300"
                 >
                   <!-- Store Header & Order Info Bar -->
-                  <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                    <div class="flex items-center gap-2.5">
+                  <div class="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
+                    <div class="flex items-center gap-2">
                       <span class="text-sm">🏬</span>
                       <h4 class="font-bold text-gray-900 text-xs">Chia Florist Workshop</h4>
-                      <span class="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
+                      <span class="hidden xs:inline-block text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
                       <span class="text-xs text-gray-300">|</span>
                       <span class="text-[11px] font-mono text-gray-500 font-bold">#{{ order.number }}</span>
                     </div>
 
                     <!-- Right side: Status Badges -->
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span :class="['px-2.5 py-0.5 text-xs font-bold rounded-full border', ordersVm.getOrderStatusBadge(order).colorClass]">
+                    <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span :class="['px-2.5 py-0.5 text-[11px] sm:text-xs font-bold rounded-full border', ordersVm.getOrderStatusBadge(order).colorClass]">
                         {{ ordersVm.getOrderStatusBadge(order).label }}
                       </span>
-                      <span v-if="order.payment?.status && order.payment.status !== 'pending' && order.payment.status !== 'paid'" :class="['px-2.5 py-0.5 text-xs font-bold rounded-full border', ordersVm.getPaymentStatusBadge(order.payment.status).colorClass]">
+                      <span v-if="order.payment?.status && order.payment.status !== 'pending' && order.payment.status !== 'paid'" :class="['px-2.5 py-0.5 text-[11px] sm:text-xs font-bold rounded-full border', ordersVm.getPaymentStatusBadge(order.payment.status).colorClass]">
                         {{ ordersVm.getPaymentStatusBadge(order.payment.status).label }}
                       </span>
-                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[10px] sm:text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
                         ⏳ Pay in {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}
                       </span>
                     </div>
                   </div>
 
                   <!-- Product Preview Item -->
-                  <div class="flex items-center justify-between gap-4 py-1">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-1">
                     <div class="flex items-center gap-3 min-w-0">
                       <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex-shrink-0 flex items-center justify-center text-xl">
                         🌸
@@ -909,34 +950,34 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                         <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">
                           {{ order.items[0]?.product_name }}{{ order.items.length > 1 ? ` and ${order.items.length - 1} other item(s)` : '' }}
                         </h5>
-                        <p class="text-[10px] text-gray-400 mt-0.5 font-medium">
+                        <p class="text-[10px] text-gray-400 mt-0.5 font-medium truncate">
                           Total Qty: {{ order.items.reduce((acc, item) => acc + item.quantity, 0) }} • Courier: {{ order.items[0]?.courier_code ? `${order.items[0].courier_code.toUpperCase()} ${order.items[0].courier_service}` : 'Standard Delivery' }}
                         </p>
                       </div>
                     </div>
 
-                    <div class="text-right flex-shrink-0">
+                    <div class="text-left sm:text-right flex-shrink-0 pl-15 sm:pl-0">
                       <p class="text-[10px] text-gray-400 font-medium">Order Total</p>
                       <p class="font-black text-[#1b4332] text-sm mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
                     </div>
                   </div>
 
                   <!-- Card Footer: Action Buttons -->
-                  <div class="flex items-center justify-between gap-3 pt-3 border-t border-gray-50">
+                  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-gray-50">
                     <span class="text-[11px] text-gray-400 font-medium">Placed on {{ ordersVm.formatDate(order.created_at) }}</span>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center justify-end gap-2">
                       <button 
                         v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending'"
                         @click.stop="navigateTo(`/payment?orderId=${order.id}`)"
-                        class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+                        class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                       >
                         Pay Now
                       </button>
                       <button 
                         v-if="['confirmed', 'processing', 'shipped', 'delivered', 'finished'].includes(order.status)"
                         @click.stop="openTrackShipment(order)"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
                         <span>🚚</span>
                         <span>Track Package</span>
@@ -944,14 +985,14 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                       <button 
                         v-if="order.status === 'shipped' || order.status === 'delivered'"
                         @click="contactDriver(order.id)"
-                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
                         <span>💬</span>
                         <span>Contact Courier</span>
                       </button>
                       <button 
                         @click="openOrderDetail(order)" 
-                        class="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                        class="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
                       >
                         View Details
                       </button>
@@ -961,7 +1002,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
               </div>
 
-              <div v-else class="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-xs space-y-3">
+              <div v-else class="bg-white border border-gray-100 rounded-2xl p-8 sm:p-12 text-center shadow-xs space-y-3">
                 <div class="text-4xl">📑</div>
                 <h4 class="font-bold text-gray-900 text-sm">No Orders Found</h4>
                 <p class="text-xs text-gray-400 max-w-xs mx-auto">There are no orders in the "{{ statusLabels[activeOrderStatus] }}" category.</p>
@@ -994,16 +1035,16 @@ const handleCheckPaymentStatus = async (orderId: string) => {
     </div>
 
     <!-- Modal Address Form -->
-    <div v-if="showAddressForm" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col justify-between">
-        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+    <div v-if="showAddressForm" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-white rounded-3xl max-w-xl w-full max-h-[90dvh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col justify-between mx-auto">
+        <div class="px-5 sm:px-8 py-4 sm:py-6 border-b border-gray-100 flex justify-between items-center">
           <h3 class="font-extrabold text-gray-900 text-base">
             {{ editingAddress?.address_id ? 'Edit Address' : 'Add New Address' }}
           </h3>
-          <button @click="showAddressForm = false" class="text-gray-400 hover:text-black font-bold text-lg cursor-pointer">✕</button>
+          <button @click="showAddressForm = false" class="text-gray-400 hover:text-black font-bold text-lg p-1 cursor-pointer">✕</button>
         </div>
 
-        <div class="p-8 space-y-4 flex-1">
+        <div class="p-5 sm:p-8 space-y-4 flex-1">
           <!-- Inline Address Validation Error -->
           <div v-if="addressFormError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
             ⚠️ {{ addressFormError }}
@@ -1059,7 +1100,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <label class="text-xs font-bold text-gray-500">Postal Code *</label>
               <input v-model="editingAddress!.postal_code" type="text" placeholder="e.g. 17131" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition" />
             </div>
-            <div class="flex items-center pt-6 gap-2">
+            <div class="flex items-center pt-2 sm:pt-6 gap-2">
               <input v-model="editingAddress!.is_default" type="checkbox" id="default-check" class="h-4 w-4 accent-[#1b4332] rounded focus:ring-0 cursor-pointer" />
               <label for="default-check" class="text-xs font-bold text-gray-700 cursor-pointer">Set as default address</label>
             </div>
@@ -1071,7 +1112,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           </div>
         </div>
 
-        <div class="px-8 py-6 border-t border-gray-100 flex justify-end gap-3">
+        <div class="px-5 sm:px-8 py-4 sm:py-6 border-t border-gray-100 flex justify-end gap-3">
           <button @click="showAddressForm = false" class="px-5 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer">
             Cancel
           </button>
@@ -1083,25 +1124,25 @@ const handleCheckPaymentStatus = async (orderId: string) => {
     </div>
 
     <!-- Independent Order Detail Modal Overlay -->
-    <div v-if="selectedOrder" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col justify-between relative animate-fade">
+    <div v-if="selectedOrder" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90dvh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col justify-between relative animate-fade mx-auto">
         
         <!-- Header -->
-        <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="px-5 sm:px-8 py-4 sm:py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
-            <div class="flex items-center gap-3">
-              <h3 class="font-extrabold text-gray-900 text-base">Order Details</h3>
-              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">#{{ selectedOrder.number }}</span>
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h3 class="font-extrabold text-gray-900 text-sm sm:text-base">Order Details</h3>
+              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">#{{ selectedOrder.number }}</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-0.5">Placed on {{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
           </div>
-          <button @click="closeOrderDetail" class="text-gray-400 hover:text-black font-bold text-lg cursor-pointer">✕</button>
+          <button @click="closeOrderDetail" class="text-gray-400 hover:text-black font-bold text-lg p-1 cursor-pointer">✕</button>
         </div>
 
         <!-- Body -->
-        <div class="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+        <div class="p-4 sm:p-8 space-y-5 sm:space-y-6 flex-1 overflow-y-auto custom-scrollbar">
           <!-- Current Status Banner with Live Tracking Action -->
-          <div class="flex flex-wrap items-center justify-between bg-emerald-50/20 border border-emerald-100 p-4 rounded-2xl gap-3">
+          <div class="flex flex-wrap items-center justify-between bg-emerald-50/20 border border-emerald-100 p-3.5 sm:p-4 rounded-2xl gap-3">
             <div>
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Order Status</p>
               <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -1124,7 +1165,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           </div>
 
           <!-- Shipping Summary Section & Tracking Overlay Launcher -->
-          <div class="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
+          <div class="bg-blue-50/30 border border-blue-100 rounded-2xl p-4 sm:p-5 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
@@ -1139,7 +1180,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
               <button 
                 @click="showShippingOverlay = true"
-                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+                class="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
               >
                 <span>📦</span>
                 <span>Open Tracking Overlay</span>
@@ -1147,7 +1188,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
             </div>
 
             <!-- Resi number pill if available -->
-            <div v-if="trackingData?.tracking_number" class="flex items-center justify-between bg-white p-3 rounded-xl border border-blue-100 text-xs">
+            <div v-if="trackingData?.tracking_number" class="flex flex-wrap items-center justify-between bg-white p-3 rounded-xl border border-blue-100 text-xs gap-2">
               <div class="flex items-center gap-2">
                 <span class="text-gray-400 font-semibold">Waybill / Resi:</span>
                 <span class="font-mono font-bold text-gray-900">{{ trackingData.tracking_number }}</span>
@@ -1158,14 +1199,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
             </div>
           </div>
 
-
           <!-- Payment Information Details Box -->
-          <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-5 space-y-3">
+          <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-4 sm:p-5 space-y-3">
             <h4 class="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-2">
               <span>💳</span>
               <span>Payment Details</span>
             </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
               <div>
                 <p class="text-gray-400 font-semibold text-[10px]">PAYMENT METHOD</p>
                 <p class="font-bold text-gray-800 mt-0.5">{{ selectedOrder.payment?.provider ? selectedOrder.payment.provider.toUpperCase() : 'Online Payment Gateway' }}</p>
@@ -1180,7 +1220,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
               <div>
                 <p class="text-gray-400 font-semibold text-[10px]">ORDER ID</p>
-                <p class="font-mono font-bold text-gray-800 mt-0.5 select-all">{{ selectedOrder.id }}</p>
+                <p class="font-mono font-bold text-gray-800 mt-0.5 select-all truncate">{{ selectedOrder.id }}</p>
               </div>
             </div>
           </div>
@@ -1189,18 +1229,18 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           <div class="space-y-3">
             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ordered Products</h4>
             <div class="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/20">
-              <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-4 items-center p-4 bg-white">
-                <div class="w-14 h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-2xl">
+              <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-3 sm:gap-4 items-center p-3 sm:p-4 bg-white">
+                <div class="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-xl sm:text-2xl">
                   🌸
                 </div>
                 <div class="flex-1 min-w-0">
                   <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">{{ item.product_name }}</h5>
-                  <div class="flex flex-wrap gap-2 mt-1.5 text-[10px] text-gray-500 font-semibold">
+                  <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-1 text-[10px] text-gray-500 font-semibold">
                     <span class="bg-gray-100 px-2 py-0.5 rounded">Shop: {{ item.shop_name }}</span>
                     <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">🚚 {{ item.courier_code.toUpperCase() }} {{ item.courier_service }}</span>
                   </div>
                 </div>
-                <div class="text-right text-xs">
+                <div class="text-right text-xs flex-shrink-0">
                   <p class="font-bold text-gray-900">{{ ordersVm.formatRupiah(item.unit_price) }}</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Qty: {{ item.quantity }}</p>
                 </div>
@@ -1230,13 +1270,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         </div>
 
         <!-- Footer Actions -->
-        <div class="px-8 py-5 border-t border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="px-5 sm:px-8 py-4 sm:py-5 border-t border-gray-100 flex flex-wrap justify-between items-center bg-gray-50/50 gap-3">
           <button @click="closeOrderDetail" class="px-5 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer">
             Close
           </button>
 
-          <div>
-            <div v-if="selectedOrder.status === 'pending'" class="flex gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <div v-if="selectedOrder.status === 'pending'" class="flex flex-wrap gap-2">
               <button 
                 @click="navigateTo(`/payment?orderId=${selectedOrder.id}`)" 
                 class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer"
@@ -1281,16 +1321,16 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           class="absolute inset-y-0 right-0 w-full sm:w-[450px] bg-white shadow-2xl border-l border-gray-100 flex flex-col justify-between z-50 transform transition-transform duration-300 ease-in-out animate-slide-in"
         >
           <!-- Overlay Header -->
-          <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div class="px-5 sm:px-6 py-4 sm:py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div class="flex items-center gap-2">
               <span class="text-base">🚚</span>
               <h3 class="font-extrabold text-gray-900 text-sm">Shipping Information</h3>
             </div>
-            <button @click="showShippingOverlay = false" class="text-gray-400 hover:text-black font-bold text-base cursor-pointer">✕</button>
+            <button @click="showShippingOverlay = false" class="text-gray-400 hover:text-black font-bold text-base p-1 cursor-pointer">✕</button>
           </div>
 
           <!-- Overlay Body -->
-          <div class="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
+          <div class="p-5 sm:p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
             <!-- Courier Summary (from backend tracking response or first item) -->
             <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 space-y-2">
               <div class="flex justify-between font-semibold">
@@ -1343,7 +1383,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   @click="fetchOrderTracking(selectedOrder.id)" 
                   class="text-[10px] text-emerald-700 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                 >
-                  <span>🔄</span> Refresh Tracking
+                  <span>🔄</span> Refresh
                 </button>
               </div>
 
@@ -1459,14 +1499,12 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           </div>
 
           <!-- Overlay Footer -->
-          <div class="px-6 py-5 border-t border-gray-100 flex justify-end bg-gray-50/50">
+          <div class="px-5 sm:px-6 py-4 sm:py-5 border-t border-gray-100 flex justify-end bg-gray-50/50">
             <button @click="showShippingOverlay = false" class="px-5 py-2.5 bg-[#1b4332] text-white hover:bg-[#143326] rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
               Go Back to Details
             </button>
           </div>
         </div>
-
-
 
       </div>
     </div>
@@ -1476,29 +1514,30 @@ const handleCheckPaymentStatus = async (orderId: string) => {
       <Transition name="cropper-fade">
         <div
           v-if="showCropper"
-          class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4"
           style="background: rgba(0,0,0,0.35); backdrop-filter: blur(4px)"
           @mousemove="onMouseMove"
           @mouseup="onMouseUp"
-          @touchmove.prevent="onTouchMoveCrop"
+          @touchmove="onTouchMoveCrop"
           @touchend="onTouchEndCrop"
+          @touchcancel="onTouchEndCrop"
         >
-          <div class="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-fade" style="width: 520px; max-width: 96vw">
+          <div class="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-fade max-w-[96vw]" style="width: 520px">
 
             <!-- Header -->
-            <div class="px-6 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+            <div class="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
               <div>
                 <h3 class="font-extrabold text-gray-900 text-sm">Crop Profile Picture</h3>
-                <p class="text-[11px] text-gray-400 mt-0.5">Drag corners or edges to resize · Drag inside crop box to move it · Drag outside to pan image</p>
+                <p class="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">Drag corners or edges to resize · Drag crop box to move · Pan outside</p>
               </div>
-              <button @click="cancelCrop" class="text-gray-400 hover:text-gray-600 transition text-lg leading-none cursor-pointer">✕</button>
+              <button @click="cancelCrop" class="text-gray-400 hover:text-gray-600 transition text-lg leading-none p-1 cursor-pointer">✕</button>
             </div>
 
             <!-- Canvas editing area -->
             <div class="relative bg-gray-900 overflow-hidden select-none"
-              :style="{ width: `${CONT_W}px`, height: `${CONT_H}px`, margin: '0 auto' }"
+              :style="{ width: `${contW}px`, height: `${contH}px`, margin: '0 auto', touchAction: 'none' }"
               @mousedown="startImgPan"
-              @touchstart.passive="startImgPan"
+              @touchstart="startImgPan"
             >
               <!-- The image -->
               <img
@@ -1523,10 +1562,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   left: `${cbX}px`, top: `${cbY}px`,
                   width: `${cbW}px`, height: `${cbH}px`,
                   border: '2px solid #fff',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  touchAction: 'none'
                 }"
                 @mousedown.stop="startCropHandle($event, 'move')"
-                @touchstart.stop.passive="startCropHandle($event, 'move')"
+                @touchstart.stop="startCropHandle($event, 'move')"
               >
                 <!-- Rule of thirds grid -->
                 <div class="absolute inset-0 pointer-events-none" style="
@@ -1538,27 +1578,27 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <!-- 8 resize handles -->
                 <!-- Corners -->
                 <div class="crop-handle crop-handle-corner" style="top:-5px;left:-5px;cursor:nw-resize"
-                  @mousedown.stop="startCropHandle($event,'nw')" @touchstart.stop.passive="startCropHandle($event,'nw')"></div>
+                  @mousedown.stop="startCropHandle($event,'nw')" @touchstart.stop="startCropHandle($event,'nw')"></div>
                 <div class="crop-handle crop-handle-corner" style="top:-5px;right:-5px;cursor:ne-resize"
-                  @mousedown.stop="startCropHandle($event,'ne')" @touchstart.stop.passive="startCropHandle($event,'ne')"></div>
+                  @mousedown.stop="startCropHandle($event,'ne')" @touchstart.stop="startCropHandle($event,'ne')"></div>
                 <div class="crop-handle crop-handle-corner" style="bottom:-5px;left:-5px;cursor:sw-resize"
-                  @mousedown.stop="startCropHandle($event,'sw')" @touchstart.stop.passive="startCropHandle($event,'sw')"></div>
+                  @mousedown.stop="startCropHandle($event,'sw')" @touchstart.stop="startCropHandle($event,'sw')"></div>
                 <div class="crop-handle crop-handle-corner" style="bottom:-5px;right:-5px;cursor:se-resize"
-                  @mousedown.stop="startCropHandle($event,'se')" @touchstart.stop.passive="startCropHandle($event,'se')"></div>
+                  @mousedown.stop="startCropHandle($event,'se')" @touchstart.stop="startCropHandle($event,'se')"></div>
                 <!-- Edges -->
                 <div class="crop-handle crop-handle-edge" style="top:-4px;left:calc(50% - 12px);cursor:n-resize"
-                  @mousedown.stop="startCropHandle($event,'n')" @touchstart.stop.passive="startCropHandle($event,'n')"></div>
+                  @mousedown.stop="startCropHandle($event,'n')" @touchstart.stop="startCropHandle($event,'n')"></div>
                 <div class="crop-handle crop-handle-edge" style="bottom:-4px;left:calc(50% - 12px);cursor:s-resize"
-                  @mousedown.stop="startCropHandle($event,'s')" @touchstart.stop.passive="startCropHandle($event,'s')"></div>
+                  @mousedown.stop="startCropHandle($event,'s')" @touchstart.stop="startCropHandle($event,'s')"></div>
                 <div class="crop-handle crop-handle-edge" style="left:-4px;top:calc(50% - 12px);cursor:w-resize"
-                  @mousedown.stop="startCropHandle($event,'w')" @touchstart.stop.passive="startCropHandle($event,'w')"></div>
+                  @mousedown.stop="startCropHandle($event,'w')" @touchstart.stop="startCropHandle($event,'w')"></div>
                 <div class="crop-handle crop-handle-edge" style="right:-4px;top:calc(50% - 12px);cursor:e-resize"
-                  @mousedown.stop="startCropHandle($event,'e')" @touchstart.stop.passive="startCropHandle($event,'e')"></div>
+                  @mousedown.stop="startCropHandle($event,'e')" @touchstart.stop="startCropHandle($event,'e')"></div>
               </div>
             </div>
 
             <!-- Controls -->
-            <div class="px-6 py-4 space-y-3">
+            <div class="px-4 sm:px-6 py-3 sm:py-4 space-y-3">
               <!-- Zoom slider -->
               <div class="flex items-center gap-3">
                 <span class="text-xs font-bold text-gray-400 w-10">Zoom</span>
@@ -1573,22 +1613,24 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
 
               <!-- Size info + buttons -->
-              <div class="flex items-center gap-3">
-                <span class="text-[11px] text-gray-400 flex-1">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[11px] text-gray-400">
                   ⬜ {{ cbW }} × {{ cbW }} px (square)
                 </span>
-                <button
-                  @click="cancelCrop"
-                  class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-                >Cancel</button>
-                <button
-                  @click="performCropAndUpload"
-                  :disabled="isUploading"
-                  class="px-5 py-2 bg-[#1b4332] hover:bg-[#143326] disabled:opacity-60 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer"
-                >
-                  <span v-if="isUploading" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  <span>{{ isUploading ? 'Uploading…' : 'Crop & Save' }}</span>
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    @click="cancelCrop"
+                    class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                  >Cancel</button>
+                  <button
+                    @click="performCropAndUpload"
+                    :disabled="isUploading"
+                    class="px-4 sm:px-5 py-2 bg-[#1b4332] hover:bg-[#143326] disabled:opacity-60 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <span v-if="isUploading" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>{{ isUploading ? 'Uploading…' : 'Crop & Save' }}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1612,6 +1654,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
   background: #e5e7eb;
   border-radius: 10px;
 }
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
 /* Cropper modal transition */
 .cropper-fade-enter-active,
@@ -1619,12 +1668,21 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 .cropper-fade-enter-from,
 .cropper-fade-leave-to { opacity: 0; }
 
-/* Crop handles */
+/* Crop handles with enlarged touch hit target */
 .crop-handle {
   position: absolute;
   background: #fff;
   border: 2px solid #1b4332;
   border-radius: 2px;
+  touch-action: none;
+}
+.crop-handle::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  right: -14px;
+  bottom: -14px;
 }
 .crop-handle-corner {
   width: 10px;

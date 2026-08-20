@@ -286,14 +286,14 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- HORIZONTALLY SCROLLABLE SHORTCUT BUTTONS -->
+    <!-- RESPONSIVE SHORTCUT BUTTONS -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center gap-3 sm:gap-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-1">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         
         <!-- Button 1: Katalog Papan Bunga (Light Gray Button) -->
         <NuxtLink
           to="/catalog"
-          class="flex items-center gap-3.5 px-5 py-3.5 bg-gray-100 hover:bg-gray-200/80 active:scale-[0.99] border border-gray-200/80 rounded-2xl shadow-2xs hover:shadow-xs transition-all shrink-0 min-w-[250px] sm:min-w-[280px] group cursor-pointer text-left"
+          class="flex items-center gap-3.5 px-4 sm:px-5 py-3.5 bg-gray-100 hover:bg-gray-200/80 active:scale-[0.99] border border-gray-200/80 rounded-2xl shadow-2xs hover:shadow-xs transition-all group cursor-pointer text-left w-full"
         >
           <div class="w-11 h-11 rounded-xl bg-white text-[#1b4332] flex items-center justify-center shrink-0 border border-gray-200 shadow-2xs group-hover:scale-105 transition-transform">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -316,7 +316,7 @@ onUnmounted(() => {
         <!-- Button 2: Custom Board Simulator (Light Green Pastel Opacity 50 Button) -->
         <NuxtLink
           to="/products/custom"
-          class="flex items-center gap-3.5 px-5 py-3.5 bg-[#4ade80]/50 hover:bg-[#4ade80]/65 active:scale-[0.99] border border-[#4ade80]/70 rounded-2xl shadow-2xs hover:shadow-xs transition-all shrink-0 min-w-[250px] sm:min-w-[280px] group cursor-pointer text-left"
+          class="flex items-center gap-3.5 px-4 sm:px-5 py-3.5 bg-[#4ade80]/50 hover:bg-[#4ade80]/65 active:scale-[0.99] border border-[#4ade80]/70 rounded-2xl shadow-2xs hover:shadow-xs transition-all group cursor-pointer text-left w-full"
         >
           <div class="w-11 h-11 rounded-xl bg-white text-[#245842] flex items-center justify-center shrink-0 border border-[#4ade80]/40 shadow-2xs group-hover:scale-105 transition-transform">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

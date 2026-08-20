@@ -10,12 +10,6 @@ let fetchCurrentUserPromise: Promise<void> | null = null
 let currentFetchSeq = 0
 
 export const useAuthViewModel = () => {
-  const currentUser = useState<UserMe | null>('auth_currentUser', () => null)
-  const challengeId = useState<string | null>('auth_challengeId', () => null)
-  const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
-  const isInitialized = useState<boolean>('auth_isInitialized', () => false)
-  const globalAlert = useGlobalAlert()
-
   const getCookieOptions = () => {
     const rememberMeCookie = useCookie('remember_me')
     const isRemembered = rememberMeCookie.value === 'true'
@@ -24,6 +18,36 @@ export const useAuthViewModel = () => {
       expires: isRemembered ? new Date(Date.now() + 30 * 24 * 3600 * 1000) : undefined
     }
   }
+
+  const currentUser = useState<UserMe | null>('auth_currentUser', () => {
+    const isLoggedIn = useCookie('is_logged_in')
+    if (isLoggedIn.value === 'true') {
+      const cachedProfile = useCookie<Partial<UserMe> | null>('user_profile')
+      if (cachedProfile.value && (cachedProfile.value.id || cachedProfile.value.name)) {
+        return { ...(cachedProfile.value as UserMe) }
+      }
+    }
+    return null
+  })
+
+  const challengeId = useState<string | null>('auth_challengeId', () => null)
+  const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
+  const isInitialized = useState<boolean>('auth_isInitialized', () => {
+    const isLoggedIn = useCookie('is_logged_in')
+    const rememberMe = useCookie('remember_me')
+    if (isLoggedIn.value !== 'true' && rememberMe.value !== 'true') {
+      return true
+    }
+    if (isLoggedIn.value === 'true') {
+      const cachedProfile = useCookie<Partial<UserMe> | null>('user_profile')
+      if (cachedProfile.value && (cachedProfile.value.id || cachedProfile.value.name)) {
+        return true
+      }
+    }
+    return false
+  })
+  const globalAlert = useGlobalAlert()
+
 
   const isLoading = ref(false)
   const error = ref<string | null>(null)
