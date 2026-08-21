@@ -16,12 +16,15 @@ type CalculateRatesInput struct {
 }
 
 type RateOption struct {
-	Name        string
-	Code        string
-	Service     string
-	Description string
-	Cost        int64
-	Etd         string
+	Name                   string
+	Code                   string
+	Service                string
+	Description            string
+	Cost                   int64
+	Etd                    string
+	EstimatedDurationHours *float64
+	SLAConfidenceScore     *float64
+	DeliveryStatus         *string
 }
 
 type ShippingProvider interface {

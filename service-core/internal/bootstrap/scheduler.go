@@ -5,6 +5,7 @@ import (
 	"time"
 
 	applogger "service-core/internal/common/logger"
+	inventoryJob "service-core/internal/modules/inventory/infra/job"
 	orderJob "service-core/internal/modules/order/infra/job"
 	paymentJob "service-core/internal/modules/payment/infra/job"
 )
@@ -50,6 +51,14 @@ func NewScheduler(cfg Config, container *Container, logger applogger.Logger) *Sc
 		logger,
 	)
 	s.Register(orderStaffExpiryJob)
+
+	stockoutRiskScanJob := inventoryJob.NewStockoutRiskScanJob(
+		&container.GetStockoutRisks,
+		container.AuditLogger,
+		6*time.Hour,
+		logger,
+	)
+	s.Register(stockoutRiskScanJob)
 
 	return s
 }

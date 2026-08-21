@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
+	intelligencelayer "service-core/internal/infra/intelligence_layer"
 	shipping "service-core/internal/infra/shipping"
 	"service-core/internal/modules/shipment/domain"
 	transaction "service-core/internal/shared/transaction"
@@ -14,15 +17,18 @@ import (
 type EstimateShippingOptionsUsecase struct {
 	shippingProvider shipping.ShippingProvider
 	executor         transaction.Executor
+	aiProv           intelligencelayer.Provider
 }
 
 func NewEstimateShippingOptionsUsecase(
 	shippingProvider shipping.ShippingProvider,
 	executor transaction.Executor,
+	aiProv intelligencelayer.Provider,
 ) *EstimateShippingOptionsUsecase {
 	return &EstimateShippingOptionsUsecase{
 		shippingProvider: shippingProvider,
 		executor:         executor,
+		aiProv:           aiProv,
 	}
 }
 
@@ -77,6 +83,31 @@ func (u *EstimateShippingOptionsUsecase) Execute(
 	costOptions, err := u.shippingProvider.CalculateRates(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate shipping cost: %w", err)
+	}
+
+	if u.aiProv != nil {
+		now := appclock.Now()
+		pythonDayOfWeek := (int(now.Weekday()) + 6) % 7
+		isWeekend := 0.0
+		if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+			isWeekend = 1.0
+		}
+
+		for i := range costOptions {
+			slaReq := intelligencelayer.CourierSLARequest{
+				CourierCode:       costOptions[i].Code,
+				ShippingCost:      float64(costOptions[i].Cost),
+				DispatchDayOfWeek: pythonDayOfWeek,
+				DispatchHour:      now.Hour(),
+				DispatchIsWeekend: isWeekend,
+			}
+			slaResp, err := u.aiProv.PredictCourierSLA(ctx, slaReq)
+			if err == nil && slaResp != nil {
+				costOptions[i].EstimatedDurationHours = &slaResp.EstimatedDurationHours
+				costOptions[i].SLAConfidenceScore = &slaResp.SLAConfidenceScore
+				costOptions[i].DeliveryStatus = &slaResp.DeliveryStatus
+			}
+		}
 	}
 
 	return costOptions, nil

@@ -63,21 +63,23 @@ import (
 	staffUsecase "service-core/internal/modules/staff/usecase"
 	userUsecase "service-core/internal/modules/user/usecase"
 
+	intelligencelayer "service-core/internal/infra/intelligence_layer"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	paymentRepo "service-core/internal/modules/payment/repository"
 )
 
 type Container struct {
-	Logger             applogger.Logger
-	AuditLogger        applogger.AuditLogger
-	CORSAllowedOrigins []string
-	Authenticator      authenRepo.Authenticator
-	Authorizer         authorRepo.Authorizer
-	DBExecutor         transaction.Executor
-	DBTransactor       transaction.Transactor
-	GoogleOAuth        appconfig.GoogleOAuthConfig
-	paymentMethodRepo  paymentRepo.PaymentMethodRepository
-	paymentGateway     paymentgateway.Provider
+	Logger               applogger.Logger
+	AuditLogger          applogger.AuditLogger
+	CORSAllowedOrigins   []string
+	Authenticator        authenRepo.Authenticator
+	Authorizer           authorRepo.Authorizer
+	DBExecutor           transaction.Executor
+	DBTransactor         transaction.Transactor
+	GoogleOAuth          appconfig.GoogleOAuthConfig
+	paymentMethodRepo    paymentRepo.PaymentMethodRepository
+	paymentGateway       paymentgateway.Provider
+	IntelligenceProvider intelligencelayer.Provider
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
@@ -200,6 +202,8 @@ type Container struct {
 	GetShipmentMetrics  analyticsUsecase.GetShipmentMetricsUsecase
 	GetInventoryMetrics analyticsUsecase.GetInventoryMetricsUsecase
 	GetProductMetrics   analyticsUsecase.GetProductMetricsUsecase
+	GetDemandForecast   analyticsUsecase.GetDemandForecastUsecase
+	GetStockoutRisks    analyticsUsecase.GetStockoutRisksUsecase
 }
 
 func NewContainer(cfg Config,
@@ -317,31 +321,41 @@ func NewContainer(cfg Config,
 		)
 	)
 
-	processPaymentWebhook := *paymentUsecase.
-		NewProcessPaymentWebhookUsecase(
-			paymentRepo,
-			paymentEventRepo,
-			paymentWebhookEventRepo,
-			orderRepo,
-			orderItemRepo,
-			inventoryRepo,
-			infra.PaymentGateway,
-			auditLogger,
-			infra.TransactionProvider,
-			infra.TransactionExecutor,
+	var intelligenceProvider intelligencelayer.Provider
+	if cfg.IntelligenceLayer.Enabled {
+		intelligenceProvider = intelligencelayer.NewClient(
+			cfg.IntelligenceLayer.BaseURL,
+			time.Duration(cfg.IntelligenceLayer.TimeoutMS)*time.Millisecond,
+			log,
 		)
+	}
+
+	processPaymentWebhook := *paymentUsecase.NewProcessPaymentWebhookUsecase(
+		paymentRepo,
+		paymentEventRepo,
+		paymentWebhookEventRepo,
+		orderRepo,
+		orderItemRepo,
+		inventoryRepo,
+		infra.PaymentGateway,
+		auditLogger,
+		infra.TransactionProvider,
+		infra.TransactionExecutor,
+		intelligenceProvider,
+	)
 
 	c := &Container{
-		Logger:             log,
-		AuditLogger:        auditLogger,
-		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
-		Authenticator:      authMidd,
-		Authorizer:         authorMdwr,
-		DBExecutor:         infra.TransactionExecutor,
-		DBTransactor:       infra.TransactionProvider,
-		GoogleOAuth:        cfg.GoogleOAuth,
-		paymentMethodRepo:  paymentMethodRepo,
-		paymentGateway:     infra.PaymentGateway,
+		Logger:               log,
+		AuditLogger:          auditLogger,
+		CORSAllowedOrigins:   cfg.App.CORSAllowedOrigins,
+		Authenticator:        authMidd,
+		Authorizer:           authorMdwr,
+		DBExecutor:           infra.TransactionExecutor,
+		DBTransactor:         infra.TransactionProvider,
+		GoogleOAuth:          cfg.GoogleOAuth,
+		paymentMethodRepo:    paymentMethodRepo,
+		paymentGateway:       infra.PaymentGateway,
+		IntelligenceProvider: intelligenceProvider,
 
 		FindProducts: *productUsecase.
 			NewFindProductsUsecase(
@@ -869,6 +883,7 @@ func NewContainer(cfg Config,
 			NewEstimateShippingOptionsUsecase(
 				infra.ShippingProvider,
 				infra.TransactionExecutor,
+				intelligenceProvider,
 			),
 		UpdateShipmentStatus: *shipmentUsecase.
 			NewUpdateShipmentStatusUsecase(
@@ -1045,6 +1060,8 @@ func NewContainer(cfg Config,
 		GetShipmentMetrics:  *analyticsUsecase.NewGetShipmentMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 		GetInventoryMetrics: *analyticsUsecase.NewGetInventoryMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 		GetProductMetrics:   *analyticsUsecase.NewGetProductMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetDemandForecast:   *analyticsUsecase.NewGetDemandForecastUsecase(infra.TransactionExecutor, analyticsRepo, intelligenceProvider),
+		GetStockoutRisks:    *analyticsUsecase.NewGetStockoutRisksUsecase(infra.TransactionExecutor, analyticsRepo, intelligenceProvider),
 	}
 
 	return c

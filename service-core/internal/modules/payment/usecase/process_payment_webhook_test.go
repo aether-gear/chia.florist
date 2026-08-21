@@ -8,6 +8,7 @@ import (
 	"time"
 
 	applogger "service-core/internal/common/logger"
+	intelligencelayer "service-core/internal/infra/intelligence_layer"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	orderDomain "service-core/internal/modules/order/domain"
@@ -375,6 +376,7 @@ func newWebhookUsecase(
 		gateway,
 		&mockAuditLogger{},
 		transactor, &mockExecutor{},
+		nil,
 	)
 }
 
@@ -935,5 +937,108 @@ func TestProcessPaymentWebhook_InvalidOrderStatusTransition(t *testing.T) {
 		Execute(ctx, ProcessPaymentWebhookInput{Payload: map[string]any{"order_id": orderID.String(), "transaction_status": "cancel"}})
 	if err == nil {
 		t.Fatal("expected error for invalid order status transition via webhook, got nil")
+	}
+}
+
+type mockAIAnomalyProvider struct {
+	anomalyResp *intelligencelayer.AnomalyCheckResponse
+	err         error
+}
+
+func (m *mockAIAnomalyProvider) HealthCheck(ctx context.Context) (*intelligencelayer.HealthData, error) {
+	return nil, nil
+}
+func (m *mockAIAnomalyProvider) PredictDemand(ctx context.Context, req intelligencelayer.DemandForecastRequest) (*intelligencelayer.DemandForecastResponse, error) {
+	return nil, nil
+}
+func (m *mockAIAnomalyProvider) PredictStockoutRisk(ctx context.Context, req intelligencelayer.StockoutRiskRequest) (*intelligencelayer.StockoutRiskResponse, error) {
+	return nil, nil
+}
+func (m *mockAIAnomalyProvider) PredictCourierSLA(ctx context.Context, req intelligencelayer.CourierSLARequest) (*intelligencelayer.CourierSLAResponse, error) {
+	return nil, nil
+}
+func (m *mockAIAnomalyProvider) DetectAnomaly(ctx context.Context, req intelligencelayer.AnomalyCheckRequest) (*intelligencelayer.AnomalyCheckResponse, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.anomalyResp, nil
+}
+
+func TestProcessPaymentWebhook_AnomalyDetected(t *testing.T) {
+	ctx := context.Background()
+	orderID := uuid.New()
+	paymentID := uuid.New()
+
+	payment := &paymentDomain.Payment{
+		ID:        paymentID,
+		OrderID:   orderID,
+		Status:    paymentDomain.PaymentStatusPending,
+		Amount:    4500000,
+		Provider:  "midtrans",
+		CreatedAt: time.Now().Add(-2 * time.Hour),
+	}
+	order := &orderDomain.Order{
+		ID:        orderID,
+		Status:    orderDomain.OrderStatusPending,
+		Total:     4500000,
+		CreatedAt: time.Now().Add(-2 * time.Hour),
+	}
+
+	pRepo := &mockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{paymentID: payment}}
+	oRepo := &mockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{orderID: order}}
+	peRepo := &mockPaymentEventRepo{}
+	auditLogger := &mockAuditLogger{}
+
+	gateway := &mockPaymentGateway{
+		result: &paymentgateway.NotificationResult{
+			GatewayOrderID: orderID.String(),
+			Status:         paymentgateway.NotificationStatusSettlement,
+			GrossAmount:    4500000,
+		},
+	}
+
+	aiProv := &mockAIAnomalyProvider{
+		anomalyResp: &intelligencelayer.AnomalyCheckResponse{
+			IsAnomaly:    true,
+			AnomalyScore: -0.1425,
+			Severity:     "HIGH",
+			Reasons:      []string{"Excessive payment completion delay"},
+		},
+	}
+
+	uc := NewProcessPaymentWebhookUsecase(
+		pRepo, peRepo,
+		newMockWebhookEventRepo(),
+		oRepo, &mockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}},
+		&mockInventoryRepo{},
+		gateway,
+		auditLogger,
+		&mockTransactor{}, &mockExecutor{},
+		aiProv,
+	)
+
+	err := uc.Execute(ctx, ProcessPaymentWebhookInput{
+		Payload: map[string]any{
+			"order_id":           orderID.String(),
+			"transaction_status": "settlement",
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	foundAnomalyEvent := false
+	for _, event := range auditLogger.events {
+		if event.Action == "payment_anomaly_detected" {
+			foundAnomalyEvent = true
+			if event.Metadata["severity"] != "HIGH" {
+				t.Errorf("expected severity HIGH, got %v", event.Metadata["severity"])
+			}
+		}
+	}
+
+	if !foundAnomalyEvent {
+		t.Errorf("expected payment_anomaly_detected audit event to be emitted")
 	}
 }

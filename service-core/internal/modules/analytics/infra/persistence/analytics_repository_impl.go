@@ -8,6 +8,7 @@ import (
 	"service-core/internal/modules/analytics/repository"
 	transaction "service-core/internal/shared/transaction"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -708,4 +709,131 @@ func (r *analyticsRepositoryImpl) GetProductMetricsSummary(
 	}
 
 	return &pMS, nil
+}
+
+func (r *analyticsRepositoryImpl) GetProductLagFeatures(
+	ctx context.Context,
+	exec transaction.Executor,
+	productID uuid.UUID,
+) (*domain.ProductLagFeatures, error) {
+	query := `
+		SELECT
+			p.id,
+			p.name,
+			COALESCE(pp.gross_margin_pct, 0.40) AS gross_margin_pct,
+			COALESCE(pp.view_count, 100) AS view_count,
+			COALESCE(SUM(i.stock), 0) AS current_stock,
+			COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at BETWEEN NOW() - INTERVAL '1 day' AND NOW()), 0)::float8 AS lag_1,
+			COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at BETWEEN NOW() - INTERVAL '7 days' AND NOW() - INTERVAL '6 days'), 0)::float8 AS lag_7,
+			COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '13 days'), 0)::float8 AS lag_14,
+			COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at BETWEEN NOW() - INTERVAL '30 days' AND NOW() - INTERVAL '29 days'), 0)::float8 AS lag_30,
+			(COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at >= NOW() - INTERVAL '7 days'), 0) / 7.0)::float8 AS rolling_7d_mean,
+			(COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at >= NOW() - INTERVAL '30 days'), 0) / 30.0)::float8 AS rolling_30d_mean
+		FROM
+			products p
+		LEFT JOIN
+			product_performance pp ON pp.product_id = p.id
+		LEFT JOIN
+			inventory i ON i.product_id = p.id
+		LEFT JOIN
+			order_items oi ON oi.product_id = p.id
+		LEFT JOIN
+			orders o ON o.id = oi.order_id AND o.status != 'cancelled'
+		WHERE
+			p.id = $1 AND p.deleted_at IS NULL
+		GROUP BY
+			p.id, p.name, pp.gross_margin_pct, pp.view_count
+	`
+
+	var feat domain.ProductLagFeatures
+	err := exec.QueryRow(ctx, query, productID).Scan(
+		&feat.ProductID,
+		&feat.ProductName,
+		&feat.GrossMarginPct,
+		&feat.ViewCount,
+		&feat.CurrentStock,
+		&feat.UnitsSoldLag1,
+		&feat.UnitsSoldLag7,
+		&feat.UnitsSoldLag14,
+		&feat.UnitsSoldLag30,
+		&feat.Rolling7dMean,
+		&feat.Rolling30dMean,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query product lag features failed: %w", err)
+	}
+
+	feat.Rolling7dStd = 1.5
+	feat.Rolling30dStd = 2.0
+
+	return &feat, nil
+}
+
+func (r *analyticsRepositoryImpl) GetInventoryBurnRates(
+	ctx context.Context,
+	exec transaction.Executor,
+	shopID *uuid.UUID,
+) ([]domain.InventoryBurnRateData, error) {
+	query := `
+		SELECT
+			i.product_id,
+			p.name AS product_name,
+			i.shop_id,
+			s.name AS shop_name,
+			i.stock,
+			i.reserved_stock,
+			COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at >= NOW() - INTERVAL '7 days' AND o.status != 'cancelled'), 0) AS units_sold_7d,
+			(COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at >= NOW() - INTERVAL '7 days' AND o.status != 'cancelled'), 0) / 7.0)::float8 AS stock_burn_rate_7d
+		FROM
+			inventory i
+		JOIN
+			products p ON p.id = i.product_id AND p.deleted_at IS NULL
+		JOIN
+			shops s ON s.id = i.shop_id
+		LEFT JOIN
+			order_items oi ON oi.product_id = i.product_id AND oi.shop_id = i.shop_id
+		LEFT JOIN
+			orders o ON o.id = oi.order_id
+	`
+	var args []any
+	if shopID != nil {
+		query += ` WHERE i.shop_id = $1 `
+		args = append(args, *shopID)
+	}
+
+	query += `
+		GROUP BY
+			i.product_id, p.name, i.shop_id, s.name, i.stock, i.reserved_stock
+		ORDER BY
+			stock_burn_rate_7d DESC, i.stock ASC
+	`
+
+	rows, err := exec.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query inventory burn rates failed: %w", err)
+	}
+	defer rows.Close()
+
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.InventoryBurnRateData, error) {
+		var item domain.InventoryBurnRateData
+		err := row.Scan(
+			&item.ProductID,
+			&item.ProductName,
+			&item.ShopID,
+			&item.ShopName,
+			&item.Stock,
+			&item.ReservedStock,
+			&item.UnitsSold7d,
+			&item.StockBurnRate7d,
+		)
+		if err == nil {
+			item.SupplierLeadTimeDays = 7.0
+		}
+		return item, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan inventory burn rates failed: %w", err)
+	}
+
+	return items, nil
 }
