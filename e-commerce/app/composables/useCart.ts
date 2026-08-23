@@ -260,9 +260,45 @@ export const useCart = () => {
   const isLoggedIn = useCookie('is_logged_in')
   const isLoadingCart = useState<boolean>('chia-florist-cart-loading', () => false)
 
+  const clearCart = () => {
+    cart.value = []
+    isLoadingCart.value = false
+    loadCartPromise = null
+
+    // Clear pending debounce timers
+    Object.keys(pendingUpdates).forEach(k => {
+      if (pendingUpdates[k]?.timeoutId) {
+        clearTimeout(pendingUpdates[k].timeoutId!)
+      }
+      delete pendingUpdates[k]
+    })
+    Object.keys(pendingAdditions).forEach(k => {
+      if (pendingAdditions[k]?.timeoutId) {
+        clearTimeout(pendingAdditions[k].timeoutId!)
+      }
+      delete pendingAdditions[k]
+    })
+
+    if (import.meta.client) {
+      try {
+        localStorage.removeItem('chia-florist-cart-cache')
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.startsWith('cart_attr_') || key.startsWith('custom_design_'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+      } catch (e) {
+        console.error('Error clearing cart local storage:', e)
+      }
+    }
+  }
+
   const loadCart = (force = false): Promise<void> => {
     if (isLoggedIn.value !== 'true') {
-      isLoadingCart.value = false
+      clearCart()
       return Promise.resolve()
     }
 
@@ -340,19 +376,13 @@ export const useCart = () => {
             }
           })
 
-          if (isLoggedIn.value === 'true') {
-            cart.value = backendItems
-          } else {
-            const customItems = cart.value.filter(localItem => 
-              localItem.isCustom && 
-              !backendItems.some(b => b.id === localItem.id || (b.isCustom && b.name === localItem.name && b.size === localItem.size))
-            )
-            cart.value = [...backendItems, ...customItems]
-          }
+          cart.value = backendItems
 
           if (import.meta.client) {
             localStorage.setItem('chia-florist-cart-cache', JSON.stringify(backendItems))
           }
+        } else {
+          cart.value = []
         }
       } catch (err) {
         logError('useCart', err)
@@ -370,10 +400,10 @@ export const useCart = () => {
     cartWatcherInitialized = true
     watch(isLoggedIn, (newVal) => {
       if (newVal === 'true') {
-        loadCart(false)
+        clearCart()
+        loadCart(true)
       } else {
-        cart.value = cart.value.filter(i => i.isCustom)
-        localStorage.removeItem('chia-florist-cart-cache')
+        clearCart()
       }
     }, { immediate: false })
   }
@@ -666,6 +696,7 @@ export const useCart = () => {
     orders,
     isLoadingCart,
     loadCart,
+    clearCart,
     flushCart,
     addToCart,
     removeFromCart,

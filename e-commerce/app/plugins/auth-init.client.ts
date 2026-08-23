@@ -1,11 +1,13 @@
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useCart } from '~/composables/useCart'
+import { useAddress } from '~/composables/useAddress'
 import { triggerSessionExpired, clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const authVm = useAuthViewModel()
   const cartVm = useCart()
+  const addressVm = useAddress()
   const { showError, showSuccess } = useGlobalAlert()
 
   if (import.meta.client) {
@@ -34,7 +36,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
               { label: 'Dismiss' }
             ]
           )
-          await cartVm.loadCart(true)
+          await Promise.all([
+            cartVm.loadCart(true),
+            addressVm.fetchAddresses(true)
+          ])
         } else {
           authVm.clearLocalSession()
           showError(
@@ -67,7 +72,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         if (authVm.isAuthenticated.value) {
           clearSessionExpired()
           clearAuthAlert()
-          await cartVm.loadCart(true)
+          await Promise.all([
+            cartVm.loadCart(true),
+            addressVm.fetchAddresses(true)
+          ])
         } else {
           if (wasLoggedIn) {
             triggerSessionExpired()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// error.vue — Nuxt global error page
+// app/error.vue — Nuxt global error page
 // Rendered by Nuxt when a fatal/unhandled error occurs (404, 500, createError, etc.)
 // NuxtLayout is NOT available here, so the branded shell is built inline.
 //

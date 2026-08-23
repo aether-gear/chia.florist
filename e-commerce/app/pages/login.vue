@@ -17,8 +17,17 @@ useHead({
   ]
 })
 
+const route = useRoute()
 const authVm = useAuthViewModel()
 const globalAlert = useGlobalAlert()
+
+const getRedirectTarget = () => {
+  const redirect = route.query.redirect as string
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/'
+}
 
 // 2-Step Login Flow: 'initial' (Choose Google or Enter Email) -> 'credentials' (Password Form without Google)
 const loginStep = ref<'initial' | 'credentials'>('initial')
@@ -42,7 +51,7 @@ watch(successMessage, (msg) => {
 // Immediately redirect if already authenticated
 watch(() => authVm.isAuthenticated.value, (isAuth) => {
   if (isAuth) {
-    navigateTo('/')
+    navigateTo(getRedirectTarget())
   }
 })
 
@@ -57,7 +66,7 @@ const showNewPassword = ref(false)
 onMounted(() => {
   const isLoggedIn = useCookie('is_logged_in')
   if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
-    navigateTo('/')
+    navigateTo(getRedirectTarget())
     return
   }
 
@@ -138,7 +147,7 @@ const handleLogin = async () => {
         clearSessionExpired()
         clearAuthAlert()
         await nextTick()
-        navigateTo('/')
+        navigateTo(getRedirectTarget())
       }
     }
   } catch (err: any) {
@@ -160,7 +169,7 @@ const handleLogin = async () => {
 const handleGoogleLogin = () => {
   const isLoggedIn = useCookie('is_logged_in')
   if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
-    navigateTo('/')
+    navigateTo(getRedirectTarget())
     return
   }
   clearSessionExpired()
@@ -340,7 +349,7 @@ const switchToForgot = () => {
           <!-- Account Switch -->
           <div class="text-center pt-2 text-xs text-gray-500">
             Don't have an account?
-            <NuxtLink to="/register" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+            <NuxtLink :to="route.query.redirect ? { path: '/register', query: { redirect: route.query.redirect } } : '/register'" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
               Create an account
             </NuxtLink>
           </div>
@@ -453,7 +462,7 @@ const switchToForgot = () => {
           <!-- Account Switch -->
           <div class="text-center pt-2 text-xs text-gray-500">
             Don't have an account?
-            <NuxtLink to="/register" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+            <NuxtLink :to="route.query.redirect ? { path: '/register', query: { redirect: route.query.redirect } } : '/register'" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
               Create an account
             </NuxtLink>
           </div>

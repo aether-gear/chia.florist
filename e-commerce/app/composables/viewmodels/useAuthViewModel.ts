@@ -6,6 +6,8 @@ import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest, UpdateProfile
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
 import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
+import { useCart } from '~/composables/useCart'
+import { useAddress } from '~/composables/useAddress'
 
 let fetchCurrentUserPromise: Promise<void> | null = null
 let currentFetchSeq = 0
@@ -203,9 +205,13 @@ export const useAuthViewModel = () => {
       if (response.message === 'login success') {
         clearSessionExpired()
         clearAuthAlert()
-        if (import.meta.client) {
-          localStorage.removeItem('chia-florist-cart-cache')
-        }
+        clearLocalSession()
+
+        // Set login state
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
+        isLoggedIn.value = 'true'
+
         // Force fetch profile to establish global user state
         await fetchCurrentUser(undefined, true)
 
@@ -215,10 +221,6 @@ export const useAuthViewModel = () => {
           error.value = errMsg
           throw new Error(errMsg)
         }
-
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-        isLoggedIn.value = 'true'
 
         if (currentUser.value) {
           userProfile.value = {
@@ -237,6 +239,10 @@ export const useAuthViewModel = () => {
           }
           currentUser.value = { ...userProfile.value as UserMe }
         }
+
+        // Force load fresh cart and address for this account
+        useCart().loadCart(true).catch((err) => console.warn('Failed to load cart on login:', err))
+        useAddress().fetchAddresses(true).catch((err) => console.warn('Failed to load addresses on login:', err))
 
         globalAlert.showSuccess('Signed In Successfully', `Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
@@ -263,9 +269,12 @@ export const useAuthViewModel = () => {
       if (response.message === 'login success') {
         clearSessionExpired()
         clearAuthAlert()
-        if (import.meta.client) {
-          localStorage.removeItem('chia-florist-cart-cache')
-        }
+        clearLocalSession()
+
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
+        isLoggedIn.value = 'true'
+
         // Force fetch profile to populate global user state
         await fetchCurrentUser(undefined, true)
 
@@ -276,13 +285,13 @@ export const useAuthViewModel = () => {
           throw new Error(errMsg)
         }
 
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-        isLoggedIn.value = 'true'
-
         if (currentUser.value) {
           userProfile.value = { ...currentUser.value }
         }
+
+        // Force load fresh cart and address for this account
+        useCart().loadCart(true).catch((err) => console.warn('Failed to load cart on google login:', err))
+        useAddress().fetchAddresses(true).catch((err) => console.warn('Failed to load addresses on google login:', err))
 
         globalAlert.showSuccess('Signed In Successfully', `Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
@@ -371,7 +380,6 @@ export const useAuthViewModel = () => {
           localStorage.removeItem('register_name')
           localStorage.removeItem('register_username')
           localStorage.removeItem('register_phone')
-          localStorage.removeItem('chia-florist-cart-cache')
         }
         challengeId.value = null
         registrationEmail.value = null
@@ -399,6 +407,11 @@ export const useAuthViewModel = () => {
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
         currentUser.value = { ...(userProfile.value as UserMe) }
+
+        // Force load fresh cart and address for verified account
+        useCart().loadCart(true).catch((err) => console.warn('Failed to load cart on verify:', err))
+        useAddress().fetchAddresses(true).catch((err) => console.warn('Failed to load addresses on verify:', err))
+
         globalAlert.showSuccess('Verification Successful', `Welcome to Chia Florist, ${name}.`)
         return true
       }
@@ -422,13 +435,51 @@ export const useAuthViewModel = () => {
     userProfile.value = null
     const rememberMeCookie = useCookie('remember_me')
     rememberMeCookie.value = null
+
+    // Clear composable states
+    try {
+      useCart().clearCart()
+    } catch (e) {
+      console.warn('Error clearing cart state:', e)
+    }
+    try {
+      useAddress().clearAddresses()
+    } catch (e) {
+      console.warn('Error clearing address state:', e)
+    }
+
+    const lastPaymentInfo = useState('last-payment-info')
+    if (lastPaymentInfo) lastPaymentInfo.value = null
+
     if (import.meta.client) {
-      localStorage.removeItem('auth_challenge_id')
-      localStorage.removeItem('register_email')
-      localStorage.removeItem('register_name')
-      localStorage.removeItem('register_username')
-      localStorage.removeItem('register_phone')
-      localStorage.removeItem('chia-florist-cart-cache')
+      try {
+        sessionStorage.removeItem('chia-last-payment-info')
+        sessionStorage.removeItem('google_auth_pending')
+
+        localStorage.removeItem('auth_challenge_id')
+        localStorage.removeItem('register_email')
+        localStorage.removeItem('register_name')
+        localStorage.removeItem('register_username')
+        localStorage.removeItem('register_phone')
+        localStorage.removeItem('chia-florist-cart-cache')
+        localStorage.removeItem('chia-florist-addresses-cache')
+
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (
+            key.startsWith('cart_attr_') ||
+            key.startsWith('custom_design_') ||
+            key.startsWith('address_') ||
+            key.includes('address')
+          )) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+      } catch (e) {
+        console.error('Error clearing local storage on session clear:', e)
+      }
     }
   }
 

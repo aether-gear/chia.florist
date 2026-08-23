@@ -12,6 +12,7 @@ import {
 } from '~/features/custom-product'
 import { useCart } from '~/composables/useCart'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import '~/features/custom-product/custom-product.css'
 
 definePageMeta({ layout: false })
@@ -24,6 +25,8 @@ const design = useCustomDesign()
 const { isAdding, addCustomDesignToCart } = useCustomCart()
 const { formatRupiah } = useCart()
 const globalAlert = useGlobalAlert()
+const authVm = useAuthViewModel()
+const isLoggedIn = useCookie('is_logged_in')
 
 const handleFinalize = () => {
   design.showFinalizeChoice = true
@@ -35,6 +38,22 @@ const handleOpenReview = () => {
 }
 
 const handleAddToCart = async () => {
+  // Free customization for all, but adding to cart requires being signed in
+  if (isLoggedIn.value !== 'true' && !authVm.isAuthenticated.value) {
+    design.saveDraft(true)
+    design.showReview = false
+    design.showFinalizeChoice = false
+    globalAlert.showWarning(
+      'Sign In Required',
+      'To add your custom flower board to cart, please log in first. Your design has been saved to your drafts!',
+      [
+        { label: 'Sign In', onClick: () => navigateTo('/login?redirect=/products/custom') },
+        { label: 'Keep Editing' }
+      ]
+    )
+    return
+  }
+
   const payload = design.buildCustomDesignPayload(design.snapshotDataUrl)
   await addCustomDesignToCart(
     payload,

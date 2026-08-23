@@ -5,6 +5,7 @@ import type { UserAddress } from '~/types/address'
 import { mapErrorMessage } from '~/utils/errorMessages'
 
 let fetchAddressesPromise: Promise<void> | null = null
+let addressWatcherInitialized = false
 
 // Memory caches for location dropdowns
 const cachedProvinces = ref<any[] | null>(null)
@@ -16,8 +17,49 @@ export const useAddress = () => {
   const addresses = useState<UserAddress[]>('chia-user-addresses-state', () => [])
   const isLoading = useState<boolean>('chia-user-addresses-loading', () => false)
   const error = ref<string | null>(null)
+  const isLoggedIn = useCookie('is_logged_in')
+
+  const clearAddresses = () => {
+    addresses.value = []
+    isLoading.value = false
+    error.value = null
+    fetchAddressesPromise = null
+    if (import.meta.client) {
+      try {
+        localStorage.removeItem('chia-florist-addresses-cache')
+        // Clean any address-related keys from localStorage if any
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.startsWith('address_') || key.includes('address'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+      } catch (e) {
+        console.error('Error removing address cache:', e)
+      }
+    }
+  }
+
+  if (import.meta.client && !addressWatcherInitialized) {
+    addressWatcherInitialized = true
+    watch(isLoggedIn, (newVal) => {
+      if (newVal === 'true') {
+        clearAddresses()
+        fetchAddresses(true)
+      } else {
+        clearAddresses()
+      }
+    }, { immediate: false })
+  }
 
   const fetchAddresses = (force = false): Promise<void> => {
+    if (isLoggedIn.value !== 'true') {
+      clearAddresses()
+      return Promise.resolve()
+    }
+
     if (!force && addresses.value.length > 0) {
       return Promise.resolve()
     }
@@ -143,6 +185,7 @@ export const useAddress = () => {
     addresses,
     isLoading,
     error,
+    clearAddresses,
     fetchAddresses,
     saveAddress,
     deleteAddress,

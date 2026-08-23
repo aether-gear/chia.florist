@@ -828,7 +828,7 @@ export const useCustomDesign = () => {
     }, 3000)
   }
 
-  const saveDraft = () => {
+  const saveDraft = (silent = false) => {
     if (!import.meta.client) return
     try {
       const draft = {
@@ -844,7 +844,9 @@ export const useCustomDesign = () => {
       localStorage.setItem(DEFAULT_DRAFT_KEY, JSON.stringify(draft))
       isDirty.value = false
       showMoreMenu.value = false
-      useGlobalAlert().showSuccess('Draft Saved', 'Your flower board design draft has been saved.')
+      if (!silent) {
+        useGlobalAlert().showSuccess('Draft Saved', 'Your flower board design draft has been saved.')
+      }
     } catch (err) {
       console.warn('Failed to save custom board draft:', err)
     }

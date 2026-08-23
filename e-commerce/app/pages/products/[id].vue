@@ -24,7 +24,7 @@ const { data: ssrProductData } = await useAsyncData(`product-detail-${productId.
   try {
     const [activeList, prod] = await Promise.all([
       storeSelection.fetchActiveShops(),
-      productService.getProductById(productId.value, storeSelection.selectedShop.value?.id)
+      productService.getProductById(productId.value, storeSelection.selectedShop.value?.id).catch(() => null)
     ])
     return {
       shops: activeList || [],
@@ -35,6 +35,15 @@ const { data: ssrProductData } = await useAsyncData(`product-detail-${productId.
     return null
   }
 })
+
+// If product was not found, throw 404 so Nuxt renders the dedicated error page
+if (productId.value && productId.value !== 'custom' && !ssrProductData.value?.product) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: 'Produk Tidak Ditemukan',
+    fatal: true
+  })
+}
 
 const { currentProduct: vmProduct, isLoading: isVmLoading, error: vmError, fetchProductById } = useProductViewModel()
 
@@ -318,14 +327,6 @@ useHead({
       <p class="text-gray-500 font-medium animate-pulse text-sm">Loading product details...</p>
     </div>
 
-    <div v-else-if="error" class="min-h-[400px]">
-      <CErrorDisplay 
-        :status-code="404" 
-        title="Produk Tidak Ditemukan"
-        :message="error" 
-      />
-    </div>
-
     <div v-else-if="product && product.status === 'archived'" class="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center animate-fade-in">
       <span class="text-4xl">📦</span>
       <h3 class="text-lg font-bold text-gray-800">Product No Longer Available</h3>
@@ -513,6 +514,11 @@ useHead({
 
         </div>
       </div>
+    </div>
+
+    <!-- Fallback Not Found state if product is null -->
+    <div v-else class="min-h-[60vh] flex items-center justify-center">
+      <CErrorDisplay :status-code="404" />
     </div>
   </div>
 </template>
