@@ -610,7 +610,14 @@ export const useCart = () => {
         if (import.meta.client) {
           localStorage.removeItem(`cart_attr_${item.id}`)
         }
-        if (!item.isCustom) {
+        if (item.isCustom) {
+          try {
+            const cartItemId = (item as any).cartItemId || item.id
+            await cartService.removeCustomItem(cartItemId)
+          } catch (err) {
+            console.error(`Failed to remove custom item ${item.id} from backend cart on checkout:`, err)
+          }
+        } else {
           try {
             const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
             await cartService.removeItem(shopId, item.id)

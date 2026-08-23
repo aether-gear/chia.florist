@@ -495,6 +495,18 @@ func (u *CreateOrderUsecase) Execute(
 						if !cart.RemoveItem(*item.ProductID, shop.ShopID) {
 							cart.RemoveProduct(*item.ProductID)
 						}
+						continue
+					}
+					// If custom item had no matched CartItemID, remove matching custom item in shop
+					if item.IsCustom {
+						for idx := range cart.Items {
+							ci := &cart.Items[idx]
+							if ci.DeletedAt == nil && ci.ProductVariantType == cartDomain.ProductVariantTypeCustom && ci.ShopID == shop.ShopID {
+								now := appclock.Now()
+								ci.DeletedAt = &now
+								break
+							}
+						}
 					}
 				}
 			}

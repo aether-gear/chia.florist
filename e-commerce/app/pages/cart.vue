@@ -52,7 +52,7 @@ let cartWatchDebounce: ReturnType<typeof setTimeout> | null = null
 onMounted(async () => {
   try {
     storeSelection.fetchActiveShops()
-    await loadCart()
+    await loadCart(true)
     await fetchCartItemsAvailability()
   } finally {
     isPageLoading.value = false
