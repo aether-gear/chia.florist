@@ -226,6 +226,7 @@ export default function SecurityPage() {
   const [wafSummary, setWafSummary] = useState({ total: 0, blocked: 0, allowed: 0, threatLevel: 'Low' });
   const [threatData, setThreatData] = useState<any[]>([]);
   const [isConfirmClearLogsOpen, setIsConfirmClearLogsOpen] = useState(false);
+  const [isConfirmResetAllIPsOpen, setIsConfirmResetAllIPsOpen] = useState(false);
 
   const [rules, setRules] = useState<any[]>([]);
   const [ipList, setIpList] = useState<any[]>([]);
@@ -610,7 +611,6 @@ export default function SecurityPage() {
   };
 
   const handleClearAllIPs = async () => {
-    if (!window.confirm("Are you sure you want to forget and reset ALL configured IPs?")) return;
     try {
       await Promise.all(
         ipList.map(entry =>
@@ -1140,7 +1140,7 @@ export default function SecurityPage() {
               size="sm"
               variant="outline"
               className="h-9 gap-2 border-border text-foreground hover:bg-muted"
-              onClick={handleClearAllIPs}
+              onClick={() => setIsConfirmResetAllIPsOpen(true)}
             >
               Reset / Forget All IPs
             </Button>
@@ -2240,6 +2240,34 @@ export default function SecurityPage() {
               }}
             >
               Clear Logs
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isConfirmResetAllIPsOpen} onOpenChange={setIsConfirmResetAllIPsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white">Reset / Forget All IPs</DialogTitle>
+            <DialogDescription className="mt-2 text-slate-500">
+              Are you sure you want to forget and reset ALL configured IP rules (Banned, Whitelisted, Muted) from the database? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmResetAllIPsOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setIsConfirmResetAllIPsOpen(false);
+                await handleClearAllIPs();
+              }}
+            >
+              Reset All
             </Button>
           </div>
         </DialogContent>

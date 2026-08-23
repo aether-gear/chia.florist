@@ -326,7 +326,7 @@ func WAFMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Rate Limiting Check
-		if isRateLimited(ip) {
+		if ip != "127.0.0.1" && ip != "::1" && ip != "localhost" && isRateLimited(ip) {
 			logRequest(r, "Blocked", "Rate Limit Exceeded (>50 req/sec)", "RATELIMIT", "Rate Limiter Block")
 			fmt.Printf("[WAF] RATE LIMIT BLOCKED %s\n", ip)
 			autoBanIP(ip, "Rate Limit Exceeded (>50 req/sec)")
