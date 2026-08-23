@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, ArrowUpDown, Eye, RefreshCw } from 'lucide-react';
+import { History, ArrowUpDown, Eye, RefreshCw, Zap, ShieldAlert } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -196,9 +196,19 @@ export default function AuditLogsPage() {
                     </div>
 
                     <div className="col-span-1 md:col-span-3">
-                      <Badge variant="outline" className="font-mono text-xs font-semibold bg-muted/40 text-foreground border-border/80">
-                        {log.action}
-                      </Badge>
+                      {log.action === 'critical_stockout_risk_alert' ? (
+                        <Badge className="font-mono text-xs font-semibold bg-destructive/15 text-destructive border-destructive/30 flex items-center gap-1 w-fit">
+                          <Zap className="h-3 w-3" /> critical_stockout_risk_alert
+                        </Badge>
+                      ) : log.action === 'payment_anomaly_detected' ? (
+                        <Badge className="font-mono text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 w-fit">
+                          <ShieldAlert className="h-3 w-3" /> payment_anomaly_detected
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-mono text-xs font-semibold bg-muted/40 text-foreground border-border/80">
+                          {log.action}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="col-span-1 md:col-span-3 font-mono text-xs text-muted-foreground truncate">

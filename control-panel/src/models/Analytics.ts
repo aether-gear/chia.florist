@@ -140,3 +140,40 @@ export interface ProductMetricsResponse {
   avg_return_rate: number;
   invoice_void_rate: number;
 }
+
+// AI Intelligence & Demand Forecasting
+export interface DemandForecast {
+  product_id: string;
+  product_name: string;
+  shop_id?: string | null;
+  predicted_units_sold_7d: number;
+  confidence_tier: 'high' | 'medium' | 'low' | 'baseline' | string;
+  historical_velocity_7d: number;
+  current_stock: number;
+  forecast_generated_at: string;
+}
+
+// AI Stockout Risk Item & Response
+export interface StockoutRiskItem {
+  product_id: string;
+  product_name: string;
+  shop_id: string;
+  shop_name: string;
+  stock: number;
+  reserved_stock: number;
+  available_stock: number;
+  stock_burn_rate_7d: number;
+  supplier_lead_time_days: number;
+  estimated_days_to_stockout: number;
+  reorder_urgency_ratio: number;
+  stockout_probability: number;
+  will_stockout: boolean;
+  risk_level: 'CRITICAL' | 'WARNING' | 'NORMAL' | string;
+  evaluated_at: string;
+}
+
+export interface StockoutRisksResponse {
+  risks: StockoutRiskItem[];
+  count: number;
+}
+

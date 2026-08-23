@@ -112,25 +112,56 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 	return nil
 }
 
-func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) {
+func (c *Cart) RemoveItem(productID uuid.UUID, shopID uuid.UUID) bool {
 	for i := range c.Items {
 		item := &c.Items[i]
-		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+		if item.DeletedAt != nil || item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
 			now := appclock.Now()
 			item.DeletedAt = &now
-			return
+			return true
 		}
 	}
+	return false
+}
+
+// RemoveItemByID soft-deletes any cart item (standard or custom) by its own UUID.
+// Returns false if the item was not found or already deleted.
+func (c *Cart) RemoveItemByID(cartItemID uuid.UUID) bool {
+	for i := range c.Items {
+		if c.Items[i].ID == cartItemID && c.Items[i].DeletedAt == nil {
+			now := appclock.Now()
+			c.Items[i].DeletedAt = &now
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveProduct soft-deletes an active standard cart item matching productID regardless of shopID.
+// Returns false if the item was not found or already deleted.
+func (c *Cart) RemoveProduct(productID uuid.UUID) bool {
+	for i := range c.Items {
+		item := &c.Items[i]
+		if item.DeletedAt != nil || item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID {
+			now := appclock.Now()
+			item.DeletedAt = &now
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveCustomItem soft-deletes a custom cart item by its own UUID.
 // Returns false if the item was not found.
 func (c *Cart) RemoveCustomItem(cartItemID uuid.UUID) bool {
 	for i := range c.Items {
-		if c.Items[i].ID == cartItemID && c.Items[i].ProductVariantType == ProductVariantTypeCustom {
+		if c.Items[i].ID == cartItemID && c.Items[i].ProductVariantType == ProductVariantTypeCustom && c.Items[i].DeletedAt == nil {
 			now := appclock.Now()
 			c.Items[i].DeletedAt = &now
 			return true

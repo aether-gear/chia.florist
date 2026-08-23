@@ -9,6 +9,7 @@ import (
 	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
+	intelligencelayer "service-core/internal/infra/intelligence_layer"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	inventoryDomain "service-core/internal/modules/inventory/domain"
 	inventoryRepo "service-core/internal/modules/inventory/repository"
@@ -32,6 +33,7 @@ type ProcessPaymentWebhookUsecase struct {
 	auditLogger      applogger.AuditLogger
 	transactor       transaction.Transactor
 	executor         transaction.Executor
+	aiProv           intelligencelayer.Provider
 }
 
 func NewProcessPaymentWebhookUsecase(
@@ -45,6 +47,7 @@ func NewProcessPaymentWebhookUsecase(
 	auditLogger applogger.AuditLogger,
 	transactor transaction.Transactor,
 	executor transaction.Executor,
+	aiProv intelligencelayer.Provider,
 ) *ProcessPaymentWebhookUsecase {
 	return &ProcessPaymentWebhookUsecase{
 		repository:       repository,
@@ -57,6 +60,7 @@ func NewProcessPaymentWebhookUsecase(
 		auditLogger:      auditLogger,
 		transactor:       transactor,
 		executor:         executor,
+		aiProv:           aiProv,
 	}
 }
 
@@ -400,6 +404,42 @@ func (u *ProcessPaymentWebhookUsecase) process(
 
 		if err := u.paymentEventRepo.Create(ctx, exec, paymentEvent); err != nil {
 			return fmt.Errorf("failed to create payment event: %w", err)
+		}
+
+		if u.aiProv != nil {
+			timeToPaySec := now.Sub(order.CreatedAt).Seconds()
+			isFailed := 0.0
+			if newPaymentStatus == domain.PaymentStatusFailed {
+				isFailed = 1.0
+			}
+
+			anomalyReq := intelligencelayer.AnomalyCheckRequest{
+				Amount:           float64(order.Total),
+				TimeToPaySec:     timeToPaySec,
+				IsFailedStatus:   isFailed,
+				IsManualTransfer: 0.0,
+			}
+
+			anomalyResp, err := u.aiProv.DetectAnomaly(ctx, anomalyReq)
+			if err == nil && anomalyResp != nil && anomalyResp.IsAnomaly {
+				if u.auditLogger != nil {
+					u.auditLogger.Log(ctx, applogger.AuditEvent{
+						Category:   "security",
+						Action:     "payment_anomaly_detected",
+						Resource:   "payment",
+						ResourceID: payment.ID.String(),
+						Outcome:    applogger.OutcomeFailure,
+						Metadata: map[string]any{
+							"order_id":        order.ID.String(),
+							"anomaly_score":   anomalyResp.AnomalyScore,
+							"severity":        anomalyResp.Severity,
+							"reasons":         anomalyResp.Reasons,
+							"time_to_pay_sec": timeToPaySec,
+							"amount":          order.Total,
+						},
+					})
+				}
+			}
 		}
 
 		return nil

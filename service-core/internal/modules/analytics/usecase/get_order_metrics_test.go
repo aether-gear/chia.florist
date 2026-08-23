@@ -93,6 +93,14 @@ func (m *mockAnalyticsRepo) GetProductMetricsSummary(_ context.Context, _ transa
 	return nil, nil
 }
 
+func (m *mockAnalyticsRepo) GetProductLagFeatures(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*domain.ProductLagFeatures, error) {
+	return nil, nil
+}
+
+func (m *mockAnalyticsRepo) GetInventoryBurnRates(_ context.Context, _ transaction.Executor, _ *uuid.UUID) ([]domain.InventoryBurnRateData, error) {
+	return nil, nil
+}
+
 func TestGetOrderMetricsUsecase_Execute_Success(t *testing.T) {
 	exec := &mockExecutor{}
 	shopID := uuid.New()

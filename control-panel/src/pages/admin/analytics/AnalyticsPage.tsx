@@ -1,11 +1,12 @@
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw, BarChart3, ShoppingBag, CreditCard, Truck, Package } from 'lucide-react';
+import { RefreshCw, BarChart3, ShoppingBag, CreditCard, Truck, Package, Sparkles } from 'lucide-react';
 import { useAnalyticsViewModel } from '../../../viewmodels/useAnalyticsViewModel';
 import AnalyticsOverviewTab from './components/AnalyticsOverviewTab';
 import OrderAnalyticsTab from './components/OrderAnalyticsTab';
 import PaymentAnalyticsTab from './components/PaymentAnalyticsTab';
 import ShipmentAnalyticsTab from './components/ShipmentAnalyticsTab';
 import ProductInventoryAnalyticsTab from './components/ProductInventoryAnalyticsTab';
+import AIForecastsAnalyticsTab from './components/AIForecastsAnalyticsTab';
 import { Button } from '../../../components/ui/button';
 
 export default function AnalyticsPage() {
@@ -38,6 +39,7 @@ export default function AnalyticsPage() {
 
   const tabs = [
     { id: 'overview', label: 'Executive Overview', icon: BarChart3 },
+    { id: 'ai-intelligence', label: 'AI Intelligence & Forecasting', icon: Sparkles },
     { id: 'orders', label: 'Orders & Sales', icon: ShoppingBag },
     { id: 'payments', label: 'Payments & Revenue', icon: CreditCard },
     { id: 'shipments', label: 'Fulfillment & Logistics', icon: Truck },
@@ -176,6 +178,9 @@ export default function AnalyticsPage() {
                 inventoryData={inventoryMetrics}
                 loading={loading}
               />
+            )}
+            {activeTab === 'ai-intelligence' && (
+              <AIForecastsAnalyticsTab shopId={shopId} />
             )}
             {activeTab === 'orders' && (
               <OrderAnalyticsTab data={orderMetrics} loading={loading} />

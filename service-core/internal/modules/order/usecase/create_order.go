@@ -180,7 +180,6 @@ func (u *CreateOrderUsecase) Execute(
 		Total:       pricingResult.GrandTotal,
 		CreatedAt:   now,
 	}
-
 	if err := order.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid order domain state: %w", err)
 	}
@@ -418,9 +417,18 @@ func (u *CreateOrderUsecase) Execute(
 			return fmt.Errorf("failed to load cart with items: %w", err)
 		}
 		if cart != nil {
-			for _, item := range orderItems {
-				if item.ProductID != nil {
-					cart.RemoveItem(*item.ProductID, item.ShopID)
+			for _, shop := range pricingResult.Shops {
+				for _, item := range shop.Items {
+					if item.CartItemID != nil {
+						if cart.RemoveItemByID(*item.CartItemID) {
+							continue
+						}
+					}
+					if item.ProductID != nil {
+						if !cart.RemoveItem(*item.ProductID, shop.ShopID) {
+							cart.RemoveProduct(*item.ProductID)
+						}
+					}
 				}
 			}
 

@@ -5,6 +5,8 @@ import (
 
 	"service-core/internal/modules/analytics/domain"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/google/uuid"
 )
 
 type AnalyticsRepository interface {
@@ -62,4 +64,16 @@ type AnalyticsRepository interface {
 		exec transaction.Executor,
 		params ProductMetricsParams,
 	) (*domain.ProductMetricsSummary, error)
+
+	GetProductLagFeatures(
+		ctx context.Context,
+		exec transaction.Executor,
+		productID uuid.UUID,
+	) (*domain.ProductLagFeatures, error)
+
+	GetInventoryBurnRates(
+		ctx context.Context,
+		exec transaction.Executor,
+		shopID *uuid.UUID,
+	) ([]domain.InventoryBurnRateData, error)
 }

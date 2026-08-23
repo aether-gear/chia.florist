@@ -18,6 +18,8 @@ type AnalyticsHandler struct {
 	getShipmentMetrics  *usecase.GetShipmentMetricsUsecase
 	getInventoryMetrics *usecase.GetInventoryMetricsUsecase
 	getProductMetrics   *usecase.GetProductMetricsUsecase
+	getDemandForecast   *usecase.GetDemandForecastUsecase
+	getStockoutRisks    *usecase.GetStockoutRisksUsecase
 }
 
 func NewAnalyticsHandler(
@@ -26,6 +28,8 @@ func NewAnalyticsHandler(
 	getShipmentMetrics *usecase.GetShipmentMetricsUsecase,
 	getInventoryMetrics *usecase.GetInventoryMetricsUsecase,
 	getProductMetrics *usecase.GetProductMetricsUsecase,
+	getDemandForecast *usecase.GetDemandForecastUsecase,
+	getStockoutRisks *usecase.GetStockoutRisksUsecase,
 ) *AnalyticsHandler {
 	return &AnalyticsHandler{
 		getOrderMetrics:     getOrderMetrics,
@@ -33,6 +37,8 @@ func NewAnalyticsHandler(
 		getShipmentMetrics:  getShipmentMetrics,
 		getInventoryMetrics: getInventoryMetrics,
 		getProductMetrics:   getProductMetrics,
+		getDemandForecast:   getDemandForecast,
+		getStockoutRisks:    getStockoutRisks,
 	}
 }
 
@@ -298,6 +304,96 @@ func (h *AnalyticsHandler) GetProductMetrics(w http.ResponseWriter, r *http.Requ
 	}
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+func (h *AnalyticsHandler) GetDemandForecast(w http.ResponseWriter, r *http.Request) error {
+	productIDStr := apphttp.Query(r, "product_id")
+	if productIDStr == "" {
+		return apperrors.NewBadRequest("product_id query param is required")
+	}
+
+	productID, err := uuid.Parse(productIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid product_id format")
+	}
+
+	var shopID *uuid.UUID
+	shopIDStr := apphttp.Query(r, "shop_id")
+	if shopIDStr != "" {
+		parsed, err := uuid.Parse(shopIDStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid shop_id format")
+		}
+		shopID = &parsed
+	}
+
+	res, err := h.getDemandForecast.Execute(r.Context(), usecase.GetDemandForecastInput{
+		ProductID: productID,
+		ShopID:    shopID,
+	})
+	if err != nil {
+		return err
+	}
+
+	resp := demandForecastResponse{
+		ProductID:            res.ProductID,
+		ProductName:          res.ProductName,
+		ShopID:               res.ShopID,
+		PredictedUnitsSold7d: res.PredictedUnitsSold7d,
+		ConfidenceTier:       res.ConfidenceTier,
+		HistoricalVelocity7d: res.HistoricalVelocity7d,
+		CurrentStock:         res.CurrentStock,
+		ForecastGeneratedAt:  res.ForecastGeneratedAt,
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+func (h *AnalyticsHandler) GetStockoutRisks(w http.ResponseWriter, r *http.Request) error {
+	var shopID *uuid.UUID
+	shopIDStr := apphttp.Query(r, "shop_id")
+	if shopIDStr != "" {
+		parsed, err := uuid.Parse(shopIDStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid shop_id format")
+		}
+		shopID = &parsed
+	}
+
+	items, err := h.getStockoutRisks.Execute(r.Context(), usecase.GetStockoutRisksInput{
+		ShopID: shopID,
+	})
+	if err != nil {
+		return err
+	}
+
+	respList := make([]stockoutRiskItemResponse, 0, len(items))
+	for _, item := range items {
+		respList = append(respList, stockoutRiskItemResponse{
+			ProductID:               item.ProductID,
+			ProductName:             item.ProductName,
+			ShopID:                  item.ShopID,
+			ShopName:                item.ShopName,
+			Stock:                   item.Stock,
+			ReservedStock:           item.ReservedStock,
+			AvailableStock:          item.AvailableStock,
+			StockBurnRate7d:         item.StockBurnRate7d,
+			SupplierLeadTimeDays:    item.SupplierLeadTimeDays,
+			EstimatedDaysToStockout: item.EstimatedDaysToStockout,
+			ReorderUrgencyRatio:     item.ReorderUrgencyRatio,
+			StockoutProbability:     item.StockoutProbability,
+			WillStockout:            item.WillStockout,
+			RiskLevel:               item.RiskLevel,
+			EvaluatedAt:             item.EvaluatedAt,
+		})
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+		"risks": respList,
+		"count": len(respList),
+	})
 	return nil
 }
 

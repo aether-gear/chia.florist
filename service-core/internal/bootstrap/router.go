@@ -278,6 +278,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetShipmentMetrics,
 			&c.GetInventoryMetrics,
 			&c.GetProductMetrics,
+			&c.GetDemandForecast,
+			&c.GetStockoutRisks,
 		)
 	)
 
@@ -515,6 +517,8 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/shipments", chains.StaffAdminOnly(analyticsHandler.GetShipmentMetrics))
 			r.Get("/inventory", chains.StaffAdminOnly(analyticsHandler.GetInventoryMetrics))
 			r.Get("/products", chains.StaffAdminOnly(analyticsHandler.GetProductMetrics))
+			r.Get("/forecasts/demand", chains.StaffAdminOnly(analyticsHandler.GetDemandForecast))
+			r.Get("/inventory/stockout-risks", chains.StaffAdminOnly(analyticsHandler.GetStockoutRisks))
 		})
 	})
 

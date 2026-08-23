@@ -5,21 +5,22 @@ import (
 )
 
 type Config struct {
-	App         config.AppConfig
-	Logistics   config.LogisticsConfig
-	JWT         config.JWTConfig
-	Storage     config.StorageConfig
-	Supabase    config.SupabaseConfig
-	Postgres    config.PostgresConfig
-	DB          config.DatabaseConfig
-	SMTP        config.SMTPConfig
-	MidTrans    config.MidTransConfig
-	RajaOngkir  config.RajaOngkirConfig
-	Komerce     config.KomerceConfig
-	GoogleOAuth config.GoogleOAuthConfig
-	WAF         config.WAFConfig
-	PaymentSync config.PaymentSyncConfig
-	PaymentExpiry config.PaymentExpiryConfig
+	App               config.AppConfig
+	Logistics         config.LogisticsConfig
+	JWT               config.JWTConfig
+	Storage           config.StorageConfig
+	Supabase          config.SupabaseConfig
+	Postgres          config.PostgresConfig
+	DB                config.DatabaseConfig
+	SMTP              config.SMTPConfig
+	MidTrans          config.MidTransConfig
+	RajaOngkir        config.RajaOngkirConfig
+	Komerce           config.KomerceConfig
+	GoogleOAuth       config.GoogleOAuthConfig
+	WAF               config.WAFConfig
+	PaymentSync       config.PaymentSyncConfig
+	PaymentExpiry     config.PaymentExpiryConfig
+	IntelligenceLayer config.IntelligenceLayerConfig
 }
 
 func LoadConfig() Config {
@@ -46,20 +47,21 @@ func LoadConfig() Config {
 	// )
 
 	return Config{
-		App:           config.LoadAppConfig(),
-		Logistics:     config.LoadLogisticsConfig(),
-		JWT:           config.LoadJWTConfig(),
-		Storage:       config.LoadStorageConfig(),
-		Supabase:      supabaseCfg,
-		Postgres:      postgresCfg,
-		DB:            dbConf,
-		SMTP:          config.LoadSMTPConfig(),
-		MidTrans:      config.LoadMidTransConfig(),
-		RajaOngkir:    config.LoadRajaOngkirConfig(),
-		Komerce:       config.LoadKomerceConfig(),
-		GoogleOAuth:   config.LoadGoogleOAuthConfig(),
-		WAF:           config.LoadWAFConfig(),
-		PaymentSync:   config.LoadPaymentSyncConfig(),
-		PaymentExpiry: config.LoadPaymentExpiryConfig(),
+		App:               config.LoadAppConfig(),
+		Logistics:         config.LoadLogisticsConfig(),
+		JWT:               config.LoadJWTConfig(),
+		Storage:           config.LoadStorageConfig(),
+		Supabase:          supabaseCfg,
+		Postgres:          postgresCfg,
+		DB:                dbConf,
+		SMTP:              config.LoadSMTPConfig(),
+		MidTrans:          config.LoadMidTransConfig(),
+		RajaOngkir:        config.LoadRajaOngkirConfig(),
+		Komerce:           config.LoadKomerceConfig(),
+		GoogleOAuth:       config.LoadGoogleOAuthConfig(),
+		WAF:               config.LoadWAFConfig(),
+		PaymentSync:       config.LoadPaymentSyncConfig(),
+		PaymentExpiry:     config.LoadPaymentExpiryConfig(),
+		IntelligenceLayer: config.LoadIntelligenceLayerConfig(),
 	}
 }
