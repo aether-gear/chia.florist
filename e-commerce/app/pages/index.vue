@@ -334,7 +334,9 @@ onUnmounted(() => {
           <!-- Text & Highlights -->
           <div class="lg:col-span-7 space-y-5">
             <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300 text-xs font-bold uppercase tracking-widest">
-              <span>🎮</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+              </svg>
               <span>Interactive 2D Board Simulator</span>
             </div>
 
@@ -349,19 +351,35 @@ onUnmounted(() => {
             <!-- Features Bullet Points -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div class="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-gray-200">
-                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs shrink-0">✓</span>
+                <div class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
                 <span>Visualisasi 2D langsung di layar</span>
               </div>
               <div class="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-gray-200">
-                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs shrink-0">✓</span>
+                <div class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
                 <span>Pilihan warna & font lengkap</span>
               </div>
               <div class="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-gray-200">
-                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs shrink-0">✓</span>
+                <div class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
                 <span>Simpan draft & review desain</span>
               </div>
               <div class="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-gray-200">
-                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs shrink-0">✓</span>
+                <div class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
                 <span>Estimasi harga transparan</span>
               </div>
             </div>
@@ -477,13 +495,6 @@ onUnmounted(() => {
 
             <!-- Product Info -->
             <div class="p-3.5 sm:p-4 space-y-2">
-              <!-- Rating & Reviews -->
-              <div class="flex items-center gap-1 text-[11px] text-yellow-500 font-bold">
-                <span>⭐ {{ item.rating ? item.rating.toFixed(1) : '4.8' }}</span>
-                <span class="text-gray-300">|</span>
-                <span class="text-gray-400 font-normal">({{ item.reviews || 80 }})</span>
-              </div>
-
               <!-- Product Name -->
               <h3 class="font-bold text-gray-900 text-xs sm:text-sm line-clamp-2 group-hover:text-[#1b4332] transition-colors leading-snug">
                 {{ item.name }}

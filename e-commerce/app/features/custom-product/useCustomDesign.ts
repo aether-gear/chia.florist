@@ -274,6 +274,12 @@ export const useCustomDesign = () => {
     boardScale.value = Math.max(0.2, Math.min(fitScale, 1.15))
   }
 
+  const setZoom = (percentOrScale: number) => {
+    _manualZoom = true
+    const scale = percentOrScale > 2 ? percentOrScale / 100 : percentOrScale
+    boardScale.value = Math.max(0.2, Math.min(1.5, Math.round(scale * 100) / 100))
+  }
+
   const zoomIn = () => {
     _manualZoom = true
     boardScale.value = Math.min(1.5, Math.round((boardScale.value + 0.05) * 100) / 100)
@@ -951,7 +957,7 @@ export const useCustomDesign = () => {
     boardBorderStyle, boardCornerStyle, centerBorderStyle, upperCornerStyle, lowerCornerStyle, floralSec,
     selectedEl, selectedImg, selectedBrush, imgElements, brushElements,
     baseSizePrice, brushFee, uniqueColors, colorFee, borderFee, accessoriesFee, mediaFee, totalPrice,
-    updateScale, zoomIn, zoomOut, resetZoom, randomizeDesign, bringToFront, deleteSelected,
+    updateScale, setZoom, zoomIn, zoomOut, resetZoom, randomizeDesign, bringToFront, deleteSelected,
     handleDrop, handleFileInput, handleBrushMousedown, handleBoardClick,
     startDragEl, startDragDiv, onMouseMove, onMouseUp, onTouchMove, onTouchEnd, onKeyDown,
     generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign,

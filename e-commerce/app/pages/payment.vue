@@ -287,7 +287,11 @@ const handleCheckPayment = async () => {
 
       <!-- Error State -->
       <div v-else-if="errorMsg" class="bg-red-50 border border-red-100 rounded-3xl p-8 text-center shadow-sm space-y-4">
-        <div class="text-4xl">⚠️</div>
+        <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
         <h3 class="font-bold text-red-800 text-lg">Error Loading Payment</h3>
         <p class="text-sm text-red-600 max-w-md mx-auto">{{ errorMsg }}</p>
         <button @click="navigateTo('/profile/orders')" class="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl transition text-xs cursor-pointer">
@@ -335,7 +339,9 @@ const handleCheckPayment = async () => {
         <!-- Expired State -->
         <div v-else-if="paymentInfoState?.status === 'expired'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-amber-50/50">
-            <span class="text-4xl">⏰</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-amber-900">Payment Window Expired</h3>
@@ -368,7 +374,9 @@ const handleCheckPayment = async () => {
         <!-- Cancelled State -->
         <div v-else-if="paymentInfoState?.status === 'cancelled'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
-            <span class="text-4xl">🚫</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-red-900">Order Cancelled</h3>
@@ -397,7 +405,9 @@ const handleCheckPayment = async () => {
         <!-- Failed State -->
         <div v-else-if="paymentInfoState?.status === 'failed'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
-            <span class="text-4xl">❌</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-red-900">Payment Failed</h3>
@@ -426,7 +436,9 @@ const handleCheckPayment = async () => {
         <!-- Refunded / Refund Pending State -->
         <div v-else-if="paymentInfoState?.status === 'refunded' || paymentInfoState?.status === 'refund_pending'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-purple-50/50">
-            <span class="text-4xl">💸</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-purple-900">{{ paymentInfoState?.status === 'refunded' ? 'Payment Refunded' : 'Refund Pending' }}</h3>
@@ -472,11 +484,19 @@ const handleCheckPayment = async () => {
               <div v-if="paymentInfoState?.channelData" class="flex flex-col justify-between p-6 rounded-2xl border border-gray-100 bg-gray-50/30 gap-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
                   <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-[#1b4332]/5 rounded-xl flex items-center justify-center text-xl">
-                      <span v-if="paymentInfoState.channelData.channel_type === 'ewallet'">📱</span>
-                      <span v-else-if="paymentInfoState.channelData.channel_type === 'bank_transfer'">🏦</span>
-                      <span v-else-if="paymentInfoState.channelData.channel_type === 'qr_code'">🔍</span>
-                      <span v-else>💳</span>
+                    <div class="w-12 h-12 bg-[#1b4332]/5 text-[#1b4332] rounded-xl flex items-center justify-center">
+                      <svg v-if="paymentInfoState.channelData.channel_type === 'ewallet'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+                      </svg>
+                      <svg v-else-if="paymentInfoState.channelData.channel_type === 'bank_transfer'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5m-15 10.5V10.5M3 21h18M3 9h18" />
+                      </svg>
+                      <svg v-else-if="paymentInfoState.channelData.channel_type === 'qr_code'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                      </svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                      </svg>
                     </div>
                     <div>
                       <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selected Provider</span>
@@ -490,7 +510,10 @@ const handleCheckPayment = async () => {
                       target="_blank"
                       class="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-2.5 px-5 rounded-xl transition text-xs shadow-sm"
                     >
-                      Proceed to Payment Page ↗
+                      <span>Proceed to Payment Page</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
                     </a>
                   </div>
                 </div>

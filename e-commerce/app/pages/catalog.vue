@@ -197,7 +197,9 @@ const navigateToProduct = (item: any) => {
           
           <div class="lg:col-span-8 space-y-4">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-              <span>🎨</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+              </svg>
               <span>Custom Board Simulator</span>
             </div>
 
@@ -269,7 +271,7 @@ const navigateToProduct = (item: any) => {
             >
               <option value="">All Locations / Stores</option>
               <option v-for="shop in shops" :key="shop.id" :value="shop.slug">
-                📍 {{ shop.name }}
+                {{ shop.name }}
               </option>
             </select>
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
@@ -301,7 +303,10 @@ const navigateToProduct = (item: any) => {
       <!-- Active Location Notification Banner if store selected -->
       <div v-if="storeSelection.selectedShop.value" class="mb-8 flex items-center justify-between bg-emerald-50 border border-emerald-100 px-5 py-3 rounded-2xl text-xs">
         <div class="flex items-center gap-2">
-          <span class="text-base">📍</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#1b4332] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
           <span class="text-gray-600 font-medium">Showing exclusive collection for:</span>
           <span class="font-bold text-[#1b4332]">{{ storeSelection.selectedShop.value.name }}</span>
         </div>
@@ -320,7 +325,12 @@ const navigateToProduct = (item: any) => {
 
       <!-- Empty State -->
       <div v-else-if="error && (!catalogProducts || catalogProducts.length === 0)" class="flex flex-col items-center justify-center min-h-[350px] space-y-6 text-center">
-        <div class="text-5xl">🌸</div>
+        <div class="w-16 h-16 rounded-full bg-emerald-50 text-[#1b4332] flex items-center justify-center mx-auto border border-emerald-100">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L9.568 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+          </svg>
+        </div>
         <div>
           <h3 class="text-2xl font-bold text-gray-900">Produk sedang tidak tersedia</h3>
           <p class="text-gray-500 text-sm mt-2 max-w-md mx-auto">
@@ -364,21 +374,16 @@ const navigateToProduct = (item: any) => {
               <span v-else-if="!item.isAvailable || item.stock === 0" class="absolute top-4 right-4 bg-red-100 text-red-800 text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-xl border border-red-200 shadow-xs z-20">
                 Sold Out
               </span>
-              <span v-else-if="item.stock !== undefined" class="absolute top-4 right-4 bg-emerald-100/90 text-emerald-900 text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-xl border border-emerald-200 shadow-xs z-20 flex items-center gap-1">
-                <span>📦</span> {{ item.stock }} in stock
+              <span v-else-if="item.stock !== undefined" class="absolute top-4 right-4 bg-emerald-100/90 text-emerald-900 text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-xl border border-emerald-200 shadow-xs z-20 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-800 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                <span>{{ item.stock }} in stock</span>
               </span>
             </div>
 
             <!-- Card Info -->
             <div class="p-6 space-y-3">
-              <div class="flex items-center justify-between text-xs font-bold">
-                <div class="flex items-center gap-1.5 text-yellow-500">
-                  <span>⭐ {{ item.rating ? item.rating.toFixed(1) : '4.8' }}</span>
-                  <span class="text-gray-300">|</span>
-                  <span class="text-gray-400 font-medium">({{ item.reviews || 150 }} reviews)</span>
-                </div>
-              </div>
-              
               <h3 class="text-lg font-bold text-gray-900 group-hover:text-[#1b4332] transition-colors leading-snug">
                 {{ item.name }}
               </h3>

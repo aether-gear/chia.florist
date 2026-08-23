@@ -39,7 +39,6 @@ const checkoutData = ref<CheckoutResponse | null>(null)
 const isLoadingCheckout = ref(false)
 const isLoadingCalculate = ref(false)
 const isInitialMountComplete = ref(false)
-const discount = ref(0)
 const selectedAddressId = ref('')
 const isProcessing = ref(false)
 
@@ -579,14 +578,14 @@ const livePaymentFee = computed(() => {
   return activeMethod ? activeMethod.fee : 0
 })
 const liveTotalPayment = computed(() => {
-  if (!checkoutData.value) return cartSubtotal.value - discount.value
+  if (!checkoutData.value) return cartSubtotal.value
   if (checkoutData.value.selected_payment_method?.id === selectedPaymentMethodId.value) {
-    return checkoutData.value.total - discount.value
+    return checkoutData.value.total
   }
   const sub = checkoutData.value.subtotal
   const ship = checkoutData.value.total_shipping
   const fee = livePaymentFee.value
-  return sub + ship + fee - discount.value
+  return sub + ship + fee
 })
 
 // Eksekusi checkout memindahkan state item keranjang ke invoice order profile
@@ -918,11 +917,6 @@ const handlePlaceOrder = async () => {
                         <span class="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">Qty: {{ item.quantity }}</span>
                         <span>•</span>
                         <span>{{ formatRupiah(item.price) }}</span>
-                        <span v-if="(item as any).size" class="text-gray-400">• Size: {{ (item as any).size }}</span>
-                        <div v-if="(item as any).color" class="flex items-center gap-1 text-gray-400">
-                          <span>• Color:</span>
-                          <span :style="{ backgroundColor: (item as any).color }" class="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block"></span>
-                        </div>
                         <span v-if="(item as any).custom_design || item.product_variant_type === 'custom'" class="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-emerald-200">
                           Custom Design
                         </span>
@@ -1111,11 +1105,6 @@ const handlePlaceOrder = async () => {
                 <span class="text-gray-900 font-bold">
                   {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
                 </span>
-              </div>
-              
-              <div class="flex justify-between items-center text-emerald-700" v-if="discount > 0">
-                <span>Promo Discount</span>
-                <span class="font-bold">-{{ formatRupiah(discount) }}</span>
               </div>
               
               <div class="border-t border-gray-100 pt-4 flex justify-between items-baseline">

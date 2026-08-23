@@ -328,7 +328,11 @@ useHead({
     </div>
 
     <div v-else-if="product && product.status === 'archived'" class="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center animate-fade-in">
-      <span class="text-4xl">📦</span>
+      <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+        </svg>
+      </div>
       <h3 class="text-lg font-bold text-gray-800">Product No Longer Available</h3>
       <p class="text-gray-500 text-sm max-w-md">This item has been archived and is no longer listed in our store catalog.</p>
       <NuxtLink to="/catalog" class="bg-[#1b4332] text-white px-5 py-2.5 rounded-xl hover:bg-[#143326] transition font-semibold text-xs inline-block">
@@ -367,19 +371,24 @@ useHead({
           <div>
             <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ product.name }}</h1>
             <div class="flex items-center gap-3 mt-2 flex-wrap">
-              <span class="text-sm text-gray-400">⭐ 4.8 ({{ product.reviews || 150 }} Reviews)</span>
-              <span class="text-gray-200">|</span>
               <span v-if="product.status === 'inactive'" class="text-amber-800 font-extrabold text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                 Preview Only — Not For Sale
               </span>
               <span v-else-if="selectedShopSlug && selectedBranchStock > 0" class="text-emerald-700 font-extrabold text-xs bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
-                <span>📦</span> In Stock ({{ selectedBranchStock }} available)
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                In Stock ({{ selectedBranchStock }} available)
               </span>
               <span v-else-if="selectedShopSlug && selectedBranchStock <= 0" class="text-red-700 font-extrabold text-xs bg-red-50 px-3 py-1 rounded-full border border-red-200">
                 Sold Out at Selected Store
               </span>
-              <span v-else class="text-amber-700 font-extrabold text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                📍 Select Fulfilling Branch Below
+              <span v-else class="text-amber-700 font-extrabold text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+                Select Fulfilling Branch Below
               </span>
             </div>
           </div>
@@ -391,35 +400,10 @@ useHead({
 
           <!-- Inactive Product Notice Banner -->
           <div v-if="product.status === 'inactive'" class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-800 flex items-center gap-2">
-            <span class="text-base">ℹ️</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+            </svg>
             <span>This product is currently available for preview only and cannot be ordered online at this time.</span>
-          </div>
-
-          <div class="space-y-3">
-            <label class="text-sm font-semibold text-gray-800">Colours:</label>
-            <div class="flex gap-3">
-              <button 
-                v-for="color in product.colors" 
-                :key="color"
-                @click="selectedColor = color"
-                :style="{ backgroundColor: color }"
-                :class="['w-7 h-7 rounded-full border-2 transition', selectedColor === color ? 'border-black scale-110 shadow' : 'border-transparent']"
-              ></button>
-            </div>
-          </div>
-
-          <div class="space-y-3">
-            <label class="text-sm font-semibold text-gray-800">Size:</label>
-            <div class="flex gap-2.5">
-              <button 
-                v-for="size in ['1.5m', '1.8m', '2m']" 
-                :key="size"
-                @click="selectedSize = size"
-                :class="['min-w-[42px] h-[34px] px-3 rounded border text-xs font-semibold transition', selectedSize === size ? 'bg-[#1b4332] text-white border-[#1b4332]' : 'bg-white border-gray-300 text-gray-700']"
-              >
-                {{ size }}
-              </button>
-            </div>
           </div>
 
           <!-- Store / Branch Availability Selection (In-Stock Branches Only) -->
@@ -440,7 +424,9 @@ useHead({
                 class="p-3 rounded-xl border flex items-center justify-between transition-all group"
               >
                 <div class="flex items-center gap-2">
-                  <span class="text-sm">🏪</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 group-hover:text-emerald-700 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
+                  </svg>
                   <span class="text-xs font-bold text-gray-800 group-hover:text-emerald-800 transition-colors">{{ avail.slug }}</span>
                 </div>
                 <div class="flex items-center gap-2">
@@ -457,14 +443,18 @@ useHead({
               class="mt-2.5 p-3 rounded-xl flex items-center gap-2 text-xs font-semibold transition-all"
               :class="branchWarning ? 'bg-red-50 text-red-700 border border-red-200 shadow-2xs' : 'bg-amber-50 text-amber-800 border border-amber-200/80'"
             >
-              <span class="text-sm font-bold">⚠️</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" :class="branchWarning ? 'text-red-600' : 'text-amber-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
               <span>{{ branchWarning || 'Please select a fulfilling store branch above to check stock and purchase.' }}</span>
             </div>
           </div>
 
           <!-- Out of Stock Message if no branches have inventory -->
           <div v-else-if="product && product.status !== 'inactive' && (product.available === false || inStockBranches.length === 0)" class="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-700 flex items-center gap-2">
-            <span class="text-base">🚫</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
             <span>This product is currently out of stock across all store branches.</span>
           </div>
 
@@ -492,23 +482,6 @@ useHead({
               >
                 {{ product.status === 'inactive' ? 'Preview Only' : 'Buy Now' }}
               </button>
-            </div>
-          </div>
-
-          <div class="border border-gray-200 rounded-xl divide-y divide-gray-200 bg-white">
-            <div class="flex items-center gap-4 p-4">
-              <span class="text-2xl">📦</span>
-              <div>
-                <h4 class="text-sm font-bold text-gray-900">Free Delivery</h4>
-                <p class="text-xs text-gray-500 underline cursor-pointer">Enter your postal code for availability</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-4 p-4">
-              <span class="text-2xl">🔄</span>
-              <div>
-                <h4 class="text-sm font-bold text-gray-900">Return Delivery</h4>
-                <p class="text-xs text-gray-500">Free 30 Days Delivery Returns.</p>
-              </div>
             </div>
           </div>
 

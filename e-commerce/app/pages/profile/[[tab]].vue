@@ -941,7 +941,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <!-- Store Header & Order Info Bar -->
                   <div class="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm">🏬</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
+                      </svg>
                       <h4 class="font-bold text-gray-900 text-xs group-hover:text-[#1b4332] transition-colors">Chia Florist Workshop</h4>
                       <span class="hidden xs:inline-block text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
                       <span class="text-xs text-gray-300">|</span>
@@ -956,8 +958,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                       <span v-if="order.payment?.status && order.payment.status !== 'pending' && order.payment.status !== 'paid'" :class="['px-2.5 py-0.5 text-[11px] sm:text-xs font-bold rounded-full border', ordersVm.getPaymentStatusBadge(order.payment.status).colorClass]">
                         {{ ordersVm.getPaymentStatusBadge(order.payment.status).label }}
                       </span>
-                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[10px] sm:text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                        ⏳ Pay in {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}
+                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[10px] sm:text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100 flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pay in {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}
                       </span>
                     </div>
                   </div>
@@ -965,8 +970,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <!-- Product Preview Item -->
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-1">
                     <div class="flex items-center gap-3 min-w-0">
-                      <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex-shrink-0 flex items-center justify-center text-xl">
-                        🌸
+                      <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex-shrink-0 flex items-center justify-center text-[#1b4332]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L9.568 3z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                        </svg>
                       </div>
                       <div class="min-w-0">
                         <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">
@@ -1001,7 +1009,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                         @click.stop="openTrackShipment(order)"
                         class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
-                        <span>🚚</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                        </svg>
                         <span>Track Package</span>
                       </button>
                       <button 
@@ -1009,7 +1019,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                         @click.stop="contactDriver(order.id)"
                         class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
-                        <span>💬</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                        </svg>
                         <span>Contact Courier</span>
                       </button>
                     </div>
@@ -1019,7 +1031,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
 
               <div v-else class="bg-white border border-gray-100 rounded-2xl p-8 sm:p-12 text-center shadow-xs space-y-3">
-                <div class="text-4xl">📑</div>
+                <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                  </svg>
+                </div>
                 <h4 class="font-bold text-gray-900 text-sm">No Orders Found</h4>
                 <p class="text-xs text-gray-400 max-w-xs mx-auto">There are no orders in the "{{ statusLabels[activeOrderStatus] }}" category.</p>
                 <button @click="navigateTo('/catalog')" class="mt-1 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition cursor-pointer">
@@ -1174,7 +1190,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               @click="showShippingOverlay = true"
               class="px-4 py-2 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>🚚</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+              </svg>
               <span>Open Tracking Overlay</span>
             </button>
           </div>
@@ -1184,7 +1202,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
-                  <span>🚚</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                  </svg>
                   <span>Shipping Information</span>
                 </h4>
                 <p class="text-[11px] text-gray-500 mt-1">
@@ -1197,7 +1217,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 @click="showShippingOverlay = true"
                 class="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
               >
-                <span>📦</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803zM13.5 10.5h-6" />
+                </svg>
                 <span>Open Tracking Overlay</span>
               </button>
             </div>
@@ -1217,7 +1239,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           <!-- Payment Information Details Box -->
           <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-4 sm:p-5 space-y-3">
             <h4 class="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-2">
-              <span>💳</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+              </svg>
               <span>Payment Details</span>
             </h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
@@ -1231,7 +1255,12 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
               <div v-if="selectedOrder.payment?.expires_at && selectedOrder.status === 'pending'">
                 <p class="text-gray-400 font-semibold text-[10px]">EXPIRATION COUNTDOWN</p>
-                <p class="font-bold text-amber-700 mt-0.5">⏳ {{ ordersVm.getTimeRemaining(selectedOrder.payment.expires_at) }}</p>
+                <p class="font-bold text-amber-700 mt-0.5 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {{ ordersVm.getTimeRemaining(selectedOrder.payment.expires_at) }}
+                </p>
               </div>
               <div>
                 <p class="text-gray-400 font-semibold text-[10px]">ORDER ID</p>
@@ -1245,14 +1274,22 @@ const handleCheckPaymentStatus = async (orderId: string) => {
             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ordered Products</h4>
             <div class="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/20">
               <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-3 sm:gap-4 items-center p-3 sm:p-4 bg-white">
-                <div class="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-xl sm:text-2xl">
-                  🌸
+                <div class="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-[#1b4332]">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L9.568 3z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                  </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                   <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">{{ item.product_name }}</h5>
                   <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-1 text-[10px] text-gray-500 font-semibold">
                     <span class="bg-gray-100 px-2 py-0.5 rounded">Shop: {{ item.shop_name }}</span>
-                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">🚚 {{ item.courier_code.toUpperCase() }} {{ item.courier_service }}</span>
+                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                      </svg>
+                      {{ item.courier_code.toUpperCase() }} {{ item.courier_service }}
+                    </span>
                   </div>
                 </div>
                 <div class="text-right text-xs flex-shrink-0">
@@ -1338,7 +1375,9 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           <!-- Overlay Header -->
           <div class="px-5 sm:px-6 py-4 sm:py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div class="flex items-center gap-2">
-              <span class="text-base">🚚</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+              </svg>
               <h3 class="font-extrabold text-gray-900 text-sm">Shipping Information</h3>
             </div>
             <button @click="showShippingOverlay = false" class="text-gray-400 hover:text-black font-bold text-base p-1 cursor-pointer">✕</button>
@@ -1397,7 +1436,10 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   @click="fetchOrderTracking(selectedOrder.id)" 
                   class="text-[10px] text-emerald-700 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                 >
-                  <span>🔄</span> Refresh
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Refresh
                 </button>
               </div>
 

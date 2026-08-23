@@ -163,7 +163,8 @@ onUnmounted(() => {
           <input type="range" min="20" max="150" step="5"
             :value="Math.round(design.boardScale * 100)"
             :style="{ '--v': Math.round(design.boardScale * 100) }"
-            @input="(e) => { design.boardScale = parseInt((e.target as HTMLInputElement).value) / 100 }"
+            @input="(e) => design.setZoom(Number((e.target as HTMLInputElement).value))"
+            @change="(e) => design.setZoom(Number((e.target as HTMLInputElement).value))"
             class="dr-zoom-slider hidden md:block" title="Zoom"/>
           <button class="dr-zoom-btn" @click="design.zoomIn()" title="Zoom in (Ctrl+=)">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
