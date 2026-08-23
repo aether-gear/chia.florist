@@ -214,6 +214,9 @@ export const useOrders = () => {
   const goToPage = (tab: OrderTab, page: number) => {
     if (page >= 1 && page <= totalPages.value) {
       fetchOrders(tab, page)
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     }
   }
 

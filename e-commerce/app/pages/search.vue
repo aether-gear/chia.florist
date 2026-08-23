@@ -453,27 +453,15 @@ useHead({
             </div>
           </div>
 
-          <!-- Card Footer Price & CTA Button (matching design_philosophy) -->
+          <!-- Card Footer Price (Clean without internal buttons) -->
           <div class="p-5 pt-0">
             <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
               <div>
                 <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Price</span>
-                <span class="text-base font-extrabold text-gray-900">
+                <span class="text-base font-extrabold text-[#1b4332]">
                   {{ formatRupiah(product.price) }}
                 </span>
               </div>
-
-              <CButton
-                :to="product.isCustomRoute || product.id === 'custom' ? '/products/custom' : `/products/${product.slug || product.id}`"
-                :variant="product.isCustomRoute || product.id === 'custom' ? 'primary' : 'secondary'"
-                size="sm"
-                @click.stop
-              >
-                <span>{{ product.isCustomRoute || product.id === 'custom' ? 'Design' : 'View' }}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
-              </CButton>
             </div>
           </div>
         </article>

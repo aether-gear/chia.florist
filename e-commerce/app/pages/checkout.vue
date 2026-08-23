@@ -700,7 +700,7 @@ const handlePlaceOrder = async () => {
       'Order placed successfully! Redirecting to secure payment page...',
       [
         { label: 'Pay Now', onClick: () => navigateTo(`/payment?orderId=${result.order_id}`) },
-        { label: 'My Orders', onClick: () => navigateTo('/profile') }
+        { label: 'My Orders', onClick: () => navigateTo('/profile/orders') }
       ]
     )
     navigateTo(`/payment?orderId=${result.order_id}`)
@@ -770,7 +770,7 @@ const handlePlaceOrder = async () => {
                 <h2 class="font-extrabold text-gray-900 text-lg">Shipping Destination</h2>
               </div>
               <CButton
-                to="/profile"
+                to="/profile/addresses"
                 variant="outline"
                 size="sm"
                 class="text-xs"
@@ -796,7 +796,7 @@ const handlePlaceOrder = async () => {
               <p class="text-xs text-gray-500 max-w-sm mx-auto">Please add your event delivery location in your profile settings before continuing.</p>
               <div class="pt-2">
                 <CButton
-                  to="/profile"
+                  to="/profile/addresses"
                   variant="primary"
                   size="sm"
                 >

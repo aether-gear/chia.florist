@@ -279,7 +279,7 @@ watch(() => route.path, () => {
                   <!-- MENU OPTIONS -->
                   <div class="py-1">
                     <NuxtLink
-                      to="/profile"
+                      to="/profile/personal"
                       @click="isProfileOpen = false"
                       class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-emerald-50/60 hover:text-[#1b4332] transition-colors"
                     >
@@ -290,7 +290,19 @@ watch(() => route.path, () => {
                     </NuxtLink>
 
                     <NuxtLink
-                      to="/profile"
+                      to="/profile/addresses"
+                      @click="isProfileOpen = false"
+                      class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-emerald-50/60 hover:text-[#1b4332] transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Shipping Addresses</span>
+                    </NuxtLink>
+
+                    <NuxtLink
+                      to="/profile/orders"
                       @click="isProfileOpen = false"
                       class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-emerald-50/60 hover:text-[#1b4332] transition-colors"
                     >
@@ -413,7 +425,7 @@ watch(() => route.path, () => {
             </div>
 
             <NuxtLink
-              to="/profile"
+              to="/profile/personal"
               @click="closeMobileMenu"
               class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-[#1b4332]"
             >
@@ -424,7 +436,19 @@ watch(() => route.path, () => {
             </NuxtLink>
 
             <NuxtLink
-              to="/profile"
+              to="/profile/addresses"
+              @click="closeMobileMenu"
+              class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-[#1b4332]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Shipping Addresses</span>
+            </NuxtLink>
+
+            <NuxtLink
+              to="/profile/orders"
               @click="closeMobileMenu"
               class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-[#1b4332]"
             >

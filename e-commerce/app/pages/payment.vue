@@ -5,6 +5,7 @@ import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { formatRupiah } from '~/utils/formatter'
 import { orderService } from '~/services/orderService'
 import { mapErrorMessage } from '~/utils/errorMessages'
+import { renderMarkdown } from '~/utils/markdown'
 
 useHead({
   title: 'Secure Payment - Chia Florist'
@@ -73,7 +74,7 @@ const startPolling = () => {
             'Payment Verified!',
             'Your payment has been received and confirmed.',
             [
-              { label: 'View Order', onClick: () => navigateTo('/profile') },
+              { label: 'View Order', onClick: () => navigateTo('/profile/orders') },
               { label: 'Got it' }
             ]
           )
@@ -109,7 +110,7 @@ const handleTimerZero = async () => {
     'The time allocated for completing your payment has lapsed.',
     [
       { label: 'Browse Catalog', onClick: () => navigateTo('/catalog') },
-      { label: 'My Orders', onClick: () => navigateTo('/profile') }
+      { label: 'My Orders', onClick: () => navigateTo('/profile/orders') }
     ]
   )
 }
@@ -208,33 +209,8 @@ const orderId = computed(() => {
   return paymentInfoState.value ? paymentInfoState.value.orderId : 'CHIA-LOCAL'
 })
 
-const renderMarkdown = (md: string) => {
-  if (!md) return ''
-  let html = md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  // Headers: # Title
-  html = html.replace(/^#\s+(.+)$/gm, '<h2 class="text-xl font-bold text-gray-900 mb-4">$1</h2>')
-
-  // Bold: **text**
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-emerald-800">$1</strong>')
-
-  // Lists: - item
-  html = html.replace(/^\s*-\s+(.+)$/gm, '<li class="ml-4 list-disc text-sm text-gray-700 my-1 font-semibold">$1</li>')
-
-  // Paragraphs / Newlines
-  html = html.split('\n\n').map(p => {
-    if (p.startsWith('<h2') || p.startsWith('<li')) return p
-    return `<p class="text-sm text-gray-600 leading-relaxed mb-3">${p.replace(/\n/g, '<br/>')}</p>`
-  }).join('')
-
-  return html
-}
-
 const instructionHtml = computed(() => {
-  return paymentInfoState.value ? renderMarkdown(paymentInfoState.value.instruction) : ''
+  return paymentInfoState.value?.instruction ? renderMarkdown(paymentInfoState.value.instruction) : ''
 })
 
 const qrCodeUrl = computed(() => {
@@ -276,7 +252,7 @@ const handleCheckPayment = async () => {
         'Payment Verified!',
         'Thank you! Your payment has been received and confirmed.',
         [
-          { label: 'View Order', onClick: () => navigateTo('/profile') },
+          { label: 'View Order', onClick: () => navigateTo('/profile/orders') },
           { label: 'Got it' }
         ]
       )
@@ -314,7 +290,7 @@ const handleCheckPayment = async () => {
         <div class="text-4xl">⚠️</div>
         <h3 class="font-bold text-red-800 text-lg">Error Loading Payment</h3>
         <p class="text-sm text-red-600 max-w-md mx-auto">{{ errorMsg }}</p>
-        <button @click="navigateTo('/profile')" class="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl transition text-xs cursor-pointer">
+        <button @click="navigateTo('/profile/orders')" class="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl transition text-xs cursor-pointer">
           Back to My Orders
         </button>
       </div>
@@ -347,7 +323,7 @@ const handleCheckPayment = async () => {
             </div>
           </div>
           <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-            <button @click="navigateTo('/profile')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+            <button @click="navigateTo('/profile/orders')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Track My Order
             </button>
             <button @click="navigateTo('/catalog')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
@@ -383,7 +359,7 @@ const handleCheckPayment = async () => {
             <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Browse Catalog / Re-Order
             </button>
-            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+            <button @click="navigateTo('/profile/orders')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               Back to My Orders
             </button>
           </div>
@@ -412,7 +388,7 @@ const handleCheckPayment = async () => {
             <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Re-Order Flower Arrangement
             </button>
-            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+            <button @click="navigateTo('/profile/orders')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               View Order History
             </button>
           </div>
@@ -441,7 +417,7 @@ const handleCheckPayment = async () => {
             <button @click="navigateTo('/checkout')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Try Checkout Again
             </button>
-            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+            <button @click="navigateTo('/profile/orders')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               Back to My Orders
             </button>
           </div>
@@ -467,7 +443,7 @@ const handleCheckPayment = async () => {
             </div>
           </div>
           <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-            <button @click="navigateTo('/profile')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+            <button @click="navigateTo('/profile/orders')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               View My Orders
             </button>
           </div>
@@ -535,8 +511,8 @@ const handleCheckPayment = async () => {
               </div>
 
               <!-- Markdown Payment Instructions from Backend -->
-              <div v-if="instructionHtml" class="bg-emerald-50/10 border border-emerald-100/50 rounded-2xl p-6 mb-6 text-left shadow-sm">
-                <div v-html="instructionHtml" class="prose max-w-none"></div>
+              <div v-if="instructionHtml" class="bg-emerald-50/20 border border-emerald-100 rounded-2xl p-6 mb-6 text-left shadow-2xs">
+                <div v-html="instructionHtml" class="payment-instruction-content"></div>
               </div>
 
               <!-- Action Buttons to check/verify payment -->
@@ -550,7 +526,7 @@ const handleCheckPayment = async () => {
                   <span>{{ isChecking ? 'Verifying Payment...' : 'I Have Paid / Verify Status' }}</span>
                 </button>
                 <button
-                  @click="navigateTo('/profile')"
+                  @click="navigateTo('/profile/orders')"
                   class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-3.5 px-6 rounded-xl transition text-xs cursor-pointer"
                 >
                   Pay Later / View Orders
@@ -566,6 +542,59 @@ const handleCheckPayment = async () => {
 </template>
 
 <style scoped>
+.payment-instruction-content :deep(h1) {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #111827;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.payment-instruction-content :deep(h2) {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #111827;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.payment-instruction-content :deep(h3) {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #064e3b;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.payment-instruction-content :deep(p) {
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+.payment-instruction-content :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.payment-instruction-content :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.payment-instruction-content :deep(li) {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0.25rem 0;
+  line-height: 1.5;
+}
+.payment-instruction-content :deep(code) {
+  background-color: #ecfdf5;
+  color: #064e3b;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  border: 1px solid #a7f3d0;
+}
 .animate-fade {
   animation: fadeIn 0.3s ease-out;
 }

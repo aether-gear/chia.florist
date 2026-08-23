@@ -1,4 +1,4 @@
-<!-- app/pages/profile.vue -->
+<!-- app/pages/profile/[[tab]].vue -->
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
@@ -18,12 +18,39 @@ definePageMeta({
 
 useHead({ title: 'My Profile - Chia Florist' })
 
+const route = useRoute()
 const authVm = useAuthViewModel()
 const addressVm = useAddress()
 const globalAlert = useGlobalAlert()
 
-const activeTab = ref('personal')
-const activeOrderStatus = ref<OrderTab>('all')
+const allowedTabs = ['personal', 'addresses', 'orders']
+const activeTab = computed(() => {
+  const t = (route.params.tab as string)?.toLowerCase()
+  return allowedTabs.includes(t) ? t : 'personal'
+})
+
+const switchTab = (tabId: string) => {
+  if (tabId === 'personal') {
+    navigateTo('/profile/personal')
+  } else {
+    navigateTo(`/profile/${tabId}`)
+  }
+}
+
+const initialStatus = ((route.query.status as string)?.toLowerCase() as OrderTab)
+const activeOrderStatus = ref<OrderTab>(
+  ['all', 'pending', 'processing', 'shipping', 'completed', 'cancelled'].includes(initialStatus)
+    ? initialStatus
+    : 'all'
+)
+
+const setOrderStatus = (statusId: OrderTab) => {
+  activeOrderStatus.value = statusId
+  navigateTo({
+    path: '/profile/orders',
+    query: statusId === 'all' ? {} : { status: statusId }
+  })
+}
 
 const statusLabels: Record<OrderTab, string> = {
   all: 'All Orders',
@@ -139,11 +166,9 @@ function onImgLoad(e: Event) {
   const img = e.target as HTMLImageElement
   naturalW.value = img.naturalWidth
   naturalH.value = img.naturalHeight
-  // Fill container: zoom=1 means image fills every pixel, overflow is clipped
   baseScale.value = Math.max(contW.value / img.naturalWidth, contH.value / img.naturalHeight)
   cropZoom.value = 1
   imgX.value = 0; imgY.value = 0
-  // Square crop box, 75% of shorter container side, centred
   const side = Math.round(Math.min(contW.value, contH.value) * 0.75)
   cbW.value = side; cbH.value = side
   cbX.value = Math.round((contW.value - side) / 2)
@@ -188,7 +213,6 @@ function onGlobalMove(cx: number, cy: number) {
     nx = Math.max(0, Math.min(contW.value - nw, nx + dx))
     ny = Math.max(0, Math.min(contH.value - nh, ny + dy))
   } else {
-    // Compute raw side length (always square: W === H)
     let rawSide: number = nw
     if (m === 'e')  rawSide = initCbW.value + dx
     if (m === 'w')  rawSide = initCbW.value - dx
@@ -202,11 +226,9 @@ function onGlobalMove(cx: number, cy: number) {
 
     nw = rawSide; nh = rawSide
 
-    // Anchor the opposite edge for W/N handles
     if (m.includes('w')) nx = initCbX.value + initCbW.value - rawSide
     if (m.includes('n')) ny = initCbY.value + initCbH.value - rawSide
 
-    // Clamp position to container, re-enforce square after clamping
     nx = Math.max(0, nx); ny = Math.max(0, ny)
     if (nx + nw > contW.value) { nw = contW.value - nx; nh = nw }
     if (ny + nh > contH.value) { nh = contH.value - ny; nw = nh }
@@ -228,7 +250,6 @@ function onTouchEndCrop()             { dragMode.value = null }
 
 function onCropZoomChange() {
   clampImg()
-  // keep crop box inside container
   if (cbX.value + cbW.value > contW.value) cbW.value = contW.value - cbX.value
   if (cbY.value + cbH.value > contH.value) cbH.value = contH.value - cbY.value
 }
@@ -300,7 +321,6 @@ const performCropAndUpload = async () => {
   const userId = authVm.currentUser.value?.id
   if (!userId) { uploadError.value = 'Not authenticated.'; return }
 
-  // Draw to canvas while image element is still in DOM
   const canvas = document.createElement('canvas')
   canvas.width = 800
   canvas.height = 800
@@ -308,11 +328,9 @@ const performCropAndUpload = async () => {
   if (!ctx) return
 
   const s = scale.value
-  // Image top-left corner in container coords
   const imgLeft = contW.value / 2 - (naturalW.value * s) / 2 + imgX.value
   const imgTop  = contH.value / 2 - (naturalH.value * s) / 2 + imgY.value
 
-  // Crop box in source image coordinates
   const srcX = (cbX.value - imgLeft) / s
   const srcY = (cbY.value - imgTop) / s
   const srcW = cbW.value / s
@@ -323,7 +341,6 @@ const performCropAndUpload = async () => {
   canvas.toBlob(async (blob) => {
     if (!blob) { uploadError.value = 'Crop failed.'; return }
 
-    // Close modal after pixel data is captured
     showCropper.value = false
     cropSrc.value = ''
     if (fileInput.value) fileInput.value.value = ''
@@ -372,7 +389,6 @@ const handleRemovePicture = async () => {
         authVm.currentUser.value.avatarUrl = null
       }
 
-      // Clear avatar URL in Go backend
       await authVm.updateUserProfile({
         avatar_url: ''
       })
@@ -423,9 +439,43 @@ const loadAddressesData = async () => {
   await addressVm.fetchAddresses()
 }
 
+// ─── Orders ────────────────────────────────────────────────────────
+const ordersVm = useOrders()
+const {
+  trackingData,
+  isTrackingLoading,
+  trackingError,
+  fetchOrderTracking
+} = ordersVm
+
+// Load orders whenever the orders tab or sub-status tab is activated and scroll smoothly to top
+const loadOrders = (tab: OrderTab = activeOrderStatus.value as OrderTab, page = 1) => {
+  ordersVm.fetchOrders(tab, page)
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'addresses') {
     loadAddressesData()
+  } else if (tab === 'orders') {
+    loadOrders(activeOrderStatus.value)
+  }
+}, { immediate: true })
+
+watch(activeOrderStatus, (status) => {
+  if (activeTab.value === 'orders') {
+    loadOrders(status)
+  }
+})
+
+watch(() => route.query.status, (newStatus) => {
+  if (newStatus && typeof newStatus === 'string') {
+    const s = newStatus.toLowerCase() as OrderTab
+    if (['all', 'pending', 'processing', 'shipping', 'completed', 'cancelled'].includes(s)) {
+      activeOrderStatus.value = s
+    }
   }
 })
 
@@ -439,6 +489,11 @@ onMounted(async () => {
     navigateTo('/login')
   } else {
     await loadProfilePicture()
+    if (activeTab.value === 'addresses') {
+      loadAddressesData()
+    } else if (activeTab.value === 'orders') {
+      loadOrders(activeOrderStatus.value)
+    }
   }
 })
 
@@ -519,7 +574,8 @@ const handleSaveAddress = async () => {
     addressFormError.value = mapErrorMessage(result.message, 'Failed to save address.')
   }
 }
-  const handleDeleteAddress = async (id: string) => {
+
+const handleDeleteAddress = async (id: string) => {
   if (confirm('Are you sure you want to delete this address?')) {
     const result = await addressVm.deleteAddress(id)
     if (result.success) {
@@ -529,32 +585,6 @@ const handleSaveAddress = async () => {
     }
   }
 }
-
-// ─── Orders ────────────────────────────────────────────────────────
-const ordersVm = useOrders()
-const {
-  trackingData,
-  isTrackingLoading,
-  trackingError,
-  fetchOrderTracking
-} = ordersVm
-
-// Load orders whenever the orders tab or sub-status tab is activated
-const loadOrders = (tab: OrderTab = activeOrderStatus.value as OrderTab, page = 1) => {
-  ordersVm.fetchOrders(tab, page)
-}
-
-watch(activeTab, (tab) => {
-  if (tab === 'orders') {
-    loadOrders(activeOrderStatus.value as OrderTab)
-  }
-})
-
-watch(activeOrderStatus, (status) => {
-  if (activeTab.value === 'orders') {
-    loadOrders(status as OrderTab)
-  }
-})
 
 // Logout
 const handleLogout = async () => {
@@ -581,11 +611,6 @@ const closeOrderDetail = () => {
   showShippingOverlay.value = false
 }
 
-const toggleShippingOverlay = () => {
-  showShippingOverlay.value = !showShippingOverlay.value
-}
-
-
 watch(showShippingOverlay, (show) => {
   if (show && selectedOrder.value?.id) {
     fetchOrderTracking(selectedOrder.value.id)
@@ -601,7 +626,6 @@ const copyTrackingNumber = (trackingNumber: string) => {
     isCopied.value = false
   }, 2000)
 }
-
 
 const contactDriver = (orderId: string) => {
   window.open(`https://wa.me/628175234999?text=Hello%20Chia%20Florist,%20I%20would%20like%20to%20inquire%20about%20the%20delivery%20status%20for%20order%20${orderId}`, '_blank')
@@ -642,7 +666,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         ]
       )
       closeOrderDetail()
-      loadOrders('pending') // Refresh pending orders list
+      loadOrders('pending')
     } else {
       globalAlert.showInfo('Payment Pending', `Payment status is still pending (status: ${res.status}). If you have already transferred, please allow up to 15 minutes for automated reconciliation.`)
     }
@@ -663,14 +687,17 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         <NuxtLink to="/" class="hover:text-[#1b4332]">Home</NuxtLink>
         <span>/</span>
         <span class="text-gray-900 font-medium">My Profile</span>
+        <span v-if="activeTab !== 'personal'">/</span>
+        <span v-if="activeTab === 'addresses'" class="text-[#1b4332] font-semibold">Shipping Addresses</span>
+        <span v-if="activeTab === 'orders'" class="text-[#1b4332] font-semibold">Order Tracking</span>
       </nav>
 
-      <!-- Mobile Horizontal Tab Switcher (Visible on mobile/tablet) -->
+      <!-- Mobile Horizontal Tab Switcher -->
       <div class="lg:hidden mb-6 bg-white p-1.5 rounded-2xl shadow-xs border border-gray-100 grid grid-cols-3 gap-1">
         <button 
           v-for="tab in [{id:'personal', label:'Profile'}, {id:'addresses', label:'Addresses'}, {id:'orders', label:'Orders'}]"
           :key="tab.id"
-          @click="activeTab = tab.id"
+          @click="switchTab(tab.id)"
           :class="['py-2.5 px-2 rounded-xl text-xs font-bold text-center transition-all cursor-pointer', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:bg-gray-50']"
         >
           {{ tab.label }}
@@ -688,18 +715,14 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 @click="triggerFileSelect"
                 title="Change Profile Picture"
               >
-                <!-- Avatar Image -->
                 <img v-if="avatarUrl" :src="avatarUrl" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" alt="Avatar" />
-                <!-- Default Icon -->
                 <div v-else class="text-3xl text-[#1b4332]">👤</div>
 
-                <!-- Hover Overlay -->
                 <div class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <span class="text-white text-xs font-bold">Change</span>
                   <span class="text-white text-[10px]">Photo</span>
                 </div>
 
-                <!-- Uploading Spinner -->
                 <div v-if="isUploading" class="absolute inset-0 bg-black/60 flex items-center justify-center">
                   <div class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                 </div>
@@ -712,12 +735,12 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Silver Member</p>
             </div>
 
-            <!-- Desktop Sidebar Tabs -->
+            <!-- Desktop Sidebar Tabs with sub-route links -->
             <nav class="hidden lg:block space-y-1">
               <button 
                 v-for="tab in [{id:'personal', label:'Personal Information'}, {id:'addresses', label:'Shipping Addresses'}, {id:'orders', label:'Order Tracking'}]"
                 :key="tab.id"
-                @click="activeTab = tab.id"
+                @click="switchTab(tab.id)"
                 :class="['w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50']"
               >
                 {{ tab.label }}
@@ -753,7 +776,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <div class="border-b border-gray-100 pb-6 space-y-4">
                 <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Profile Picture</h4>
                 <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-                  <!-- Image Preview -->
                   <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center text-3xl text-gray-400 relative flex-shrink-0">
                     <img v-if="avatarUrl" :src="avatarUrl" class="w-full h-full object-cover" alt="Profile picture" />
                     <span v-else>👤</span>
@@ -775,7 +797,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   </div>
                 </div>
 
-                <!-- Upload Error -->
                 <div v-if="uploadError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
                   ⚠️ {{ uploadError }}
                 </div>
@@ -875,7 +896,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Orders tab -->
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
-            <!-- Shopee Category Tabs Bar (Scrollable on mobile, Grid on tablet/desktop) -->
+            <!-- Order Category Tabs Bar -->
             <div class="bg-white border border-gray-100 p-1.5 rounded-2xl shadow-xs flex overflow-x-auto sm:grid sm:grid-cols-6 gap-1 text-center font-medium scrollbar-none">
               <button 
                 v-for="status in [
@@ -887,7 +908,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   { id: 'cancelled', label: 'Cancelled' }
                 ]"
                 :key="status.id"
-                @click="activeOrderStatus = status.id as any"
+                @click="setOrderStatus(status.id as any)"
                 :class="['py-2 px-3 sm:px-1 text-xs rounded-xl transition-all font-bold cursor-pointer whitespace-nowrap flex-shrink-0 sm:flex-shrink', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50']"
               >
                 {{ status.label }}
@@ -908,19 +929,20 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <button @click="loadOrders()" class="mt-3 px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition cursor-pointer">Retry</button>
             </div>
 
-            <!-- Orders list (Sleek Compact Cards) -->
+            <!-- Orders list (Clear Sleek Cards - Clickable card without View Details button) -->
             <template v-else>
               <div v-if="ordersVm.orders.value.length > 0" class="space-y-4">
                 <div 
                   v-for="order in ordersVm.orders.value" 
                   :key="order.id" 
-                  class="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 hover:shadow-md transition duration-300"
+                  @click="openOrderDetail(order)"
+                  class="group bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 hover:shadow-md hover:border-emerald-200 transition duration-300 cursor-pointer"
                 >
                   <!-- Store Header & Order Info Bar -->
                   <div class="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
                     <div class="flex items-center gap-2">
                       <span class="text-sm">🏬</span>
-                      <h4 class="font-bold text-gray-900 text-xs">Chia Florist Workshop</h4>
+                      <h4 class="font-bold text-gray-900 text-xs group-hover:text-[#1b4332] transition-colors">Chia Florist Workshop</h4>
                       <span class="hidden xs:inline-block text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
                       <span class="text-xs text-gray-300">|</span>
                       <span class="text-[11px] font-mono text-gray-500 font-bold">#{{ order.number }}</span>
@@ -962,7 +984,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                     </div>
                   </div>
 
-                  <!-- Card Footer: Action Buttons -->
+                  <!-- Card Footer: Contextual Direct Action Buttons (without redundant View Details button) -->
                   <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-gray-50">
                     <span class="text-[11px] text-gray-400 font-medium">Placed on {{ ordersVm.formatDate(order.created_at) }}</span>
 
@@ -984,17 +1006,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                       </button>
                       <button 
                         v-if="order.status === 'shipped' || order.status === 'delivered'"
-                        @click="contactDriver(order.id)"
+                        @click.stop="contactDriver(order.id)"
                         class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
                         <span>💬</span>
                         <span>Contact Courier</span>
-                      </button>
-                      <button 
-                        @click="openOrderDetail(order)" 
-                        class="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
-                      >
-                        View Details
                       </button>
                     </div>
 
@@ -1011,7 +1027,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </button>
               </div>
 
-              <!-- Pagination -->
+              <!-- Pagination with Smooth Scroll to Top -->
               <div v-if="ordersVm.totalPages.value > 1" class="flex items-center justify-center gap-2 pt-2">
                 <button
                   @click="loadOrders(activeOrderStatus as OrderTab, ordersVm.currentPage.value - 1)"
@@ -1045,7 +1061,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         </div>
 
         <div class="p-5 sm:p-8 space-y-4 flex-1">
-          <!-- Inline Address Validation Error -->
           <div v-if="addressFormError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
             ⚠️ {{ addressFormError }}
           </div>
@@ -1331,7 +1346,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Overlay Body -->
           <div class="p-5 sm:p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
-            <!-- Courier Summary (from backend tracking response or first item) -->
             <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 space-y-2">
               <div class="flex justify-between font-semibold">
                 <span class="text-gray-400">Courier Partner</span>
@@ -1418,9 +1432,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
               </div>
 
-              <!-- Fallback Status Milestones (when tracking is not yet available or returns empty) -->
+              <!-- Fallback Status Milestones -->
               <div v-else class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
-                <!-- Milestone: Placed -->
                 <div class="relative">
                   <span 
                     class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white flex items-center justify-center"
@@ -1430,7 +1443,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="text-[10px] text-gray-400 mt-0.5">{{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
                 </div>
 
-                <!-- Milestone: Payment (for non-pending) -->
                 <div v-if="selectedOrder.status !== 'pending' && selectedOrder.status !== 'cancelled'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Payment Verified by Admin</p>
@@ -1442,7 +1454,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="text-[10px] text-gray-400 mt-0.5">Awaiting payment confirmation</p>
                 </div>
 
-                <!-- Milestone: Arranging Flowers (for processing or later) -->
                 <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Flower Arrangement Complete</p>
@@ -1458,7 +1469,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="font-bold text-gray-500">Flower Board Production</p>
                 </div>
 
-                <!-- Milestone: Shipped (for shipped or later) -->
                 <div v-if="['shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Handed Over to Courier</p>
@@ -1469,7 +1479,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="font-bold text-gray-500">Hand Over to Courier Partner</p>
                 </div>
 
-                <!-- Milestone: Delivered (for delivered or later) -->
                 <div v-if="['delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Delivered to Destination</p>
@@ -1480,14 +1489,12 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="font-bold text-gray-500">Out for Delivery / Completed Destination</p>
                 </div>
 
-                <!-- Milestone: Completed / Finished -->
                 <div v-if="selectedOrder.status === 'finished'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Order Completed</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Transaction finalized by customer</p>
                 </div>
 
-                <!-- Milestone: Cancelled -->
                 <div v-if="selectedOrder.status === 'cancelled'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-red-500 ring-4 ring-red-100"></span>
                   <p class="font-bold text-red-600">Order Cancelled</p>
@@ -1539,7 +1546,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               @mousedown="startImgPan"
               @touchstart="startImgPan"
             >
-              <!-- The image -->
               <img
                 v-if="cropSrc"
                 :src="cropSrc"
@@ -1549,7 +1555,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 alt=""
               />
 
-              <!-- Dim overlays (4 rects outside crop box) -->
+              <!-- Dim overlays -->
               <div class="absolute pointer-events-none" :style="{ ...dimTop,    background: 'rgba(0,0,0,0.5)' }"></div>
               <div class="absolute pointer-events-none" :style="{ ...dimBottom, background: 'rgba(0,0,0,0.5)' }"></div>
               <div class="absolute pointer-events-none" :style="{ ...dimLeft,   background: 'rgba(0,0,0,0.5)' }"></div>
@@ -1576,7 +1582,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 "></div>
 
                 <!-- 8 resize handles -->
-                <!-- Corners -->
                 <div class="crop-handle crop-handle-corner" style="top:-5px;left:-5px;cursor:nw-resize"
                   @mousedown.stop="startCropHandle($event,'nw')" @touchstart.stop="startCropHandle($event,'nw')"></div>
                 <div class="crop-handle crop-handle-corner" style="top:-5px;right:-5px;cursor:ne-resize"
@@ -1585,7 +1590,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   @mousedown.stop="startCropHandle($event,'sw')" @touchstart.stop="startCropHandle($event,'sw')"></div>
                 <div class="crop-handle crop-handle-corner" style="bottom:-5px;right:-5px;cursor:se-resize"
                   @mousedown.stop="startCropHandle($event,'se')" @touchstart.stop="startCropHandle($event,'se')"></div>
-                <!-- Edges -->
+                
                 <div class="crop-handle crop-handle-edge" style="top:-4px;left:calc(50% - 12px);cursor:n-resize"
                   @mousedown.stop="startCropHandle($event,'n')" @touchstart.stop="startCropHandle($event,'n')"></div>
                 <div class="crop-handle crop-handle-edge" style="bottom:-4px;left:calc(50% - 12px);cursor:s-resize"
@@ -1599,7 +1604,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
             <!-- Controls -->
             <div class="px-4 sm:px-6 py-3 sm:py-4 space-y-3">
-              <!-- Zoom slider -->
               <div class="flex items-center gap-3">
                 <span class="text-xs font-bold text-gray-400 w-10">Zoom</span>
                 <input
@@ -1612,7 +1616,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <span class="text-xs font-bold text-gray-500 w-10 text-right">{{ Math.round(cropZoom * 100) }}%</span>
               </div>
 
-              <!-- Size info + buttons -->
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <span class="text-[11px] text-gray-400">
                   ⬜ {{ cbW }} × {{ cbW }} px (square)

@@ -26,7 +26,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
             'Signed In Successfully',
             `Welcome, ${authVm.currentUser.value?.name || 'Customer'}!`,
             [
-              { label: 'My Profile', onClick: () => navigateTo('/profile') },
+              { label: 'My Profile', onClick: () => navigateTo('/profile/personal') },
               { label: 'Dismiss' }
             ]
           )
