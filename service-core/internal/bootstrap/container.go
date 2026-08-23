@@ -248,15 +248,16 @@ func NewContainer(cfg Config,
 		customerRepo            = customerPersistence.NewCustomerRepositoryImpl()
 		membershipRepo          = authorPersistence.NewStaffMembershipRepositoryImpl()
 		staffPermRepo           = authorPersistence.NewStaffPermissionRepositoryImpl()
-		roleRepo                = authorPersistence.NewRoleRepositoryImpl()
-		orderRepo               = orderPersistence.NewOrderRepositoryImpl()
-		orderItemRepo           = orderPersistence.NewOrderItemRepositoryImpl()
-		invoiceRepo             = orderPersistence.NewInvoiceRepositoryImpl()
-		invoiceItemRepo         = orderPersistence.NewInvoiceItemRepositoryImpl()
-		shipmentRepo            = shipmentPersistence.NewShipmentRepositoryImpl()
-		shipmentEventRepo       = shipmentPersistence.NewShipmentEventRepositoryImpl()
-		threatIntelRepo         = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
-		analyticsRepo           = analyticsPersistence.NewAnalyticsRepositoryImpl()
+		roleRepo                   = authorPersistence.NewRoleRepositoryImpl()
+		orderRepo                  = orderPersistence.NewOrderRepositoryImpl()
+		orderItemRepo              = orderPersistence.NewOrderItemRepositoryImpl()
+		orderItemCustomDesignRepo  = orderPersistence.NewOrderItemCustomDesignRepositoryImpl()
+		invoiceRepo                = orderPersistence.NewInvoiceRepositoryImpl()
+		invoiceItemRepo            = orderPersistence.NewInvoiceItemRepositoryImpl()
+		shipmentRepo               = shipmentPersistence.NewShipmentRepositoryImpl()
+		shipmentEventRepo          = shipmentPersistence.NewShipmentEventRepositoryImpl()
+		threatIntelRepo            = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
+		analyticsRepo              = analyticsPersistence.NewAnalyticsRepositoryImpl()
 	)
 
 	var (
@@ -907,6 +908,7 @@ func NewContainer(cfg Config,
 				accountRepo,
 				orderRepo,
 				orderItemRepo,
+				orderItemCustomDesignRepo,
 				invoiceRepo,
 				invoiceItemRepo,
 				paymentRepo,
@@ -925,6 +927,7 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				orderRepo,
 				orderItemRepo,
+				orderItemCustomDesignRepo,
 				paymentRepo,
 				paymentChannelDataRepo,
 				shipmentRepo,
@@ -935,6 +938,7 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				orderRepo,
 				orderItemRepo,
+				orderItemCustomDesignRepo,
 				paymentRepo,
 				paymentChannelDataRepo,
 				shipmentRepo,

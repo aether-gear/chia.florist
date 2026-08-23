@@ -30,6 +30,8 @@ const (
 	DEFAULT_HEX_COLOR_FALLBACK = "#FFFFFF"
 )
 
+// CustomDesignPayload represents the standardized custom flower board
+// design approach (supporting v3.0.0, v1.0.0, and normalized legacy payloads).
 type CustomDesignPayload struct {
 	Metadata    DesignMetadata    `json:"metadata"`
 	Layout      DesignLayout      `json:"layout"`
@@ -40,17 +42,19 @@ type CustomDesignPayload struct {
 }
 
 type DesignMetadata struct {
-	Version       string `json:"version"`
-	EditorVersion string `json:"editorVersion"`
-	Platform      string `json:"platform"`
-	Locale        string `json:"locale"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
-	Checksum      string `json:"checksum"`
+	Version       string          `json:"version"`
+	EditorVersion string          `json:"editorVersion"`
+	Platform      string          `json:"platform"`
+	Locale        string          `json:"locale"`
+	CreatedAt     string          `json:"createdAt"`
+	UpdatedAt     string          `json:"updatedAt"`
+	Checksum      string          `json:"checksum"`
+	FeatureFlags  map[string]bool `json:"featureFlags,omitempty"`
 }
 
 type DesignLayout struct {
 	PhysicalSizeID   string     `json:"physicalSizeId"` // "small", "medium", "large"
+	AspectRatioID    string     `json:"aspectRatioId,omitempty"`
 	UpperHeightRatio float64    `json:"upperHeightRatio"`
 	Border           BorderSpec `json:"border"`
 }
@@ -68,10 +72,17 @@ type DesignSections struct {
 }
 
 type SectionSpec struct {
-	BGColorHex  string         `json:"bgColorHex"`
-	CornerStyle string         `json:"cornerStyle"` // "none", "rounded", "cut", "ornate", "floral"
-	Header      TypographySpec `json:"header"`
-	Body        TypographySpec `json:"body"`
+	BGColorHex        string         `json:"bgColorHex"`
+	CornerStyle       string         `json:"cornerStyle"` // "none", "rounded", "cut", "ornate", "floral"
+	OpacityPercent    *int           `json:"opacityPercent,omitempty"`
+	Header            TypographySpec `json:"header"`
+	Body              TypographySpec `json:"body"`
+	HeaderBorder      *bool          `json:"headerBorder,omitempty"`
+	HeaderBorderColor *string        `json:"headerBorderColor,omitempty"`
+	HeaderBorderWidth *int           `json:"headerBorderWidth,omitempty"`
+	BodyBorder        *bool          `json:"bodyBorder,omitempty"`
+	BodyBorderColor   *string        `json:"bodyBorderColor,omitempty"`
+	BodyBorderWidth   *int           `json:"bodyBorderWidth,omitempty"`
 }
 
 type TypographySpec struct {
@@ -83,8 +94,9 @@ type TypographySpec struct {
 }
 
 type DesignDecorations struct {
-	TopCrest    CrestSpec `json:"topCrest"`
-	BottomCrest CrestSpec `json:"bottomCrest"`
+	TopCrest    CrestSpec      `json:"topCrest"`
+	BottomCrest CrestSpec      `json:"bottomCrest"`
+	Watermark   *WatermarkSpec `json:"watermark,omitempty"`
 }
 
 type CrestSpec struct {
@@ -93,6 +105,12 @@ type CrestSpec struct {
 	PrimaryColorHex   string `json:"primaryColorHex"`
 	SecondaryColorHex string `json:"secondaryColorHex"`
 	ScalePercent      int    `json:"scalePercent"`
+}
+
+type WatermarkSpec struct {
+	Enabled        bool   `json:"enabled"`
+	Text           string `json:"text"`
+	OpacityPercent int    `json:"opacityPercent"`
 }
 
 type DesignElement struct {
@@ -117,14 +135,15 @@ type ElementTransform struct {
 	YPercent     float64 `json:"yPercent"`
 	ScalePercent float64 `json:"scalePercent"`
 	RotationDeg  float64 `json:"rotationDeg"`
+	ZIndex       *int    `json:"zIndex,omitempty"`
 }
 
 type DesignAssets struct {
-	PreviewBase64   *string `json:"previewBase64"`
-	PreviewAssetID  *string `json:"previewAssetId"`
-	PreviewURL      *string `json:"previewUrl"`
-	BucketPath      *string `json:"bucketPath"`
-	StorageProvider *string `json:"storageProvider"`
+	PreviewBase64   *string `json:"previewBase64,omitempty"`
+	PreviewAssetID  *string `json:"previewAssetId,omitempty"`
+	PreviewURL      *string `json:"previewUrl,omitempty"`
+	BucketPath      *string `json:"bucketPath,omitempty"`
+	StorageProvider *string `json:"storageProvider,omitempty"`
 }
 
 // CustomPricingMatrix contains configurable pricing rules
@@ -198,14 +217,237 @@ func NormalizeHexColor(color string, fallback string) string {
 	return fallback
 }
 
+// ParseCustomDesignPayload parses a raw JSON payload, seamlessly handling
+// v3.0.0, v1.0.0, and legacy flat schemas.
 func ParseCustomDesignPayload(raw json.RawMessage) (*CustomDesignPayload, error) {
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("empty custom design payload")
 	}
-	var payload CustomDesignPayload
-	if err := json.Unmarshal(raw, &payload); err != nil {
+
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &rawMap); err != nil {
 		return nil, fmt.Errorf("failed to parse custom design payload: %w", err)
 	}
+
+	// Check if this is standard structured payload (has "sections" or "layout")
+	if _, hasSections := rawMap["sections"]; hasSections {
+		var payload CustomDesignPayload
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal structured custom design: %w", err)
+		}
+		if payload.Metadata.Version == "" {
+			payload.Metadata.Version = "3.0.0"
+		}
+		if payload.Layout.PhysicalSizeID == "" {
+			payload.Layout.PhysicalSizeID = DEFAULT_PHYSICAL_SIZE_ID
+		}
+		return &payload, nil
+	}
+
+	// Fallback / legacy flat payload parser
+	var payload CustomDesignPayload
+	payload.Metadata.Version = "3.0.0"
+	payload.Layout.PhysicalSizeID = DEFAULT_PHYSICAL_SIZE_ID
+
+	if layoutRaw, ok := rawMap["layout"]; ok {
+		_ = json.Unmarshal(layoutRaw, &payload.Layout)
+	}
+	if metaRaw, ok := rawMap["metadata"]; ok {
+		_ = json.Unmarshal(metaRaw, &payload.Metadata)
+	}
+	if decRaw, ok := rawMap["decorations"]; ok {
+		_ = json.Unmarshal(decRaw, &payload.Decorations)
+	}
+	if elemRaw, ok := rawMap["elements"]; ok {
+		_ = json.Unmarshal(elemRaw, &payload.Elements)
+	}
+	if assetRaw, ok := rawMap["assets"]; ok {
+		_ = json.Unmarshal(assetRaw, &payload.Assets)
+	}
+
+	// Check top-level physicalSizeId / physical_size_id
+	if sizeRaw, ok := rawMap["physicalSizeId"]; ok {
+		var sizeStr string
+		if err := json.Unmarshal(sizeRaw, &sizeStr); err == nil && sizeStr != "" {
+			payload.Layout.PhysicalSizeID = sizeStr
+		}
+	} else if sizeRaw, ok := rawMap["physical_size_id"]; ok {
+		var sizeStr string
+		if err := json.Unmarshal(sizeRaw, &sizeStr); err == nil && sizeStr != "" {
+			payload.Layout.PhysicalSizeID = sizeStr
+		}
+	}
+
+	// Check top-level heightRatio / upperHeightRatio
+	if hrRaw, ok := rawMap["heightRatio"]; ok {
+		var hr float64
+		if err := json.Unmarshal(hrRaw, &hr); err == nil && hr > 0 {
+			payload.Layout.UpperHeightRatio = hr
+		}
+	} else if hrRaw, ok := rawMap["upperHeightRatio"]; ok {
+		var hr float64
+		if err := json.Unmarshal(hrRaw, &hr); err == nil && hr > 0 {
+			payload.Layout.UpperHeightRatio = hr
+		}
+	}
+
+	// Parse flat topCrest / bottomCrest if present
+	if tcRaw, ok := rawMap["topCrest"]; ok {
+		var tc map[string]interface{}
+		if err := json.Unmarshal(tcRaw, &tc); err == nil {
+			if vis, ok := tc["enabled"].(bool); ok {
+				payload.Decorations.TopCrest.Visible = vis
+			} else if vis, ok := tc["visible"].(bool); ok {
+				payload.Decorations.TopCrest.Visible = vis
+			}
+			if st, ok := tc["style"].(string); ok {
+				payload.Decorations.TopCrest.VariantID = st
+			} else if st, ok := tc["variantId"].(string); ok {
+				payload.Decorations.TopCrest.VariantID = st
+			}
+			if p, ok := tc["primary"].(string); ok {
+				payload.Decorations.TopCrest.PrimaryColorHex = p
+			} else if p, ok := tc["primaryColorHex"].(string); ok {
+				payload.Decorations.TopCrest.PrimaryColorHex = p
+			}
+			if s, ok := tc["secondary"].(string); ok {
+				payload.Decorations.TopCrest.SecondaryColorHex = s
+			} else if s, ok := tc["secondaryColorHex"].(string); ok {
+				payload.Decorations.TopCrest.SecondaryColorHex = s
+			}
+		}
+	}
+	if bcRaw, ok := rawMap["bottomCrest"]; ok {
+		var bc map[string]interface{}
+		if err := json.Unmarshal(bcRaw, &bc); err == nil {
+			if vis, ok := bc["enabled"].(bool); ok {
+				payload.Decorations.BottomCrest.Visible = vis
+			} else if vis, ok := bc["visible"].(bool); ok {
+				payload.Decorations.BottomCrest.Visible = vis
+			}
+			if st, ok := bc["style"].(string); ok {
+				payload.Decorations.BottomCrest.VariantID = st
+			} else if st, ok := bc["variantId"].(string); ok {
+				payload.Decorations.BottomCrest.VariantID = st
+			}
+			if p, ok := bc["primary"].(string); ok {
+				payload.Decorations.BottomCrest.PrimaryColorHex = p
+			} else if p, ok := bc["primaryColorHex"].(string); ok {
+				payload.Decorations.BottomCrest.PrimaryColorHex = p
+			}
+			if s, ok := bc["secondary"].(string); ok {
+				payload.Decorations.BottomCrest.SecondaryColorHex = s
+			} else if s, ok := bc["secondaryColorHex"].(string); ok {
+				payload.Decorations.BottomCrest.SecondaryColorHex = s
+			}
+		}
+	}
+
+	// Parse flat previewBase64 / previewUrl if present
+	if pbRaw, ok := rawMap["previewBase64"]; ok {
+		var pb string
+		if err := json.Unmarshal(pbRaw, &pb); err == nil && pb != "" {
+			payload.Assets.PreviewBase64 = &pb
+		}
+	}
+	if puRaw, ok := rawMap["previewUrl"]; ok {
+		var pu string
+		if err := json.Unmarshal(puRaw, &pu); err == nil && pu != "" {
+			payload.Assets.PreviewURL = &pu
+		}
+	}
+
+	// Parse flat upper section if present
+	if upperRaw, ok := rawMap["upper"]; ok {
+		var flatUpper map[string]interface{}
+		if err := json.Unmarshal(upperRaw, &flatUpper); err == nil {
+			if bg, ok := flatUpper["bgColor"].(string); ok {
+				payload.Sections.Upper.BGColorHex = bg
+			} else if bgHex, ok := flatUpper["bgColorHex"].(string); ok {
+				payload.Sections.Upper.BGColorHex = bgHex
+			}
+			if cs, ok := flatUpper["cornerStyle"].(string); ok {
+				payload.Sections.Upper.CornerStyle = cs
+			}
+			if ht, ok := flatUpper["headerText"].(string); ok && ht != "" {
+				payload.Sections.Upper.Header.Text = &ht
+			}
+			if hf, ok := flatUpper["headerFont"].(string); ok {
+				payload.Sections.Upper.Header.FontID = hf
+			}
+			if hc, ok := flatUpper["headerColor"].(string); ok {
+				payload.Sections.Upper.Header.FontColorHex = hc
+			}
+			if bt, ok := flatUpper["bodyText"].(string); ok && bt != "" {
+				payload.Sections.Upper.Body.Text = &bt
+			}
+			if bf, ok := flatUpper["bodyFont"].(string); ok {
+				payload.Sections.Upper.Body.FontID = bf
+			}
+			if bc, ok := flatUpper["bodyColor"].(string); ok {
+				payload.Sections.Upper.Body.FontColorHex = bc
+			}
+		}
+	}
+
+	// Parse flat lower section if present
+	if lowerRaw, ok := rawMap["lower"]; ok {
+		var flatLower map[string]interface{}
+		if err := json.Unmarshal(lowerRaw, &flatLower); err == nil {
+			if bg, ok := flatLower["bgColor"].(string); ok {
+				payload.Sections.Lower.BGColorHex = bg
+			} else if bgHex, ok := flatLower["bgColorHex"].(string); ok {
+				payload.Sections.Lower.BGColorHex = bgHex
+			}
+			if cs, ok := flatLower["cornerStyle"].(string); ok {
+				payload.Sections.Lower.CornerStyle = cs
+			}
+			if ht, ok := flatLower["headerText"].(string); ok && ht != "" {
+				payload.Sections.Lower.Header.Text = &ht
+			}
+			if hf, ok := flatLower["headerFont"].(string); ok {
+				payload.Sections.Lower.Header.FontID = hf
+			}
+			if hc, ok := flatLower["headerColor"].(string); ok {
+				payload.Sections.Lower.Header.FontColorHex = hc
+			}
+			if bt, ok := flatLower["bodyText"].(string); ok && bt != "" {
+				payload.Sections.Lower.Body.Text = &bt
+			}
+			if bf, ok := flatLower["bodyFont"].(string); ok {
+				payload.Sections.Lower.Body.FontID = bf
+			}
+			if bc, ok := flatLower["bodyColor"].(string); ok {
+				payload.Sections.Lower.Body.FontColorHex = bc
+			}
+		}
+	}
+
+	// Parse flat border if present
+	if borderRaw, ok := rawMap["border"]; ok {
+		var flatBorder map[string]interface{}
+		if err := json.Unmarshal(borderRaw, &flatBorder); err == nil {
+			if s, ok := flatBorder["style"].(string); ok {
+				payload.Layout.Border.Style = s
+			}
+			if c, ok := flatBorder["color"].(string); ok {
+				payload.Layout.Border.ColorHex = c
+			} else if cHex, ok := flatBorder["colorHex"].(string); ok {
+				payload.Layout.Border.ColorHex = cHex
+			}
+			if w, ok := flatBorder["width"].(float64); ok {
+				payload.Layout.Border.WidthPx = int(w)
+			} else if wPx, ok := flatBorder["widthPx"].(float64); ok {
+				payload.Layout.Border.WidthPx = int(wPx)
+			}
+			if ctr, ok := flatBorder["center"].(bool); ok {
+				payload.Layout.Border.ShowCenterDivider = ctr
+			} else if div, ok := flatBorder["showCenterDivider"].(bool); ok {
+				payload.Layout.Border.ShowCenterDivider = div
+			}
+		}
+	}
+
 	return &payload, nil
 }
 
@@ -319,3 +561,38 @@ func CalculateCustomProductPrice(design CustomDesignPayload, matrix CustomPricin
 		TotalPrice:        totalPrice,
 	}
 }
+
+// ExtractDesignSummary returns key fields for quick order indexing and admin fulfillment sheets.
+func ExtractDesignSummary(design CustomDesignPayload) (
+	physicalSizeID string,
+	previewURL *string,
+	headerUpper *string,
+	bodyUpper *string,
+	headerLower *string,
+	bodyLower *string,
+) {
+	physicalSizeID = design.Layout.PhysicalSizeID
+	if physicalSizeID == "" {
+		physicalSizeID = DEFAULT_PHYSICAL_SIZE_ID
+	}
+
+	if design.Assets.PreviewURL != nil && *design.Assets.PreviewURL != "" {
+		previewURL = design.Assets.PreviewURL
+	}
+
+	if design.Sections.Upper.Header.Text != nil && *design.Sections.Upper.Header.Text != "" {
+		headerUpper = design.Sections.Upper.Header.Text
+	}
+	if design.Sections.Upper.Body.Text != nil && *design.Sections.Upper.Body.Text != "" {
+		bodyUpper = design.Sections.Upper.Body.Text
+	}
+	if design.Sections.Lower.Header.Text != nil && *design.Sections.Lower.Header.Text != "" {
+		headerLower = design.Sections.Lower.Header.Text
+	}
+	if design.Sections.Lower.Body.Text != nil && *design.Sections.Lower.Body.Text != "" {
+		bodyLower = design.Sections.Lower.Body.Text
+	}
+
+	return physicalSizeID, previewURL, headerUpper, bodyUpper, headerLower, bodyLower
+}
+

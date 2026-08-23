@@ -75,6 +75,22 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			}
 		}
 
+		var customDesignResp *orderItemCustomDesignResponse
+		if o.CustomDesigns != nil {
+			if cd, ok := o.CustomDesigns[item.ID]; ok {
+				customDesignResp = &orderItemCustomDesignResponse{
+					Version:         cd.Version,
+					PhysicalSizeID:  cd.PhysicalSizeID,
+					PreviewURL:      cd.PreviewURL,
+					HeaderTextUpper: cd.HeaderTextUpper,
+					BodyTextUpper:   cd.BodyTextUpper,
+					HeaderTextLower: cd.HeaderTextLower,
+					BodyTextLower:   cd.BodyTextLower,
+					DesignSnapshot:  cd.DesignSnapshot,
+				}
+			}
+		}
+
 		items[j] = orderItemResponse{
 			ID:                 item.ID.String(),
 			ShipmentID:         shipmentIDStr,
@@ -90,6 +106,7 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			CourierCode:        item.CourierCode,
 			CourierService:     item.CourierService,
 			ShippingFeeTotal:   item.ShippingFee,
+			CustomDesign:       customDesignResp,
 		}
 	}
 
@@ -458,12 +475,13 @@ func (h *orderHandler) GetOrder(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	resp := buildOrderResponse(usecase.OrderSearchResult{
-		Order:       result.Order,
-		Items:       result.Items,
-		Payment:     result.Payment,
-		ChannelData: result.ChannelData,
-		Shipment:    result.Shipment,
-		Shipments:   result.Shipments,
+		Order:         result.Order,
+		Items:         result.Items,
+		CustomDesigns: result.CustomDesigns,
+		Payment:       result.Payment,
+		ChannelData:   result.ChannelData,
+		Shipment:      result.Shipment,
+		Shipments:     result.Shipments,
 	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
@@ -604,11 +622,13 @@ func (h *orderHandler) GetMyOrder(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	resp := buildOrderResponse(usecase.OrderSearchResult{
-		Order:       result.Order,
-		Items:       result.Items,
-		Payment:     result.Payment,
-		ChannelData: result.ChannelData,
-		Shipment:    result.Shipment,
+		Order:         result.Order,
+		Items:         result.Items,
+		CustomDesigns: result.CustomDesigns,
+		Payment:       result.Payment,
+		ChannelData:   result.ChannelData,
+		Shipment:      result.Shipment,
+		Shipments:     result.Shipments,
 	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)

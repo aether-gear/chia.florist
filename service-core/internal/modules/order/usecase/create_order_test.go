@@ -294,6 +294,43 @@ func (m *coMockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Ex
 	return nil
 }
 
+// --- custom design repo ---
+
+type coMockCustomDesignRepo struct {
+	designs []orderDomain.OrderItemCustomDesign
+}
+
+func (m *coMockCustomDesignRepo) Save(_ context.Context, _ transaction.Executor, d orderDomain.OrderItemCustomDesign) error {
+	m.designs = append(m.designs, d)
+	return nil
+}
+func (m *coMockCustomDesignRepo) SaveBulk(_ context.Context, _ transaction.Executor, ds []orderDomain.OrderItemCustomDesign) error {
+	m.designs = append(m.designs, ds...)
+	return nil
+}
+func (m *coMockCustomDesignRepo) GetByOrderItemID(_ context.Context, _ transaction.Executor, id uuid.UUID) (*orderDomain.OrderItemCustomDesign, error) {
+	for _, d := range m.designs {
+		if d.OrderItemID == id {
+			return &d, nil
+		}
+	}
+	return nil, nil
+}
+func (m *coMockCustomDesignRepo) ListByOrderItemIDs(_ context.Context, _ transaction.Executor, ids []uuid.UUID) (map[uuid.UUID]orderDomain.OrderItemCustomDesign, error) {
+	res := make(map[uuid.UUID]orderDomain.OrderItemCustomDesign)
+	for _, d := range m.designs {
+		for _, id := range ids {
+			if d.OrderItemID == id {
+				res[id] = d
+			}
+		}
+	}
+	return res, nil
+}
+func (m *coMockCustomDesignRepo) ListByOrderID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItemCustomDesign, error) {
+	return m.designs, nil
+}
+
 // --- invoice repos ---
 
 type coMockInvoiceRepo struct{}
@@ -532,6 +569,7 @@ func buildUCWith(
 		accountRepo,
 		orderStore,
 		&coMockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}},
+		&coMockCustomDesignRepo{},
 		&coMockInvoiceRepo{},
 		&coMockInvoiceItemRepo{},
 		paymentStore,

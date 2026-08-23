@@ -9,6 +9,7 @@ import (
 
 	addressDomain "service-core/internal/modules/address/domain"
 	addressRepo "service-core/internal/modules/address/repository"
+	cartDomain "service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
 	paymentDomain "service-core/internal/modules/payment/domain"
@@ -25,6 +26,7 @@ type FindOrdersUsecase struct {
 	executor               transaction.Executor
 	orderRepo              repository.OrderRepository
 	orderItemRepo          repository.OrderItemRepository
+	customDesignRepo       repository.OrderItemCustomDesignRepository
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
 	shipmentRepo           shipmentRepo.ShipmentRepository
@@ -35,6 +37,7 @@ func NewFindOrdersUsecase(
 	executor transaction.Executor,
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
+	customDesignRepo repository.OrderItemCustomDesignRepository,
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
@@ -44,6 +47,7 @@ func NewFindOrdersUsecase(
 		executor:               executor,
 		orderRepo:              orderRepo,
 		orderItemRepo:          orderItemRepo,
+		customDesignRepo:       customDesignRepo,
 		paymentRepo:            paymentRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
 		shipmentRepo:           shipmentRepo,
@@ -67,13 +71,14 @@ type FindOrdersInput struct {
 }
 
 type OrderSearchResult struct {
-	Order       domain.Order
-	Items       []domain.OrderItem
-	Payment     *paymentDomain.Payment
-	ChannelData *paymentDomain.PaymentChannelData
-	Shipment    *shipmentDomain.Shipment
-	Shipments   []shipmentDomain.Shipment
-	Address     *addressDomain.CustomerAddress
+	Order         domain.Order
+	Items         []domain.OrderItem
+	CustomDesigns map[uuid.UUID]domain.OrderItemCustomDesign
+	Payment       *paymentDomain.Payment
+	ChannelData   *paymentDomain.PaymentChannelData
+	Shipment      *shipmentDomain.Shipment
+	Shipments     []shipmentDomain.Shipment
+	Address       *addressDomain.CustomerAddress
 }
 
 func (u *FindOrdersUsecase) Execute(
@@ -183,6 +188,18 @@ func (u *FindOrdersUsecase) Execute(
 	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list order items: %w", err)
+	}
+
+	var customItemIDs []uuid.UUID
+	for _, item := range orderItems {
+		if item.ProductVariantType == cartDomain.ProductVariantTypeCustom || item.ProductID == nil {
+			customItemIDs = append(customItemIDs, item.ID)
+		}
+	}
+
+	var customDesignsMap map[uuid.UUID]domain.OrderItemCustomDesign
+	if len(customItemIDs) > 0 && u.customDesignRepo != nil {
+		customDesignsMap, _ = u.customDesignRepo.ListByOrderItemIDs(ctx, u.executor, customItemIDs)
 	}
 
 	payments, err := u.paymentRepo.ListByOrderIDs(ctx, u.executor,
@@ -297,13 +314,14 @@ func (u *FindOrdersUsecase) Execute(
 		}
 
 		results[i] = OrderSearchResult{
-			Order:       o,
-			Items:       items,
-			Payment:     payment,
-			ChannelData: channelData,
-			Shipment:    firstShipment,
-			Shipments:   filteredShipments,
-			Address:     addressesMap[o.AddressID],
+			Order:         o,
+			Items:         items,
+			CustomDesigns: customDesignsMap,
+			Payment:       payment,
+			ChannelData:   channelData,
+			Shipment:      firstShipment,
+			Shipments:     filteredShipments,
+			Address:       addressesMap[o.AddressID],
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	cartDomain "service-core/internal/modules/cart/domain"
 	"service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/repository"
 	paymentDomain "service-core/internal/modules/payment/domain"
@@ -19,6 +20,7 @@ type GetOrderUsecase struct {
 	executor               transaction.Executor
 	orderRepo              repository.OrderRepository
 	orderItemRepo          repository.OrderItemRepository
+	customDesignRepo       repository.OrderItemCustomDesignRepository
 	paymentRepo            paymentRepo.PaymentRepository
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository
 	shipmentRepo           shipmentRepo.ShipmentRepository
@@ -29,6 +31,7 @@ func NewGetOrderUsecase(
 	executor transaction.Executor,
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
+	customDesignRepo repository.OrderItemCustomDesignRepository,
 	paymentRepo paymentRepo.PaymentRepository,
 	paymentChannelDataRepo paymentRepo.PaymentChannelDataRepository,
 	shipmentRepo shipmentRepo.ShipmentRepository,
@@ -38,6 +41,7 @@ func NewGetOrderUsecase(
 		executor:               executor,
 		orderRepo:              orderRepo,
 		orderItemRepo:          orderItemRepo,
+		customDesignRepo:       customDesignRepo,
 		paymentRepo:            paymentRepo,
 		paymentChannelDataRepo: paymentChannelDataRepo,
 		shipmentRepo:           shipmentRepo,
@@ -57,12 +61,13 @@ type GetOrderInput struct {
 }
 
 type GetOrderResult struct {
-	Order       domain.Order
-	Items       []domain.OrderItem
-	Payment     *paymentDomain.Payment
-	ChannelData *paymentDomain.PaymentChannelData
-	Shipment    *shipmentDomain.Shipment
-	Shipments   []shipmentDomain.Shipment
+	Order         domain.Order
+	Items         []domain.OrderItem
+	CustomDesigns map[uuid.UUID]domain.OrderItemCustomDesign
+	Payment       *paymentDomain.Payment
+	ChannelData   *paymentDomain.PaymentChannelData
+	Shipment      *shipmentDomain.Shipment
+	Shipments     []shipmentDomain.Shipment
 }
 
 func (u *GetOrderUsecase) Execute(
@@ -93,6 +98,17 @@ func (u *GetOrderUsecase) Execute(
 	}
 	if items == nil {
 		items = []domain.OrderItem{}
+	}
+
+	var customDesignsMap map[uuid.UUID]domain.OrderItemCustomDesign
+	var customItemIDs []uuid.UUID
+	for _, itm := range items {
+		if itm.ProductVariantType == cartDomain.ProductVariantTypeCustom || itm.ProductID == nil {
+			customItemIDs = append(customItemIDs, itm.ID)
+		}
+	}
+	if len(customItemIDs) > 0 && u.customDesignRepo != nil {
+		customDesignsMap, _ = u.customDesignRepo.ListByOrderItemIDs(ctx, u.executor, customItemIDs)
 	}
 
 	payment, err := u.paymentRepo.GetByOrderID(ctx, u.executor,
@@ -149,11 +165,13 @@ func (u *GetOrderUsecase) Execute(
 	}
 
 	return &GetOrderResult{
-		Order:       *order,
-		Items:       items,
-		Payment:     payment,
-		ChannelData: channelData,
-		Shipment:    firstShipment,
-		Shipments:   shipments,
+		Order:         *order,
+		Items:         items,
+		CustomDesigns: customDesignsMap,
+		Payment:       payment,
+		ChannelData:   channelData,
+		Shipment:      firstShipment,
+		Shipments:     shipments,
 	}, nil
 }
+

@@ -141,3 +141,36 @@ type InvoiceItemRepository interface {
 		items []domain.InvoiceItem,
 	) error
 }
+
+type OrderItemCustomDesignRepository interface {
+	Save(
+		ctx context.Context,
+		exec transaction.Executor,
+		design domain.OrderItemCustomDesign,
+	) error
+
+	SaveBulk(
+		ctx context.Context,
+		exec transaction.Executor,
+		designs []domain.OrderItemCustomDesign,
+	) error
+
+	GetByOrderItemID(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderItemID uuid.UUID,
+	) (*domain.OrderItemCustomDesign, error)
+
+	ListByOrderItemIDs(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderItemIDs []uuid.UUID,
+	) (map[uuid.UUID]domain.OrderItemCustomDesign, error)
+
+	ListByOrderID(
+		ctx context.Context,
+		exec transaction.Executor,
+		orderID uuid.UUID,
+	) ([]domain.OrderItemCustomDesign, error)
+}
+

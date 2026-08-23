@@ -89,21 +89,33 @@ type createOrderResponse struct {
 	ChannelData    *paymentChannelDataResponse        `json:"channel_data,omitempty"`
 }
 
+type orderItemCustomDesignResponse struct {
+	Version         string          `json:"version"`
+	PhysicalSizeID  string          `json:"physical_size_id"`
+	PreviewURL      *string         `json:"preview_url,omitempty"`
+	HeaderTextUpper *string         `json:"header_text_upper,omitempty"`
+	BodyTextUpper   *string         `json:"body_text_upper,omitempty"`
+	HeaderTextLower *string         `json:"header_text_lower,omitempty"`
+	BodyTextLower   *string         `json:"body_text_lower,omitempty"`
+	DesignSnapshot  json.RawMessage `json:"design_snapshot,omitempty"`
+}
+
 type orderItemResponse struct {
-	ID                 string  `json:"id"`
-	ShipmentID         *string `json:"shipment_id,omitempty"`
-	ProductID          *string `json:"product_id,omitempty"`
-	ProductVariantType string  `json:"product_variant_type"`
-	IsCustom           bool    `json:"is_custom"`
-	ProductName        string  `json:"product_name"`
-	Quantity           int     `json:"quantity"`
-	UnitPrice          int64   `json:"unit_price"`
-	Subtotal           int64   `json:"subtotal"`
-	ShopID             string  `json:"shop_id"`
-	ShopName           string  `json:"shop_name"`
-	CourierCode        *string `json:"courier_code,omitempty"`
-	CourierService     *string `json:"courier_service,omitempty"`
-	ShippingFeeTotal   int64   `json:"shipping_fee"`
+	ID                 string                         `json:"id"`
+	ShipmentID         *string                        `json:"shipment_id,omitempty"`
+	ProductID          *string                        `json:"product_id,omitempty"`
+	ProductVariantType string                         `json:"product_variant_type"`
+	IsCustom           bool                           `json:"is_custom"`
+	ProductName        string                         `json:"product_name"`
+	Quantity           int                            `json:"quantity"`
+	UnitPrice          int64                          `json:"unit_price"`
+	Subtotal           int64                          `json:"subtotal"`
+	ShopID             string                         `json:"shop_id"`
+	ShopName           string                         `json:"shop_name"`
+	CourierCode        *string                        `json:"courier_code,omitempty"`
+	CourierService     *string                        `json:"courier_service,omitempty"`
+	ShippingFeeTotal   int64                          `json:"shipping_fee"`
+	CustomDesign       *orderItemCustomDesignResponse `json:"custom_design,omitempty"`
 }
 
 type paymentChannelDataResponse struct {

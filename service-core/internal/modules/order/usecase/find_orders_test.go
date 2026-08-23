@@ -80,6 +80,24 @@ func (m *foMockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Ex
 	return nil
 }
 
+type foMockCustomDesignRepo struct{}
+
+func (m *foMockCustomDesignRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.OrderItemCustomDesign) error {
+	return nil
+}
+func (m *foMockCustomDesignRepo) SaveBulk(_ context.Context, _ transaction.Executor, _ []orderDomain.OrderItemCustomDesign) error {
+	return nil
+}
+func (m *foMockCustomDesignRepo) GetByOrderItemID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*orderDomain.OrderItemCustomDesign, error) {
+	return nil, nil
+}
+func (m *foMockCustomDesignRepo) ListByOrderItemIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) (map[uuid.UUID]orderDomain.OrderItemCustomDesign, error) {
+	return map[uuid.UUID]orderDomain.OrderItemCustomDesign{}, nil
+}
+func (m *foMockCustomDesignRepo) ListByOrderID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItemCustomDesign, error) {
+	return []orderDomain.OrderItemCustomDesign{}, nil
+}
+
 type foMockPaymentRepo struct{}
 
 func (m *foMockPaymentRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.Payment, error) {
@@ -177,6 +195,7 @@ func TestFindOrdersUsecase_ShopFilter(t *testing.T) {
 		&foMockExecutor{},
 		mockOrderRepo,
 		&foMockOrderItemRepo{},
+		&foMockCustomDesignRepo{},
 		&foMockPaymentRepo{},
 		&foMockPaymentChannelDataRepo{},
 		&foMockShipmentRepo{},
@@ -217,6 +236,7 @@ func TestFindOrdersUsecase_StatusFilter_ClearsSingleStatusWhenStatusesProvided(t
 		&foMockExecutor{},
 		mockOrderRepo,
 		&foMockOrderItemRepo{},
+		&foMockCustomDesignRepo{},
 		&foMockPaymentRepo{},
 		&foMockPaymentChannelDataRepo{},
 		&foMockShipmentRepo{},

@@ -91,6 +91,24 @@ func (m *hMockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Exe
 	return nil
 }
 
+type hMockCustomDesignRepo struct{}
+
+func (m *hMockCustomDesignRepo) Save(_ context.Context, _ transaction.Executor, _ orderDomain.OrderItemCustomDesign) error {
+	return nil
+}
+func (m *hMockCustomDesignRepo) SaveBulk(_ context.Context, _ transaction.Executor, _ []orderDomain.OrderItemCustomDesign) error {
+	return nil
+}
+func (m *hMockCustomDesignRepo) GetByOrderItemID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*orderDomain.OrderItemCustomDesign, error) {
+	return nil, nil
+}
+func (m *hMockCustomDesignRepo) ListByOrderItemIDs(_ context.Context, _ transaction.Executor, _ []uuid.UUID) (map[uuid.UUID]orderDomain.OrderItemCustomDesign, error) {
+	return map[uuid.UUID]orderDomain.OrderItemCustomDesign{}, nil
+}
+func (m *hMockCustomDesignRepo) ListByOrderID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItemCustomDesign, error) {
+	return []orderDomain.OrderItemCustomDesign{}, nil
+}
+
 type hMockPaymentRepo struct{}
 
 func (m *hMockPaymentRepo) GetByID(_ context.Context, _ transaction.Executor, _ uuid.UUID) (*paymentDomain.Payment, error) {
@@ -205,6 +223,7 @@ func TestGetOrderTrackingForStaff_MissingPermission_ReturnsForbidden(t *testing.
 		&hMockExecutor{},
 		orderRepoMock,
 		orderItemRepoMock,
+		&hMockCustomDesignRepo{},
 		&hMockPaymentRepo{},
 		&hMockPaymentChannelDataRepo{},
 		&hMockShipmentRepo{},
@@ -264,6 +283,7 @@ func TestUpdateOrderStatus_MultiShop_EnforcesAllShopRules(t *testing.T) {
 		&hMockExecutor{},
 		orderRepoMock,
 		orderItemRepoMock,
+		&hMockCustomDesignRepo{},
 		&hMockPaymentRepo{},
 		&hMockPaymentChannelDataRepo{},
 		&hMockShipmentRepo{},
