@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
+import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 
 definePageMeta({
   layout: 'auth',
@@ -46,7 +47,8 @@ const errorMessage = ref('')
 const registrationEmail = computed(() => authVm.registrationEmail.value)
 
 onMounted(() => {
-  if (authVm.isAuthenticated.value) {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
     navigateTo('/')
     return
   }
@@ -132,10 +134,26 @@ const handleVerify = async () => {
   errorMessage.value = ''
 
   try {
+    clearSessionExpired()
+    clearAuthAlert()
+
     const success = await authVm.verifyOtp(otpCode.value)
-    if (success && authVm.isAuthenticated.value) {
-      await nextTick()
-      navigateTo('/')
+    if (success) {
+      let attempts = 0
+      while (
+        (!authVm.isAuthenticated.value || !authVm.isInitialized.value || !authVm.currentUser.value || authVm.isLoading.value) &&
+        attempts < 20
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        attempts++
+      }
+
+      if (authVm.isAuthenticated.value) {
+        clearSessionExpired()
+        clearAuthAlert()
+        await nextTick()
+        navigateTo('/')
+      }
     }
   } catch (err: any) {
     errorMessage.value = mapErrorMessage(err, 'Verification failed. Please try again.')
@@ -143,6 +161,13 @@ const handleVerify = async () => {
 }
 
 const handleGoogleLogin = () => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo('/')
+    return
+  }
+  clearSessionExpired()
+  clearAuthAlert()
   sessionStorage.setItem('google_auth_pending', '1')
   window.location.href = '/api/auth/google'
 }

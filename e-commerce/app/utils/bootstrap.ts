@@ -27,7 +27,7 @@ export const bootstrapConfig = {
    * Helper utility to fetch from the service core API endpoint.
    * Includes credentials so cookies flow through the proxy.
    */
-  async fetchApi<T>(endpoint: string, options?: Parameters<typeof $fetch>[1]): Promise<T> {
+  async fetchApi<T>(endpoint: string, options?: Parameters<typeof $fetch>[1] & { skipSessionExpiredCheck?: boolean }): Promise<T> {
     const baseUrl = this.getApiBaseUrl().replace(/\/$/, '')
     const cleanEndpoint = endpoint.replace(/^\//, '')
     const url = `${baseUrl}/${cleanEndpoint}`
@@ -45,7 +45,8 @@ export const bootstrapConfig = {
       if (err && typeof err === 'object') {
         err.friendlyMessage = mapErrorMessage(err)
       }
-      if (import.meta.client && (err.status === 401 || err.status === 403)) {
+      const isAuthEndpoint = cleanEndpoint.startsWith('auth/') || cleanEndpoint === 'profile' || cleanEndpoint.startsWith('users/me')
+      if (import.meta.client && !options?.skipSessionExpiredCheck && !isAuthEndpoint && (err.status === 401 || err.status === 403)) {
         const isLoggedIn = useCookie('is_logged_in')
         if (isLoggedIn.value === 'true') {
           triggerSessionExpired()
@@ -55,4 +56,5 @@ export const bootstrapConfig = {
     }
   }
 }
+
 

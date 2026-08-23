@@ -5,6 +5,7 @@ import { supabaseService } from '~/services/supabaseService'
 import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest, UpdateProfileRequest } from '~/types/auth'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
+import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 
 let fetchCurrentUserPromise: Promise<void> | null = null
 let currentFetchSeq = 0
@@ -94,6 +95,8 @@ export const useAuthViewModel = () => {
         if (thisFetchSeq !== currentFetchSeq) return
 
         if (response && response.is_authenticated && response.account_type === 'customer') {
+          clearSessionExpired()
+          clearAuthAlert()
           const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
           const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
 
@@ -198,6 +201,8 @@ export const useAuthViewModel = () => {
         rememberMe
       })
       if (response.message === 'login success') {
+        clearSessionExpired()
+        clearAuthAlert()
         if (import.meta.client) {
           localStorage.removeItem('chia-florist-cart-cache')
         }
@@ -256,6 +261,8 @@ export const useAuthViewModel = () => {
     try {
       const response = await authService.signInWithGoogle()
       if (response.message === 'login success') {
+        clearSessionExpired()
+        clearAuthAlert()
         if (import.meta.client) {
           localStorage.removeItem('chia-florist-cart-cache')
         }
@@ -346,6 +353,8 @@ export const useAuthViewModel = () => {
 
       const response = await authService.verify(reqData)
       if (response.message === 'verify success') {
+        clearSessionExpired()
+        clearAuthAlert()
         let name = 'Verified User'
         let username = 'user'
         let email = ''

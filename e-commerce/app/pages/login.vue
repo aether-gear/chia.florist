@@ -3,6 +3,7 @@ import { ref, onMounted, nextTick, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { mapErrorMessage } from '~/utils/errorMessages'
+import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 
 definePageMeta({
   layout: 'auth',
@@ -54,7 +55,8 @@ const newPassword = ref('')
 const showNewPassword = ref(false)
 
 onMounted(() => {
-  if (authVm.isAuthenticated.value) {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
     navigateTo('/')
     return
   }
@@ -98,6 +100,12 @@ const handleInitialEmailSubmit = () => {
 }
 
 const handleLogin = async () => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo('/')
+    return
+  }
+
   if (!email.value || !password.value) {
     errorMessage.value = 'Please fill in all required fields.'
     return
@@ -107,14 +115,31 @@ const handleLogin = async () => {
   successMessage.value = ''
 
   try {
+    clearSessionExpired()
+    clearAuthAlert()
+
     const success = await authVm.login({
       email: email.value,
       password: password.value
     }, rememberMe.value)
 
-    if (success && authVm.isAuthenticated.value) {
-      await nextTick()
-      navigateTo('/')
+    if (success) {
+      // Wait for both login verification and reactive state readiness
+      let attempts = 0
+      while (
+        (!authVm.isAuthenticated.value || !authVm.isInitialized.value || !authVm.currentUser.value || authVm.isLoading.value) &&
+        attempts < 20
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        attempts++
+      }
+
+      if (authVm.isAuthenticated.value) {
+        clearSessionExpired()
+        clearAuthAlert()
+        await nextTick()
+        navigateTo('/')
+      }
     }
   } catch (err: any) {
     if (err.status === 403 && (err.data?.message === 'email not verified' || err.data?.message?.includes('not verified'))) {
@@ -133,6 +158,13 @@ const handleLogin = async () => {
 }
 
 const handleGoogleLogin = () => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo('/')
+    return
+  }
+  clearSessionExpired()
+  clearAuthAlert()
   const rememberMeCookie = useCookie('remember_me')
   rememberMeCookie.value = rememberMe.value ? 'true' : 'false'
 

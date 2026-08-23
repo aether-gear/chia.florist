@@ -1,6 +1,6 @@
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useCart } from '~/composables/useCart'
-import { triggerSessionExpired } from '~/composables/useSessionState'
+import { triggerSessionExpired, clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
@@ -17,11 +17,15 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     if (isGoogleCallback) {
       // Clear the flag immediately so it doesn't persist across future loads
       sessionStorage.removeItem('google_auth_pending')
+      clearSessionExpired()
+      clearAuthAlert()
 
       try {
         await authVm.fetchCurrentUser(undefined, true)
 
         if (authVm.isAuthenticated.value) {
+          clearSessionExpired()
+          clearAuthAlert()
           showSuccess(
             'Signed In Successfully',
             `Welcome, ${authVm.currentUser.value?.name || 'Customer'}!`,
@@ -61,6 +65,8 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         await authVm.fetchCurrentUser(undefined, true)
 
         if (authVm.isAuthenticated.value) {
+          clearSessionExpired()
+          clearAuthAlert()
           await cartVm.loadCart(true)
         } else {
           if (wasLoggedIn) {
