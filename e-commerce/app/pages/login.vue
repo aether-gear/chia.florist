@@ -2,9 +2,12 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
+import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 
 definePageMeta({
-  layout: 'auth'
+  layout: 'auth',
+  middleware: 'guest'
 })
 
 useHead({ 
@@ -14,8 +17,17 @@ useHead({
   ]
 })
 
+const route = useRoute()
 const authVm = useAuthViewModel()
 const globalAlert = useGlobalAlert()
+
+const getRedirectTarget = () => {
+  const redirect = route.query.redirect as string
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/'
+}
 
 // 2-Step Login Flow: 'initial' (Choose Google or Enter Email) -> 'credentials' (Password Form without Google)
 const loginStep = ref<'initial' | 'credentials'>('initial')
@@ -35,6 +47,14 @@ watch(successMessage, (msg) => {
     globalAlert.showSuccess('Success', msg)
   }
 })
+
+// Immediately redirect if already authenticated
+watch(() => authVm.isAuthenticated.value, (isAuth) => {
+  if (isAuth) {
+    navigateTo(getRedirectTarget())
+  }
+})
+
 const viewMode = ref<'login' | 'forgot_request' | 'forgot_verify' | 'forgot_reset'>('login')
 
 const forgotEmail = ref('')
@@ -44,6 +64,12 @@ const newPassword = ref('')
 const showNewPassword = ref(false)
 
 onMounted(() => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo(getRedirectTarget())
+    return
+  }
+
   nextTick(() => {
     emailInputRef.value?.focus()
   })
@@ -83,6 +109,12 @@ const handleInitialEmailSubmit = () => {
 }
 
 const handleLogin = async () => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo('/')
+    return
+  }
+
   if (!email.value || !password.value) {
     errorMessage.value = 'Please fill in all required fields.'
     return
@@ -92,16 +124,34 @@ const handleLogin = async () => {
   successMessage.value = ''
 
   try {
+    clearSessionExpired()
+    clearAuthAlert()
+
     const success = await authVm.login({
       email: email.value,
       password: password.value
     }, rememberMe.value)
 
     if (success) {
-      navigateTo('/')
+      // Wait for both login verification and reactive state readiness
+      let attempts = 0
+      while (
+        (!authVm.isAuthenticated.value || !authVm.isInitialized.value || !authVm.currentUser.value || authVm.isLoading.value) &&
+        attempts < 20
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        attempts++
+      }
+
+      if (authVm.isAuthenticated.value) {
+        clearSessionExpired()
+        clearAuthAlert()
+        await nextTick()
+        navigateTo(getRedirectTarget())
+      }
     }
   } catch (err: any) {
-    if (err.status === 403 && err.data?.message === 'email not verified') {
+    if (err.status === 403 && (err.data?.message === 'email not verified' || err.data?.message?.includes('not verified'))) {
       if (import.meta.client) {
         localStorage.setItem('register_email', email.value)
       }
@@ -111,12 +161,19 @@ const handleLogin = async () => {
         navigateTo('/register?verify=true')
       }, 1200)
     } else {
-      errorMessage.value = err.data?.message || 'Login failed. Please check your credentials.'
+      errorMessage.value = mapErrorMessage(err, 'Login failed. Please check your credentials.')
     }
   }
 }
 
 const handleGoogleLogin = () => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo(getRedirectTarget())
+    return
+  }
+  clearSessionExpired()
+  clearAuthAlert()
   const rememberMeCookie = useCookie('remember_me')
   rememberMeCookie.value = rememberMe.value ? 'true' : 'false'
 
@@ -139,7 +196,7 @@ const handleForgotPasswordRequest = async () => {
     }
     viewMode.value = 'forgot_verify'
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'Failed to request password reset.'
+    errorMessage.value = mapErrorMessage(err, 'Failed to request password reset.')
   }
 }
 
@@ -158,7 +215,7 @@ const handleForgotPasswordVerify = async () => {
     }
     viewMode.value = 'forgot_reset'
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'Verification failed.'
+    errorMessage.value = mapErrorMessage(err, 'Verification failed.')
   }
 }
 
@@ -181,7 +238,7 @@ const handleForgotPasswordReset = async () => {
     newPassword.value = ''
     focusPasswordInput()
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || 'Failed to reset password.'
+    errorMessage.value = mapErrorMessage(err, 'Failed to reset password.')
   }
 }
 
@@ -292,7 +349,7 @@ const switchToForgot = () => {
           <!-- Account Switch -->
           <div class="text-center pt-2 text-xs text-gray-500">
             Don't have an account?
-            <NuxtLink to="/register" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+            <NuxtLink :to="route.query.redirect ? { path: '/register', query: { redirect: route.query.redirect } } : '/register'" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
               Create an account
             </NuxtLink>
           </div>
@@ -405,7 +462,7 @@ const switchToForgot = () => {
           <!-- Account Switch -->
           <div class="text-center pt-2 text-xs text-gray-500">
             Don't have an account?
-            <NuxtLink to="/register" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+            <NuxtLink :to="route.query.redirect ? { path: '/register', query: { redirect: route.query.redirect } } : '/register'" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
               Create an account
             </NuxtLink>
           </div>

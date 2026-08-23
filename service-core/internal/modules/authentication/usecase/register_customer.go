@@ -9,6 +9,7 @@ import (
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/infra/service"
 	"service-core/internal/modules/authentication/repository"
 	customerDomain "service-core/internal/modules/customer/domain"
 	customerRepo "service-core/internal/modules/customer/repository"
@@ -21,16 +22,15 @@ import (
 )
 
 type RegisterCustomerUsecase struct {
-	executor      transaction.Executor
-	transactor    transaction.Transactor
-	accountRepo   repository.AccountRepository
-	hasher        domain.PasswordHasher
-	userRepo      userRepo.UserRepository
-	customerRepo  customerRepo.CustomerRepository
-	challengeRepo repository.VerificationChallengeRepository
-	otpGen        otp.Generator
-	mailer        mailer.Sender
-	auditLogger   applogger.AuditLogger
+	executor     transaction.Executor
+	transactor   transaction.Transactor
+	accountRepo  repository.AccountRepository
+	hasher       domain.PasswordHasher
+	userRepo     userRepo.UserRepository
+	customerRepo customerRepo.CustomerRepository
+	challengeSvc repository.ChallengeService
+	auditLogger  applogger.AuditLogger
+	sysLogger    applogger.Logger
 }
 
 func NewRegisterCustomerUsecase(
@@ -45,18 +45,37 @@ func NewRegisterCustomerUsecase(
 	mailer mailer.Sender,
 	auditLogger applogger.AuditLogger,
 ) *RegisterCustomerUsecase {
-	return &RegisterCustomerUsecase{
-		executor:      executor,
-		transactor:    transactor,
-		accountRepo:   accountRepo,
-		hasher:        hasher,
-		userRepo:      userRepo,
-		customerRepo:  customerRepo,
-		challengeRepo: challengeRepo,
-		otpGen:        otpGen,
-		mailer:        mailer,
-		auditLogger:   auditLogger,
+	var pwHasher repository.PasswordHasher
+	if ph, ok := hasher.(repository.PasswordHasher); ok {
+		pwHasher = ph
 	}
+
+	challengeSvc := service.NewChallengeService(
+		transactor,
+		challengeRepo,
+		pwHasher,
+		otpGen,
+		mailer,
+	)
+
+	return &RegisterCustomerUsecase{
+		executor:     executor,
+		transactor:   transactor,
+		accountRepo:  accountRepo,
+		hasher:       hasher,
+		userRepo:     userRepo,
+		customerRepo: customerRepo,
+		challengeSvc: challengeSvc,
+		auditLogger:  auditLogger,
+	}
+}
+
+func (u *RegisterCustomerUsecase) SetChallengeService(challengeSvc repository.ChallengeService) {
+	u.challengeSvc = challengeSvc
+}
+
+func (u *RegisterCustomerUsecase) SetSysLogger(sysLogger applogger.Logger) {
+	u.sysLogger = sysLogger
 }
 
 type RegisterCustomerParams struct {
@@ -70,258 +89,140 @@ type RegisterCustomerParams struct {
 func (u *RegisterCustomerUsecase) Execute(
 	ctx context.Context,
 	params RegisterCustomerParams,
-) (*uuid.UUID, error) {
+) (challengeID *uuid.UUID, err error) {
 	now := appclock.Now()
 
-	existUsr, err := u.userRepo.
-		GetByUsername(ctx, u.executor, params.Username)
+	audit := &applogger.AuditScope{
+		Category: "user_action",
+		Action:   "register_customer",
+		Resource: "account",
+		Metadata: map[string]any{
+			"email":    params.Email,
+			"username": params.Username,
+		},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, u.sysLogger, audit, &err)()
+
+	existUsr, err := u.userRepo.GetByUsername(ctx, u.executor, params.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user: %w", err)
 	}
 
-	existAcc, err := u.accountRepo.
-		GetByEmail(ctx, u.executor, params.Email)
+	existAcc, err := u.accountRepo.GetByEmail(ctx, u.executor, params.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check account: %w", err)
 	}
-
 	if existAcc != nil {
-		// Ensure if the account already has password,
-		// this process will not allow to overwrite it
 		if existAcc.Password != "" {
-			u.auditLogger.Log(ctx, applogger.AuditEvent{
-				Category: "user_action",
-				Action:   "register_customer",
-				Resource: "account",
-				Outcome:  applogger.OutcomeFailure,
-				Metadata: map[string]any{
-					"email":    params.Email,
-					"username": params.Username,
-					"reason":   "account already exists with password",
-				},
-			})
+			audit.SetReason("account already exists with password")
 			return nil, apperrors.NewConflict(domain.ErrAccountAlreadyExists.Error())
 		}
+	}
 
-		// Check if the account already have an ID or
-		// the desired username is already taken by ANOTHER user.
-		if existUsr != nil &&
-			existUsr.ID != existAcc.UserID {
-			u.auditLogger.Log(ctx, applogger.AuditEvent{
-				Category: "user_action",
-				Action:   "register_customer",
-				Resource: "account",
-				Outcome:  applogger.OutcomeFailure,
-				Metadata: map[string]any{
-					"email":    params.Email,
-					"username": params.Username,
-					"reason":   "username already taken",
-				},
-			})
-			return nil, apperrors.NewConflict(domain.ErrAccountAlreadyExists.Error())
-		}
+	if existUsr != nil {
+		audit.SetReason("username conflict")
+		return nil, apperrors.NewConflict("username already exists")
+	}
 
-		hash, err := u.hasher.Hash(params.Password)
+	var (
+		userID     uuid.UUID
+		accountID  uuid.UUID
+		customerID uuid.UUID
+	)
+
+	if existAcc == nil {
+		userID = uuid.New()
+		accountID = uuid.New()
+		customerID = uuid.New()
+
+		hashedPassword, err := u.hasher.Hash(params.Password)
 		if err != nil {
 			return nil, fmt.Errorf("failed to hash password: %w", err)
 		}
 
-		otpCode, err := u.otpGen.Generate()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create otp: %w", err)
+		userProps := userRepo.CreateUserProps{
+			ID:        userID,
+			Name:      params.Name,
+			Username:  params.Username,
+			Phone:     params.Phone,
+			CreatedAt: now,
 		}
 
-		otpHash, err := u.hasher.Hash(otpCode)
-		if err != nil {
-			return nil, fmt.Errorf("failed to hash otp: %w", err)
+		acc := domain.Account{
+			ID:        accountID,
+			UserID:    userID,
+			Email:     params.Email,
+			Password:  hashedPassword,
+			Status:    domain.AccountPending,
+			Type:      domain.AccountTypeCustomer,
+			CreatedAt: now,
 		}
 
-		challenge := domain.VerificationChallenge{
-			ID:           uuid.New(),
-			UserID:       &existAcc.UserID,
-			Type:         domain.OTPTypeNumeric,
-			Channel:      domain.OTPChannelEmail,
-			Purpose:      domain.OTPPurposeRegister,
-			Target:       params.Email,
-			CodeHash:     otpHash,
-			ExpiresAt:    now.Add(15 * time.Minute),
-			AttemptCount: 0,
-			CreatedAt:    now,
+		cust := customerDomain.Customer{
+			ID:        customerID,
+			UserID:    userID,
+			CreatedAt: now,
 		}
 
 		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-			profileProps := userRepo.SaveProfileProps{
-				UserID:    existAcc.UserID,
-				Name:      &params.Name,
-				Username:  &params.Username,
-				Phone:     params.Phone,
-				UpdatedAt: now,
+			if err := u.userRepo.CreateUser(ctx, exec, userProps); err != nil {
+				return fmt.Errorf("failed to create user: %w", err)
 			}
-			if err := u.userRepo.
-				SaveProfile(ctx, exec, profileProps); err != nil {
-				return fmt.Errorf("failed to update user profile: %w", err)
+			if err := u.customerRepo.Create(ctx, exec, cust); err != nil {
+				return fmt.Errorf("failed to create customer profile: %w", err)
 			}
-
-			if err := u.accountRepo.
-				UpdatePasswordByUserID(
-					ctx,
-					exec,
-					existAcc.UserID,
-					hash,
-				); err != nil {
-				return fmt.Errorf("failed to update account password: %w", err)
+			if err := u.accountRepo.Create(ctx, exec, acc); err != nil {
+				return fmt.Errorf("failed to create account: %w", err)
 			}
-
-			if err := u.challengeRepo.
-				Save(ctx, exec, challenge); err != nil {
-				return fmt.Errorf("failed to save verification challenge: %w", err)
-			}
-
 			return nil
 		})
 		if err != nil {
 			return nil, err
 		}
+	}
 
-		mail := mailer.SendInput{
-			To:      params.Email,
-			Subject: "Verify your account",
-			Text:    fmt.Sprintf("Your OTP is %s", otpCode),
-		}
-		if err := u.mailer.Send(mail); err != nil {
-			return nil, fmt.Errorf("failed to send otp: %w", err)
+	if existAcc != nil {
+		userID = existAcc.UserID
+		accountID = existAcc.ID
+
+		hashedPassword, err := u.hasher.Hash(params.Password)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash password: %w", err)
 		}
 
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category:   "user_action",
-			Action:     "register_customer",
-			Resource:   "account",
-			ResourceID: existAcc.ID.String(),
-			Outcome:    applogger.OutcomeSuccess,
-			Metadata: map[string]any{
-				"email":    params.Email,
-				"username": params.Username,
-				"type":     "link_local",
-			},
+		err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+			if err := u.accountRepo.UpdatePasswordByUserID(ctx, exec, userID, hashedPassword); err != nil {
+				return fmt.Errorf("failed to update account password: %w", err)
+			}
+
+			userProps := userRepo.SaveProfileProps{
+				UserID:    userID,
+				Name:      &params.Name,
+				Username:  &params.Username,
+				Phone:     params.Phone,
+				UpdatedAt: now,
+			}
+			if err := u.userRepo.SaveProfile(ctx, exec, userProps); err != nil {
+				return fmt.Errorf("failed to update user profile: %w", err)
+			}
+			return nil
 		})
-
-		return &challenge.ID, nil
-	}
-
-	if existUsr != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "register_customer",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"email":    params.Email,
-				"username": params.Username,
-				"reason":   "username already exists",
-			},
-		})
-		return nil, apperrors.NewConflict(domain.ErrAccountAlreadyExists.Error())
-	}
-
-	userProps := userRepo.CreateUserProps{
-		ID:        uuid.New(),
-		Name:      params.Name,
-		Username:  params.Username,
-		Phone:     params.Phone,
-		CreatedAt: now,
-	}
-
-	hash, err := u.hasher.Hash(params.Password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hashed: %w", err)
-	}
-
-	acc := domain.Account{
-		ID:        uuid.New(),
-		UserID:    userProps.ID,
-		Email:     params.Email,
-		Status:    domain.AccountPending,
-		Type:      domain.AccountTypeCustomer,
-		Password:  hash,
-		CreatedAt: now,
-	}
-
-	otp, err := u.otpGen.Generate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create otp: %w", err)
-	}
-
-	otpHash, err := u.hasher.Hash(otp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash otp: %w", err)
-	}
-
-	challenge := domain.VerificationChallenge{
-		ID:           uuid.New(),
-		UserID:       &userProps.ID,
-		Type:         domain.OTPTypeNumeric,
-		Channel:      domain.OTPChannelEmail,
-		Purpose:      domain.OTPPurposeRegister,
-		Target:       params.Email,
-		CodeHash:     otpHash,
-		ExpiresAt:    now.Add(15 * time.Minute),
-		AttemptCount: 0,
-		CreatedAt:    now,
-	}
-
-	cust := customerDomain.Customer{
-		ID:        uuid.New(),
-		UserID:    userProps.ID,
-		CreatedAt: now,
-	}
-
-	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		if err := u.userRepo.
-			CreateUser(ctx, exec, userProps); err != nil {
-			return fmt.Errorf("failed to register: %w", err)
+		if err != nil {
+			return nil, err
 		}
+	}
 
-		if err := u.customerRepo.
-			Create(ctx, exec, cust); err != nil {
-			return fmt.Errorf("failed to register: %w", err)
-		}
+	audit.SetResourceID(accountID.String())
 
-		if err := u.accountRepo.
-			Create(ctx, exec, acc); err != nil {
-			return fmt.Errorf("failed to register: %w", err)
-		}
-
-		if err := u.challengeRepo.
-			Save(ctx, exec, challenge); err != nil {
-			return fmt.Errorf("failed to save challenge: %w", err)
-		}
-
-		return nil
+	chID, err := u.challengeSvc.CreateAndSend(ctx, repository.CreateChallengeParams{
+		UserID:   &userID,
+		Email:    params.Email,
+		Purpose:  domain.OTPPurposeRegister,
+		Duration: 15 * time.Minute,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	mail := mailer.SendInput{
-		To:      params.Email,
-		Subject: "Verify your account",
-		Text:    fmt.Sprintf("Your OTP is %s", otp),
-	}
-	if err := u.mailer.Send(mail); err != nil {
-		return nil, fmt.Errorf("failed to send otp: %w", err)
-	}
-
-	u.auditLogger.Log(ctx, applogger.AuditEvent{
-		Category:   "user_action",
-		Action:     "register_customer",
-		Resource:   "account",
-		ResourceID: acc.ID.String(),
-		Outcome:    applogger.OutcomeSuccess,
-		Metadata: map[string]any{
-			"email":    params.Email,
-			"username": params.Username,
-		},
-	})
-
-	return &challenge.ID, nil
+	return chID, nil
 }

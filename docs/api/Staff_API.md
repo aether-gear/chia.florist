@@ -59,7 +59,7 @@ Endpoints are organized by access level: **Public**, **Staff**, and **Admin**.
     - [x] List Payment Account
     - [x] Create Payment Account
   - [X] Orders
-    - [X] List Orders
+    - [X] List Orders (Supports filtering by Shop ID & Shop Slug)
     - [X] Get Order
     - [X] Get Order Tracking Timeline (Customer Endpoint)
 
@@ -576,6 +576,43 @@ Authentication is handled via a session cookie set at sign-in.
 | `409 Conflict`     | The challenge is already consumed, already verified, or already expired. |
 
 ## Shops
+
+### List Shops
+
+- **Method**: `GET`
+- **Endpoint**: `/shops`
+- **Description**: Retrieve a paginated list of shops. For non-superadmin staff accounts, search results are strictly filtered to return only the shops explicitly assigned to their staff account with granted permissions (`order:read` or `shop:view`). Superadmin staff accounts receive all shops.
+- **Authentication**: Staff / Staff Admin
+- **Request Body**: None
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `page` | `integer` | No | `1` | Page number for pagination. Must be `>= 1`. |
+| `limit` | `integer` | No | `10` | Number of items per page. Must be `>= 1`. |
+| `name` | `string` | No | - | Filter by shop name. |
+| `id` | `string` | No | - | Filter by specific Shop UUID. |
+| `active` | `boolean` | No | - | Filter by active status (`true` or `false`). |
+
+#### Response `200 OK`
+
+```json
+{
+  "page": 1,
+  "limit": 10,
+  "total": 1,
+  "shops": [
+    {
+      "id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
+      "name": "Chia Cipinang",
+      "slug": "chia-cipinang",
+      "description": "Chia Florist Cipinang Branch",
+      "is_active": true
+    }
+  ]
+}
+```
 
 ### Save Shop
 
@@ -1728,8 +1765,8 @@ Empty body.
 
 - **Method**: `GET`
 - **Endpoint**: `/orders`
-- **Description**: Retrieve a paginated list of registered customer accounts with optional filtering and sorting.
-- **Authentication**: Staff Admin
+- **Description**: Retrieve a paginated list of customer orders with optional filtering by shop (via `shop`, `shop_slug`, or `shop_id`), customer, status, order number, and sorting. Non-superadmin staff accounts automatically have search results scoped to their assigned shops unless a specific assigned shop is requested.
+- **Authentication**: Staff / Staff Admin
 - **Request Body**: None
 
 #### Query Parameters
@@ -1741,17 +1778,20 @@ Empty body.
 | `sort` | `string` | No | `latest:desc` | Sorting criteria. Format: `field:direction` (e.g. `latest:asc`, `total:desc`). Multiple sorts can be comma-separated. |
 | `id` | `string` | No | - | Filter by unique Order UUID. |
 | `number` | `string` | No | - | Filter/Search by order number (case-insensitive substring search). |
-| `user_id` | `string` | No | - | Filter by customer User UUID. |
+| `customer_id` | `string` | No | - | Filter by customer Customer UUID. |
 | `status` | `string` | No | - | Filter by order status (`pending`, `confirmed`, `processing`, `shipped`, `delivered`, `cancelled`). |
+| `shop_id` | `string` | No | - | Filter orders containing items for a specific Shop UUID. |
+| `shop_slug` | `string` | No | - | Filter orders containing items for a specific Shop slug. |
+| `shop` | `string` | No | - | Filter orders by either Shop UUID or Shop slug string. |
 
 #### Sort Fields
 
 | Field        | Example                | Description                    |
 |--------------|------------------------|--------------------------------|
-| `latest` / `date`     | `sort=latest:desc`     | Sort by account creation date. |
+| `latest` / `date`     | `sort=latest:desc`     | Sort by order creation date. |
 | `number`       | `sort=number:asc`        | Sort by display number.          |
 | `total`   | `sort=total:asc`    | Sort by total paid.              |
-| `status`      | `sort=status:asc`       | Sort by status number.          |
+| `status`      | `sort=status:asc`       | Sort by status.                |
 | `modified`     | `sort=modified:desc`     | Sort by last modified date.    |
 
 > Default sort: `latest:desc`. Multiple fields can be chained, e.g. `sort=latest:asc,number:desc`.
@@ -1759,6 +1799,9 @@ Empty body.
 **Examples**:
 
 - `GET /orders?page=1&limit=20`
+- `GET /orders?shop_slug=chia-cipinang`
+- `GET /orders?shop=chia-cipinang&status=confirmed`
+- `GET /orders?shop_id=8c1e82f6-30a2-4cc6-be52-f05aa2d6e9ec`
 - `GET /orders?number=011&sort=modified:desc`
 
 #### Response `200 OK`
@@ -1826,8 +1869,8 @@ Empty body.
 
 - **Method**: `GET`
 - **Endpoint**: `/orders/{orderID}`
-- **Description**: Retrieve the order by its ID. This API is meant for staff administrators to view order details, including payment and shipment tracking history.
-- **Authentication**: Staff Admin
+- **Description**: Retrieve the order by its ID. Non-superadmin staff members are verified against their assigned shop permissions.
+- **Authentication**: Staff / Staff Admin
 - **Request Body**: None
 
 #### Path Parameters

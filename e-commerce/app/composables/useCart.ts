@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { cartService } from '~/services/cartService'
 import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Global
+import { logError } from '~/utils/errorMessages'
 
 import { migrateToV3, calculateDesignChecksum, normalizeHexColor } from '~/features/custom-product/migrate'
 import type {
@@ -259,9 +260,49 @@ export const useCart = () => {
   const isLoggedIn = useCookie('is_logged_in')
   const isLoadingCart = useState<boolean>('chia-florist-cart-loading', () => false)
 
+  const clearCart = () => {
+    cart.value = []
+    isLoadingCart.value = false
+    loadCartPromise = null
+
+    // Clear pending debounce timers
+    Object.keys(pendingUpdates).forEach(k => {
+      if (pendingUpdates[k]?.timeoutId) {
+        clearTimeout(pendingUpdates[k].timeoutId!)
+      }
+      delete pendingUpdates[k]
+    })
+    Object.keys(pendingAdditions).forEach(k => {
+      if (pendingAdditions[k]?.timeoutId) {
+        clearTimeout(pendingAdditions[k].timeoutId!)
+      }
+      delete pendingAdditions[k]
+    })
+
+    if (import.meta.client) {
+      try {
+        localStorage.removeItem('chia-florist-cart-cache')
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.startsWith('cart_attr_') || key.startsWith('custom_design_'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+      } catch (e) {
+        console.error('Error clearing cart local storage:', e)
+      }
+    }
+  }
+
   const loadCart = (force = false): Promise<void> => {
     if (isLoggedIn.value !== 'true') {
-      isLoadingCart.value = false
+      clearCart()
+      return Promise.resolve()
+    }
+
+    if (!force && cart.value.length > 0) {
       return Promise.resolve()
     }
 
@@ -335,22 +376,16 @@ export const useCart = () => {
             }
           })
 
-          if (isLoggedIn.value === 'true') {
-            cart.value = backendItems
-          } else {
-            const customItems = cart.value.filter(localItem => 
-              localItem.isCustom && 
-              !backendItems.some(b => b.id === localItem.id || (b.isCustom && b.name === localItem.name && b.size === localItem.size))
-            )
-            cart.value = [...backendItems, ...customItems]
-          }
+          cart.value = backendItems
 
           if (import.meta.client) {
             localStorage.setItem('chia-florist-cart-cache', JSON.stringify(backendItems))
           }
+        } else {
+          cart.value = []
         }
       } catch (err) {
-        console.error('Failed to load cart from backend:', err)
+        logError('useCart', err)
       } finally {
         isLoadingCart.value = false
         loadCartPromise = null
@@ -365,17 +400,20 @@ export const useCart = () => {
     cartWatcherInitialized = true
     watch(isLoggedIn, (newVal) => {
       if (newVal === 'true') {
+        clearCart()
         loadCart(true)
       } else {
-        cart.value = cart.value.filter(i => i.isCustom)
-        localStorage.removeItem('chia-florist-cart-cache')
+        clearCart()
       }
-    }, { immediate: true })
+    }, { immediate: false })
   }
 
   const flushCart = async () => {
     if (isLoggedIn.value !== 'true') return
-    const updatePromises = Object.keys(pendingUpdates).map(async (productId) => {
+    const pendingKeys = Object.keys(pendingUpdates)
+    if (pendingKeys.length === 0) return
+
+    const updatePromises = pendingKeys.map(async (productId) => {
       const pending = pendingUpdates[productId]
       if (!pending) return
       clearTimeout(pending.timeoutId ?? undefined)
@@ -385,7 +423,7 @@ export const useCart = () => {
       try {
         await cartService.updateItem(shopId, productId, qty)
       } catch (err) {
-        console.error(err)
+        logError('useCart', err)
       }
     })
     await Promise.all(updatePromises)
@@ -572,7 +610,14 @@ export const useCart = () => {
         if (import.meta.client) {
           localStorage.removeItem(`cart_attr_${item.id}`)
         }
-        if (!item.isCustom) {
+        if (item.isCustom) {
+          try {
+            const cartItemId = (item as any).cartItemId || item.id
+            await cartService.removeCustomItem(cartItemId)
+          } catch (err) {
+            console.error(`Failed to remove custom item ${item.id} from backend cart on checkout:`, err)
+          }
+        } else {
           try {
             const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
             await cartService.removeItem(shopId, item.id)
@@ -658,6 +703,7 @@ export const useCart = () => {
     orders,
     isLoadingCart,
     loadCart,
+    clearCart,
     flushCart,
     addToCart,
     removeFromCart,

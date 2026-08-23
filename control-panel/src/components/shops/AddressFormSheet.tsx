@@ -8,7 +8,6 @@ import {
   Sheet,
   SheetContent,
 } from '../ui/sheet';
-import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { fetchApi } from '../../lib/api';
 
 interface AddressFormSheetProps {
@@ -67,7 +66,6 @@ export default function AddressFormSheet({
   onSuccess,
 }: AddressFormSheetProps) {
   const isEdit = Boolean(address);
-  const { createAddress, updateAddress } = useShopViewModel();
 
   // Form states
   const [label, setLabel] = useState('');
@@ -272,10 +270,24 @@ export default function AddressFormSheet({
     };
 
     try {
+      const isActiveStr = isActive ? 'true' : 'false';
       if (isEdit && address) {
-        await updateAddress(shopId, address.id, formData);
+        await fetchApi(`/shops/${shopId}/addresses/${address.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...formData,
+            shop_id: shopId,
+            is_active: isActiveStr,
+          }),
+        });
       } else {
-        await createAddress(shopId, formData);
+        await fetchApi(`/shops/${shopId}/addresses`, {
+          method: 'POST',
+          body: JSON.stringify({
+            ...formData,
+            is_active: isActiveStr,
+          }),
+        });
       }
       onSuccess();
       onOpenChange(false);

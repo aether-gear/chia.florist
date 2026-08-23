@@ -4,6 +4,8 @@ import { useCart } from '~/composables/useCart'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { formatRupiah } from '~/utils/formatter'
 import { orderService } from '~/services/orderService'
+import { mapErrorMessage } from '~/utils/errorMessages'
+import { renderMarkdown } from '~/utils/markdown'
 
 useHead({
   title: 'Secure Payment - Chia Florist'
@@ -72,7 +74,7 @@ const startPolling = () => {
             'Payment Verified!',
             'Your payment has been received and confirmed.',
             [
-              { label: 'View Order', onClick: () => navigateTo('/profile') },
+              { label: 'View Order', onClick: () => navigateTo('/profile/orders') },
               { label: 'Got it' }
             ]
           )
@@ -108,7 +110,7 @@ const handleTimerZero = async () => {
     'The time allocated for completing your payment has lapsed.',
     [
       { label: 'Browse Catalog', onClick: () => navigateTo('/catalog') },
-      { label: 'My Orders', onClick: () => navigateTo('/profile') }
+      { label: 'My Orders', onClick: () => navigateTo('/profile/orders') }
     ]
   )
 }
@@ -149,7 +151,7 @@ onMounted(async () => {
       }
     } catch (err: any) {
       console.error('Failed to load payment details:', err)
-      errorMsg.value = err.data?.message || err.message || 'Failed to load payment details. Please check your login session.'
+      errorMsg.value = mapErrorMessage(err, 'Failed to load payment details. Please check your login session.')
     } finally {
       isLoading.value = false
     }
@@ -207,33 +209,8 @@ const orderId = computed(() => {
   return paymentInfoState.value ? paymentInfoState.value.orderId : 'CHIA-LOCAL'
 })
 
-const renderMarkdown = (md: string) => {
-  if (!md) return ''
-  let html = md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  // Headers: # Title
-  html = html.replace(/^#\s+(.+)$/gm, '<h2 class="text-xl font-bold text-gray-900 mb-4">$1</h2>')
-
-  // Bold: **text**
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-emerald-800">$1</strong>')
-
-  // Lists: - item
-  html = html.replace(/^\s*-\s+(.+)$/gm, '<li class="ml-4 list-disc text-sm text-gray-700 my-1 font-semibold">$1</li>')
-
-  // Paragraphs / Newlines
-  html = html.split('\n\n').map(p => {
-    if (p.startsWith('<h2') || p.startsWith('<li')) return p
-    return `<p class="text-sm text-gray-600 leading-relaxed mb-3">${p.replace(/\n/g, '<br/>')}</p>`
-  }).join('')
-
-  return html
-}
-
 const instructionHtml = computed(() => {
-  return paymentInfoState.value ? renderMarkdown(paymentInfoState.value.instruction) : ''
+  return paymentInfoState.value?.instruction ? renderMarkdown(paymentInfoState.value.instruction) : ''
 })
 
 const qrCodeUrl = computed(() => {
@@ -275,7 +252,7 @@ const handleCheckPayment = async () => {
         'Payment Verified!',
         'Thank you! Your payment has been received and confirmed.',
         [
-          { label: 'View Order', onClick: () => navigateTo('/profile') },
+          { label: 'View Order', onClick: () => navigateTo('/profile/orders') },
           { label: 'Got it' }
         ]
       )
@@ -290,8 +267,8 @@ const handleCheckPayment = async () => {
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
-    checkError.value = err.data?.message || err.message || 'Verification failed. Please try again.'
-    globalAlert.showError('Verification Error', checkError.value || 'Failed to check status')
+    checkError.value = mapErrorMessage(err, 'Verification failed. Please try again.')
+    globalAlert.showError('Verification Error', checkError.value)
   } finally {
     isChecking.value = false
   }
@@ -310,10 +287,14 @@ const handleCheckPayment = async () => {
 
       <!-- Error State -->
       <div v-else-if="errorMsg" class="bg-red-50 border border-red-100 rounded-3xl p-8 text-center shadow-sm space-y-4">
-        <div class="text-4xl">⚠️</div>
+        <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
         <h3 class="font-bold text-red-800 text-lg">Error Loading Payment</h3>
         <p class="text-sm text-red-600 max-w-md mx-auto">{{ errorMsg }}</p>
-        <button @click="navigateTo('/profile')" class="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl transition text-xs cursor-pointer">
+        <button @click="navigateTo('/profile/orders')" class="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl transition text-xs cursor-pointer">
           Back to My Orders
         </button>
       </div>
@@ -346,7 +327,7 @@ const handleCheckPayment = async () => {
             </div>
           </div>
           <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-            <button @click="navigateTo('/profile')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+            <button @click="navigateTo('/profile/orders')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Track My Order
             </button>
             <button @click="navigateTo('/catalog')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
@@ -358,7 +339,9 @@ const handleCheckPayment = async () => {
         <!-- Expired State -->
         <div v-else-if="paymentInfoState?.status === 'expired'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-amber-50/50">
-            <span class="text-4xl">⏰</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-amber-900">Payment Window Expired</h3>
@@ -382,7 +365,7 @@ const handleCheckPayment = async () => {
             <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Browse Catalog / Re-Order
             </button>
-            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+            <button @click="navigateTo('/profile/orders')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               Back to My Orders
             </button>
           </div>
@@ -391,7 +374,9 @@ const handleCheckPayment = async () => {
         <!-- Cancelled State -->
         <div v-else-if="paymentInfoState?.status === 'cancelled'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
-            <span class="text-4xl">🚫</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-red-900">Order Cancelled</h3>
@@ -411,7 +396,7 @@ const handleCheckPayment = async () => {
             <button @click="navigateTo('/catalog')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Re-Order Flower Arrangement
             </button>
-            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+            <button @click="navigateTo('/profile/orders')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               View Order History
             </button>
           </div>
@@ -420,7 +405,9 @@ const handleCheckPayment = async () => {
         <!-- Failed State -->
         <div v-else-if="paymentInfoState?.status === 'failed'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/50">
-            <span class="text-4xl">❌</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-red-900">Payment Failed</h3>
@@ -440,7 +427,7 @@ const handleCheckPayment = async () => {
             <button @click="navigateTo('/checkout')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               Try Checkout Again
             </button>
-            <button @click="navigateTo('/profile')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
+            <button @click="navigateTo('/profile/orders')" class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer">
               Back to My Orders
             </button>
           </div>
@@ -449,7 +436,9 @@ const handleCheckPayment = async () => {
         <!-- Refunded / Refund Pending State -->
         <div v-else-if="paymentInfoState?.status === 'refunded' || paymentInfoState?.status === 'refund_pending'" class="bg-white border border-gray-100 rounded-3xl p-8 md:p-12 text-center shadow-sm space-y-6 animate-fade">
           <div class="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-purple-50/50">
-            <span class="text-4xl">💸</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
           </div>
           <div class="space-y-2">
             <h3 class="text-2xl font-black text-purple-900">{{ paymentInfoState?.status === 'refunded' ? 'Payment Refunded' : 'Refund Pending' }}</h3>
@@ -466,7 +455,7 @@ const handleCheckPayment = async () => {
             </div>
           </div>
           <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-            <button @click="navigateTo('/profile')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
+            <button @click="navigateTo('/profile/orders')" class="bg-[#1b4332] hover:bg-[#143326] text-white font-bold px-6 py-3 rounded-xl transition text-xs cursor-pointer shadow-sm">
               View My Orders
             </button>
           </div>
@@ -495,11 +484,19 @@ const handleCheckPayment = async () => {
               <div v-if="paymentInfoState?.channelData" class="flex flex-col justify-between p-6 rounded-2xl border border-gray-100 bg-gray-50/30 gap-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
                   <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-[#1b4332]/5 rounded-xl flex items-center justify-center text-xl">
-                      <span v-if="paymentInfoState.channelData.channel_type === 'ewallet'">📱</span>
-                      <span v-else-if="paymentInfoState.channelData.channel_type === 'bank_transfer'">🏦</span>
-                      <span v-else-if="paymentInfoState.channelData.channel_type === 'qr_code'">🔍</span>
-                      <span v-else>💳</span>
+                    <div class="w-12 h-12 bg-[#1b4332]/5 text-[#1b4332] rounded-xl flex items-center justify-center">
+                      <svg v-if="paymentInfoState.channelData.channel_type === 'ewallet'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+                      </svg>
+                      <svg v-else-if="paymentInfoState.channelData.channel_type === 'bank_transfer'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5m-15 10.5V10.5M3 21h18M3 9h18" />
+                      </svg>
+                      <svg v-else-if="paymentInfoState.channelData.channel_type === 'qr_code'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                      </svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                      </svg>
                     </div>
                     <div>
                       <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selected Provider</span>
@@ -513,7 +510,10 @@ const handleCheckPayment = async () => {
                       target="_blank"
                       class="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#1b4332] hover:bg-[#143326] text-white font-bold py-2.5 px-5 rounded-xl transition text-xs shadow-sm"
                     >
-                      Proceed to Payment Page ↗
+                      <span>Proceed to Payment Page</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
                     </a>
                   </div>
                 </div>
@@ -534,8 +534,8 @@ const handleCheckPayment = async () => {
               </div>
 
               <!-- Markdown Payment Instructions from Backend -->
-              <div v-if="instructionHtml" class="bg-emerald-50/10 border border-emerald-100/50 rounded-2xl p-6 mb-6 text-left shadow-sm">
-                <div v-html="instructionHtml" class="prose max-w-none"></div>
+              <div v-if="instructionHtml" class="bg-emerald-50/20 border border-emerald-100 rounded-2xl p-6 mb-6 text-left shadow-2xs">
+                <div v-html="instructionHtml" class="payment-instruction-content"></div>
               </div>
 
               <!-- Action Buttons to check/verify payment -->
@@ -549,7 +549,7 @@ const handleCheckPayment = async () => {
                   <span>{{ isChecking ? 'Verifying Payment...' : 'I Have Paid / Verify Status' }}</span>
                 </button>
                 <button
-                  @click="navigateTo('/profile')"
+                  @click="navigateTo('/profile/orders')"
                   class="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-3.5 px-6 rounded-xl transition text-xs cursor-pointer"
                 >
                   Pay Later / View Orders
@@ -565,6 +565,59 @@ const handleCheckPayment = async () => {
 </template>
 
 <style scoped>
+.payment-instruction-content :deep(h1) {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #111827;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.payment-instruction-content :deep(h2) {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #111827;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.payment-instruction-content :deep(h3) {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #064e3b;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.payment-instruction-content :deep(p) {
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+.payment-instruction-content :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.payment-instruction-content :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.payment-instruction-content :deep(li) {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0.25rem 0;
+  line-height: 1.5;
+}
+.payment-instruction-content :deep(code) {
+  background-color: #ecfdf5;
+  color: #064e3b;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  border: 1px solid #a7f3d0;
+}
 .animate-fade {
   animation: fadeIn 0.3s ease-out;
 }

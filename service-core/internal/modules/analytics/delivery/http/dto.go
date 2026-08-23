@@ -123,3 +123,32 @@ type productMetricsSummaryResponse struct {
 	AvgReturnRate   float64                  `json:"avg_return_rate"`
 	InvoiceVoidRate float64                  `json:"invoice_void_rate"`
 }
+
+type demandForecastResponse struct {
+	ProductID            uuid.UUID  `json:"product_id"`
+	ProductName          string     `json:"product_name"`
+	ShopID               *uuid.UUID `json:"shop_id,omitempty"`
+	PredictedUnitsSold7d float64    `json:"predicted_units_sold_7d"`
+	ConfidenceTier       string     `json:"confidence_tier"`
+	HistoricalVelocity7d int        `json:"historical_velocity_7d"`
+	CurrentStock         int        `json:"current_stock"`
+	ForecastGeneratedAt  time.Time  `json:"forecast_generated_at"`
+}
+
+type stockoutRiskItemResponse struct {
+	ProductID               uuid.UUID `json:"product_id"`
+	ProductName             string    `json:"product_name"`
+	ShopID                  uuid.UUID `json:"shop_id"`
+	ShopName                string    `json:"shop_name"`
+	Stock                   int       `json:"stock"`
+	ReservedStock           int       `json:"reserved_stock"`
+	AvailableStock          int       `json:"available_stock"`
+	StockBurnRate7d         float64   `json:"stock_burn_rate_7d"`
+	SupplierLeadTimeDays    float64   `json:"supplier_lead_time_days"`
+	EstimatedDaysToStockout float64   `json:"estimated_days_to_stockout"`
+	ReorderUrgencyRatio     float64   `json:"reorder_urgency_ratio"`
+	StockoutProbability     float64   `json:"stockout_probability"`
+	WillStockout            bool      `json:"will_stockout"`
+	RiskLevel               string    `json:"risk_level"`
+	EvaluatedAt             time.Time `json:"evaluated_at"`
+}

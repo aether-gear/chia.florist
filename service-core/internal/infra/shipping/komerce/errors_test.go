@@ -8,19 +8,20 @@ import (
 
 func TestMapKomerceError(t *testing.T) {
 	tests := []struct {
-		code         int
-		rawMsg       string
-		expectedType apperrors.ErrorType
-		expectedCode int
+		code            int
+		rawMsg          string
+		expectedType    apperrors.ErrorType
+		expectedCode    int
+		expectedMessage string
 	}{
-		{400, "Invalid Api key, key not found", apperrors.ErrTypeUnauthorized, 401},
-		{400, "API key is required", apperrors.ErrTypeUnauthorized, 401},
-		{400, "Data waybill not found", apperrors.ErrTypeNotFound, 404},
-		{400, "Resi tidak ditemukan", apperrors.ErrTypeNotFound, 404},
-		{400, "Courier is not supported", apperrors.ErrTypeInvalidInput, 400},
-		{429, "Too Many Requests", apperrors.ErrTypeTooManyRequests, 429},
-		{500, "Internal Server Error", apperrors.ErrTypeInternal, 500},
-		{400, "General invalid param", apperrors.ErrTypeBadRequest, 400},
+		{400, "Invalid Api key, key not found", apperrors.ErrTypeUnauthorized, 401, ""},
+		{400, "API key is required", apperrors.ErrTypeUnauthorized, 401, ""},
+		{400, "Data waybill not found", apperrors.ErrTypeNotFound, 404, ""},
+		{400, "Resi tidak ditemukan", apperrors.ErrTypeNotFound, 404, ""},
+		{400, "Courier is not supported", apperrors.ErrTypeBadRequest, 400, "Komerce API error (400): Courier is not supported"},
+		{429, "Too Many Requests", apperrors.ErrTypeTooManyRequests, 429, ""},
+		{500, "Internal Server Error", apperrors.ErrTypeInternal, 500, ""},
+		{400, "General invalid param", apperrors.ErrTypeBadRequest, 400, "Komerce API error (400): General invalid param"},
 	}
 
 	for _, tt := range tests {
@@ -33,6 +34,9 @@ func TestMapKomerceError(t *testing.T) {
 		}
 		if appErr.StatusCode != tt.expectedCode {
 			t.Errorf("mapKomerceError(%d, %q).StatusCode = %d; want %d", tt.code, tt.rawMsg, appErr.StatusCode, tt.expectedCode)
+		}
+		if tt.expectedMessage != "" && appErr.Message != tt.expectedMessage {
+			t.Errorf("mapKomerceError(%d, %q).Message = %q; want %q", tt.code, tt.rawMsg, appErr.Message, tt.expectedMessage)
 		}
 	}
 }

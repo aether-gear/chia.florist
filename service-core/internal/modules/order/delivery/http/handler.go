@@ -1,27 +1,35 @@
 package http
 
 import (
+	"errors"
 	"net/http"
+	"slices"
+	"strings"
+	"time"
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	authenDomain "service-core/internal/modules/authentication/domain"
+	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
 	orderDomain "service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/usecase"
 	paymentDomain "service-core/internal/modules/payment/domain"
 	shipmentDomain "service-core/internal/modules/shipment/domain"
+	shopUsecase "service-core/internal/modules/shop/usecase"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type orderHandler struct {
-	findOrders        *usecase.FindOrdersUsecase
-	getOrder          *usecase.GetOrderUsecase
-	createOrder       *usecase.CreateOrderUsecase
-	updateOrderStatus *usecase.UpdateOrderStatusUsecase
-	getOrderTracking  *usecase.GetOrderTrackingUsecase
+	findOrders           *usecase.FindOrdersUsecase
+	getOrder             *usecase.GetOrderUsecase
+	createOrder          *usecase.CreateOrderUsecase
+	updateOrderStatus    *usecase.UpdateOrderStatusUsecase
+	dispatchShopShipment *usecase.DispatchShopShipmentUsecase
+	getOrderTracking     *usecase.GetOrderTrackingUsecase
+	getShop              *shopUsecase.GetShopUsecase
 }
 
 func NewOrderHandler(
@@ -29,14 +37,18 @@ func NewOrderHandler(
 	getOrder *usecase.GetOrderUsecase,
 	createOrder *usecase.CreateOrderUsecase,
 	updateOrderStatus *usecase.UpdateOrderStatusUsecase,
+	dispatchShopShipment *usecase.DispatchShopShipmentUsecase,
 	getOrderTracking *usecase.GetOrderTrackingUsecase,
+	getShop *shopUsecase.GetShopUsecase,
 ) *orderHandler {
 	return &orderHandler{
-		findOrders:        findOrders,
-		getOrder:          getOrder,
-		createOrder:       createOrder,
-		updateOrderStatus: updateOrderStatus,
-		getOrderTracking:  getOrderTracking,
+		findOrders:           findOrders,
+		getOrder:             getOrder,
+		createOrder:          createOrder,
+		updateOrderStatus:    updateOrderStatus,
+		dispatchShopShipment: dispatchShopShipment,
+		getOrderTracking:     getOrderTracking,
+		getShop:              getShop,
 	}
 }
 
@@ -63,6 +75,22 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			}
 		}
 
+		var customDesignResp *orderItemCustomDesignResponse
+		if o.CustomDesigns != nil {
+			if cd, ok := o.CustomDesigns[item.ID]; ok {
+				customDesignResp = &orderItemCustomDesignResponse{
+					Version:         cd.Version,
+					PhysicalSizeID:  cd.PhysicalSizeID,
+					PreviewURL:      cd.PreviewURL,
+					HeaderTextUpper: cd.HeaderTextUpper,
+					BodyTextUpper:   cd.BodyTextUpper,
+					HeaderTextLower: cd.HeaderTextLower,
+					BodyTextLower:   cd.BodyTextLower,
+					DesignSnapshot:  cd.DesignSnapshot,
+				}
+			}
+		}
+
 		items[j] = orderItemResponse{
 			ID:                 item.ID.String(),
 			ShipmentID:         shipmentIDStr,
@@ -78,6 +106,7 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			CourierCode:        item.CourierCode,
 			CourierService:     item.CourierService,
 			ShippingFeeTotal:   item.ShippingFee,
+			CustomDesign:       customDesignResp,
 		}
 	}
 
@@ -183,6 +212,57 @@ func mapShipmentDetail(s *shipmentDomain.Shipment) *shipmentDetailResponse {
 	}
 }
 
+func (h *orderHandler) resolveShopFilter(r *http.Request) (*uuid.UUID, bool, error) {
+	shopIDStr := apphttp.Query(r, "shop_id")
+	shopSlug := apphttp.Query(r, "shop_slug")
+	shopParam := apphttp.Query(r, "shop")
+
+	if shopIDStr == "all" || shopSlug == "all" || shopParam == "all" {
+		return nil, false, nil
+	}
+
+	targetIDStr := ""
+	targetSlug := ""
+
+	if shopIDStr != "" {
+		targetIDStr = shopIDStr
+	} else if shopSlug != "" {
+		targetSlug = shopSlug
+	} else if shopParam != "" {
+		if parsed, err := uuid.Parse(shopParam); err == nil {
+			return &parsed, true, nil
+		}
+		targetSlug = shopParam
+	}
+
+	if targetIDStr != "" {
+		id, err := uuid.Parse(targetIDStr)
+		if err != nil {
+			return nil, true, apperrors.NewBadRequest("invalid shop id")
+		}
+		return &id, true, nil
+	}
+
+	if targetSlug != "" {
+		if targetSlug == "all" {
+			return nil, false, nil
+		}
+		if h.getShop == nil {
+			return nil, true, apperrors.NewInternal(errors.New("shop filter service unavailable"))
+		}
+		shop, err := h.getShop.GetBySlug(r.Context(), targetSlug)
+		if err != nil {
+			return nil, true, err
+		}
+		if shop == nil {
+			return nil, true, nil
+		}
+		return &shop.ID, true, nil
+	}
+
+	return nil, false, nil
+}
+
 func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error {
 	actor, ok := authzSvc.GetActor(r.Context())
 	if !ok {
@@ -236,8 +316,84 @@ func (h *orderHandler) FindOrders(w http.ResponseWriter, r *http.Request) error 
 
 	if status != "" {
 		input.Status = &status
-	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
-		input.Status = &statuses
+	} else if statusesParam := apphttp.Query(r, "statuses"); statusesParam != "" {
+		var parsedStatuses []string
+		parts := strings.Split(statusesParam, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				parsedStatuses = append(parsedStatuses, trimmed)
+			}
+		}
+		input.Statuses = parsedStatuses
+	}
+
+	fromDateStr := apphttp.Query(r, "from_date")
+	if fromDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			input.FromDate = &t
+		} else if t, err := time.Parse("2006-01-02", fromDateStr); err == nil {
+			input.FromDate = &t
+		} else {
+			return apperrors.NewBadRequest("invalid from_date format")
+		}
+	}
+
+	toDateStr := apphttp.Query(r, "to_date")
+	if toDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			input.ToDate = &t
+		} else if t, err := time.Parse("2006-01-02", toDateStr); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Nanosecond)
+			input.ToDate = &endOfDay
+		} else {
+			return apperrors.NewBadRequest("invalid to_date format")
+		}
+	}
+
+	shopID, shopSpecified, err := h.resolveShopFilter(r)
+	if err != nil {
+		return err
+	}
+	if shopSpecified {
+		if shopID == nil {
+			apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+				"orders": []orderResponse{},
+				"page":   page,
+				"limit":  limit,
+				"total":  0,
+			})
+			return nil
+		}
+		input.ShopID = shopID
+	}
+
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		allAssigned := actor.GetAssignedShopIDs()
+		var assignedIDs []uuid.UUID
+		for _, sID := range allAssigned {
+			if actor.HasPermission(sID, authzDomain.PermissionOrderRead) {
+				assignedIDs = append(assignedIDs, sID)
+			}
+		}
+
+		if len(assignedIDs) == 0 {
+			apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+				"orders": []orderResponse{},
+				"page":   page,
+				"limit":  limit,
+				"total":  0,
+			})
+			return nil
+		}
+
+		if input.ShopID != nil {
+			if !actor.HasPermission(*input.ShopID, authzDomain.PermissionOrderRead) {
+				return apperrors.NewForbidden("forbidden: missing order:read permission for this shop")
+			}
+		} else {
+			input.ShopIDs = assignedIDs
+		}
 	}
 
 	orders, total, err := h.findOrders.Execute(r.Context(), input)
@@ -285,13 +441,47 @@ func (h *orderHandler) GetOrder(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewNotFound("order not found")
 	}
 
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		var permittedItems []orderDomain.OrderItem
+		for _, item := range result.Items {
+			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderRead) {
+				permittedItems = append(permittedItems, item)
+			}
+		}
+		if len(permittedItems) == 0 {
+			return apperrors.NewForbidden("forbidden: missing order:read permission for this shop's order")
+		}
+		result.Items = permittedItems
+
+		var permittedShipments []shipmentDomain.Shipment
+		for _, s := range result.Shipments {
+			hasItem := false
+			for _, itm := range permittedItems {
+				if itm.ShipmentID != nil && *itm.ShipmentID == s.ID {
+					hasItem = true
+					break
+				}
+			}
+			if hasItem {
+				permittedShipments = append(permittedShipments, s)
+			}
+		}
+		result.Shipments = permittedShipments
+		if len(permittedShipments) > 0 {
+			result.Shipment = &permittedShipments[0]
+		} else {
+			result.Shipment = nil
+		}
+	}
+
 	resp := buildOrderResponse(usecase.OrderSearchResult{
-		Order:       result.Order,
-		Items:       result.Items,
-		Payment:     result.Payment,
-		ChannelData: result.ChannelData,
-		Shipment:    result.Shipment,
-		Shipments:   result.Shipments,
+		Order:         result.Order,
+		Items:         result.Items,
+		CustomDesigns: result.CustomDesigns,
+		Payment:       result.Payment,
+		ChannelData:   result.ChannelData,
+		Shipment:      result.Shipment,
+		Shipments:     result.Shipments,
 	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
@@ -331,8 +521,56 @@ func (h *orderHandler) ListMyOrders(w http.ResponseWriter, r *http.Request) erro
 
 	if status != "" {
 		input.Status = &status
-	} else if statuses := apphttp.Query(r, "statuses"); statuses != "" {
-		input.Status = &statuses
+	} else if statusesParam := apphttp.Query(r, "statuses"); statusesParam != "" {
+		var parsedStatuses []string
+		parts := strings.Split(statusesParam, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				parsedStatuses = append(parsedStatuses, trimmed)
+			}
+		}
+		input.Statuses = parsedStatuses
+	}
+
+	fromDateStr := apphttp.Query(r, "from_date")
+	if fromDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			input.FromDate = &t
+		} else if t, err := time.Parse("2006-01-02", fromDateStr); err == nil {
+			input.FromDate = &t
+		} else {
+			return apperrors.NewBadRequest("invalid from_date format")
+		}
+	}
+
+	toDateStr := apphttp.Query(r, "to_date")
+	if toDateStr != "" {
+		if t, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			input.ToDate = &t
+		} else if t, err := time.Parse("2006-01-02", toDateStr); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Nanosecond)
+			input.ToDate = &endOfDay
+		} else {
+			return apperrors.NewBadRequest("invalid to_date format")
+		}
+	}
+
+	shopID, shopSpecified, err := h.resolveShopFilter(r)
+	if err != nil {
+		return err
+	}
+	if shopSpecified {
+		if shopID == nil {
+			apphttp.WriteJSON(w, http.StatusOK, map[string]any{
+				"orders": []orderResponse{},
+				"page":   page,
+				"limit":  limit,
+				"total":  0,
+			})
+			return nil
+		}
+		input.ShopID = shopID
 	}
 
 	orders, total, err := h.findOrders.Execute(r.Context(), input)
@@ -384,11 +622,13 @@ func (h *orderHandler) GetMyOrder(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	resp := buildOrderResponse(usecase.OrderSearchResult{
-		Order:       result.Order,
-		Items:       result.Items,
-		Payment:     result.Payment,
-		ChannelData: result.ChannelData,
-		Shipment:    result.Shipment,
+		Order:         result.Order,
+		Items:         result.Items,
+		CustomDesigns: result.CustomDesigns,
+		Payment:       result.Payment,
+		ChannelData:   result.ChannelData,
+		Shipment:      result.Shipment,
+		Shipments:     result.Shipments,
 	})
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
@@ -584,6 +824,43 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		return apperrors.NewBadRequest("status is required")
 	}
 
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		existingOrder, err := h.getOrder.Execute(r.Context(), usecase.GetOrderInput{
+			OrderID: orderID,
+		})
+		if err != nil || existingOrder == nil {
+			return apperrors.NewNotFound("order not found")
+		}
+
+		uniqueShops := make(map[uuid.UUID]bool)
+		for _, item := range existingOrder.Items {
+			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderUpdateStatus) {
+				uniqueShops[item.ShopID] = true
+			}
+		}
+		if len(uniqueShops) == 0 {
+			return apperrors.NewForbidden("forbidden: missing order:update_status permission for this shop's order")
+		}
+
+		for shopID := range uniqueShops {
+			if shopRules, exists := actor.Rules[shopID]; exists && shopRules != nil {
+				if allowedRaw, ok := shopRules["allowed_statuses"]; ok {
+					allowedList := parseStringSlice(allowedRaw)
+					if len(allowedList) > 0 && !slices.Contains(allowedList, req.Status) {
+						return apperrors.NewForbidden("forbidden: status transition to '" + req.Status + "' is not allowed by staff rule")
+					}
+				}
+
+				if maxRaw, ok := shopRules["max_order_amount"]; ok {
+					maxAmount := parseFloat64(maxRaw)
+					if maxAmount > 0 && float64(existingOrder.Order.Total) > maxAmount {
+						return apperrors.NewForbidden("forbidden: order total amount exceeds staff rule limit")
+					}
+				}
+			}
+		}
+	}
+
 	var shipmentsInput []usecase.ShipmentDispatchInput
 	if len(req.Shipments) > 0 {
 		for _, sReq := range req.Shipments {
@@ -622,6 +899,76 @@ func (h *orderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		Shipment:  result.Shipment,
 		Shipments: result.Shipments,
 	})
+
+	apphttp.WriteJSON(w, http.StatusOK, resp)
+	return nil
+}
+
+// DispatchOrderShipment handles POST /orders/{orderID}/shipments — staff-only.
+// Creates a shipment for a specific shop's order items.
+func (h *orderHandler) DispatchOrderShipment(w http.ResponseWriter, r *http.Request) error {
+	actor, ok := authzSvc.GetActor(r.Context())
+	if !ok {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if actor.Type != authenDomain.AccountTypeStaff {
+		return apperrors.NewForbidden("forbidden: staff account required")
+	}
+
+	orderIDStr := chi.URLParam(r, "orderID")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid order id")
+	}
+
+	var req dispatchShopShipmentRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	shopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		return apperrors.NewBadRequest("invalid shop id")
+	}
+
+	if len(req.ItemIDs) == 0 {
+		return apperrors.NewBadRequest("item_ids is required and must not be empty")
+	}
+
+	var itemUUIDs []uuid.UUID
+	for _, idStr := range req.ItemIDs {
+		parsed, err := uuid.Parse(idStr)
+		if err != nil {
+			return apperrors.NewBadRequest("invalid item id in item_ids")
+		}
+		itemUUIDs = append(itemUUIDs, parsed)
+	}
+
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		if !actor.HasPermission(shopID, authzDomain.PermissionOrderUpdateStatus) {
+			return apperrors.NewForbidden("forbidden: missing order:update_status permission for this shop")
+		}
+	}
+
+	res, err := h.dispatchShopShipment.Execute(r.Context(), usecase.DispatchShopShipmentInput{
+		OrderID:           orderID,
+		ShopID:            shopID,
+		FulfillmentMethod: req.FulfillmentMethod,
+		Courier:           req.Courier,
+		Service:           req.Service,
+		TrackingNumber:    req.TrackingNumber,
+		ItemIDs:           itemUUIDs,
+	})
+	if err != nil {
+		return err
+	}
+
+	resp := map[string]any{
+		"order_id":          res.Order.ID.String(),
+		"order_status":      string(res.Order.Status),
+		"shipment_id":       res.Shipment.ID.String(),
+		"all_items_shipped": res.AllItemsShipped,
+	}
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
@@ -699,6 +1046,26 @@ func (h *orderHandler) GetOrderTrackingForStaff(w http.ResponseWriter, r *http.R
 		return apperrors.NewBadRequest("invalid order id")
 	}
 
+	if actor.StaffID != nil && !actor.IsSuperAdmin() {
+		existingOrder, err := h.getOrder.Execute(r.Context(), usecase.GetOrderInput{
+			OrderID: orderID,
+		})
+		if err != nil || existingOrder == nil {
+			return apperrors.NewNotFound("order not found")
+		}
+
+		hasAccess := false
+		for _, item := range existingOrder.Items {
+			if actor.HasPermission(item.ShopID, authzDomain.PermissionOrderRead) {
+				hasAccess = true
+				break
+			}
+		}
+		if !hasAccess {
+			return apperrors.NewForbidden("forbidden: missing order:read permission for this shop's order")
+		}
+	}
+
 	input := usecase.GetOrderTrackingInput{
 		OrderID:    orderID,
 		CustomerID: uuid.Nil,
@@ -737,4 +1104,33 @@ func (h *orderHandler) GetOrderTrackingForStaff(w http.ResponseWriter, r *http.R
 
 	apphttp.WriteJSON(w, http.StatusOK, resp)
 	return nil
+}
+
+func parseStringSlice(val any) []string {
+	var result []string
+	switch v := val.(type) {
+	case []string:
+		return v
+	case []any:
+		for _, elem := range v {
+			if s, ok := elem.(string); ok {
+				result = append(result, s)
+			}
+		}
+	}
+	return result
+}
+
+func parseFloat64(val any) float64 {
+	switch v := val.(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int:
+		return float64(v)
+	}
+	return 0
 }

@@ -1,12 +1,11 @@
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 
 export default defineNuxtRouteMiddleware(async (_to, _from) => {
-  if (import.meta.server) return   // SSR: skip — auth state is client-only
-
   const authVm = useAuthViewModel()
   const isLoggedIn = useCookie('is_logged_in')
+  const rememberMe = useCookie('remember_me')
 
-  if (!authVm.isInitialized.value && isLoggedIn.value === 'true') {
+  if (!authVm.isInitialized.value && (isLoggedIn.value === 'true' || rememberMe.value === 'true')) {
     try {
       await authVm.fetchCurrentUser()
     } catch (err) {
@@ -14,7 +13,9 @@ export default defineNuxtRouteMiddleware(async (_to, _from) => {
     }
   }
 
-  if (!authVm.isAuthenticated.value) {
+  if (!authVm.isAuthenticated.value && isLoggedIn.value !== 'true') {
     return navigateTo('/login')
   }
 })
+
+

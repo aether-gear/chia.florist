@@ -18,6 +18,7 @@ import (
 	"service-core/internal/modules/order/repository"
 	paymentDomain "service-core/internal/modules/payment/domain"
 	paymentRepo "service-core/internal/modules/payment/repository"
+	productDomain "service-core/internal/modules/product/domain"
 	userRepo "service-core/internal/modules/user/repository"
 	markdown "service-core/internal/shared/markdown"
 	transaction "service-core/internal/shared/transaction"
@@ -81,6 +82,7 @@ type CreateOrderUsecase struct {
 	accountRepo            authenRepo.AccountRepository
 	orderRepo              repository.OrderRepository
 	orderItemRepo          repository.OrderItemRepository
+	customDesignRepo       repository.OrderItemCustomDesignRepository
 	invoiceRepo            repository.InvoiceRepository
 	invoiceItemRepo        repository.InvoiceItemRepository
 	paymentRepo            paymentRepo.PaymentRepository
@@ -101,6 +103,7 @@ func NewCreateOrderUsecase(
 	accountRepo authenRepo.AccountRepository,
 	orderRepo repository.OrderRepository,
 	orderItemRepo repository.OrderItemRepository,
+	customDesignRepo repository.OrderItemCustomDesignRepository,
 	invoiceRepo repository.InvoiceRepository,
 	invoiceItemRepo repository.InvoiceItemRepository,
 	paymentRepo paymentRepo.PaymentRepository,
@@ -120,6 +123,7 @@ func NewCreateOrderUsecase(
 		accountRepo:            accountRepo,
 		orderRepo:              orderRepo,
 		orderItemRepo:          orderItemRepo,
+		customDesignRepo:       customDesignRepo,
 		invoiceRepo:            invoiceRepo,
 		invoiceItemRepo:        invoiceItemRepo,
 		paymentRepo:            paymentRepo,
@@ -180,7 +184,6 @@ func (u *CreateOrderUsecase) Execute(
 		Total:       pricingResult.GrandTotal,
 		CreatedAt:   now,
 	}
-
 	if err := order.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid order domain state: %w", err)
 	}
@@ -188,9 +191,10 @@ func (u *CreateOrderUsecase) Execute(
 	invoice := order.NewInvoice()
 
 	var (
-		orderItems   []domain.OrderItem
-		invoiceItems []domain.InvoiceItem
-		chargeItems  []paymentgateway.ChargeItem
+		orderItems    []domain.OrderItem
+		invoiceItems  []domain.InvoiceItem
+		customDesigns []domain.OrderItemCustomDesign
+		chargeItems   []paymentgateway.ChargeItem
 
 		expiresAt = now.Add(PAYMENT_EXPIRATION)
 	)
@@ -204,7 +208,15 @@ func (u *CreateOrderUsecase) Execute(
 			courierService = &shopRes.SelectedCourier.Service
 		}
 
-		for _, itemRes := range shopRes.Items {
+		var inputShop *OrderShopInput
+		for i := range input.Shops {
+			if input.Shops[i].ShopID == shopRes.ShopID {
+				inputShop = &input.Shops[i]
+				break
+			}
+		}
+
+		for itemIdx, itemRes := range shopRes.Items {
 			var variantType cartDomain.ProductVariantType = cartDomain.ProductVariantTypeStandard
 			if itemRes.IsCustom || itemRes.ProductID == nil {
 				variantType = cartDomain.ProductVariantTypeCustom
@@ -230,6 +242,54 @@ func (u *CreateOrderUsecase) Execute(
 
 			orderItems = append(orderItems, orderItem)
 			invoiceItems = append(invoiceItems, invoiceItem)
+
+			if variantType == cartDomain.ProductVariantTypeCustom {
+				var rawDesign json.RawMessage
+				if inputShop != nil {
+					if itemRes.CartItemID != nil {
+						for _, inItm := range inputShop.Items {
+							if inItm.CartItemID != nil && *inItm.CartItemID == *itemRes.CartItemID && len(inItm.CustomDesign) > 0 {
+								rawDesign = inItm.CustomDesign
+								break
+							}
+						}
+					}
+					if len(rawDesign) == 0 && itemIdx < len(inputShop.Items) && len(inputShop.Items[itemIdx].CustomDesign) > 0 {
+						rawDesign = inputShop.Items[itemIdx].CustomDesign
+					}
+				}
+
+				if len(rawDesign) > 0 {
+					version := "3.0.0"
+					physicalSizeID := productDomain.DEFAULT_PHYSICAL_SIZE_ID
+					var previewURL *string
+					var hUpper, bUpper, hLower, bLower *string
+
+					if parsed, err := productDomain.ParseCustomDesignPayload(rawDesign); err == nil {
+						if parsed.Metadata.Version != "" {
+							version = parsed.Metadata.Version
+						}
+						size, prev, hu, bu, hl, bl := productDomain.ExtractDesignSummary(*parsed)
+						physicalSizeID = size
+						previewURL = prev
+						hUpper, bUpper, hLower, bLower = hu, bu, hl, bl
+					}
+
+					customDesigns = append(customDesigns, domain.OrderItemCustomDesign{
+						ID:              uuid.New(),
+						OrderItemID:     orderItem.ID,
+						Version:         version,
+						PhysicalSizeID:  physicalSizeID,
+						PreviewURL:      previewURL,
+						HeaderTextUpper: hUpper,
+						BodyTextUpper:   bUpper,
+						HeaderTextLower: hLower,
+						BodyTextLower:   bLower,
+						DesignSnapshot:  rawDesign,
+						CreatedAt:       now,
+					})
+				}
+			}
 		}
 	}
 
@@ -359,6 +419,12 @@ func (u *CreateOrderUsecase) Execute(
 			return fmt.Errorf("failed to save order items: %w", err)
 		}
 
+		if len(customDesigns) > 0 && u.customDesignRepo != nil {
+			if err := u.customDesignRepo.SaveBulk(ctx, exec, customDesigns); err != nil {
+				return fmt.Errorf("failed to save order item custom designs: %w", err)
+			}
+		}
+
 		if err := u.invoiceItemRepo.SaveBulk(ctx, exec, invoiceItems); err != nil {
 			return fmt.Errorf("failed to save invoice items: %w", err)
 		}
@@ -418,9 +484,30 @@ func (u *CreateOrderUsecase) Execute(
 			return fmt.Errorf("failed to load cart with items: %w", err)
 		}
 		if cart != nil {
-			for _, item := range orderItems {
-				if item.ProductID != nil {
-					cart.RemoveItem(*item.ProductID, item.ShopID)
+			for _, shop := range pricingResult.Shops {
+				for _, item := range shop.Items {
+					if item.CartItemID != nil {
+						if cart.RemoveItemByID(*item.CartItemID) {
+							continue
+						}
+					}
+					if item.ProductID != nil {
+						if !cart.RemoveItem(*item.ProductID, shop.ShopID) {
+							cart.RemoveProduct(*item.ProductID)
+						}
+						continue
+					}
+					// If custom item had no matched CartItemID, remove matching custom item in shop
+					if item.IsCustom {
+						for idx := range cart.Items {
+							ci := &cart.Items[idx]
+							if ci.DeletedAt == nil && ci.ProductVariantType == cartDomain.ProductVariantTypeCustom && ci.ShopID == shop.ShopID {
+								now := appclock.Now()
+								ci.DeletedAt = &now
+								break
+							}
+						}
+					}
 				}
 			}
 

@@ -54,8 +54,8 @@ filter: brightness(1.02) contrast(1.25);
 
 ---
 
-## 🧬 5. Component Implementations
+## 🎛️ 6. Overlay Right Panel Drawer Rule
 
-*   **Inputs**: Must use `h-11` heights, thin borders (`border-zinc-200/80`), light backgrounds (`bg-zinc-50/20`), transition animations, and thin green focus outlines (`focus-visible:ring-2 focus-visible:ring-emerald-600/20`).
-*   **Buttons**: Must be solid primary green with smooth scaling states on click (`active:scale-[0.98]`).
-*   **Checkboxes**: Must be refactored to use standard design tokens (`data-[state=checked]:bg-primary`) to avoid hardcoded slate backgrounds.
+*   **Mandatory Panel Standard**: ALWAYS use the global **Overlay Right Panel** (`Sheet` drawer component with `w-full sm:max-w-none md:w-[48vw] md:min-w-[480px]`) for any data input, entity creation, editing, account binding, or permission assignment workflows (e.g. creating staff, editing staff, binding user accounts, assigning shop permissions).
+*   **No Center Modals/Popups for Inputs**: Avoid using centered modal dialogs for multi-field forms or editing. All input, editing, and configuration forms must slide in from the right edge as a full-height overlay panel with sticky header and action footer.
+

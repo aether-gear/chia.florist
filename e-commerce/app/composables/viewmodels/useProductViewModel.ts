@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { productService } from '~/services/productService'
 import type { Product, CatalogProduct, FindProductsParams } from '~/types/product'
 import { useStoreSelection } from '~/composables/useStoreSelection'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 export const useProductViewModel = () => {
   const products = ref<Product[]>([])
@@ -44,7 +45,7 @@ export const useProductViewModel = () => {
         error.value = 'Produk sedang tidak tersedia'
       }
     } catch (e) {
-      error.value = 'Produk sedang tidak tersedia'
+      error.value = mapErrorMessage(e, 'Produk sedang tidak tersedia')
     } finally {
       isLoading.value = false
     }
@@ -65,7 +66,7 @@ export const useProductViewModel = () => {
         error.value = 'Produk tidak ditemukan atau sedang tidak tersedia'
       }
     } catch (e) {
-      error.value = 'Produk tidak ditemukan atau sedang tidak tersedia'
+      error.value = mapErrorMessage(e, 'Produk tidak ditemukan atau sedang tidak tersedia')
     } finally {
       isLoading.value = false
     }

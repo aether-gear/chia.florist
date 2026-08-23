@@ -338,6 +338,12 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 	now := appclock.Now()
 	var preparedShipments []preparedShipment
+	var createdLogisticsOrders []string
+	rollbackLogistics := func() {
+		for _, orderNo := range createdLogisticsOrders {
+			_ = u.logistics.CancelOrder(ctx, orderNo)
+		}
+	}
 
 	if len(input.Shipments) > 0 {
 		// Staff explicitly configured shipment grouping (split / multi shipment)
@@ -445,7 +451,11 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 				komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
 				if err != nil {
+					rollbackLogistics()
 					return nil, fmt.Errorf("failed to create shipment order: %w", err)
+				}
+				if komerceResult != nil && komerceResult.KomerceOrderNo != "" {
+					createdLogisticsOrders = append(createdLogisticsOrders, komerceResult.KomerceOrderNo)
 				}
 
 				tracking := komerceResult.TrackingNumber
@@ -474,6 +484,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 			}
 
 			if err := shipment.Validate(); err != nil {
+				rollbackLogistics()
 				return nil, apperrors.NewInvalidInput(err.Error())
 			}
 
@@ -594,7 +605,11 @@ func (u *UpdateOrderStatusUsecase) Execute(
 
 				komerceResult, err := u.logistics.CreateOrder(ctx, orderInput)
 				if err != nil {
+					rollbackLogistics()
 					return nil, fmt.Errorf("failed to create Komerce shipment order: %w", err)
+				}
+				if komerceResult != nil && komerceResult.KomerceOrderNo != "" {
+					createdLogisticsOrders = append(createdLogisticsOrders, komerceResult.KomerceOrderNo)
 				}
 
 				tracking := komerceResult.TrackingNumber
@@ -623,6 +638,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 			}
 
 			if err := shipment.Validate(); err != nil {
+				rollbackLogistics()
 				return nil, apperrors.NewInvalidInput(err.Error())
 			}
 
@@ -655,6 +671,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil
 	})
 	if err != nil {
+		rollbackLogistics()
 		return nil, err
 	}
 

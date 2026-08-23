@@ -1,4 +1,5 @@
-import { Package, AlertTriangle, TrendingUp, DollarSign } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Package, AlertTriangle, TrendingUp, DollarSign, Sparkles } from 'lucide-react';
 import type { InventoryMetricsResponse, ProductMetricsResponse } from '../../../../models/Analytics';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table';
 import { Skeleton } from '../../../../components/ui/skeleton';
@@ -86,6 +87,27 @@ export default function ProductInventoryAnalyticsTab({
           </div>
           <p className="text-xs text-muted-foreground">Canceled / voided invoices</p>
         </div>
+      </div>
+
+      {/* AI Stockout & Demand Callout Banner */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/20 gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="font-bold font-display text-sm text-foreground">AI Stockout Risk Scanner & Demand Forecasting Available</h4>
+            <p className="text-xs text-muted-foreground">
+              Evaluate real-time inventory depletion risks and projected 7-day SKU volume forecasts.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/admin/analytics?tab=ai-intelligence"
+          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"
+        >
+          Open AI Intelligence →
+        </Link>
       </div>
 
       {/* Product Tables: By Revenue vs By Volume */}

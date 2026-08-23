@@ -246,31 +246,32 @@
   left: 0;
   right: 0;
   width: 100%;
-  height: 72px;
-  padding-bottom: 8px; /* Container bottom padding creates floating button gap */
+  height: 68px;
+  padding: 0 0.5rem;
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
   z-index: 50;
   display: flex;
-  align-items: flex-start; /* Buttons align to top 64px */
+  align-items: flex-start;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   /* Top half = frosted low opacity white, Bottom half = full opacity white */
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.45) 32px, #ffffff 32px);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(255, 255, 255, 0.7);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55) 30px, #ffffff 30px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .zzz-tab-btn {
-  width: fit-content;
-  flex: 0 0 auto;
-  height: 64px;
+  height: 60px;
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 0.35rem 1.25rem 0.25rem 1.25rem;
+  padding: 0.25rem 0.25rem 0.2rem 0.25rem;
+  min-width: 44px;
+  max-width: 80px;
   border: none;
   outline: none;
   border-radius: 8px 8px 0 0;
@@ -284,7 +285,7 @@
 
 /* Top half icon area: Green icon on container's frosted white bg */
 .zzz-tab-icon {
-  height: 32px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -292,20 +293,20 @@
   transition: color 0.15s ease, transform 0.15s ease;
 }
 .zzz-tab-icon svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.15rem;
+  height: 1.15rem;
   color: inherit;
 }
 
 /* Bottom half label area: Green text on container's full opacity white bg */
 .zzz-tab-label {
-  height: 32px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #10b981;
   line-height: 1;
@@ -326,7 +327,7 @@
   border-radius: 8px;
   background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
   box-shadow: 0 -2px 10px rgba(16, 185, 129, 0.35), 0 6px 14px rgba(0, 0, 0, 0.15);
-  transform: translateY(-4px); /* Floating effect */
+  transform: translateY(-3px); /* Floating effect */
 }
 
 /* Active State: BOTH Icon and Label Text turn PURE WHITE (#ffffff) */
@@ -337,7 +338,7 @@
 
 .zzz-tab-btn.tab-active .zzz-tab-icon svg {
   color: #ffffff !important;
-  transform: scale(1.08);
+  transform: scale(1.06);
 }
 
 /* ZZZ green triangle indicator at top of active button */
@@ -348,9 +349,9 @@
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid #10b981;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #10b981;
 }
 
 /* ─── TAB BODY ───────────────────────────────────────────────────── */
@@ -620,19 +621,21 @@
 
 /* ─── 3D TOGGLE BUTTON ───────────────────────────────────────────── */
 .btn-3d-toggle {
-  position: absolute; top: 14px; right: 14px; z-index: 25;
+  position: absolute; top: 14px; right: 14px; z-index: 35;
   display: flex; align-items: center; gap: 0.42rem;
-  padding: 0.42rem 1rem;
+  padding: 0.45rem 1rem;
   border-radius: 999px;
-  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em;
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em;
   font-family: 'Inter', system-ui, sans-serif;
   border: none; cursor: pointer;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
               background 0.25s;
   box-shadow: 0 2px 14px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.06);
   user-select: none;
+  pointer-events: auto;
 }
 
 /* Flat (edit) mode appearance */
@@ -661,13 +664,14 @@
 /* ─── 3D PREVIEW MODE BADGE ──────────────────────────────────────── */
 .badge-3d-mode {
   position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-  background: rgba(108, 63, 197, 0.90);
+  background: rgba(108, 63, 197, 0.92);
   color: #fff;
   font-size: 0.67rem; font-weight: 600; letter-spacing: 0.04em;
   font-family: 'Inter', system-ui, sans-serif;
   padding: 0.32rem 1rem; border-radius: 999px;
-  pointer-events: none; z-index: 25; white-space: nowrap;
-  backdrop-filter: blur(8px);
+  pointer-events: none; z-index: 20; white-space: nowrap;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 12px rgba(108,63,197,0.4);
   animation: badge-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -723,30 +727,11 @@
   background: #f8f5f0; border-radius: 8px;
   border: 1px solid #ede8e0;
 }
-/* ─── MORE MENU CORNER WRAPPER & POPOVER (Bottom-Left Corner) ─────── */
-.zzz-more-corner-wrap {
-  position: absolute;
-  bottom: 0;
-  left: 1.5rem;
-  z-index: 55;
-  height: 64px;
-  display: flex;
-  align-items: center;
-}
-.zzz-more-corner-wrap .zzz-more-btn {
-  background: rgba(28, 24, 19, 0.75) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px 12px 0 0 !important;
-}
-.zzz-more-corner-wrap .zzz-more-btn.tab-active {
-  background: #10b981 !important;
-  color: #ffffff !important;
-}
 
+/* ─── MORE MENU QUICK ACTIONS POPOVER ────────────────────────────── */
 .more-menu-popover {
   position: absolute;
-  bottom: 72px;
+  bottom: 68px;
   left: 0;
   z-index: 65;
   display: flex;
@@ -754,7 +739,7 @@
   gap: 0.35rem;
   padding: 0.45rem;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -797,4 +782,160 @@
 }
 .toast-fade-enter-active, .toast-fade-leave-active { transition: all 0.25s ease; }
 .toast-fade-enter-from, .toast-fade-leave-to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+
+/* ─── MOBILE DRAWER HEADER (Visible on small screens) ───────────── */
+.dr-panel-mobile-header {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  border-bottom: 1px solid #ede8e0;
+  background: #faf8f5;
+  flex-shrink: 0;
+}
+.dr-panel-drag-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d4c9bc;
+  margin: 8px auto 4px auto;
+}
+.dr-panel-mobile-title-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 1rem 0.5rem 1rem;
+}
+.dr-panel-mobile-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.dr-panel-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #888;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.dr-panel-close-btn:hover {
+  background: #ede8e0;
+  color: #1c1813;
+}
+
+/* ─── RESPONSIVE MOBILE BREAKPOINTS ─────────────────────────────── */
+@media (max-width: 768px) {
+  .dr-root {
+    height: 100dvh;
+    height: 100vh;
+  }
+
+  .dr-panel-mobile-header {
+    display: flex;
+  }
+
+  /* Transform side panel into slide-up bottom drawer on mobile */
+  .dr-panel {
+    position: fixed;
+    inset-x: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: 0;
+    max-height: 75dvh;
+    border-left: none;
+    border-radius: 20px 20px 0 0;
+    z-index: 60;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.25);
+    background: #ffffff;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dr-panel.panel-open {
+    height: 70dvh;
+    border-top: 1px solid #e5ddd4;
+  }
+
+  .dr-canvas-wrapper {
+    padding-bottom: 72px;
+  }
+
+  .panel-foot {
+    padding-bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 24px));
+  }
+
+  /* Bottom toolbar on mobile: all 7 buttons fit neatly */
+  .zzz-bottom-bar {
+    justify-content: space-between;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+    gap: 0.15rem;
+  }
+
+  .zzz-tab-btn {
+    padding: 0.2rem 0.1rem 0.15rem 0.1rem;
+    min-width: 38px;
+  }
+
+  .more-menu-popover {
+    bottom: 72px;
+    left: 0.25rem;
+    max-width: 90vw;
+  }
+
+  .canvas-summary-bar {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    padding: 0.38rem 0.75rem;
+    font-size: 0.68rem;
+    gap: 0.5rem;
+    max-width: 94vw;
+  }
+
+  .dr-modal-backdrop {
+    padding: 0.75rem;
+  }
+
+  .dr-modal {
+    max-width: 96vw;
+    max-height: 88dvh;
+  }
+}
+
+@media (max-width: 640px) {
+  .dr-nav {
+    padding: 0 0.75rem;
+  }
+
+  .canvas-info-chip {
+    top: 10px;
+    left: 10px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.65rem;
+    z-index: 25;
+  }
+
+  .btn-3d-toggle {
+    top: 10px;
+    right: 10px;
+    padding: 0.38rem 0.8rem;
+    font-size: 0.68rem;
+    z-index: 35;
+    pointer-events: auto;
+  }
+
+  .badge-3d-mode {
+    top: 50px;
+    font-size: 0.62rem;
+    padding: 0.28rem 0.75rem;
+    max-width: 90vw;
+    z-index: 20;
+    pointer-events: none;
+  }
+}
 

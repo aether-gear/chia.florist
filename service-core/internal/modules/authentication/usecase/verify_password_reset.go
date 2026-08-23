@@ -19,6 +19,7 @@ type VerifyPasswordResetUsecase struct {
 	challengeRepo repository.VerificationChallengeRepository
 	pwHasher      repository.PasswordHasher
 	auditLogger   applogger.AuditLogger
+	sysLogger     applogger.Logger
 }
 
 func NewVerifyPasswordResetUsecase(
@@ -35,6 +36,10 @@ func NewVerifyPasswordResetUsecase(
 	}
 }
 
+func (u *VerifyPasswordResetUsecase) SetSysLogger(sysLogger applogger.Logger) {
+	u.sysLogger = sysLogger
+}
+
 type VerifyPasswordResetParams struct {
 	ChallengeID uuid.UUID
 	OTP         string
@@ -43,8 +48,16 @@ type VerifyPasswordResetParams struct {
 func (u *VerifyPasswordResetUsecase) Execute(
 	ctx context.Context,
 	input VerifyPasswordResetParams,
-) (*uuid.UUID, error) {
+) (verifiedID *uuid.UUID, err error) {
 	now := appclock.Now()
+
+	audit := &applogger.AuditScope{
+		Category: "user_action",
+		Action:   "verify_password_reset",
+		Resource: "account",
+		Metadata: map[string]any{"challenge_id": input.ChallengeID.String()},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, u.sysLogger, audit, &err)()
 
 	challenge, err := u.challengeRepo.
 		GetByID(ctx, u.executor, input.ChallengeID)
@@ -53,137 +66,53 @@ func (u *VerifyPasswordResetUsecase) Execute(
 	}
 
 	if challenge == nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id": input.ChallengeID.String(),
-				"reason":       "challenge not found",
-			},
-		})
-
+		audit.SetReason("challenge not found")
 		return nil, apperrors.NewNotFound(domain.ErrNotFoundChallenge.Error())
 	}
 
 	if challenge.Purpose != domain.OTPPurposePasswordReset {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id": input.ChallengeID.String(),
-				"reason":       "wrong challenge purpose",
-			},
-		})
-
+		audit.SetReason("wrong challenge purpose")
 		return nil, apperrors.NewNotFound(domain.ErrNotFoundChallenge.Error())
 	}
 
 	if challenge.ConsumedAt != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id": input.ChallengeID.String(),
-				"reason":       "challenge already consumed",
-			},
-		})
-
+		audit.SetReason("challenge already consumed")
 		return nil, apperrors.NewConflict(domain.ErrConsumedChallenge.Error())
 	}
 
 	if challenge.VerifiedAt != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id": input.ChallengeID.String(),
-				"reason":       "challenge already verified",
-			},
-		})
-
+		audit.SetReason("challenge already verified")
 		return nil, apperrors.NewConflict(domain.ErrVerifiedChallenge.Error())
 	}
 
 	if challenge.ExpiresAt.Before(now) {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id": input.ChallengeID.String(),
-				"reason":       "challenge expired",
-			},
-		})
-
+		audit.SetReason("challenge expired")
 		return nil, apperrors.NewConflict(domain.ErrExpiredChallenge.Error())
 	}
 
 	if challenge.AttemptCount >= 5 {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id": input.ChallengeID.String(),
-				"reason":       "maximum attempts reached",
-			},
-		})
-
+		audit.SetReason("maximum attempts reached")
 		return nil, apperrors.NewConflict(domain.ErrMaxAttemptReached.Error())
 	}
 
 	if err := u.pwHasher.Compare(challenge.CodeHash, input.OTP); err != nil {
 		challenge.AttemptCount++
 
-		if err := u.challengeRepo.Save(ctx, u.executor, *challenge); err != nil {
+		if err := u.challengeRepo.
+			Save(ctx, u.executor, *challenge); err != nil {
 			return nil, fmt.Errorf("failed to update challenge attempts: %w", err)
 		}
 
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_password_reset",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"challenge_id":  input.ChallengeID.String(),
-				"attempt_count": challenge.AttemptCount,
-				"reason":        "invalid otp",
-			},
-		})
-
+		audit.SetReason("invalid otp")
+		audit.SetMeta("attempt_count", challenge.AttemptCount)
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidOTP.Error())
 	}
 
-	// Mark as verified only — NOT consumed yet.
-	//
-	// ResetPasswordUsecase will consume it
-	// after the new password is set.
 	challenge.VerifiedAt = &now
-
 	if err := u.challengeRepo.
 		Save(ctx, u.executor, *challenge); err != nil {
-		return nil, fmt.Errorf("failed to mark challenge as verified: %w", err)
+		return nil, fmt.Errorf("failed to update challenge verification state: %w", err)
 	}
-
-	u.auditLogger.Log(ctx, applogger.AuditEvent{
-		Category: "user_action",
-		Action:   "verify_password_reset",
-		Resource: "account",
-		Outcome:  applogger.OutcomeSuccess,
-		Metadata: map[string]any{
-			"challenge_id": input.ChallengeID.String(),
-		},
-	})
 
 	return &challenge.ID, nil
 }

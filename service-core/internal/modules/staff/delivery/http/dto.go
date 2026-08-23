@@ -74,3 +74,25 @@ type listStaffAccountsResponse struct {
 	Accounts []staffAccountResponse `json:"accounts"`
 }
 
+type saveStaffPermissionRequest struct {
+	ShopID      uuid.UUID      `json:"shop_id"`
+	Permissions []string       `json:"permissions"`
+	Rules       map[string]any `json:"rules"`
+}
+
+type staffPermissionResponse struct {
+	ID          uuid.UUID      `json:"id"`
+	StaffID     uuid.UUID      `json:"staff_id"`
+	ShopID      uuid.UUID      `json:"shop_id"`
+	ShopName    string         `json:"shop_name,omitempty"`
+	Permissions []string       `json:"permissions"`
+	Rules       map[string]any `json:"rules"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   *time.Time     `json:"updated_at,omitempty"`
+}
+
+type listStaffPermissionsResponse struct {
+	StaffID     uuid.UUID                 `json:"staff_id"`
+	Total       int                       `json:"total"`
+	Permissions []staffPermissionResponse `json:"permissions"`
+}

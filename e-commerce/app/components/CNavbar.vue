@@ -6,18 +6,18 @@ import type { CatalogProduct } from '~/types/product'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useCart } from '~/composables/useCart'
 import { useAddress } from '~/composables/useAddress'
+import { filterCatalogProductsByQuery } from '~/utils/searchMatcher'
 
 const authVm = useAuthViewModel()
 const cart = useCart()
 const route = useRoute()
 const { addresses, fetchAddresses } = useAddress()
 
-// Watch authentication status to load user addresses
-watch(() => authVm.isAuthenticated.value, (isAuth) => {
-  if (isAuth) {
+const ensureAddressesLoaded = () => {
+  if (authVm.isAuthenticated.value && addresses.value.length === 0) {
     fetchAddresses().catch((err) => console.warn('Failed to load user addresses for navbar:', err))
   }
-}, { immediate: true })
+}
 
 // Get primary/default user address
 const defaultAddress = computed(() => {
@@ -48,6 +48,7 @@ let profileCloseTimeout: ReturnType<typeof setTimeout> | null = null
 const openProfileDropdown = () => {
   if (profileCloseTimeout) clearTimeout(profileCloseTimeout)
   isProfileOpen.value = true
+  ensureAddressesLoaded()
 }
 
 const closeProfileDropdown = () => {
@@ -58,6 +59,9 @@ const closeProfileDropdown = () => {
 
 const toggleProfileDropdown = () => {
   isProfileOpen.value = !isProfileOpen.value
+  if (isProfileOpen.value) {
+    ensureAddressesLoaded()
+  }
 }
 
 // --- SEARCH STATE & LOGIC ---
@@ -95,19 +99,13 @@ watch(searchQuery, (newQuery) => {
 
   debounceTimeout = setTimeout(async () => {
     try {
-      const apiResults = await productService.getCatalogProducts({
-        name: query
-      })
-
-      const matchesCustom = customSimulatorCard.name.toLowerCase().includes(query.toLowerCase()) ||
-                            'custom'.includes(query.toLowerCase()) ||
-                            'simulator'.includes(query.toLowerCase())
-
-      if (matchesCustom) {
-        searchResults.value = [customSimulatorCard, ...apiResults]
-      } else {
-        searchResults.value = apiResults
-      }
+      const apiResults = await productService.getCatalogProducts()
+      searchResults.value = filterCatalogProductsByQuery(
+        apiResults,
+        query,
+        true,
+        customSimulatorCard
+      )
     } catch (err) {
       console.error('Search failed:', err)
       searchResults.value = []
@@ -132,6 +130,14 @@ const closeSearch = () => {
   isSearchOpen.value = false
   searchQuery.value = ''
   searchResults.value = []
+}
+
+const goToDedicatedSearch = () => {
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim()
+    closeSearch()
+    navigateTo(`/search?q=${encodeURIComponent(q)}`)
+  }
 }
 
 // Close mobile menu on route change
@@ -273,7 +279,7 @@ watch(() => route.path, () => {
                   <!-- MENU OPTIONS -->
                   <div class="py-1">
                     <NuxtLink
-                      to="/profile"
+                      to="/profile/personal"
                       @click="isProfileOpen = false"
                       class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-emerald-50/60 hover:text-[#1b4332] transition-colors"
                     >
@@ -284,7 +290,19 @@ watch(() => route.path, () => {
                     </NuxtLink>
 
                     <NuxtLink
-                      to="/profile"
+                      to="/profile/addresses"
+                      @click="isProfileOpen = false"
+                      class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-emerald-50/60 hover:text-[#1b4332] transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Shipping Addresses</span>
+                    </NuxtLink>
+
+                    <NuxtLink
+                      to="/profile/orders"
                       @click="isProfileOpen = false"
                       class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-emerald-50/60 hover:text-[#1b4332] transition-colors"
                     >
@@ -407,7 +425,7 @@ watch(() => route.path, () => {
             </div>
 
             <NuxtLink
-              to="/profile"
+              to="/profile/personal"
               @click="closeMobileMenu"
               class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-[#1b4332]"
             >
@@ -418,7 +436,19 @@ watch(() => route.path, () => {
             </NuxtLink>
 
             <NuxtLink
-              to="/profile"
+              to="/profile/addresses"
+              @click="closeMobileMenu"
+              class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-[#1b4332]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Shipping Addresses</span>
+            </NuxtLink>
+
+            <NuxtLink
+              to="/profile/orders"
               @click="closeMobileMenu"
               class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-[#1b4332]"
             >
@@ -478,6 +508,7 @@ watch(() => route.path, () => {
                 <input
                   ref="searchInput"
                   v-model="searchQuery"
+                  @keydown.enter="goToDedicatedSearch"
                   type="text"
                   placeholder="Search flower boards, hand bouquets..."
                   class="w-full bg-surface text-sm text-gray-800 px-5 py-3.5 pr-10 rounded-2xl outline-none border border-transparent focus:border-[#1b4332] focus:bg-white transition-all shadow-inner"
@@ -486,6 +517,17 @@ watch(() => route.path, () => {
                   ✕
                 </span>
               </div>
+              <p class="text-[10px] text-gray-400 mt-2 flex items-center justify-between">
+                <span>Press <strong>Enter ↵</strong> for full search page</span>
+                <NuxtLink
+                  v-if="searchQuery"
+                  :to="`/search?q=${encodeURIComponent(searchQuery)}`"
+                  @click="closeSearch"
+                  class="text-emerald-700 hover:underline font-bold"
+                >
+                  View all results →
+                </NuxtLink>
+              </p>
             </div>
 
             <div class="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
@@ -520,11 +562,28 @@ watch(() => route.path, () => {
                     <p class="text-[11px] font-semibold text-[#1b4332] mt-1">Starting From {{ formatRupiah(product.price) }}</p>
                   </div>
                 </NuxtLink>
+
+                <div class="pt-2">
+                  <NuxtLink
+                    :to="`/search?q=${encodeURIComponent(searchQuery)}`"
+                    @click="closeSearch"
+                    class="block text-center py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#1b4332] text-xs font-bold transition"
+                  >
+                    Open dedicated search page for "{{ searchQuery }}" →
+                  </NuxtLink>
+                </div>
               </div>
 
-              <div v-else-if="searchQuery && searchResults.length === 0" class="h-full flex flex-col items-center justify-center py-12 text-gray-400">
-                <p class="text-3xl mb-2">🔍</p>
+              <div v-else-if="searchQuery && searchResults.length === 0" class="h-full flex flex-col items-center justify-center py-12 text-gray-400 space-y-3">
+                <p class="text-3xl">🔍</p>
                 <p class="text-xs font-bold">No products match "{{ searchQuery }}"</p>
+                <NuxtLink
+                  :to="`/search?q=${encodeURIComponent(searchQuery)}`"
+                  @click="closeSearch"
+                  class="text-xs text-emerald-700 underline font-bold"
+                >
+                  Search on dedicated page
+                </NuxtLink>
               </div>
 
               <div v-else class="h-full flex flex-col items-center justify-center py-12 text-gray-300">

@@ -1,3 +1,8 @@
+// Memory cache for backend shops to avoid repeating GET /shops on every product request
+let cachedShops: { data: any[]; expiresAt: number } | null = null
+const uuidToSlugCache = new Map<string, { slug: string; expiresAt: number }>()
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id
   const config = useRuntimeConfig()
@@ -24,16 +29,22 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // 2. If parameter is a UUID string, resolve it to slug via GET /products?id={uuid}
+  // 2. If parameter is a UUID string, resolve it to slug via GET /products?id={uuid} with caching
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
   if (isUuid) {
-    try {
-      const listRes: any = await $fetch(`${backendBaseUrl}/products?id=${slug}`)
-      if (listRes && Array.isArray(listRes.products) && listRes.products.length > 0 && listRes.products[0].slug) {
-        slug = listRes.products[0].slug
+    const cached = uuidToSlugCache.get(slug)
+    if (cached && Date.now() < cached.expiresAt) {
+      slug = cached.slug
+    } else {
+      try {
+        const listRes: any = await $fetch(`${backendBaseUrl}/products?id=${slug}`)
+        if (listRes && Array.isArray(listRes.products) && listRes.products.length > 0 && listRes.products[0].slug) {
+          slug = listRes.products[0].slug
+          uuidToSlugCache.set(id!, { slug, expiresAt: Date.now() + CACHE_TTL_MS })
+        }
+      } catch (lookupErr) {
+        console.error(`Failed to resolve product slug for UUID ${slug}:`, lookupErr)
       }
-    } catch (lookupErr) {
-      console.error(`Failed to resolve product slug for UUID ${slug}:`, lookupErr)
     }
   }
 
@@ -49,14 +60,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 3. Resolve shop_id using backend shops API based on availability
+  // 4. Resolve shop_id using backend shops API based on availability with caching
   let shopId = '333f6432-a01c-412f-99f4-0f08ca0d8eb1' // Default fallback
   try {
-    const shopsRes: any = await $fetch(`${backendBaseUrl}/shops`)
-    if (shopsRes && Array.isArray(shopsRes.shops) && Array.isArray(product.availability) && product.availability.length > 0) {
+    let shopsList: any[] = []
+    if (cachedShops && Date.now() < cachedShops.expiresAt) {
+      shopsList = cachedShops.data
+    } else {
+      const shopsRes: any = await $fetch(`${backendBaseUrl}/shops`)
+      if (shopsRes && Array.isArray(shopsRes.shops)) {
+        shopsList = shopsRes.shops
+        cachedShops = { data: shopsList, expiresAt: Date.now() + CACHE_TTL_MS }
+      }
+    }
+
+    if (shopsList.length > 0 && Array.isArray(product.availability) && product.availability.length > 0) {
       const sortedAvail = [...product.availability].sort((a, b) => b.stock - a.stock)
       const highestStockShopSlug = sortedAvail[0].name
-      const matchedShop = shopsRes.shops.find((s: any) => s.slug === highestStockShopSlug)
+      const matchedShop = shopsList.find((s: any) => s.slug === highestStockShopSlug)
       if (matchedShop) {
         shopId = matchedShop.id
       }

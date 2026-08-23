@@ -129,6 +129,9 @@ func (r *testAccountRepo) Create(ctx context.Context, exec transaction.Executor,
 func (r *testAccountRepo) DeleteByUserID(ctx context.Context, exec transaction.Executor, userID uuid.UUID) error {
 	return nil
 }
+func (r *testAccountRepo) UpdateLastLoginAt(ctx context.Context, exec transaction.Executor, id uuid.UUID, lastLoginAt time.Time) error {
+	return nil
+}
 
 type testUserRepo struct {
 	user *userDomain.User
@@ -244,9 +247,10 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, userDeletionSvc, audit)
 	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, sessionRepo, audit)
 
-	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC)
+	handler := NewStaffHandler(addUC, createUC, nil, listUC, updateUC, deleteUC, removeUC, nil, nil, nil)
 	return handler, sRepo, mRepo
 }
+
 
 func withActorContext(r *http.Request, accountID, staffID uuid.UUID) *http.Request {
 	actor := &authzDomain.Actor{

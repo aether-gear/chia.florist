@@ -3,9 +3,12 @@ import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
+import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 
 definePageMeta({
-  layout: 'auth'
+  layout: 'auth',
+  middleware: 'guest'
 })
 
 useHead({ 
@@ -18,6 +21,21 @@ useHead({
 const route = useRoute()
 const authVm = useAuthViewModel()
 const globalAlert = useGlobalAlert()
+
+const getRedirectTarget = () => {
+  const redirect = route.query.redirect as string
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/'
+}
+
+// Immediately redirect if already authenticated
+watch(() => authVm.isAuthenticated.value, (isAuth) => {
+  if (isAuth) {
+    navigateTo(getRedirectTarget())
+  }
+})
 
 // 2-Step Registration Flow: 'initial' (Choose Google or Enter Email) -> 'form' (Account Details without Google)
 const registerStep = ref<'initial' | 'form'>('initial')
@@ -37,6 +55,12 @@ const errorMessage = ref('')
 const registrationEmail = computed(() => authVm.registrationEmail.value)
 
 onMounted(() => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo(getRedirectTarget())
+    return
+  }
+
   nextTick(() => {
     emailInputRef.value?.focus()
   })
@@ -105,7 +129,7 @@ const handleRegister = async () => {
       activePanel.value = 'verify'
     }
   } catch (err: any) {
-    errorMessage.value = err.data?.message || 'Registration failed. Please check your input details.'
+    errorMessage.value = mapErrorMessage(err, 'Registration failed. Please check your input details.')
   }
 }
 
@@ -118,16 +142,40 @@ const handleVerify = async () => {
   errorMessage.value = ''
 
   try {
+    clearSessionExpired()
+    clearAuthAlert()
+
     const success = await authVm.verifyOtp(otpCode.value)
     if (success) {
-      navigateTo('/')
+      let attempts = 0
+      while (
+        (!authVm.isAuthenticated.value || !authVm.isInitialized.value || !authVm.currentUser.value || authVm.isLoading.value) &&
+        attempts < 20
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        attempts++
+      }
+
+      if (authVm.isAuthenticated.value) {
+        clearSessionExpired()
+        clearAuthAlert()
+        await nextTick()
+        navigateTo(getRedirectTarget())
+      }
     }
   } catch (err: any) {
-    errorMessage.value = err.data?.message || 'Verification failed. Please try again.'
+    errorMessage.value = mapErrorMessage(err, 'Verification failed. Please try again.')
   }
 }
 
 const handleGoogleLogin = () => {
+  const isLoggedIn = useCookie('is_logged_in')
+  if (authVm.isAuthenticated.value || isLoggedIn.value === 'true') {
+    navigateTo(getRedirectTarget())
+    return
+  }
+  clearSessionExpired()
+  clearAuthAlert()
   sessionStorage.setItem('google_auth_pending', '1')
   window.location.href = '/api/auth/google'
 }
@@ -223,7 +271,7 @@ const handleBackToRegister = () => {
           <!-- Account Switch -->
           <div class="text-center pt-2 text-xs text-gray-500">
             Already have an account?
-            <NuxtLink to="/login" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+            <NuxtLink :to="route.query.redirect ? { path: '/login', query: { redirect: route.query.redirect } } : '/login'" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
               Sign in
             </NuxtLink>
           </div>
@@ -351,7 +399,7 @@ const handleBackToRegister = () => {
           <!-- Account Switch -->
           <div class="text-center pt-2 text-xs text-gray-500">
             Already have an account?
-            <NuxtLink to="/login" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
+            <NuxtLink :to="route.query.redirect ? { path: '/login', query: { redirect: route.query.redirect } } : '/login'" class="font-bold text-gray-900 hover:text-[#245842] underline ml-1 transition-colors">
               Sign in
             </NuxtLink>
           </div>

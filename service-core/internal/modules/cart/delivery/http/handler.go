@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	apperrors "service-core/internal/common/errors"
@@ -80,6 +81,9 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 		if item.ProductVariantType == domain.ProductVariantTypeCustom {
 			var price int64
 			var subtotal int64
+			customName := "Custom Flower Board"
+			imageResp := productImageResponse{}
+
 			if len(item.CustomDesign) > 0 {
 				if parsedDesign, err := productDomain.ParseCustomDesignPayload(item.CustomDesign); err == nil {
 					breakdown := productDomain.CalculateCustomProductPrice(
@@ -88,16 +92,25 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 					)
 					price = breakdown.TotalPrice
 					subtotal = price * int64(item.Quantity)
-				}
-			}
 
-			imageResp := productImageResponse{}
-			if len(item.CustomDesign) > 0 {
-				var rawMap map[string]interface{}
-				if err := json.Unmarshal(item.CustomDesign, &rawMap); err == nil {
-					if assets, ok := rawMap["assets"].(map[string]interface{}); ok {
-						if previewURL, ok := assets["previewUrl"].(string); ok && previewURL != "" {
-							imageResp.Thumbnail = &previewURL
+					_, prev, hUpper, _, _, _ := productDomain.ExtractDesignSummary(*parsedDesign)
+					if hUpper != nil && *hUpper != "" {
+						customName = fmt.Sprintf("Custom Board — %s", *hUpper)
+					}
+					if prev != nil && *prev != "" {
+						imageResp.Thumbnail = prev
+					}
+				}
+
+				if imageResp.Thumbnail == nil {
+					var rawMap map[string]interface{}
+					if err := json.Unmarshal(item.CustomDesign, &rawMap); err == nil {
+						if assets, ok := rawMap["assets"].(map[string]interface{}); ok {
+							if previewURL, ok := assets["previewUrl"].(string); ok && previewURL != "" {
+								imageResp.Thumbnail = &previewURL
+							} else if previewBase64, ok := assets["previewBase64"].(string); ok && previewBase64 != "" {
+								imageResp.Thumbnail = &previewBase64
+							}
 						}
 					}
 				}
@@ -109,7 +122,7 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 				ShopID:             item.ShopID,
 				ShopName:           shopName,
 				ShopSlug:           shopSlug,
-				Name:               "(Custom Board)",
+				Name:               customName,
 				Price:              price,
 				Quantity:           item.Quantity,
 				Subtotal:           subtotal,

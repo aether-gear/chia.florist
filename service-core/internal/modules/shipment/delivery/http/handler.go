@@ -64,12 +64,15 @@ func (h *ShipmentHandler) EstimateShippingOptions(w http.ResponseWriter, r *http
 
 	for _, result := range results {
 		option := estimateShippingOptionsResponse{
-			Name:        result.Name,
-			Code:        result.Code,
-			Service:     result.Service,
-			Description: result.Description,
-			Cost:        result.Cost,
-			Etd:         result.Etd,
+			Name:                   result.Name,
+			Code:                   result.Code,
+			Service:                result.Service,
+			Description:            result.Description,
+			Cost:                   result.Cost,
+			Etd:                    result.Etd,
+			EstimatedDurationHours: result.EstimatedDurationHours,
+			SLAConfidenceScore:     result.SLAConfidenceScore,
+			DeliveryStatus:         result.DeliveryStatus,
 		}
 
 		couriers = append(couriers, option)

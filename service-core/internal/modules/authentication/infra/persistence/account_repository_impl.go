@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	apperrors "service-core/internal/common/errors"
 	"service-core/internal/modules/authentication/domain"
@@ -262,6 +263,32 @@ func (r *accountRepositoryImpl) DeleteByUserID(
 
 	if res.RowsAffected() == 0 {
 		return apperrors.NewNotFound("account not found or already deleted")
+	}
+
+	return nil
+}
+
+func (r *accountRepositoryImpl) UpdateLastLoginAt(
+	ctx context.Context,
+	exec transaction.Executor,
+	accID uuid.UUID,
+	lastLoginAt time.Time,
+) error {
+	query := `
+		UPDATE accounts
+		SET
+			last_login_at = $1,
+			updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+	`
+
+	res, err := exec.Exec(ctx, query, lastLoginAt, accID)
+	if err != nil {
+		return fmt.Errorf("query to update account last login at: %w", err)
+	}
+
+	if res.RowsAffected() == 0 {
+		return apperrors.NewNotFound(domain.ErrNotFoundAccount.Error())
 	}
 
 	return nil

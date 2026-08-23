@@ -6,12 +6,12 @@ import (
 	applimiter "service-core/internal/common/limiter"
 	applogger "service-core/internal/common/logger"
 
+	"service-core/internal/infra/shipping"
 	appconfig "service-core/internal/shared/config"
 	imgSvc "service-core/internal/shared/image"
 	mailerSvc "service-core/internal/shared/mailer"
 	otpSvc "service-core/internal/shared/otp"
 	sGen "service-core/internal/shared/slug"
-	"service-core/internal/infra/shipping"
 	"service-core/internal/shared/transaction"
 
 	auditInfra "service-core/internal/modules/audit/infra"
@@ -63,21 +63,23 @@ import (
 	staffUsecase "service-core/internal/modules/staff/usecase"
 	userUsecase "service-core/internal/modules/user/usecase"
 
+	intelligencelayer "service-core/internal/infra/intelligence_layer"
 	paymentgateway "service-core/internal/infra/payment-gateway"
 	paymentRepo "service-core/internal/modules/payment/repository"
 )
 
 type Container struct {
-	Logger             applogger.Logger
-	AuditLogger        applogger.AuditLogger
-	CORSAllowedOrigins []string
-	Authenticator      authenRepo.Authenticator
-	Authorizer         authorRepo.Authorizer
-	DBExecutor         transaction.Executor
-	DBTransactor       transaction.Transactor
-	GoogleOAuth        appconfig.GoogleOAuthConfig
-	paymentMethodRepo  paymentRepo.PaymentMethodRepository
-	paymentGateway     paymentgateway.Provider
+	Logger               applogger.Logger
+	AuditLogger          applogger.AuditLogger
+	CORSAllowedOrigins   []string
+	Authenticator        authenRepo.Authenticator
+	Authorizer           authorRepo.Authorizer
+	DBExecutor           transaction.Executor
+	DBTransactor         transaction.Transactor
+	GoogleOAuth          appconfig.GoogleOAuthConfig
+	paymentMethodRepo    paymentRepo.PaymentMethodRepository
+	paymentGateway       paymentgateway.Provider
+	IntelligenceProvider intelligencelayer.Provider
 
 	FindProducts     productUsecase.FindProductsUsecase
 	GetProduct       productUsecase.GetProductUsecase
@@ -109,6 +111,10 @@ type Container struct {
 	UpdateStaff        staffUsecase.UpdateStaffUsecase
 	DeleteStaff        staffUsecase.DeleteStaffUsecase
 	RemoveStaffAccount staffUsecase.RemoveStaffAccountUsecase
+
+	ListStaffPermissions  staffUsecase.ListStaffPermissionsUsecase
+	SaveStaffPermission   staffUsecase.SaveStaffPermissionUsecase
+	DeleteStaffPermission staffUsecase.DeleteStaffPermissionUsecase
 
 	GetCart          cartUsecase.GetCartUsecase
 	AddItem          cartUsecase.AddItemUsecase
@@ -167,6 +173,7 @@ type Container struct {
 	FindOrders              orderUsecase.FindOrdersUsecase
 	GetOrder                orderUsecase.GetOrderUsecase
 	UpdateOrderStatus       orderUsecase.UpdateOrderStatusUsecase
+	DispatchShopShipment    orderUsecase.DispatchShopShipmentUsecase
 	GetOrderTracking        orderUsecase.GetOrderTrackingUsecase
 	ExpireUnfulfilledOrders orderUsecase.ExpireUnfulfilledOrdersUsecase
 
@@ -195,6 +202,8 @@ type Container struct {
 	GetShipmentMetrics  analyticsUsecase.GetShipmentMetricsUsecase
 	GetInventoryMetrics analyticsUsecase.GetInventoryMetricsUsecase
 	GetProductMetrics   analyticsUsecase.GetProductMetricsUsecase
+	GetDemandForecast   analyticsUsecase.GetDemandForecastUsecase
+	GetStockoutRisks    analyticsUsecase.GetStockoutRisksUsecase
 }
 
 func NewContainer(cfg Config,
@@ -238,15 +247,17 @@ func NewContainer(cfg Config,
 		staffRepo               = staffPersistence.NewStaffRepositoryImpl()
 		customerRepo            = customerPersistence.NewCustomerRepositoryImpl()
 		membershipRepo          = authorPersistence.NewStaffMembershipRepositoryImpl()
-		roleRepo                = authorPersistence.NewRoleRepositoryImpl()
-		orderRepo               = orderPersistence.NewOrderRepositoryImpl()
-		orderItemRepo           = orderPersistence.NewOrderItemRepositoryImpl()
-		invoiceRepo             = orderPersistence.NewInvoiceRepositoryImpl()
-		invoiceItemRepo         = orderPersistence.NewInvoiceItemRepositoryImpl()
-		shipmentRepo            = shipmentPersistence.NewShipmentRepositoryImpl()
-		shipmentEventRepo       = shipmentPersistence.NewShipmentEventRepositoryImpl()
-		threatIntelRepo         = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
-		analyticsRepo           = analyticsPersistence.NewAnalyticsRepositoryImpl()
+		staffPermRepo           = authorPersistence.NewStaffPermissionRepositoryImpl()
+		roleRepo                   = authorPersistence.NewRoleRepositoryImpl()
+		orderRepo                  = orderPersistence.NewOrderRepositoryImpl()
+		orderItemRepo              = orderPersistence.NewOrderItemRepositoryImpl()
+		orderItemCustomDesignRepo  = orderPersistence.NewOrderItemCustomDesignRepositoryImpl()
+		invoiceRepo                = orderPersistence.NewInvoiceRepositoryImpl()
+		invoiceItemRepo            = orderPersistence.NewInvoiceItemRepositoryImpl()
+		shipmentRepo               = shipmentPersistence.NewShipmentRepositoryImpl()
+		shipmentEventRepo          = shipmentPersistence.NewShipmentEventRepositoryImpl()
+		threatIntelRepo            = threatIntelProvider.NewThreatIntelProvider(cfg.WAF)
+		analyticsRepo              = analyticsPersistence.NewAnalyticsRepositoryImpl()
 	)
 
 	var (
@@ -263,7 +274,9 @@ func NewContainer(cfg Config,
 		actorSvc = authorSvc.NewActorService(
 			accountRepo,
 			membershipRepo,
+			staffPermRepo,
 		)
+
 		userDeletionSvc = authenSvc.NewUserDeletionService(
 			accountRepo,
 			oauthRepo,
@@ -309,31 +322,41 @@ func NewContainer(cfg Config,
 		)
 	)
 
-	processPaymentWebhook := *paymentUsecase.
-		NewProcessPaymentWebhookUsecase(
-			paymentRepo,
-			paymentEventRepo,
-			paymentWebhookEventRepo,
-			orderRepo,
-			orderItemRepo,
-			inventoryRepo,
-			infra.PaymentGateway,
-			auditLogger,
-			infra.TransactionProvider,
-			infra.TransactionExecutor,
+	var intelligenceProvider intelligencelayer.Provider
+	if cfg.IntelligenceLayer.Enabled {
+		intelligenceProvider = intelligencelayer.NewClient(
+			cfg.IntelligenceLayer.BaseURL,
+			time.Duration(cfg.IntelligenceLayer.TimeoutMS)*time.Millisecond,
+			log,
 		)
+	}
+
+	processPaymentWebhook := *paymentUsecase.NewProcessPaymentWebhookUsecase(
+		paymentRepo,
+		paymentEventRepo,
+		paymentWebhookEventRepo,
+		orderRepo,
+		orderItemRepo,
+		inventoryRepo,
+		infra.PaymentGateway,
+		auditLogger,
+		infra.TransactionProvider,
+		infra.TransactionExecutor,
+		intelligenceProvider,
+	)
 
 	c := &Container{
-		Logger:             log,
-		AuditLogger:        auditLogger,
-		CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
-		Authenticator:      authMidd,
-		Authorizer:         authorMdwr,
-		DBExecutor:         infra.TransactionExecutor,
-		DBTransactor:       infra.TransactionProvider,
-		GoogleOAuth:        cfg.GoogleOAuth,
-		paymentMethodRepo:  paymentMethodRepo,
-		paymentGateway:     infra.PaymentGateway,
+		Logger:               log,
+		AuditLogger:          auditLogger,
+		CORSAllowedOrigins:   cfg.App.CORSAllowedOrigins,
+		Authenticator:        authMidd,
+		Authorizer:           authorMdwr,
+		DBExecutor:           infra.TransactionExecutor,
+		DBTransactor:         infra.TransactionProvider,
+		GoogleOAuth:          cfg.GoogleOAuth,
+		paymentMethodRepo:    paymentMethodRepo,
+		paymentGateway:       infra.PaymentGateway,
+		IntelligenceProvider: intelligenceProvider,
 
 		FindProducts: *productUsecase.
 			NewFindProductsUsecase(
@@ -501,6 +524,18 @@ func NewContainer(cfg Config,
 				sessionRepo,
 				auditLogger,
 			),
+		ListStaffPermissions: *staffUsecase.NewListStaffPermissionsUsecase(
+			infra.TransactionExecutor,
+			staffPermRepo,
+		),
+		SaveStaffPermission: *staffUsecase.NewSaveStaffPermissionUsecase(
+			infra.TransactionProvider,
+			staffPermRepo,
+		),
+		DeleteStaffPermission: *staffUsecase.NewDeleteStaffPermissionUsecase(
+			infra.TransactionProvider,
+			staffPermRepo,
+		),
 
 		RegisterCustomer: *authenUsecase.
 			NewRegisterCustomerUsecase(
@@ -849,6 +884,7 @@ func NewContainer(cfg Config,
 			NewEstimateShippingOptionsUsecase(
 				infra.ShippingProvider,
 				infra.TransactionExecutor,
+				intelligenceProvider,
 			),
 		UpdateShipmentStatus: *shipmentUsecase.
 			NewUpdateShipmentStatusUsecase(
@@ -872,6 +908,7 @@ func NewContainer(cfg Config,
 				accountRepo,
 				orderRepo,
 				orderItemRepo,
+				orderItemCustomDesignRepo,
 				invoiceRepo,
 				invoiceItemRepo,
 				paymentRepo,
@@ -890,6 +927,7 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				orderRepo,
 				orderItemRepo,
+				orderItemCustomDesignRepo,
 				paymentRepo,
 				paymentChannelDataRepo,
 				shipmentRepo,
@@ -900,6 +938,7 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				orderRepo,
 				orderItemRepo,
+				orderItemCustomDesignRepo,
 				paymentRepo,
 				paymentChannelDataRepo,
 				shipmentRepo,
@@ -913,6 +952,19 @@ func NewContainer(cfg Config,
 				orderItemRepo,
 				inventoryRepo,
 				paymentRepo,
+				productRepo,
+				shipmentRepo,
+				addressRepo,
+				addressShopRepo,
+				infra.LogisticsProvider,
+				auditLogger,
+			),
+		DispatchShopShipment: *orderUsecase.
+			NewDispatchShopShipmentUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				orderRepo,
+				orderItemRepo,
 				productRepo,
 				shipmentRepo,
 				addressRepo,
@@ -1012,6 +1064,8 @@ func NewContainer(cfg Config,
 		GetShipmentMetrics:  *analyticsUsecase.NewGetShipmentMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 		GetInventoryMetrics: *analyticsUsecase.NewGetInventoryMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
 		GetProductMetrics:   *analyticsUsecase.NewGetProductMetricsUsecase(infra.TransactionExecutor, analyticsRepo),
+		GetDemandForecast:   *analyticsUsecase.NewGetDemandForecastUsecase(infra.TransactionExecutor, analyticsRepo, intelligenceProvider),
+		GetStockoutRisks:    *analyticsUsecase.NewGetStockoutRisksUsecase(infra.TransactionExecutor, analyticsRepo, intelligenceProvider),
 	}
 
 	return c

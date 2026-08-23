@@ -71,7 +71,16 @@ func NewRouteChains(c *Container) *RouteChains {
 	}
 
 	return &RouteChains{
-		Core: buildChain(),
+		Core: buildChain(
+			c.Authenticator.OptionalAuth(
+				c.DBExecutor,
+				c.DBTransactor,
+				appcookie.CookieCustomer,
+				appcookie.CookieStaff,
+			),
+			c.Authorizer.OptionalLoadActor(c.DBExecutor),
+		),
+
 		CoreAuth: buildChain(
 			c.Authenticator.RequireMultiAuth(
 				c.DBExecutor,
@@ -160,6 +169,9 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.UpdateStaff,
 			&c.DeleteStaff,
 			&c.RemoveStaffAccount,
+			&c.ListStaffPermissions,
+			&c.SaveStaffPermission,
+			&c.DeleteStaffPermission,
 		)
 
 		customerHandler = customerH.NewCustomerHandler(
@@ -232,7 +244,9 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetOrder,
 			&c.CreateOrder,
 			&c.UpdateOrderStatus,
+			&c.DispatchShopShipment,
 			&c.GetOrderTracking,
+			&c.GetShop,
 		)
 
 		auditHandler = auditH.NewAuditHandler(
@@ -264,6 +278,8 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.GetShipmentMetrics,
 			&c.GetInventoryMetrics,
 			&c.GetProductMetrics,
+			&c.GetDemandForecast,
+			&c.GetStockoutRisks,
 		)
 	)
 
@@ -320,6 +336,12 @@ func NewRouter(c *Container) *chi.Mux {
 					r.Get("/", chains.StaffAdminOnly(staffHandler.ListStaffAccounts))
 					r.Post("/", chains.StaffAdminOnly(staffHandler.AddStaffAccount))
 					r.Delete("/{accountID}", chains.StaffAdminOnly(staffHandler.RemoveStaffAccount))
+				})
+
+				r.Route("/shops", func(r chi.Router) {
+					r.Get("/", chains.StaffAdminOnly(staffHandler.ListStaffPermissions))
+					r.Post("/", chains.StaffAdminOnly(staffHandler.SaveStaffPermission))
+					r.Delete("/{shopID}", chains.StaffAdminOnly(staffHandler.DeleteStaffPermission))
 				})
 			})
 		})
@@ -390,31 +412,36 @@ func NewRouter(c *Container) *chi.Mux {
 			})
 		})
 
+		requirePerm := func(permission string, h apphttp.AppHandler) http.HandlerFunc {
+			return chains.StaffOnly(c.Authorizer.RequirePermission(permission)(h))
+		}
+
 		r.Route("/shops", func(r chi.Router) {
 			r.Get("/", chains.Core(shopHandler.FindShops))
-			r.Post("/", chains.StaffOnly(shopHandler.SaveShop))
+			r.Post("/", chains.StaffAdminOnly(shopHandler.SaveShop))
 
 			r.Route("/{shopID}", func(r chi.Router) {
 				r.Get("/", chains.Core(shopHandler.GetShopByID))
+				r.Put("/", requirePerm(authorzDomain.PermissionShopUpdate, shopHandler.SaveShop))
 				r.Delete("/", chains.StaffAdminOnly(shopHandler.DeleteShop))
 
 				r.Route("/addresses", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopAddresses))
-					r.Post("/", chains.StaffOnly(addressHandler.CreateShopAddress))
-					r.Put("/{addressID}", chains.StaffOnly(addressHandler.UpdateShopAddress))
-					r.Delete("/{addressID}", chains.StaffOnly(addressHandler.DeleteShopAddress))
+					r.Post("/", requirePerm(authorzDomain.PermissionAddressManage, addressHandler.CreateShopAddress))
+					r.Put("/{addressID}", requirePerm(authorzDomain.PermissionAddressManage, addressHandler.UpdateShopAddress))
+					r.Delete("/{addressID}", requirePerm(authorzDomain.PermissionAddressManage, addressHandler.DeleteShopAddress))
 				})
 
 				r.Route("/couriers", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopCouriers))
-					r.Post("/", chains.StaffOnly(courierHandler.ConfigureCourierShop))
+					r.Post("/", requirePerm(authorzDomain.PermissionCourierManage, courierHandler.ConfigureCourierShop))
 				})
 
 				r.Route("/products", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopProducts))
-					r.Post("/{productID}/inventories", chains.StaffOnly(inventoryHandler.AddInventory))
-					r.Put("/{productID}/inventories", chains.StaffOnly(inventoryHandler.UpdateInventory))
-					r.Delete("/{productID}/inventories", chains.StaffOnly(inventoryHandler.RemoveInventory))
+					r.Post("/{productID}/inventories", requirePerm(authorzDomain.PermissionInventoryManage, inventoryHandler.AddInventory))
+					r.Put("/{productID}/inventories", requirePerm(authorzDomain.PermissionInventoryManage, inventoryHandler.UpdateInventory))
+					r.Delete("/{productID}/inventories", requirePerm(authorzDomain.PermissionInventoryManage, inventoryHandler.RemoveInventory))
 				})
 			})
 		})
@@ -444,6 +471,7 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/{orderID}", chains.StaffOnly(orderHandler.GetOrder))
 			r.Get("/{orderID}/tracking", chains.StaffOnly(orderHandler.GetOrderTrackingForStaff))
 			r.Patch("/{orderID}/status", chains.StaffOnly(orderHandler.UpdateOrderStatus))
+			r.Post("/{orderID}/shipments", chains.StaffOnly(orderHandler.DispatchOrderShipment))
 		})
 
 		r.Route("/shipments", func(r chi.Router) {
@@ -489,6 +517,8 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Get("/shipments", chains.StaffAdminOnly(analyticsHandler.GetShipmentMetrics))
 			r.Get("/inventory", chains.StaffAdminOnly(analyticsHandler.GetInventoryMetrics))
 			r.Get("/products", chains.StaffAdminOnly(analyticsHandler.GetProductMetrics))
+			r.Get("/forecasts/demand", chains.StaffAdminOnly(analyticsHandler.GetDemandForecast))
+			r.Get("/inventory/stockout-risks", chains.StaffAdminOnly(analyticsHandler.GetStockoutRisks))
 		})
 	})
 
