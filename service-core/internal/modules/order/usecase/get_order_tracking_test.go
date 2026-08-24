@@ -164,6 +164,9 @@ type gotMockLogisticsProvider struct {
 func (m *gotMockLogisticsProvider) CreateOrder(_ context.Context, _ shipping.CreateOrderInput) (*shipping.CreateOrderResult, error) {
 	return nil, nil
 }
+func (m *gotMockLogisticsProvider) CancelOrder(_ context.Context, _ string) error {
+	return nil
+}
 func (m *gotMockLogisticsProvider) TrackShipment(_ context.Context, _ shipping.TrackShipmentInput) ([]shipping.TrackingEvent, error) {
 	if m.err != nil {
 		return nil, m.err

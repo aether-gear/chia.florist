@@ -7,7 +7,8 @@ import type {
   ListOrdersResponse, 
   BackendOrder, 
   GetOrderPaymentDetailsResponse,
-  CheckOrderPaymentStatusResponse
+  CheckOrderPaymentStatusResponse,
+  GetOrderTrackingTimelineResponse
 } from '~/types/order'
 
 export const orderService = {
@@ -42,6 +43,11 @@ export const orderService = {
     return bootstrapConfig.fetchApi<CheckOrderPaymentStatusResponse>(`/users/me/orders/${orderId}/payment/check`, {
       method: 'POST'
     })
+  },
+
+  async getOrderTrackingTimeline(orderId: string): Promise<GetOrderTrackingTimelineResponse> {
+    return bootstrapConfig.fetchApi<GetOrderTrackingTimelineResponse>(`/users/me/orders/${orderId}/tracking`)
   }
 }
+
 

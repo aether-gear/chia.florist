@@ -1,6 +1,6 @@
-<!-- app/pages/profile.vue -->
+<!-- app/pages/profile/[[tab]].vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useAddress } from '~/composables/useAddress'
 import { useOrders } from '~/composables/useOrders'
@@ -10,15 +10,47 @@ import { supabaseService } from '~/services/supabaseService'
 import { orderService } from '~/services/orderService'
 import type { UserAddress } from '~/types/address'
 import type { BackendOrder } from '~/types/order'
+import { mapErrorMessage } from '~/utils/errorMessages'
+
+definePageMeta({
+  middleware: 'auth'
+})
 
 useHead({ title: 'My Profile - Chia Florist' })
 
+const route = useRoute()
 const authVm = useAuthViewModel()
 const addressVm = useAddress()
 const globalAlert = useGlobalAlert()
 
-const activeTab = ref('personal')
-const activeOrderStatus = ref<OrderTab>('all')
+const allowedTabs = ['personal', 'addresses', 'orders']
+const activeTab = computed(() => {
+  const t = (route.params.tab as string)?.toLowerCase()
+  return allowedTabs.includes(t) ? t : 'personal'
+})
+
+const switchTab = (tabId: string) => {
+  if (tabId === 'personal') {
+    navigateTo('/profile/personal')
+  } else {
+    navigateTo(`/profile/${tabId}`)
+  }
+}
+
+const initialStatus = ((route.query.status as string)?.toLowerCase() as OrderTab)
+const activeOrderStatus = ref<OrderTab>(
+  ['all', 'pending', 'processing', 'shipping', 'completed', 'cancelled'].includes(initialStatus)
+    ? initialStatus
+    : 'all'
+)
+
+const setOrderStatus = (statusId: OrderTab) => {
+  activeOrderStatus.value = statusId
+  navigateTo({
+    path: '/profile/orders',
+    query: statusId === 'all' ? {} : { status: statusId }
+  })
+}
 
 const statusLabels: Record<OrderTab, string> = {
   all: 'All Orders',
@@ -63,10 +95,17 @@ const cropFilename = ref('avatar.jpg')
 const cropMime     = ref('image/jpeg')
 const cropImgEl    = ref<HTMLImageElement | null>(null)
 
-// Container dimensions (fixed, matches template)
-const CONT_W = 440
-const CONT_H = 320
-const MIN_CROP = 40
+// Container dimensions (responsive to screen width)
+const contW = ref(440)
+const contH = ref(320)
+const MIN_CROP = 36
+
+const updateCropperContainerSize = () => {
+  if (typeof window === 'undefined') return
+  const maxW = Math.min(window.innerWidth - 48, 440)
+  contW.value = Math.max(260, Math.round(maxW))
+  contH.value = Math.round(contW.value * 0.72)
+}
 
 // Natural image size
 const naturalW = ref(0)
@@ -79,8 +118,8 @@ const imgX = ref(0)  // pan offset from container centre
 const imgY = ref(0)
 
 const scale = computed(() => baseScale.value * cropZoom.value)
-const maxImgDX = computed(() => Math.max(0, (naturalW.value * scale.value - CONT_W) / 2))
-const maxImgDY = computed(() => Math.max(0, (naturalH.value * scale.value - CONT_H) / 2))
+const maxImgDX = computed(() => Math.max(0, (naturalW.value * scale.value - contW.value) / 2))
+const maxImgDY = computed(() => Math.max(0, (naturalH.value * scale.value - contH.value) / 2))
 
 const imgDisplayStyle = computed(() => ({
   width: `${naturalW.value * scale.value}px`,
@@ -102,10 +141,10 @@ function clampImg() {
 }
 
 // Crop box (in container pixel coords)
-const cbX = ref(60)
-const cbY = ref(40)
-const cbW = ref(CONT_W - 120)
-const cbH = ref(CONT_H - 80)
+const cbX = ref(40)
+const cbY = ref(30)
+const cbW = ref(200)
+const cbH = ref(200)
 
 // Computed: the four clipping rects that dim outside the crop box
 const dimTop    = computed(() => ({ top: 0, left: 0, width: '100%', height: `${cbY.value}px` }))
@@ -123,22 +162,22 @@ const initCbW = ref(0); const initCbH = ref(0)
 const lastPanX = ref(0); const lastPanY = ref(0)
 
 function onImgLoad(e: Event) {
+  updateCropperContainerSize()
   const img = e.target as HTMLImageElement
   naturalW.value = img.naturalWidth
   naturalH.value = img.naturalHeight
-  // Fill container: zoom=1 means image fills every pixel, overflow is clipped
-  baseScale.value = Math.max(CONT_W / img.naturalWidth, CONT_H / img.naturalHeight)
+  baseScale.value = Math.max(contW.value / img.naturalWidth, contH.value / img.naturalHeight)
   cropZoom.value = 1
   imgX.value = 0; imgY.value = 0
-  // Square crop box, 75% of shorter container side, centred
-  const side = Math.round(Math.min(CONT_W, CONT_H) * 0.75)
+  const side = Math.round(Math.min(contW.value, contH.value) * 0.75)
   cbW.value = side; cbH.value = side
-  cbX.value = Math.round((CONT_W - side) / 2)
-  cbY.value = Math.round((CONT_H - side) / 2)
+  cbX.value = Math.round((contW.value - side) / 2)
+  cbY.value = Math.round((contH.value - side) / 2)
 }
 
 function startCropHandle(e: MouseEvent | TouchEvent, mode: DragMode) {
   e.stopPropagation()
+  if (e.cancelable) e.preventDefault()
   const cx = e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0)
   const cy = e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0)
   dragMode.value = mode
@@ -171,10 +210,9 @@ function onGlobalMove(cx: number, cy: number) {
   let nx = initCbX.value, ny = initCbY.value, nw = initCbW.value, nh = initCbH.value
 
   if (m === 'move') {
-    nx = Math.max(0, Math.min(CONT_W - nw, nx + dx))
-    ny = Math.max(0, Math.min(CONT_H - nh, ny + dy))
+    nx = Math.max(0, Math.min(contW.value - nw, nx + dx))
+    ny = Math.max(0, Math.min(contH.value - nh, ny + dy))
   } else {
-    // Compute raw side length (always square: W === H)
     let rawSide: number = nw
     if (m === 'e')  rawSide = initCbW.value + dx
     if (m === 'w')  rawSide = initCbW.value - dx
@@ -188,14 +226,12 @@ function onGlobalMove(cx: number, cy: number) {
 
     nw = rawSide; nh = rawSide
 
-    // Anchor the opposite edge for W/N handles
     if (m.includes('w')) nx = initCbX.value + initCbW.value - rawSide
     if (m.includes('n')) ny = initCbY.value + initCbH.value - rawSide
 
-    // Clamp position to container, re-enforce square after clamping
     nx = Math.max(0, nx); ny = Math.max(0, ny)
-    if (nx + nw > CONT_W) { nw = CONT_W - nx; nh = nw }
-    if (ny + nh > CONT_H) { nh = CONT_H - ny; nw = nh }
+    if (nx + nw > contW.value) { nw = contW.value - nx; nh = nw }
+    if (ny + nh > contH.value) { nh = contH.value - ny; nw = nh }
   }
 
   cbX.value = nx; cbY.value = ny; cbW.value = nw; cbH.value = nh
@@ -203,14 +239,19 @@ function onGlobalMove(cx: number, cy: number) {
 
 function onMouseMove(e: MouseEvent)  { onGlobalMove(e.clientX, e.clientY) }
 function onMouseUp()                  { dragMode.value = null }
-function onTouchMoveCrop(e: TouchEvent) { const touch = e.touches[0]; if (e.touches.length === 1 && touch) { e.preventDefault(); onGlobalMove(touch.clientX, touch.clientY) } }
+function onTouchMoveCrop(e: TouchEvent) {
+  const touch = e.touches[0]
+  if (e.touches.length === 1 && touch) {
+    if (e.cancelable) e.preventDefault()
+    onGlobalMove(touch.clientX, touch.clientY)
+  }
+}
 function onTouchEndCrop()             { dragMode.value = null }
 
 function onCropZoomChange() {
   clampImg()
-  // keep crop box inside container
-  if (cbX.value + cbW.value > CONT_W) cbW.value = CONT_W - cbX.value
-  if (cbY.value + cbH.value > CONT_H) cbH.value = CONT_H - cbY.value
+  if (cbX.value + cbW.value > contW.value) cbW.value = contW.value - cbX.value
+  if (cbY.value + cbH.value > contH.value) cbH.value = contH.value - cbY.value
 }
 
 function cancelCrop() {
@@ -266,6 +307,7 @@ const handleFileUpload = (event: Event) => {
 
   const reader = new FileReader()
   reader.onload = (e) => {
+    updateCropperContainerSize()
     cropSrc.value = e.target?.result as string
     showCropper.value = true
   }
@@ -279,7 +321,6 @@ const performCropAndUpload = async () => {
   const userId = authVm.currentUser.value?.id
   if (!userId) { uploadError.value = 'Not authenticated.'; return }
 
-  // Draw to canvas while image element is still in DOM
   const canvas = document.createElement('canvas')
   canvas.width = 800
   canvas.height = 800
@@ -287,11 +328,9 @@ const performCropAndUpload = async () => {
   if (!ctx) return
 
   const s = scale.value
-  // Image top-left corner in container coords
-  const imgLeft = CONT_W / 2 - (naturalW.value * s) / 2 + imgX.value
-  const imgTop  = CONT_H / 2 - (naturalH.value * s) / 2 + imgY.value
+  const imgLeft = contW.value / 2 - (naturalW.value * s) / 2 + imgX.value
+  const imgTop  = contH.value / 2 - (naturalH.value * s) / 2 + imgY.value
 
-  // Crop box in source image coordinates
   const srcX = (cbX.value - imgLeft) / s
   const srcY = (cbY.value - imgTop) / s
   const srcW = cbW.value / s
@@ -302,7 +341,6 @@ const performCropAndUpload = async () => {
   canvas.toBlob(async (blob) => {
     if (!blob) { uploadError.value = 'Crop failed.'; return }
 
-    // Close modal after pixel data is captured
     showCropper.value = false
     cropSrc.value = ''
     if (fileInput.value) fileInput.value.value = ''
@@ -351,7 +389,6 @@ const handleRemovePicture = async () => {
         authVm.currentUser.value.avatarUrl = null
       }
 
-      // Clear avatar URL in Go backend
       await authVm.updateUserProfile({
         avatar_url: ''
       })
@@ -380,10 +417,10 @@ const handleUpdateProfile = async () => {
     if (res.success) {
       globalAlert.showSuccess('Profile Updated', 'Your profile has been updated successfully!')
     } else {
-      globalAlert.showError('Update Failed', res.message || 'Failed to update profile.')
+      globalAlert.showError('Update Failed', mapErrorMessage(res.message, 'Failed to update profile.'))
     }
   } catch (err: any) {
-    globalAlert.showError('Update Failed', err.message || 'An error occurred while updating profile.')
+    globalAlert.showError('Update Failed', mapErrorMessage(err, 'An error occurred while updating profile.'))
   }
 }
 
@@ -402,19 +439,66 @@ const loadAddressesData = async () => {
   await addressVm.fetchAddresses()
 }
 
+// ─── Orders ────────────────────────────────────────────────────────
+const ordersVm = useOrders()
+const {
+  trackingData,
+  isTrackingLoading,
+  trackingError,
+  fetchOrderTracking
+} = ordersVm
+
+// Load orders whenever the orders tab or sub-status tab is activated and scroll smoothly to top
+const loadOrders = (tab: OrderTab = activeOrderStatus.value as OrderTab, page = 1) => {
+  ordersVm.fetchOrders(tab, page)
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'addresses') {
     loadAddressesData()
+  } else if (tab === 'orders') {
+    loadOrders(activeOrderStatus.value)
+  }
+}, { immediate: true })
+
+watch(activeOrderStatus, (status) => {
+  if (activeTab.value === 'orders') {
+    loadOrders(status)
+  }
+})
+
+watch(() => route.query.status, (newStatus) => {
+  if (newStatus && typeof newStatus === 'string') {
+    const s = newStatus.toLowerCase() as OrderTab
+    if (['all', 'pending', 'processing', 'shipping', 'completed', 'cancelled'].includes(s)) {
+      activeOrderStatus.value = s
+    }
   }
 })
 
 onMounted(async () => {
-  await authVm.fetchCurrentUser()
+  updateCropperContainerSize()
+  window.addEventListener('resize', updateCropperContainerSize)
+  if (!authVm.isInitialized.value) {
+    await authVm.fetchCurrentUser()
+  }
   if (!authVm.isAuthenticated.value) {
     navigateTo('/login')
   } else {
     await loadProfilePicture()
+    if (activeTab.value === 'addresses') {
+      loadAddressesData()
+    } else if (activeTab.value === 'orders') {
+      loadOrders(activeOrderStatus.value)
+    }
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateCropperContainerSize)
 })
 
 // Chained location selections
@@ -487,7 +571,7 @@ const handleSaveAddress = async () => {
     editingAddress.value = null
     globalAlert.showSuccess('Address Saved', 'Shipping address has been saved.')
   } else {
-    addressFormError.value = result.message || 'Failed to save address.'
+    addressFormError.value = mapErrorMessage(result.message, 'Failed to save address.')
   }
 }
 
@@ -497,42 +581,29 @@ const handleDeleteAddress = async (id: string) => {
     if (result.success) {
       globalAlert.showSuccess('Address Deleted', 'Shipping address has been removed.')
     } else {
-      globalAlert.showError('Delete Failed', result.message || 'Failed to delete address.')
+      globalAlert.showError('Delete Failed', mapErrorMessage(result.message, 'Failed to delete address.'))
     }
   }
 }
 
-// ─── Orders ────────────────────────────────────────────────────────
-const ordersVm = useOrders()
-
-// Load orders whenever the orders tab or sub-status tab is activated
-const loadOrders = (tab: OrderTab = activeOrderStatus.value as OrderTab, page = 1) => {
-  ordersVm.fetchOrders(tab, page)
-}
-
-watch(activeTab, (tab) => {
-  if (tab === 'orders') {
-    loadOrders(activeOrderStatus.value as OrderTab)
-  }
-})
-
-watch(activeOrderStatus, (status) => {
-  if (activeTab.value === 'orders') {
-    loadOrders(status as OrderTab)
-  }
-})
-
 // Logout
 const handleLogout = async () => {
   await authVm.logout()
-  globalAlert.showInfo('Signed Out', 'You have been successfully signed out.')
 }
 
 const selectedOrder = ref<BackendOrder | null>(null)
 const showShippingOverlay = ref(false)
+const isCopied = ref(false)
 
 const openOrderDetail = (order: BackendOrder) => {
   selectedOrder.value = order
+  fetchOrderTracking(order.id)
+}
+
+const openTrackShipment = (order: BackendOrder) => {
+  selectedOrder.value = order
+  showShippingOverlay.value = true
+  fetchOrderTracking(order.id)
 }
 
 const closeOrderDetail = () => {
@@ -540,8 +611,20 @@ const closeOrderDetail = () => {
   showShippingOverlay.value = false
 }
 
-const toggleShippingOverlay = () => {
-  showShippingOverlay.value = !showShippingOverlay.value
+watch(showShippingOverlay, (show) => {
+  if (show && selectedOrder.value?.id) {
+    fetchOrderTracking(selectedOrder.value.id)
+  }
+})
+
+const copyTrackingNumber = (trackingNumber: string) => {
+  if (!trackingNumber) return
+  navigator.clipboard.writeText(trackingNumber)
+  isCopied.value = true
+  globalAlert.showSuccess('Copied', 'Tracking number copied to clipboard!')
+  setTimeout(() => {
+    isCopied.value = false
+  }, 2000)
 }
 
 const contactDriver = (orderId: string) => {
@@ -583,13 +666,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         ]
       )
       closeOrderDetail()
-      loadOrders('pending') // Refresh pending orders list
+      loadOrders('pending')
     } else {
       globalAlert.showInfo('Payment Pending', `Payment status is still pending (status: ${res.status}). If you have already transferred, please allow up to 15 minutes for automated reconciliation.`)
     }
   } catch (err: any) {
     console.error('Failed to check payment status:', err)
-    globalAlert.showError('Verification Failed', err.data?.message || err.message || 'Failed to check payment status. Please try again.')
+    globalAlert.showError('Verification Failed', mapErrorMessage(err, 'Failed to check payment status. Please try again.'))
   } finally {
     isCheckingPayment.value = false
   }
@@ -597,38 +680,49 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50/50 py-12 font-sans">
-    <div class="max-w-7xl mx-auto px-8 sm:px-10">
+  <div class="min-h-screen bg-gray-50/50 py-6 sm:py-12 font-sans">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
-      <nav class="flex text-sm text-gray-400 mb-8 gap-2">
+      <nav class="flex text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 gap-2">
         <NuxtLink to="/" class="hover:text-[#1b4332]">Home</NuxtLink>
         <span>/</span>
         <span class="text-gray-900 font-medium">My Profile</span>
+        <span v-if="activeTab !== 'personal'">/</span>
+        <span v-if="activeTab === 'addresses'" class="text-[#1b4332] font-semibold">Shipping Addresses</span>
+        <span v-if="activeTab === 'orders'" class="text-[#1b4332] font-semibold">Order Tracking</span>
       </nav>
 
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <!-- Mobile Horizontal Tab Switcher -->
+      <div class="lg:hidden mb-6 bg-white p-1.5 rounded-2xl shadow-xs border border-gray-100 grid grid-cols-3 gap-1">
+        <button 
+          v-for="tab in [{id:'personal', label:'Profile'}, {id:'addresses', label:'Addresses'}, {id:'orders', label:'Orders'}]"
+          :key="tab.id"
+          @click="switchTab(tab.id)"
+          :class="['py-2.5 px-2 rounded-xl text-xs font-bold text-center transition-all cursor-pointer', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:bg-gray-50']"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
         
         <aside class="lg:col-span-1 space-y-6">
-          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex flex-col items-center text-center mb-8">
+          <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100">
+            <div class="flex flex-col items-center text-center mb-6 lg:mb-8">
               <!-- Interactive Avatar Container -->
               <div 
                 class="relative group cursor-pointer w-20 h-20 mb-4 rounded-full overflow-hidden border border-gray-200 shadow-sm flex items-center justify-center bg-gray-100" 
                 @click="triggerFileSelect"
                 title="Change Profile Picture"
               >
-                <!-- Avatar Image -->
                 <img v-if="avatarUrl" :src="avatarUrl" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" alt="Avatar" />
-                <!-- Default Icon -->
                 <div v-else class="text-3xl text-[#1b4332]">👤</div>
 
-                <!-- Hover Overlay -->
                 <div class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <span class="text-white text-xs font-bold">Change</span>
                   <span class="text-white text-[10px]">Photo</span>
                 </div>
 
-                <!-- Uploading Spinner -->
                 <div v-if="isUploading" class="absolute inset-0 bg-black/60 flex items-center justify-center">
                   <div class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                 </div>
@@ -640,22 +734,31 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <h2 class="font-bold text-gray-900 leading-tight">{{ user.name }}</h2>
               <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Silver Member</p>
             </div>
-            <nav class="space-y-1">
+
+            <!-- Desktop Sidebar Tabs with sub-route links -->
+            <nav class="hidden lg:block space-y-1">
               <button 
                 v-for="tab in [{id:'personal', label:'Personal Information'}, {id:'addresses', label:'Shipping Addresses'}, {id:'orders', label:'Order Tracking'}]"
                 :key="tab.id"
-                @click="activeTab = tab.id"
-                :class="['w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50']"
+                @click="switchTab(tab.id)"
+                :class="['w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer', activeTab === tab.id ? 'bg-[#1b4332] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50']"
               >
                 {{ tab.label }}
               </button>
               
               <div class="pt-4 mt-4 border-t border-gray-100">
-                <button @click="handleLogout" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all flex items-center gap-2">
+                <button @click="handleLogout" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all flex items-center gap-2 cursor-pointer">
                   Logout
                 </button>
               </div>
             </nav>
+
+            <!-- Mobile Logout Quick Button -->
+            <div class="lg:hidden pt-4 border-t border-gray-100">
+              <button @click="handleLogout" class="w-full text-center py-2 px-3 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-all cursor-pointer">
+                Logout
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -663,18 +766,17 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           
           <!-- Personal tab -->
           <div v-if="activeTab === 'personal'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade">
-            <div class="px-8 py-6 border-b border-gray-50">
-              <h3 class="font-bold text-gray-900 text-lg">Edit Profile</h3>
-              <p class="text-xs text-gray-400 mt-1">Manage your personal details and contact information.</p>
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-50">
+              <h3 class="font-bold text-gray-900 text-base sm:text-lg">Edit Profile</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Manage your personal details and contact information.</p>
             </div>
             
-            <div class="p-8 space-y-6">
+            <div class="p-5 sm:p-8 space-y-6">
               <!-- PROFILE PICTURE SECTION -->
               <div class="border-b border-gray-100 pb-6 space-y-4">
                 <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Profile Picture</h4>
-                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                  <!-- Image Preview -->
-                  <div class="w-24 h-24 rounded-full overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center text-3xl text-gray-400 relative">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                  <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center text-3xl text-gray-400 relative flex-shrink-0">
                     <img v-if="avatarUrl" :src="avatarUrl" class="w-full h-full object-cover" alt="Profile picture" />
                     <span v-else>👤</span>
                     <div v-if="isUploading" class="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -684,10 +786,10 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
                   <div class="space-y-3 flex-1">
                     <div class="flex flex-wrap gap-2">
-                      <button @click="triggerFileSelect" :disabled="isUploading" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50 cursor-pointer">
+                      <button @click="triggerFileSelect" :disabled="isUploading" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50 cursor-pointer">
                         Upload New Photo
                       </button>
-                      <button v-if="avatarUrl" @click="handleRemovePicture" :disabled="isUploading" class="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer">
+                      <button v-if="avatarUrl" @click="handleRemovePicture" :disabled="isUploading" class="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer">
                         Remove Photo
                       </button>
                     </div>
@@ -695,15 +797,12 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   </div>
                 </div>
 
-
-                
-                <!-- Upload Error -->
                 <div v-if="uploadError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
                   ⚠️ {{ uploadError }}
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div class="space-y-1.5">
                   <label class="text-xs font-bold text-gray-500">Full Name</label>
                   <input type="text" v-model="user.name" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-[#1b4332] transition-all" />
@@ -727,7 +826,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
               
               <div class="flex justify-end">
-                <button @click="handleUpdateProfile" :disabled="authVm.isLoading.value" class="bg-[#1b4332] hover:bg-[#143326] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-sm transition disabled:opacity-50 flex items-center gap-2 cursor-pointer">
+                <button @click="handleUpdateProfile" :disabled="authVm.isLoading.value" class="w-full sm:w-auto bg-[#1b4332] hover:bg-[#143326] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">
                   <span v-if="authVm.isLoading.value" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                   <span>Save Changes</span>
                 </button>
@@ -737,17 +836,17 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Shipping Addresses tab -->
           <div v-if="activeTab === 'addresses'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade">
-            <div class="px-8 py-6 border-b border-gray-50 flex justify-between items-center">
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-50 flex flex-wrap gap-3 justify-between items-center">
               <div>
-                <h3 class="font-bold text-gray-900 text-lg">Shipping Addresses</h3>
-                <p class="text-xs text-gray-400 mt-1">Manage your delivery addresses for secure checkout.</p>
+                <h3 class="font-bold text-gray-900 text-base sm:text-lg">Shipping Addresses</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Manage your delivery addresses for secure checkout.</p>
               </div>
               <button @click="initAddressForm()" class="bg-[#1b4332] hover:bg-[#143326] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
                 + Add New Address
               </button>
             </div>
 
-            <div class="p-8 space-y-6">
+            <div class="p-5 sm:p-8 space-y-6">
               <!-- Loading -->
               <div v-if="addressVm.isLoading.value" class="flex flex-col items-center justify-center py-12 space-y-4">
                 <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#1b4332]"></div>
@@ -766,7 +865,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <div 
                   v-for="addr in addressVm.addresses.value" 
                   :key="addr.address_id" 
-                  :class="['border rounded-2xl p-6 relative flex flex-col justify-between transition-all duration-300', addr.is_default ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-gray-300 bg-white']"
+                  :class="['border rounded-2xl p-5 sm:p-6 relative flex flex-col justify-between transition-all duration-300', addr.is_default ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-gray-300 bg-white']"
                 >
                   <div>
                     <div class="flex items-center gap-2 mb-3">
@@ -797,8 +896,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
           <!-- Orders tab -->
           <div v-if="activeTab === 'orders'" class="space-y-6 animate-fade">
-            <!-- Shopee Category Tabs Bar (Compact) -->
-            <div class="bg-white border border-gray-100 p-1.5 rounded-2xl shadow-xs grid grid-cols-3 sm:grid-cols-6 gap-1 text-center font-medium">
+            <!-- Order Category Tabs Bar -->
+            <div class="bg-white border border-gray-100 p-1.5 rounded-2xl shadow-xs flex overflow-x-auto sm:grid sm:grid-cols-6 gap-1 text-center font-medium scrollbar-none">
               <button 
                 v-for="status in [
                   { id: 'all', label: 'All' },
@@ -809,8 +908,8 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   { id: 'cancelled', label: 'Cancelled' }
                 ]"
                 :key="status.id"
-                @click="activeOrderStatus = status.id as any"
-                :class="['py-2 px-1 text-xs rounded-xl transition-all font-bold cursor-pointer', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50']"
+                @click="setOrderStatus(status.id as any)"
+                :class="['py-2 px-3 sm:px-1 text-xs rounded-xl transition-all font-bold cursor-pointer whitespace-nowrap flex-shrink-0 sm:flex-shrink', activeOrderStatus === status.id ? 'bg-[#1b4332] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50']"
               >
                 {{ status.label }}
               </button>
@@ -830,93 +929,113 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <button @click="loadOrders()" class="mt-3 px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition cursor-pointer">Retry</button>
             </div>
 
-            <!-- Orders list (Sleek Compact Cards) -->
+            <!-- Orders list (Clear Sleek Cards - Clickable card without View Details button) -->
             <template v-else>
               <div v-if="ordersVm.orders.value.length > 0" class="space-y-4">
                 <div 
                   v-for="order in ordersVm.orders.value" 
                   :key="order.id" 
-                  class="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4 hover:shadow-md transition duration-300"
+                  @click="openOrderDetail(order)"
+                  class="group bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 hover:shadow-md hover:border-emerald-200 transition duration-300 cursor-pointer"
                 >
                   <!-- Store Header & Order Info Bar -->
-                  <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-sm">🏬</span>
-                      <h4 class="font-bold text-gray-900 text-xs">Chia Florist Workshop</h4>
-                      <span class="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
+                  <div class="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
+                    <div class="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
+                      </svg>
+                      <h4 class="font-bold text-gray-900 text-xs group-hover:text-[#1b4332] transition-colors">Chia Florist Workshop</h4>
+                      <span class="hidden xs:inline-block text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">Official Store</span>
                       <span class="text-xs text-gray-300">|</span>
                       <span class="text-[11px] font-mono text-gray-500 font-bold">#{{ order.number }}</span>
                     </div>
 
                     <!-- Right side: Status Badges -->
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span :class="['px-2.5 py-0.5 text-xs font-bold rounded-full border', ordersVm.getOrderStatusBadge(order).colorClass]">
+                    <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span :class="['px-2.5 py-0.5 text-[11px] sm:text-xs font-bold rounded-full border', ordersVm.getOrderStatusBadge(order).colorClass]">
                         {{ ordersVm.getOrderStatusBadge(order).label }}
                       </span>
-                      <span v-if="order.payment?.status && order.payment.status !== 'pending' && order.payment.status !== 'paid'" :class="['px-2.5 py-0.5 text-xs font-bold rounded-full border', ordersVm.getPaymentStatusBadge(order.payment.status).colorClass]">
+                      <span v-if="order.payment?.status && order.payment.status !== 'pending' && order.payment.status !== 'paid'" :class="['px-2.5 py-0.5 text-[11px] sm:text-xs font-bold rounded-full border', ordersVm.getPaymentStatusBadge(order.payment.status).colorClass]">
                         {{ ordersVm.getPaymentStatusBadge(order.payment.status).label }}
                       </span>
-                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                        ⏳ Pay in {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}
+                      <span v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending' && order.payment?.expires_at" class="text-[10px] sm:text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100 flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pay in {{ ordersVm.getTimeRemaining(order.payment.expires_at) }}
                       </span>
                     </div>
                   </div>
 
                   <!-- Product Preview Item -->
-                  <div class="flex items-center justify-between gap-4 py-1">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-1">
                     <div class="flex items-center gap-3 min-w-0">
-                      <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex-shrink-0 flex items-center justify-center text-xl">
-                        🌸
+                      <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex-shrink-0 flex items-center justify-center text-[#1b4332]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L9.568 3z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                        </svg>
                       </div>
                       <div class="min-w-0">
                         <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">
                           {{ order.items[0]?.product_name }}{{ order.items.length > 1 ? ` and ${order.items.length - 1} other item(s)` : '' }}
                         </h5>
-                        <p class="text-[10px] text-gray-400 mt-0.5 font-medium">
+                        <p class="text-[10px] text-gray-400 mt-0.5 font-medium truncate">
                           Total Qty: {{ order.items.reduce((acc, item) => acc + item.quantity, 0) }} • Courier: {{ order.items[0]?.courier_code ? `${order.items[0].courier_code.toUpperCase()} ${order.items[0].courier_service}` : 'Standard Delivery' }}
                         </p>
                       </div>
                     </div>
 
-                    <div class="text-right flex-shrink-0">
+                    <div class="text-left sm:text-right flex-shrink-0 pl-15 sm:pl-0">
                       <p class="text-[10px] text-gray-400 font-medium">Order Total</p>
                       <p class="font-black text-[#1b4332] text-sm mt-0.5">{{ ordersVm.formatRupiah(order.total) }}</p>
                     </div>
                   </div>
 
-                  <!-- Card Footer: Action Buttons -->
-                  <div class="flex items-center justify-between gap-3 pt-3 border-t border-gray-50">
+                  <!-- Card Footer: Contextual Direct Action Buttons (without redundant View Details button) -->
+                  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-gray-50">
                     <span class="text-[11px] text-gray-400 font-medium">Placed on {{ ordersVm.formatDate(order.created_at) }}</span>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center justify-end gap-2">
                       <button 
                         v-if="!ordersVm.isOrderExpired(order) && order.status === 'pending'"
                         @click.stop="navigateTo(`/payment?orderId=${order.id}`)"
-                        class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+                        class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                       >
                         Pay Now
                       </button>
                       <button 
-                        v-if="order.status === 'shipped' || order.status === 'delivered'"
-                        @click="contactDriver(order.id)"
-                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                        v-if="['confirmed', 'processing', 'shipped', 'delivered', 'finished'].includes(order.status)"
+                        @click.stop="openTrackShipment(order)"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
-                        <span>💬</span>
-                        <span>Contact Courier</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                        </svg>
+                        <span>Track Package</span>
                       </button>
                       <button 
-                        @click="openOrderDetail(order)" 
-                        class="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                        v-if="order.status === 'shipped' || order.status === 'delivered'"
+                        @click.stop="contactDriver(order.id)"
+                        class="bg-[#1b4332] hover:bg-[#143326] text-white px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
                       >
-                        View Details
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                        </svg>
+                        <span>Contact Courier</span>
                       </button>
                     </div>
+
                   </div>
                 </div>
               </div>
 
-              <div v-else class="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-xs space-y-3">
-                <div class="text-4xl">📑</div>
+              <div v-else class="bg-white border border-gray-100 rounded-2xl p-8 sm:p-12 text-center shadow-xs space-y-3">
+                <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                  </svg>
+                </div>
                 <h4 class="font-bold text-gray-900 text-sm">No Orders Found</h4>
                 <p class="text-xs text-gray-400 max-w-xs mx-auto">There are no orders in the "{{ statusLabels[activeOrderStatus] }}" category.</p>
                 <button @click="navigateTo('/catalog')" class="mt-1 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition cursor-pointer">
@@ -924,7 +1043,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </button>
               </div>
 
-              <!-- Pagination -->
+              <!-- Pagination with Smooth Scroll to Top -->
               <div v-if="ordersVm.totalPages.value > 1" class="flex items-center justify-center gap-2 pt-2">
                 <button
                   @click="loadOrders(activeOrderStatus as OrderTab, ordersVm.currentPage.value - 1)"
@@ -948,17 +1067,16 @@ const handleCheckPaymentStatus = async (orderId: string) => {
     </div>
 
     <!-- Modal Address Form -->
-    <div v-if="showAddressForm" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col justify-between">
-        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+    <div v-if="showAddressForm" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-white rounded-3xl max-w-xl w-full max-h-[90dvh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col justify-between mx-auto">
+        <div class="px-5 sm:px-8 py-4 sm:py-6 border-b border-gray-100 flex justify-between items-center">
           <h3 class="font-extrabold text-gray-900 text-base">
             {{ editingAddress?.address_id ? 'Edit Address' : 'Add New Address' }}
           </h3>
-          <button @click="showAddressForm = false" class="text-gray-400 hover:text-black font-bold text-lg cursor-pointer">✕</button>
+          <button @click="showAddressForm = false" class="text-gray-400 hover:text-black font-bold text-lg p-1 cursor-pointer">✕</button>
         </div>
 
-        <div class="p-8 space-y-4 flex-1">
-          <!-- Inline Address Validation Error -->
+        <div class="p-5 sm:p-8 space-y-4 flex-1">
           <div v-if="addressFormError" class="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs font-semibold">
             ⚠️ {{ addressFormError }}
           </div>
@@ -1013,7 +1131,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               <label class="text-xs font-bold text-gray-500">Postal Code *</label>
               <input v-model="editingAddress!.postal_code" type="text" placeholder="e.g. 17131" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#1b4332] outline-none text-xs font-semibold transition" />
             </div>
-            <div class="flex items-center pt-6 gap-2">
+            <div class="flex items-center pt-2 sm:pt-6 gap-2">
               <input v-model="editingAddress!.is_default" type="checkbox" id="default-check" class="h-4 w-4 accent-[#1b4332] rounded focus:ring-0 cursor-pointer" />
               <label for="default-check" class="text-xs font-bold text-gray-700 cursor-pointer">Set as default address</label>
             </div>
@@ -1025,7 +1143,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           </div>
         </div>
 
-        <div class="px-8 py-6 border-t border-gray-100 flex justify-end gap-3">
+        <div class="px-5 sm:px-8 py-4 sm:py-6 border-t border-gray-100 flex justify-end gap-3">
           <button @click="showAddressForm = false" class="px-5 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer">
             Cancel
           </button>
@@ -1037,25 +1155,25 @@ const handleCheckPaymentStatus = async (orderId: string) => {
     </div>
 
     <!-- Independent Order Detail Modal Overlay -->
-    <div v-if="selectedOrder" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col justify-between relative animate-fade">
+    <div v-if="selectedOrder" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90dvh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col justify-between relative animate-fade mx-auto">
         
         <!-- Header -->
-        <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="px-5 sm:px-8 py-4 sm:py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
-            <div class="flex items-center gap-3">
-              <h3 class="font-extrabold text-gray-900 text-base">Order Details</h3>
-              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">#{{ selectedOrder.number }}</span>
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h3 class="font-extrabold text-gray-900 text-sm sm:text-base">Order Details</h3>
+              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">#{{ selectedOrder.number }}</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-0.5">Placed on {{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
           </div>
-          <button @click="closeOrderDetail" class="text-gray-400 hover:text-black font-bold text-lg cursor-pointer">✕</button>
+          <button @click="closeOrderDetail" class="text-gray-400 hover:text-black font-bold text-lg p-1 cursor-pointer">✕</button>
         </div>
 
         <!-- Body -->
-        <div class="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
-          <!-- Current Status Banner (No Delivery Timeline button here) -->
-          <div class="flex flex-wrap items-center justify-between bg-emerald-50/20 border border-emerald-100 p-4 rounded-2xl gap-3">
+        <div class="p-4 sm:p-8 space-y-5 sm:space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+          <!-- Current Status Banner with Live Tracking Action -->
+          <div class="flex flex-wrap items-center justify-between bg-emerald-50/20 border border-emerald-100 p-3.5 sm:p-4 rounded-2xl gap-3">
             <div>
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Order Status</p>
               <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -1067,54 +1185,66 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </span>
               </div>
             </div>
+            <button 
+              v-if="['confirmed', 'processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)"
+              @click="showShippingOverlay = true"
+              class="px-4 py-2 bg-[#1b4332] hover:bg-[#143326] text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+              </svg>
+              <span>Open Tracking Overlay</span>
+            </button>
           </div>
 
-          <!-- Shipping Information & Delivery Timeline Section -->
-          <div class="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100/60 pb-3">
-              <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
-                <span>🚚</span>
-                <span>Shipping Information & Delivery Progress</span>
-              </h4>
-              <span class="text-xs font-bold text-blue-800 bg-blue-100/60 px-2.5 py-0.5 rounded-lg border border-blue-200/50">
-                Courier: {{ selectedOrder.items[0]?.courier_code ? `${selectedOrder.items[0].courier_code.toUpperCase()} ${selectedOrder.items[0].courier_service}` : 'Standard Courier' }}
-              </span>
+          <!-- Shipping Summary Section & Tracking Overlay Launcher -->
+          <div class="bg-blue-50/30 border border-blue-100 rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 class="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                  </svg>
+                  <span>Shipping Information</span>
+                </h4>
+                <p class="text-[11px] text-gray-500 mt-1">
+                  Courier: <span class="font-bold text-gray-900 uppercase">{{ trackingData?.courier || selectedOrder.items[0]?.courier_code || 'Standard Courier' }}</span>
+                  <span v-if="selectedOrder.items[0]?.courier_service"> ({{ selectedOrder.items[0].courier_service }})</span>
+                </p>
+              </div>
+
+              <button 
+                @click="showShippingOverlay = true"
+                class="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803zM13.5 10.5h-6" />
+                </svg>
+                <span>Open Tracking Overlay</span>
+              </button>
             </div>
 
-            <!-- Delivery Progress Log Step Tracker -->
-            <div class="space-y-3 pt-1">
-              <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Real-time Delivery Timeline</p>
-              <div class="relative pl-6 space-y-4 border-l-2 border-blue-200 ml-2">
-                <div 
-                  v-for="step in ordersVm.getOrderTimelineSteps(selectedOrder)" 
-                  :key="step.step"
-                  class="relative"
-                >
-                  <!-- Dot indicator -->
-                  <div 
-                    :class="[
-                      'absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center text-[8px] font-bold',
-                      step.error ? 'bg-rose-500 border-rose-600 text-white ring-4 ring-rose-100' : (step.active ? 'bg-[#1b4332] border-[#1b4332] text-white ring-4 ring-emerald-100' : (step.done ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-400'))
-                    ]"
-                  >
-                    {{ step.done ? '✓' : step.step }}
-                  </div>
-                  <div>
-                    <h5 :class="['text-xs font-bold', step.active || step.done ? 'text-gray-900' : 'text-gray-400']">{{ step.title }}</h5>
-                    <p class="text-[11px] text-gray-500 mt-0.5 font-medium">{{ step.desc }}</p>
-                  </div>
-                </div>
+            <!-- Resi number pill if available -->
+            <div v-if="trackingData?.tracking_number" class="flex flex-wrap items-center justify-between bg-white p-3 rounded-xl border border-blue-100 text-xs gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400 font-semibold">Waybill / Resi:</span>
+                <span class="font-mono font-bold text-gray-900">{{ trackingData.tracking_number }}</span>
               </div>
+              <button @click="copyTrackingNumber(trackingData.tracking_number)" class="text-[10px] text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 font-bold transition cursor-pointer">
+                {{ isCopied ? 'Copied!' : 'Copy Resi' }}
+              </button>
             </div>
           </div>
 
           <!-- Payment Information Details Box -->
-          <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-5 space-y-3">
+          <div class="bg-amber-50/20 border border-amber-100/80 rounded-2xl p-4 sm:p-5 space-y-3">
             <h4 class="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-2">
-              <span>💳</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+              </svg>
               <span>Payment Details</span>
             </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
               <div>
                 <p class="text-gray-400 font-semibold text-[10px]">PAYMENT METHOD</p>
                 <p class="font-bold text-gray-800 mt-0.5">{{ selectedOrder.payment?.provider ? selectedOrder.payment.provider.toUpperCase() : 'Online Payment Gateway' }}</p>
@@ -1125,11 +1255,16 @@ const handleCheckPaymentStatus = async (orderId: string) => {
               </div>
               <div v-if="selectedOrder.payment?.expires_at && selectedOrder.status === 'pending'">
                 <p class="text-gray-400 font-semibold text-[10px]">EXPIRATION COUNTDOWN</p>
-                <p class="font-bold text-amber-700 mt-0.5">⏳ {{ ordersVm.getTimeRemaining(selectedOrder.payment.expires_at) }}</p>
+                <p class="font-bold text-amber-700 mt-0.5 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {{ ordersVm.getTimeRemaining(selectedOrder.payment.expires_at) }}
+                </p>
               </div>
               <div>
                 <p class="text-gray-400 font-semibold text-[10px]">ORDER ID</p>
-                <p class="font-mono font-bold text-gray-800 mt-0.5 select-all">{{ selectedOrder.id }}</p>
+                <p class="font-mono font-bold text-gray-800 mt-0.5 select-all truncate">{{ selectedOrder.id }}</p>
               </div>
             </div>
           </div>
@@ -1138,18 +1273,26 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           <div class="space-y-3">
             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ordered Products</h4>
             <div class="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/20">
-              <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-4 items-center p-4 bg-white">
-                <div class="w-14 h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-2xl">
-                  🌸
+              <div v-for="(item, idx) in selectedOrder.items" :key="idx" class="flex gap-3 sm:gap-4 items-center p-3 sm:p-4 bg-white">
+                <div class="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 rounded-xl border border-emerald-100 flex-shrink-0 flex items-center justify-center text-[#1b4332]">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L9.568 3z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                  </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                   <h5 class="font-bold text-gray-900 text-xs truncate leading-snug">{{ item.product_name }}</h5>
-                  <div class="flex flex-wrap gap-2 mt-1.5 text-[10px] text-gray-500 font-semibold">
+                  <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-1 text-[10px] text-gray-500 font-semibold">
                     <span class="bg-gray-100 px-2 py-0.5 rounded">Shop: {{ item.shop_name }}</span>
-                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">🚚 {{ item.courier_code.toUpperCase() }} {{ item.courier_service }}</span>
+                    <span v-if="item.courier_code" class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+                      </svg>
+                      {{ item.courier_code.toUpperCase() }} {{ item.courier_service }}
+                    </span>
                   </div>
                 </div>
-                <div class="text-right text-xs">
+                <div class="text-right text-xs flex-shrink-0">
                   <p class="font-bold text-gray-900">{{ ordersVm.formatRupiah(item.unit_price) }}</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Qty: {{ item.quantity }}</p>
                 </div>
@@ -1179,13 +1322,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
         </div>
 
         <!-- Footer Actions -->
-        <div class="px-8 py-5 border-t border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="px-5 sm:px-8 py-4 sm:py-5 border-t border-gray-100 flex flex-wrap justify-between items-center bg-gray-50/50 gap-3">
           <button @click="closeOrderDetail" class="px-5 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer">
             Close
           </button>
 
-          <div>
-            <div v-if="selectedOrder.status === 'pending'" class="flex gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <div v-if="selectedOrder.status === 'pending'" class="flex flex-wrap gap-2">
               <button 
                 @click="navigateTo(`/payment?orderId=${selectedOrder.id}`)" 
                 class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer"
@@ -1230,24 +1373,34 @@ const handleCheckPaymentStatus = async (orderId: string) => {
           class="absolute inset-y-0 right-0 w-full sm:w-[450px] bg-white shadow-2xl border-l border-gray-100 flex flex-col justify-between z-50 transform transition-transform duration-300 ease-in-out animate-slide-in"
         >
           <!-- Overlay Header -->
-          <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div class="px-5 sm:px-6 py-4 sm:py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div class="flex items-center gap-2">
-              <span class="text-base">🚚</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.948c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75" />
+              </svg>
               <h3 class="font-extrabold text-gray-900 text-sm">Shipping Information</h3>
             </div>
-            <button @click="showShippingOverlay = false" class="text-gray-400 hover:text-black font-bold text-base cursor-pointer">✕</button>
+            <button @click="showShippingOverlay = false" class="text-gray-400 hover:text-black font-bold text-base p-1 cursor-pointer">✕</button>
           </div>
 
           <!-- Overlay Body -->
-          <div class="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
-            <!-- Courier Summary (from first item) -->
+          <div class="p-5 sm:p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar text-xs">
             <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 space-y-2">
               <div class="flex justify-between font-semibold">
                 <span class="text-gray-400">Courier Partner</span>
-                <span class="text-gray-900 font-bold">
-                  {{ selectedOrder.items[0]?.courier_code || '—' }}
-                  <span v-if="selectedOrder.items[0]?.courier_service"> ({{ selectedOrder.items[0].courier_service }})</span>
+                <span class="text-gray-900 font-bold uppercase">
+                  {{ trackingData?.courier || selectedOrder.items[0]?.courier_code || '—' }}
+                  <span v-if="selectedOrder.items[0]?.courier_service" class="normal-case"> ({{ selectedOrder.items[0].courier_service }})</span>
                 </span>
+              </div>
+              <div v-if="trackingData?.tracking_number" class="flex justify-between items-center font-semibold pt-1 border-t border-gray-100/60">
+                <span class="text-gray-400">Tracking Number</span>
+                <div class="flex items-center gap-1.5 font-mono font-bold text-gray-900">
+                  <span>{{ trackingData.tracking_number }}</span>
+                  <button @click="copyTrackingNumber(trackingData.tracking_number)" class="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition cursor-pointer">
+                    {{ isCopied ? 'Copied!' : 'Copy' }}
+                  </button>
+                </div>
               </div>
               <div class="flex justify-between font-semibold">
                 <span class="text-gray-400">Shipping Fee</span>
@@ -1276,10 +1429,53 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 
             <!-- Shipping Timeline -->
             <div class="space-y-4">
-              <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order Timeline</h4>
+              <div class="flex items-center justify-between">
+                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order &amp; Tracking Timeline</h4>
+                <button 
+                  v-if="selectedOrder.id" 
+                  @click="fetchOrderTracking(selectedOrder.id)" 
+                  class="text-[10px] text-emerald-700 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+
+              <!-- Loading Skeleton -->
+              <div v-if="isTrackingLoading" class="p-6 text-center space-y-3">
+                <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-emerald-600 border-t-transparent"></div>
+                <p class="text-gray-400 text-[11px]">Fetching latest tracking updates from courier...</p>
+              </div>
               
-              <div class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
-                <!-- Milestone: Placed -->
+              <!-- Dynamic Real-time Courier Timeline -->
+              <div 
+                v-else-if="trackingData?.timeline && trackingData.timeline.length > 0"
+                class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-emerald-100"
+              >
+                <div 
+                  v-for="(event, idx) in trackingData.timeline" 
+                  :key="idx" 
+                  class="relative"
+                >
+                  <span 
+                    class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white"
+                    :class="[idx === 0 ? 'bg-emerald-500 ring-4 ring-emerald-100 animate-pulse' : 'bg-emerald-400']"
+                  ></span>
+                  <div class="flex items-center justify-between">
+                    <p class="font-bold text-gray-900 capitalize">{{ event.status.replace(/_/g, ' ') }}</p>
+                    <span class="text-[10px] font-mono text-gray-400">{{ ordersVm.formatDate(event.timestamp) }}</span>
+                  </div>
+                  <p class="text-[11px] text-gray-600 mt-0.5">{{ event.description }}</p>
+                  <p v-if="event.location" class="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                    <span>📍</span> {{ event.location }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Fallback Status Milestones -->
+              <div v-else class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
                 <div class="relative">
                   <span 
                     class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white flex items-center justify-center"
@@ -1289,7 +1485,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="text-[10px] text-gray-400 mt-0.5">{{ ordersVm.formatDate(selectedOrder.created_at) }}</p>
                 </div>
 
-                <!-- Milestone: Payment (for non-pending) -->
                 <div v-if="selectedOrder.status !== 'pending' && selectedOrder.status !== 'cancelled'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Payment Verified by Admin</p>
@@ -1301,8 +1496,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="text-[10px] text-gray-400 mt-0.5">Awaiting payment confirmation</p>
                 </div>
 
-                <!-- Milestone: Arranging Flowers (for processing or later) -->
-                <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative"> <!-- Milestone: Arranging Flowers -->
+                <div v-if="['processing', 'shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Flower Arrangement Complete</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Expert florist team finished production</p>
@@ -1317,7 +1511,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="font-bold text-gray-500">Flower Board Production</p>
                 </div>
 
-                <!-- Milestone: Shipped (for shipped or later) -->
                 <div v-if="['shipped', 'delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Handed Over to Courier</p>
@@ -1328,7 +1521,6 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="font-bold text-gray-500">Hand Over to Courier Partner</p>
                 </div>
 
-                <!-- Milestone: Delivered (for delivered or later) -->
                 <div v-if="['delivered', 'finished'].includes(selectedOrder.status)" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Delivered to Destination</p>
@@ -1339,14 +1531,12 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   <p class="font-bold text-gray-500">Out for Delivery / Completed Destination</p>
                 </div>
 
-                <!-- Milestone: Completed / Finished -->
                 <div v-if="selectedOrder.status === 'finished'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 ring-4 ring-emerald-100"></span>
                   <p class="font-bold text-gray-900">Order Completed</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">Transaction finalized by customer</p>
                 </div>
 
-                <!-- Milestone: Cancelled -->
                 <div v-if="selectedOrder.status === 'cancelled'" class="relative">
                   <span class="absolute -left-[23px] top-0 w-3 h-3 rounded-full border-2 border-white bg-red-500 ring-4 ring-red-100"></span>
                   <p class="font-bold text-red-600">Order Cancelled</p>
@@ -1354,17 +1544,16 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 </div>
               </div>
             </div>
+
           </div>
 
           <!-- Overlay Footer -->
-          <div class="px-6 py-5 border-t border-gray-100 flex justify-end bg-gray-50/50">
+          <div class="px-5 sm:px-6 py-4 sm:py-5 border-t border-gray-100 flex justify-end bg-gray-50/50">
             <button @click="showShippingOverlay = false" class="px-5 py-2.5 bg-[#1b4332] text-white hover:bg-[#143326] rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
               Go Back to Details
             </button>
           </div>
         </div>
-
-
 
       </div>
     </div>
@@ -1374,31 +1563,31 @@ const handleCheckPaymentStatus = async (orderId: string) => {
       <Transition name="cropper-fade">
         <div
           v-if="showCropper"
-          class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4"
           style="background: rgba(0,0,0,0.35); backdrop-filter: blur(4px)"
           @mousemove="onMouseMove"
           @mouseup="onMouseUp"
-          @touchmove.prevent="onTouchMoveCrop"
+          @touchmove="onTouchMoveCrop"
           @touchend="onTouchEndCrop"
+          @touchcancel="onTouchEndCrop"
         >
-          <div class="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-fade" style="width: 520px; max-width: 96vw">
+          <div class="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-fade max-w-[96vw]" style="width: 520px">
 
             <!-- Header -->
-            <div class="px-6 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+            <div class="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
               <div>
                 <h3 class="font-extrabold text-gray-900 text-sm">Crop Profile Picture</h3>
-                <p class="text-[11px] text-gray-400 mt-0.5">Drag corners or edges to resize · Drag inside crop box to move it · Drag outside to pan image</p>
+                <p class="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">Drag corners or edges to resize · Drag crop box to move · Pan outside</p>
               </div>
-              <button @click="cancelCrop" class="text-gray-400 hover:text-gray-600 transition text-lg leading-none cursor-pointer">✕</button>
+              <button @click="cancelCrop" class="text-gray-400 hover:text-gray-600 transition text-lg leading-none p-1 cursor-pointer">✕</button>
             </div>
 
             <!-- Canvas editing area -->
             <div class="relative bg-gray-900 overflow-hidden select-none"
-              :style="{ width: `${CONT_W}px`, height: `${CONT_H}px`, margin: '0 auto' }"
+              :style="{ width: `${contW}px`, height: `${contH}px`, margin: '0 auto', touchAction: 'none' }"
               @mousedown="startImgPan"
-              @touchstart.passive="startImgPan"
+              @touchstart="startImgPan"
             >
-              <!-- The image -->
               <img
                 v-if="cropSrc"
                 :src="cropSrc"
@@ -1408,7 +1597,7 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 alt=""
               />
 
-              <!-- Dim overlays (4 rects outside crop box) -->
+              <!-- Dim overlays -->
               <div class="absolute pointer-events-none" :style="{ ...dimTop,    background: 'rgba(0,0,0,0.5)' }"></div>
               <div class="absolute pointer-events-none" :style="{ ...dimBottom, background: 'rgba(0,0,0,0.5)' }"></div>
               <div class="absolute pointer-events-none" :style="{ ...dimLeft,   background: 'rgba(0,0,0,0.5)' }"></div>
@@ -1421,10 +1610,11 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                   left: `${cbX}px`, top: `${cbY}px`,
                   width: `${cbW}px`, height: `${cbH}px`,
                   border: '2px solid #fff',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  touchAction: 'none'
                 }"
                 @mousedown.stop="startCropHandle($event, 'move')"
-                @touchstart.stop.passive="startCropHandle($event, 'move')"
+                @touchstart.stop="startCropHandle($event, 'move')"
               >
                 <!-- Rule of thirds grid -->
                 <div class="absolute inset-0 pointer-events-none" style="
@@ -1434,30 +1624,28 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 "></div>
 
                 <!-- 8 resize handles -->
-                <!-- Corners -->
                 <div class="crop-handle crop-handle-corner" style="top:-5px;left:-5px;cursor:nw-resize"
-                  @mousedown.stop="startCropHandle($event,'nw')" @touchstart.stop.passive="startCropHandle($event,'nw')"></div>
+                  @mousedown.stop="startCropHandle($event,'nw')" @touchstart.stop="startCropHandle($event,'nw')"></div>
                 <div class="crop-handle crop-handle-corner" style="top:-5px;right:-5px;cursor:ne-resize"
-                  @mousedown.stop="startCropHandle($event,'ne')" @touchstart.stop.passive="startCropHandle($event,'ne')"></div>
+                  @mousedown.stop="startCropHandle($event,'ne')" @touchstart.stop="startCropHandle($event,'ne')"></div>
                 <div class="crop-handle crop-handle-corner" style="bottom:-5px;left:-5px;cursor:sw-resize"
-                  @mousedown.stop="startCropHandle($event,'sw')" @touchstart.stop.passive="startCropHandle($event,'sw')"></div>
+                  @mousedown.stop="startCropHandle($event,'sw')" @touchstart.stop="startCropHandle($event,'sw')"></div>
                 <div class="crop-handle crop-handle-corner" style="bottom:-5px;right:-5px;cursor:se-resize"
-                  @mousedown.stop="startCropHandle($event,'se')" @touchstart.stop.passive="startCropHandle($event,'se')"></div>
-                <!-- Edges -->
+                  @mousedown.stop="startCropHandle($event,'se')" @touchstart.stop="startCropHandle($event,'se')"></div>
+                
                 <div class="crop-handle crop-handle-edge" style="top:-4px;left:calc(50% - 12px);cursor:n-resize"
-                  @mousedown.stop="startCropHandle($event,'n')" @touchstart.stop.passive="startCropHandle($event,'n')"></div>
+                  @mousedown.stop="startCropHandle($event,'n')" @touchstart.stop="startCropHandle($event,'n')"></div>
                 <div class="crop-handle crop-handle-edge" style="bottom:-4px;left:calc(50% - 12px);cursor:s-resize"
-                  @mousedown.stop="startCropHandle($event,'s')" @touchstart.stop.passive="startCropHandle($event,'s')"></div>
+                  @mousedown.stop="startCropHandle($event,'s')" @touchstart.stop="startCropHandle($event,'s')"></div>
                 <div class="crop-handle crop-handle-edge" style="left:-4px;top:calc(50% - 12px);cursor:w-resize"
-                  @mousedown.stop="startCropHandle($event,'w')" @touchstart.stop.passive="startCropHandle($event,'w')"></div>
+                  @mousedown.stop="startCropHandle($event,'w')" @touchstart.stop="startCropHandle($event,'w')"></div>
                 <div class="crop-handle crop-handle-edge" style="right:-4px;top:calc(50% - 12px);cursor:e-resize"
-                  @mousedown.stop="startCropHandle($event,'e')" @touchstart.stop.passive="startCropHandle($event,'e')"></div>
+                  @mousedown.stop="startCropHandle($event,'e')" @touchstart.stop="startCropHandle($event,'e')"></div>
               </div>
             </div>
 
             <!-- Controls -->
-            <div class="px-6 py-4 space-y-3">
-              <!-- Zoom slider -->
+            <div class="px-4 sm:px-6 py-3 sm:py-4 space-y-3">
               <div class="flex items-center gap-3">
                 <span class="text-xs font-bold text-gray-400 w-10">Zoom</span>
                 <input
@@ -1470,23 +1658,24 @@ const handleCheckPaymentStatus = async (orderId: string) => {
                 <span class="text-xs font-bold text-gray-500 w-10 text-right">{{ Math.round(cropZoom * 100) }}%</span>
               </div>
 
-              <!-- Size info + buttons -->
-              <div class="flex items-center gap-3">
-                <span class="text-[11px] text-gray-400 flex-1">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[11px] text-gray-400">
                   ⬜ {{ cbW }} × {{ cbW }} px (square)
                 </span>
-                <button
-                  @click="cancelCrop"
-                  class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-                >Cancel</button>
-                <button
-                  @click="performCropAndUpload"
-                  :disabled="isUploading"
-                  class="px-5 py-2 bg-[#1b4332] hover:bg-[#143326] disabled:opacity-60 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer"
-                >
-                  <span v-if="isUploading" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  <span>{{ isUploading ? 'Uploading…' : 'Crop & Save' }}</span>
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    @click="cancelCrop"
+                    class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                  >Cancel</button>
+                  <button
+                    @click="performCropAndUpload"
+                    :disabled="isUploading"
+                    class="px-4 sm:px-5 py-2 bg-[#1b4332] hover:bg-[#143326] disabled:opacity-60 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <span v-if="isUploading" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>{{ isUploading ? 'Uploading…' : 'Crop & Save' }}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1510,6 +1699,13 @@ const handleCheckPaymentStatus = async (orderId: string) => {
   background: #e5e7eb;
   border-radius: 10px;
 }
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
 /* Cropper modal transition */
 .cropper-fade-enter-active,
@@ -1517,12 +1713,21 @@ const handleCheckPaymentStatus = async (orderId: string) => {
 .cropper-fade-enter-from,
 .cropper-fade-leave-to { opacity: 0; }
 
-/* Crop handles */
+/* Crop handles with enlarged touch hit target */
 .crop-handle {
   position: absolute;
   background: #fff;
   border: 2px solid #1b4332;
   border-radius: 2px;
+  touch-action: none;
+}
+.crop-handle::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  right: -14px;
+  bottom: -14px;
 }
 .crop-handle-corner {
   width: 10px;

@@ -95,7 +95,7 @@
                 <NuxtLink to="/catalog" class="relative inline-block py-0.5 text-sm md:text-md font-medium text-gray-600 hover:text-[#1b4332] transition-colors after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-[2px] after:bottom-0 after:left-0 after:bg-[#1b4332] after:origin-bottom-left after:transition-transform after:duration-300 hover:after:scale-x-100">Catalog</NuxtLink>
               </li>
               <li>
-                <NuxtLink to="/catalog" class="relative inline-block py-0.5 text-sm md:text-md font-medium text-gray-600 hover:text-[#1b4332] transition-colors after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-[2px] after:bottom-0 after:left-0 after:bg-[#1b4332] after:origin-bottom-left after:transition-transform after:duration-300 hover:after:scale-x-100">Search</NuxtLink>
+                <NuxtLink to="/search" class="relative inline-block py-0.5 text-sm md:text-md font-medium text-gray-600 hover:text-[#1b4332] transition-colors after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-[2px] after:bottom-0 after:left-0 after:bg-[#1b4332] after:origin-bottom-left after:transition-transform after:duration-300 hover:after:scale-x-100">Search</NuxtLink>
               </li>
             </ul>
           </div>

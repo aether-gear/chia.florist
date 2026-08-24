@@ -30,6 +30,7 @@ export default function AppRoutes() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/shop" element={<ShopManagementPage />} />
+            <Route path="/shop/:shopId" element={<ShopManagementPage />} />
             <Route path="/products" element={<ProductsPage />} />
 
             <Route path="/orders" element={<OrdersPage />} />

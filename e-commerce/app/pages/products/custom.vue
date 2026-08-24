@@ -12,6 +12,7 @@ import {
 } from '~/features/custom-product'
 import { useCart } from '~/composables/useCart'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import '~/features/custom-product/custom-product.css'
 
 definePageMeta({ layout: false })
@@ -24,6 +25,8 @@ const design = useCustomDesign()
 const { isAdding, addCustomDesignToCart } = useCustomCart()
 const { formatRupiah } = useCart()
 const globalAlert = useGlobalAlert()
+const authVm = useAuthViewModel()
+const isLoggedIn = useCookie('is_logged_in')
 
 const handleFinalize = () => {
   design.showFinalizeChoice = true
@@ -35,6 +38,22 @@ const handleOpenReview = () => {
 }
 
 const handleAddToCart = async () => {
+  // Free customization for all, but adding to cart requires being signed in
+  if (isLoggedIn.value !== 'true' && !authVm.isAuthenticated.value) {
+    design.saveDraft(true)
+    design.showReview = false
+    design.showFinalizeChoice = false
+    globalAlert.showWarning(
+      'Sign In Required',
+      'To add your custom flower board to cart, please log in first. Your design has been saved to your drafts!',
+      [
+        { label: 'Sign In', onClick: () => navigateTo('/login?redirect=/products/custom') },
+        { label: 'Keep Editing' }
+      ]
+    )
+    return
+  }
+
   const payload = design.buildCustomDesignPayload(design.snapshotDataUrl)
   await addCustomDesignToCart(
     payload,
@@ -88,11 +107,23 @@ const handleBeforeUnload = (e: BeforeUnloadEvent) => {
   }
 }
 
+const handleResize = () => {
+  design.updateScale()
+}
+
 onMounted(() => {
   design.loadDraft()
   design.updateScale()
+  nextTick(() => design.updateScale())
+  setTimeout(() => design.updateScale(), 100)
+  setTimeout(() => design.updateScale(), 400)
   window.addEventListener('mousemove', design.onMouseMove)
   window.addEventListener('mouseup', design.onMouseUp)
+  window.addEventListener('touchmove', design.onTouchMove, { passive: false })
+  window.addEventListener('touchend', design.onTouchEnd)
+  window.addEventListener('touchcancel', design.onTouchEnd)
+  window.addEventListener('resize', handleResize)
+  window.addEventListener('orientationchange', handleResize)
   window.addEventListener('keydown', design.onKeyDown)
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
@@ -100,6 +131,11 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('mousemove', design.onMouseMove)
   window.removeEventListener('mouseup', design.onMouseUp)
+  window.removeEventListener('touchmove', design.onTouchMove)
+  window.removeEventListener('touchend', design.onTouchEnd)
+  window.removeEventListener('touchcancel', design.onTouchEnd)
+  window.removeEventListener('resize', handleResize)
+  window.removeEventListener('orientationchange', handleResize)
   window.removeEventListener('keydown', design.onKeyDown)
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
@@ -111,12 +147,12 @@ onUnmounted(() => {
     <nav class="dr-nav">
       <button class="dr-back" @click="handleTryLeave('/')" title="Back to Home">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Home
+        <span class="hidden xs:inline">Home</span>
       </button>
       <div class="dr-nav-center">
-        <span class="dr-brand">CHIA FLORIST</span>
-        <span class="dr-dot">◆</span>
-        <span class="dr-page-title">Board Designer v3.0</span>
+        <span class="dr-brand hidden sm:inline">CHIA FLORIST</span>
+        <span class="dr-dot hidden sm:inline">◆</span>
+        <span class="dr-page-title">Board Designer</span>
       </div>
       <div class="dr-nav-right">
         <!-- Zoom controls -->
@@ -127,8 +163,9 @@ onUnmounted(() => {
           <input type="range" min="20" max="150" step="5"
             :value="Math.round(design.boardScale * 100)"
             :style="{ '--v': Math.round(design.boardScale * 100) }"
-            @input="(e) => { design.boardScale = parseInt((e.target as HTMLInputElement).value) / 100 }"
-            class="dr-zoom-slider" title="Zoom"/>
+            @input="(e) => design.setZoom(Number((e.target as HTMLInputElement).value))"
+            @change="(e) => design.setZoom(Number((e.target as HTMLInputElement).value))"
+            class="dr-zoom-slider hidden md:block" title="Zoom"/>
           <button class="dr-zoom-btn" @click="design.zoomIn()" title="Zoom in (Ctrl+=)">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -166,56 +203,60 @@ onUnmounted(() => {
         />
       </div>
 
-      <!-- ✦ BOTTOM-LEFT CORNER MORE BUTTON & POPOVER (3x3 Grid Icon) -->
-      <div class="zzz-more-corner-wrap">
-        <button
-          class="zzz-tab-btn zzz-more-btn"
-          :class="{ 'tab-active': design.showMoreMenu }"
-          @click="design.showMoreMenu = !design.showMoreMenu"
-          title="More Actions (Save, Reset, Randomize)"
-        >
-          <span v-if="design.showMoreMenu" class="zzz-indicator"></span>
-          <div class="zzz-tab-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-              <circle cx="5" cy="5" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/>
-              <circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/>
-              <circle cx="5" cy="19" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/>
-            </svg>
-          </div>
-          <span class="zzz-tab-label">More</span>
-        </button>
-
-        <!-- MORE QUICK ACTIONS MENU POPOVER -->
-        <div v-if="design.showMoreMenu" class="more-menu-popover">
-          <button class="more-menu-item" @click="design.saveDraft()">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-            </svg>
-            <span>Save Progress</span>
-          </button>
-          <button class="more-menu-item" @click="design.randomizeDesign()">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>
-            </svg>
-            <span>Randomize Design</span>
-          </button>
-          <button class="more-menu-item danger" @click="design.resetDesign()">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-            </svg>
-            <span>Reset to Default</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- ⬡ ZZZ Bottom Toolbar — Centered Tool Buttons -->
+      <!-- ⬡ ZZZ Bottom Toolbar — All 7 Tool & Action Buttons -->
       <nav class="zzz-bottom-bar" role="tablist" aria-label="Tool selection">
+        
+        <!-- ✦ More Action Button (First Item in Bar) -->
+        <div class="relative flex-1 md:flex-initial flex justify-center">
+          <button
+            class="zzz-tab-btn zzz-more-btn w-full"
+            :class="{ 'tab-active': design.showMoreMenu }"
+            @click="design.showMoreMenu = !design.showMoreMenu"
+            title="More Actions (Save, Reset, Randomize)"
+            role="button"
+            aria-label="More Options"
+          >
+            <span v-if="design.showMoreMenu" class="zzz-indicator"></span>
+            <div class="zzz-tab-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <circle cx="5" cy="5" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/>
+                <circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/>
+                <circle cx="5" cy="19" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/>
+              </svg>
+            </div>
+            <span class="zzz-tab-label">More</span>
+          </button>
+
+          <!-- MORE QUICK ACTIONS MENU POPOVER -->
+          <div v-if="design.showMoreMenu" class="more-menu-popover" @click.stop>
+            <button class="more-menu-item" @click="design.saveDraft(); design.showMoreMenu = false">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              <span>Save Progress</span>
+            </button>
+            <button class="more-menu-item" @click="design.randomizeDesign(); design.showMoreMenu = false">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>
+              </svg>
+              <span>Randomize Design</span>
+            </button>
+            <button class="more-menu-item danger" @click="design.resetDesign(); design.showMoreMenu = false">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+              </svg>
+              <span>Reset to Default</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ✦ 6 Tool Tabs: Text, Image, Brush, Border, Corner, Floral -->
         <button
           v-for="tab in TOOL_TABS"
           :key="tab.id"
-          class="zzz-tab-btn"
+          class="zzz-tab-btn flex-1 md:flex-initial"
           :class="{ 'tab-active': design.activeTab === tab.id }"
-          @click="design.activeTab === tab.id ? (design.activeTab = null) : (design.activeTab = tab.id)"
+          @click="design.showMoreMenu = false; (design.activeTab === tab.id ? (design.activeTab = null) : (design.activeTab = tab.id))"
           role="tab"
           :aria-selected="design.activeTab === tab.id"
         >
@@ -225,7 +266,7 @@ onUnmounted(() => {
             <svg v-else-if="tab.id === 'image'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             <svg v-else-if="tab.id === 'brush'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 2.5-2 5-2 5"/></svg>
             <svg v-else-if="tab.id === 'border'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/></svg>
-            <svg v-else-if="tab.id === 'corner'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 9V5a2 2 0 012-2h4"/><path d="M3 15v4a2 2 0 002 2h4"/></svg>
+            <svg v-else-if="tab.id === 'corner'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V5a2 2 0 012-2h4"/><path d="M3 15v4a2 2 0 002 2h4"/></svg>
             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C12 22 20 18 20 12C20 6 12 2 12 2C12 2 4 6 4 12C4 18 12 22 12 22Z"/><circle cx="12" cy="12" r="3"/></svg>
           </div>
           <span class="zzz-tab-label">{{ tab.label }}</span>

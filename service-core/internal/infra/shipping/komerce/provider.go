@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,13 +27,13 @@ func NewKomerceProvider(
 	cfg config.KomerceConfig,
 ) (shipping.LogisticsProvider, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
-		return nil, fmt.Errorf("komerce: api key is required")
+		return nil, ErrAPIKeyRequired
 	}
 	if strings.TrimSpace(cfg.OrderBaseURL) == "" {
-		return nil, fmt.Errorf("komerce: order base URL is required")
+		return nil, ErrOrderBaseURLRequired
 	}
 	if strings.TrimSpace(cfg.TrackBaseURL) == "" {
-		return nil, fmt.Errorf("komerce: track base URL is required")
+		return nil, ErrTrackBaseURLRequired
 	}
 
 	return &komerceProvider{
@@ -80,11 +81,15 @@ func (p *komerceProvider) CreateOrder(
 	ctx context.Context,
 	input shipping.CreateOrderInput,
 ) (*shipping.CreateOrderResult, error) {
+	if !isValidKomerceCourier(input.CourierCode) {
+		return nil, ErrInvalidCourierCode(input.CourierCode)
+	}
+
 	endpoint := "/order/api/v1/orders/store"
 	reqBody := createOrderRequestBody{
 		OriginAreaID:      input.OriginAreaID,
 		DestinationAreaID: input.DestinationAreaID,
-		Courier:           input.CourierCode,
+		Courier:           normalizeCourierCode(input.CourierCode),
 		CourierService:    input.CourierService,
 		Weight:            input.Weight,
 		UniqueOrderID:     input.UniqueOrderID,
@@ -120,43 +125,63 @@ func (p *komerceProvider) CreateOrder(
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= http.StatusBadRequest {
-		switch resp.StatusCode {
-		case http.StatusBadRequest:
-			return nil, fmt.Errorf("one or more request parameters are invalid")
-
-		case http.StatusUnauthorized:
-			return nil, fmt.Errorf("invalid or missing API key")
-
-		case http.StatusUnprocessableEntity:
-			return nil, fmt.Errorf("missing required parameter")
-
-		case http.StatusInternalServerError:
-			return nil, fmt.Errorf("provider service unavailable")
-
-		default:
-			return nil, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
-		}
-	}
-
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
 	var result createOrderResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	if err := json.Unmarshal(respBody, &result); err == nil && (result.Meta.Code != 0 || result.Meta.Message != "") {
+		if result.Meta.Code != 200 {
+			return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
+		}
 	}
 
-	if result.Meta.Code != 200 {
-		return nil, fmt.Errorf("rejected (%d): %s", result.Meta.Code, result.Meta.Message)
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, ErrHTTPStatus(resp.StatusCode, string(respBody))
+	}
+
+	if result.Meta.Code != 200 && result.Meta.Code != 0 {
+		return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
 	}
 
 	return &shipping.CreateOrderResult{
 		KomerceOrderNo: result.Data.OrderNo,
 		TrackingNumber: result.Data.AirwayBill,
 	}, nil
+}
+
+func (p *komerceProvider) CancelOrder(
+	ctx context.Context,
+	komerceOrderNo string,
+) error {
+	if strings.TrimSpace(komerceOrderNo) == "" {
+		return nil
+	}
+
+	endpoint := "/order/api/v1/orders/cancel"
+	reqBody := map[string]string{
+		"order_no": komerceOrderNo,
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal cancel request: %w", err)
+	}
+
+	url := p.orderBaseURL + endpoint
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build cancel request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", p.apiKey)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("cancel request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 type trackWaybillRequestBody struct {
@@ -188,26 +213,29 @@ func (p *komerceProvider) TrackShipment(
 	ctx context.Context,
 	input shipping.TrackShipmentInput,
 ) ([]shipping.TrackingEvent, error) {
+	if !isValidKomerceCourier(input.Courier) {
+		return nil, ErrInvalidCourierCode(input.Courier)
+	}
+
 	endpoint := "/api/v1/track/waybill"
-	reqBody := trackWaybillRequestBody{
-		AWB:             input.TrackingNumber,
-		Courier:         normalizeCourierCode(input.Courier),
-		LastPhone:       input.LastPhone,
-		LastPhoneNumber: input.LastPhone,
-	}
-
-	body, err := json.Marshal(reqBody)
+	reqURL, err := url.Parse(p.trackBaseURL + endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("parse url: %w", err)
 	}
 
-	url := p.trackBaseURL + endpoint
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	q := reqURL.Query()
+	q.Set("courier", normalizeCourierCode(input.Courier))
+	q.Set("awb", input.TrackingNumber)
+	if input.LastPhone != nil && *input.LastPhone != "" {
+		q.Set("last_phone_number", *input.LastPhone)
+	}
+	reqURL.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Key", p.shippingKey)
+	req.Header.Set("key", p.shippingKey)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -221,13 +249,18 @@ func (p *komerceProvider) TrackShipment(
 	}
 
 	var result trackWaybillResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	if err := json.Unmarshal(respBody, &result); err == nil && (result.Meta.Code != 0 || result.Meta.Message != "") {
+		if result.Meta.Code != 200 {
+			return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
+		}
 	}
 
-	if result.Meta.Code != 200 {
-		appErr := mapKomerceError(result.Meta.Code, result.Meta.Message)
-		return nil, appErr
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, ErrHTTPStatus(resp.StatusCode, string(respBody))
+	}
+
+	if result.Meta.Code != 200 && result.Meta.Code != 0 {
+		return nil, mapKomerceError(result.Meta.Code, result.Meta.Message)
 	}
 
 	var events []shipping.TrackingEvent
@@ -244,33 +277,41 @@ func (p *komerceProvider) TrackShipment(
 	return events, nil
 }
 
+func isValidKomerceCourier(courier string) bool {
+	c := normalizeCourierCode(courier)
+	switch c {
+	case "jne", "jnt", "ninja", "tiki", "pos", "anteraja", "sap", "lion", "wahana", "first", "ide":
+		return true
+	default:
+		return false
+	}
+}
+
 func normalizeCourierCode(courier string) string {
 	c := strings.ToLower(strings.TrimSpace(courier))
 	switch {
-	case strings.Contains(c, "spx") || strings.Contains(c, "shopee"):
-		return "spx"
 	case strings.Contains(c, "jne"):
 		return "jne"
 	case strings.Contains(c, "j&t") || strings.Contains(c, "jnt"):
 		return "jnt"
-	case strings.Contains(c, "sicepat"):
-		return "sicepat"
-	case strings.Contains(c, "pos"):
-		return "pos"
-	case strings.Contains(c, "tiki"):
-		return "tiki"
 	case strings.Contains(c, "ninja"):
 		return "ninja"
+	case strings.Contains(c, "tiki"):
+		return "tiki"
+	case strings.Contains(c, "pos"):
+		return "pos"
+	case strings.Contains(c, "anteraja"):
+		return "anteraja"
+	case strings.Contains(c, "sap"):
+		return "sap"
 	case strings.Contains(c, "lion"):
 		return "lion"
 	case strings.Contains(c, "wahana"):
 		return "wahana"
+	case strings.Contains(c, "first"):
+		return "first"
 	case strings.Contains(c, "idexpress") || strings.Contains(c, "ide"):
 		return "ide"
-	case strings.Contains(c, "sentral"):
-		return "sentral"
-	case strings.Contains(c, "rex"):
-		return "rex"
 	default:
 		fields := strings.Fields(c)
 		if len(fields) > 0 {

@@ -1,6 +1,8 @@
 package http
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -55,6 +57,7 @@ type meResponse struct {
 	Roles           []roleResponse       `json:"roles,omitempty"`
 	Permissions     []permissionResponse `json:"permissions,omitempty"`
 	OAuthProvider   *string              `json:"oauth_provider,omitempty"`
+	LastLoginAt     *time.Time           `json:"last_login_at,omitempty"`
 }
 
 type forgotPasswordCustomerRequest struct {

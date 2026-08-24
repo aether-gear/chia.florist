@@ -22,5 +22,7 @@ This file contains project-scoped rules and behavioral constraints for the `cont
     *   Use **Inter** (`font-sans`) for form labels, descriptions, and general text copy.
 *   **Responsive Auth Design**:
     *   Auth and settings templates must use a split-screen design (`lg:grid-cols-12`) where one side handles inputs and forms and the other handles dithered illustration art.
-    *   Harness responsive visibility (e.g., `hidden lg:block` for the art panel) to conceal heavy visual elements on smaller displays (mobile/tablet) to optimize loading performance.
-*   **Checkbox Class Variable Usage**: Avoid hardcoding neutral slate borders and backgrounds. Use variables like `bg-primary`, `border-input`, and `text-primary-foreground` to support active accent adjustments dynamically.
+*   **Mandatory Overlay Right Panel Drawer Standard**:
+    *   ALWAYS use the global **Overlay Right Panel** (`Sheet` drawer component with `w-full sm:max-w-none md:w-[48vw] md:min-w-[480px]`) for any data input, creation, editing, binding, or permission assignment tasks.
+    *   Do **not** use centered modal dialogs for multi-field input forms or editing. All editing and form operations must slide in from the right edge as a full-height overlay panel with sticky header and action footer.
+

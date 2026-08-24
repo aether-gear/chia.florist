@@ -1,18 +1,11 @@
 // app/composables/useOrders.ts
 import { ref, computed } from 'vue'
 import { orderService } from '~/services/orderService'
-import type { BackendOrder } from '~/types/order'
+import type { BackendOrder, GetOrderTrackingTimelineResponse } from '~/types/order'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
-/**
- * Maps Shopee category tab keys to backend status strings.
- *   all        -> all orders (no status filter query)
- *   pending    -> pending (To Pay - active unexpired payment)
- *   processing -> confirmed | processing (To Ship - packing/arranging flowers)
- *   shipping   -> shipped (To Receive - package in transit)
- *   completed  -> delivered | finished (Completed - delivered successfully)
- *   cancelled  -> cancelled | expired (Cancelled / Expired orders)
- */
 export type OrderTab = 'all' | 'pending' | 'processing' | 'shipping' | 'completed' | 'cancelled'
+
 
 const TAB_STATUSES: Record<OrderTab, string[]> = {
   all:        [],
@@ -210,7 +203,7 @@ export const useOrders = () => {
       orders.value      = fetchedOrders
       totalOrders.value = res.total ?? fetchedOrders.length
     } catch (err: any) {
-      error.value = err?.data?.message || err?.message || 'Failed to load orders'
+      error.value = mapErrorMessage(err, 'Gagal memuat pesanan. Silakan coba lagi.')
       orders.value      = []
       totalOrders.value = 0
     } finally {
@@ -221,6 +214,9 @@ export const useOrders = () => {
   const goToPage = (tab: OrderTab, page: number) => {
     if (page >= 1 && page <= totalPages.value) {
       fetchOrders(tab, page)
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     }
   }
 
@@ -243,6 +239,25 @@ export const useOrders = () => {
     })
   }
 
+  const trackingData       = ref<GetOrderTrackingTimelineResponse | null>(null)
+  const isTrackingLoading  = ref(false)
+  const trackingError      = ref<string | null>(null)
+
+  const fetchOrderTracking = async (orderId: string) => {
+    if (!orderId) return
+    isTrackingLoading.value = true
+    trackingError.value     = null
+    try {
+      const res = await orderService.getOrderTrackingTimeline(orderId)
+      trackingData.value = res
+    } catch (err: any) {
+      trackingError.value = mapErrorMessage(err, 'Gagal memuat data pelacakan pengiriman.')
+      trackingData.value = null
+    } finally {
+      isTrackingLoading.value = false
+    }
+  }
+
   return {
     orders,
     isLoading,
@@ -253,6 +268,10 @@ export const useOrders = () => {
     totalPages,
     fetchOrders,
     goToPage,
+    trackingData,
+    isTrackingLoading,
+    trackingError,
+    fetchOrderTracking,
     formatRupiah,
     formatDate,
     isOrderExpired,
@@ -262,3 +281,4 @@ export const useOrders = () => {
     getTimeRemaining
   }
 }
+

@@ -1,11 +1,13 @@
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { useCart } from '~/composables/useCart'
-import { triggerSessionExpired } from '~/composables/useSessionState'
+import { useAddress } from '~/composables/useAddress'
+import { triggerSessionExpired, clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const authVm = useAuthViewModel()
   const cartVm = useCart()
+  const addressVm = useAddress()
   const { showError, showSuccess } = useGlobalAlert()
 
   if (import.meta.client) {
@@ -17,20 +19,27 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     if (isGoogleCallback) {
       // Clear the flag immediately so it doesn't persist across future loads
       sessionStorage.removeItem('google_auth_pending')
+      clearSessionExpired()
+      clearAuthAlert()
 
       try {
-        await authVm.fetchCurrentUser()
+        await authVm.fetchCurrentUser(undefined, true)
 
         if (authVm.isAuthenticated.value) {
+          clearSessionExpired()
+          clearAuthAlert()
           showSuccess(
             'Signed In Successfully',
             `Welcome, ${authVm.currentUser.value?.name || 'Customer'}!`,
             [
-              { label: 'My Profile', onClick: () => navigateTo('/profile') },
+              { label: 'My Profile', onClick: () => navigateTo('/profile/personal') },
               { label: 'Dismiss' }
             ]
           )
-          await cartVm.loadCart(true)
+          await Promise.all([
+            cartVm.loadCart(true),
+            addressVm.fetchAddresses(true)
+          ])
         } else {
           authVm.clearLocalSession()
           showError(
@@ -55,13 +64,18 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         )
       }
 
-    } else if (isLoggedIn.value === 'true' || rememberMe.value === 'true' || !isLoggedIn.value) {
-      // Attempt session restore for email/password or persistent sessions
+    } else if (isLoggedIn.value === 'true' || rememberMe.value === 'true') {
+      // Attempt session restore for authenticated or remembered sessions
       try {
-        await authVm.fetchCurrentUser()
+        await authVm.fetchCurrentUser(undefined, true)
 
         if (authVm.isAuthenticated.value) {
-          await cartVm.loadCart(true)
+          clearSessionExpired()
+          clearAuthAlert()
+          await Promise.all([
+            cartVm.loadCart(true),
+            addressVm.fetchAddresses(true)
+          ])
         } else {
           if (wasLoggedIn) {
             triggerSessionExpired()
@@ -75,6 +89,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         }
         authVm.clearLocalSession()
       }
+    } else {
+      // Unauthenticated visitor: initialize state immediately without calling /auth/me
+      await authVm.fetchCurrentUser()
     }
   }
 })
+

@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
-import { Edit, X, Package, CheckCircle2, XCircle, Loader2, Weight, BarChart2 } from 'lucide-react';
+import { Edit, X, Package, CheckCircle2, XCircle, Loader2, Weight, BarChart2, Sparkles, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import StatusBadge from '../StatusBadge';
 import { useProductFormViewModel } from '../../viewmodels/useProductFormViewModel';
+import { useDemandForecastViewModel } from '../../viewmodels/useDemandForecastViewModel';
+import { Skeleton } from '../ui/skeleton';
 
 interface ProductDetailsViewProps {
   productSlug: string;
@@ -17,12 +19,19 @@ export default function ProductDetailsView({
   onEditProduct,
 }: ProductDetailsViewProps) {
   const { product, loading, error, loadProduct } = useProductFormViewModel();
+  const { forecast, loading: forecastLoading, fetchForecast } = useDemandForecastViewModel();
 
   useEffect(() => {
     if (productSlug) {
       loadProduct(productSlug);
     }
   }, [productSlug, loadProduct]);
+
+  useEffect(() => {
+    if (product?.id) {
+      fetchForecast(product.id);
+    }
+  }, [product?.id, fetchForecast]);
 
   if (loading) {
     return (
@@ -158,6 +167,65 @@ export default function ProductDetailsView({
             </p>
           </div>
         </div>
+      </div>
+
+      {/* AI Demand & Stockout Intelligence Card */}
+      <div className="space-y-3 pt-4 border-t border-border/60">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold font-display tracking-tight text-foreground flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-primary" />
+            AI Demand & Stockout Intelligence
+          </span>
+          {forecast && (
+            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 uppercase font-mono">
+              {forecast.confidence_tier} Confidence
+            </Badge>
+          )}
+        </div>
+
+        {forecastLoading ? (
+          <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-2">
+            <Skeleton className="h-4 w-48 bg-muted" />
+            <Skeleton className="h-8 w-full bg-muted" />
+          </div>
+        ) : forecast ? (
+          <div className="p-4 rounded-xl border border-border/60 bg-muted/10 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-2.5 rounded-lg bg-background border border-border/60">
+                <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-primary" /> 7d Forecast
+                </span>
+                <div className="text-base font-bold font-display text-primary mt-0.5">
+                  {forecast.predicted_units_sold_7d.toFixed(1)} <span className="text-[10px] font-normal text-muted-foreground">units</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-background border border-border/60">
+                <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider flex items-center gap-1">
+                  <BarChart2 className="h-3 w-3 text-muted-foreground" /> Historical 7d
+                </span>
+                <div className="text-base font-bold font-display text-foreground mt-0.5">
+                  {forecast.historical_velocity_7d} <span className="text-[10px] font-normal text-muted-foreground">units</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40">
+              <span className="text-muted-foreground">Depletion Runway:</span>
+              <span className="font-semibold text-foreground">
+                {forecast.current_stock < forecast.predicted_units_sold_7d ? (
+                  <span className="text-destructive font-bold flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" /> High Risk (Stockout Deficit)
+                  </span>
+                ) : (
+                  <span className="text-emerald-600 font-medium">
+                    ✓ Stock sufficient for ~{Math.max(1, Math.round(forecast.current_stock / Math.max(0.1, forecast.predicted_units_sold_7d / 7)))} days
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Shop Stock Breakdown Section */}

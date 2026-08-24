@@ -37,4 +37,24 @@ export default defineNuxtConfig({
   app: {
     pageTransition: { name: "page", mode: "out-in" },
   },
+
+  routeRules: {
+    // SSR / SEO Discoverable Public Pages
+    '/': { ssr: true },
+    '/catalog': { ssr: true },
+    '/products/**': { ssr: true },
+    '/search': { ssr: true },
+    '/privacy': { prerender: true },
+    '/terms': { prerender: true },
+
+    // SPA / Client-Only Interactive & Private Pages
+    '/products/custom': { ssr: false },
+    '/cart': { ssr: false },
+    '/checkout': { ssr: false },
+    '/payment': { ssr: false },
+    '/profile': { ssr: false },
+    '/login': { ssr: false },
+    '/register': { ssr: false },
+    '/verify': { ssr: false },
+  },
 });

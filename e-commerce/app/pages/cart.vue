@@ -3,6 +3,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCart } from '~/composables/useCart'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 useHead({
   title: 'Your Shopping Cart - Chia Florist'
@@ -18,14 +19,16 @@ const activeShops = storeSelection.activeShops
 
 const isPageLoading = ref(true)
 const isTransferringId = ref<string | null>(null)
-const productAvailabilityMap = ref<Record<string, { slug: string; name: string; stock: number }[]>>({})
+const productAvailabilityMap = useState<Record<string, { slug: string; name: string; stock: number }[]>>('chia-product-availability-map', () => ({}))
+const fetchingIdentifiers = new Set<string>()
 
 const fetchCartItemsAvailability = async () => {
   const standardItems = cart.value.filter(i => !i.isCustom && (i.slug || i.id))
-  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.id))]
+  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.id).filter(Boolean))]
 
-  for (const identifier of uniqueIdentifiers) {
-    if (identifier && !productAvailabilityMap.value[identifier]) {
+  const promises = uniqueIdentifiers.map(async (identifier) => {
+    if (identifier && !productAvailabilityMap.value[identifier] && !fetchingIdentifiers.has(identifier)) {
+      fetchingIdentifiers.add(identifier)
       try {
         const prod = await productService.getProductById(identifier)
         if (prod && (prod as any).availability) {
@@ -35,15 +38,20 @@ const fetchCartItemsAvailability = async () => {
         }
       } catch (e) {
         console.error(`Failed to fetch availability for product ${identifier}`, e)
+      } finally {
+        fetchingIdentifiers.delete(identifier)
       }
     }
-  }
+  })
+
+  await Promise.all(promises)
 }
+
+let cartWatchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   try {
     storeSelection.fetchActiveShops()
-    await flushCart()
     await loadCart(true)
     await fetchCartItemsAvailability()
   } finally {
@@ -52,8 +60,11 @@ onMounted(async () => {
 })
 
 watch(cart, () => {
-  fetchCartItemsAvailability()
-})
+  if (cartWatchDebounce) clearTimeout(cartWatchDebounce)
+  cartWatchDebounce = setTimeout(() => {
+    fetchCartItemsAvailability()
+  }, 200)
+}, { deep: false })
 
 const getAvailableShopsForItem = (item: any) => {
   if (item.isCustom) {
@@ -77,18 +88,16 @@ const handleTransferItemShop = async (cartItemId: string, targetShopId: string) 
     const matchedShop = activeShops.value.find(s => s.id === targetShopId)
     globalAlert.showSuccess('Branch Transferred', `Item transferred to ${matchedShop?.name || 'new store branch'}!`)
   } catch (err: any) {
-    globalAlert.showError('Transfer Failed', err.message || 'Failed to transfer item to new shop branch.')
+    globalAlert.showError('Transfer Failed', mapErrorMessage(err, 'Failed to transfer item to new shop branch.'))
   } finally {
     isTransferringId.value = null
   }
 }
 
 const shippingFee = ref(20000)
-const promoCode = ref('')
-const discount = ref(0)
 
 const totalPayment = computed(() => {
-  return cartSubtotal.value + shippingFee.value - discount.value
+  return cartSubtotal.value + shippingFee.value
 })
 
 const cartGroupedByShop = computed(() => {
@@ -103,15 +112,6 @@ const cartGroupedByShop = computed(() => {
   })
   return Object.values(groups)
 })
-
-const applyPromo = () => {
-  if (promoCode.value.toUpperCase() === 'CHIAFLORIST') {
-    discount.value = 50000
-    globalAlert.showSuccess('Promo Code Applied', `Promo code applied successfully! You received a ${formatRupiah(50000)} discount.`)
-  } else {
-    globalAlert.showError('Invalid Promo Code', 'The promo code entered is invalid or has expired.')
-  }
-}
 
 const handleCheckout = () => {
   navigateTo('/checkout')
@@ -140,7 +140,7 @@ const handleRemove = async (id: string, size?: string, color?: string) => {
     globalAlert.showSuccess('Item Removed', 'The product has been removed from your cart.')
   } catch (e) {
     console.error('Remove failed:', e)
-    globalAlert.showError('Remove Failed', 'Could not remove item. Please try again.')
+    globalAlert.showError('Remove Failed', mapErrorMessage(e, 'Could not remove item. Please try again.'))
   } finally {
     isRemovingAny.value = false
     activeRemovingId.value = null
@@ -254,7 +254,9 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
             <!-- Store Header -->
             <div class="flex items-center justify-between pb-4 border-b border-gray-100">
               <div class="flex items-center gap-2">
-                <span class="text-lg">🏪</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-800 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
+                </svg>
                 <h3 class="font-extrabold text-gray-900 text-base">
                   Fulfilled by {{ group.shopName }}
                 </h3>
@@ -279,12 +281,12 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
                   <div class="min-w-0 flex-1">
                     <h3 class="font-bold text-gray-900 text-lg leading-snug break-words">{{ item.name }}</h3>
                     <div class="flex flex-wrap gap-2.5 mt-2 text-xs text-gray-500 font-medium">
-                      <span v-if="item.size" class="bg-gray-100 px-2.5 py-1 rounded-md">Size: {{ item.size }}</span>
-                      <div v-if="item.color" class="flex items-center gap-1.5 bg-gray-100 px-2.5 py-1 rounded-md">
-                        <span>Color:</span>
-                        <span :style="{ backgroundColor: item.color }" class="w-3 h-3 rounded-full border border-gray-300 inline-block"></span>
-                      </div>
-                      <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold">✨ Custom Board</span>
+                      <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+                        </svg>
+                        <span>Custom Board</span>
+                      </span>
                     </div>
 
                     <!-- Store Branch Transfer Dropdown (PATCH /carts/items/{cartItemID}/shop) -->
@@ -383,21 +385,9 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
                 <span>Estimated Delivery</span>
                 <span class="text-gray-900 font-bold">{{ formatRupiah(shippingFee) }}</span>
               </div>
-              <div class="flex justify-between items-center text-emerald-600" v-if="discount > 0">
-                <span>Promo Discount</span>
-                <span class="font-bold">-{{ formatRupiah(discount) }}</span>
-              </div>
               <div class="border-t border-gray-100 pt-4 flex justify-between items-center text-base font-bold text-gray-900">
                 <span>Total Amount</span>
                 <span class="text-2xl font-extrabold text-[#1b4332]">{{ formatRupiah(totalPayment) }}</span>
-              </div>
-            </div>
-
-            <div class="pt-4 border-t border-gray-50 space-y-2">
-              <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Do you have a promo code?</label>
-              <div class="flex gap-2">
-                <input v-model="promoCode" type="text" placeholder="e.g. CHIAFLORIST" class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-[#1b4332] transition-all font-semibold" />
-                <button @click="applyPromo" class="bg-gray-900 hover:bg-black text-white px-5 py-3 rounded-xl text-xs font-bold transition cursor-pointer">Apply</button>
               </div>
             </div>
 
@@ -410,7 +400,9 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
           </div>
           
           <div class="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex gap-3 items-center text-emerald-800">
-            <span class="text-2xl">🔒</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
             <p class="text-xs font-medium leading-normal">Secure Checkout Guaranteed. Your data is encrypted and completely safe with us.</p>
           </div>
         </div>

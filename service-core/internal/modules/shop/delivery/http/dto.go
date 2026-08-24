@@ -25,6 +25,14 @@ type getShopResponse struct {
 	UpdatedAt      *time.Time `json:"updated_at"`
 }
 
+type listShopsResponse struct {
+	Page  int               `json:"page"`
+	Limit int               `json:"limit"`
+	Total int               `json:"total"`
+	Shops []getShopResponse `json:"shops"`
+}
+
+
 
 type shopAddressResponse struct {
 	ID          uuid.UUID  `json:"id"`

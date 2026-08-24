@@ -37,6 +37,14 @@ func (p *manualShippingProvider) CreateOrder(
 	}, nil
 }
 
+// CancelOrder is a no-op for manual shipping provider.
+func (p *manualShippingProvider) CancelOrder(
+	_ context.Context,
+	_ string,
+) error {
+	return nil
+}
+
 // TrackShipment returns an empty event list.
 // Manual shipments have no automated tracking feed.
 func (p *manualShippingProvider) TrackShipment(

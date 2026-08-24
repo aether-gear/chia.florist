@@ -60,7 +60,11 @@ export default function StaffListPage() {
     deleteStaff,
     addStaffAccount,
     removeStaffAccount,
+    fetchStaffShopPermissions,
+    saveStaffShopPermission,
+    deleteStaffShopPermission,
   } = useStaffViewModel();
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -526,7 +530,11 @@ export default function StaffListPage() {
                   onUnbindAccount={async (accountId) => {
                     await removeStaffAccount(activeStaff.id, accountId);
                   }}
+                  fetchShopPermissions={fetchStaffShopPermissions}
+                  saveShopPermission={saveStaffShopPermission}
+                  deleteShopPermission={deleteStaffShopPermission}
                 />
+
               </div>
             )}
           </div>

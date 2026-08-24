@@ -38,6 +38,17 @@ func (p *manualTrackedShippingProvider) CreateOrder(
 	}, nil
 }
 
+// CancelOrder delegates order cancellation to the external tracker if available.
+func (p *manualTrackedShippingProvider) CancelOrder(
+	ctx context.Context,
+	komerceOrderNo string,
+) error {
+	if p.tracker == nil {
+		return nil
+	}
+	return p.tracker.CancelOrder(ctx, komerceOrderNo)
+}
+
 // TrackShipment delegates tracking lookup to the external tracker (e.g. Komerce Waybill API).
 func (p *manualTrackedShippingProvider) TrackShipment(
 	ctx context.Context,

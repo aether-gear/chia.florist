@@ -185,6 +185,56 @@ func (aM *jwtAuthenticator) RequireMultiAuth(
 	}
 }
 
+func (aM *jwtAuthenticator) OptionalAuth(
+	exec transaction.Executor,
+	tran transaction.Transactor,
+	cookies ...appcookie.CookieName,
+) commonmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			var collected []*domain.AuthContext
+
+			for _, cookie := range cookies {
+				var authCtx *domain.AuthContext
+
+				token, err := appcookie.Extract(r, cookie)
+				if err == nil {
+					authCtx, err = aM.authenticate(r.Context(), exec, token)
+				}
+
+				if err != nil {
+					var refreshErr error
+					authCtx, refreshErr = aM.trySilentRefresh(
+						r.Context(),
+						exec,
+						tran,
+						w,
+						r,
+						cookie,
+					)
+					if refreshErr != nil {
+						continue
+					}
+				}
+
+				if !isValidCookieForAuth(cookie, authCtx) {
+					continue
+				}
+
+				collected = append(collected, authCtx)
+			}
+
+			if len(collected) > 0 {
+				ctx := domain.WithMultiAuthContext(r.Context(), collected)
+				ctx = domain.WithAuthContext(ctx, collected[0])
+				return next(w, r.WithContext(ctx))
+			}
+
+			return next(w, r)
+		}
+	}
+}
+
 func isValidCookieForAuth(
 	cookie appcookie.CookieName,
 	authCtx *domain.AuthContext,

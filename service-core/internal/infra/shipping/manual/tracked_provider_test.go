@@ -18,6 +18,10 @@ func (m *mockTracker) CreateOrder(_ context.Context, _ shipping.CreateOrderInput
 	return nil, nil
 }
 
+func (m *mockTracker) CancelOrder(_ context.Context, _ string) error {
+	return nil
+}
+
 func (m *mockTracker) TrackShipment(_ context.Context, _ shipping.TrackShipmentInput) ([]shipping.TrackingEvent, error) {
 	return m.events, m.err
 }

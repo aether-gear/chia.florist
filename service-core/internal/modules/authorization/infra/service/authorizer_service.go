@@ -12,6 +12,9 @@ import (
 	"service-core/internal/modules/authorization/domain"
 	"service-core/internal/modules/authorization/repository"
 	transaction "service-core/internal/shared/transaction"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type actorContextKey struct{}
@@ -127,6 +130,40 @@ func (s *authorizer) RequireStaffRole(
 	}
 }
 
+func (s *authorizer) RequirePermission(
+	permission string,
+) appmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			actor, ok := GetActor(r.Context())
+			if !ok {
+				return apperrors.NewUnauthorized("authentication required")
+			}
+			if actor.Type != authendomain.AccountTypeStaff {
+				return apperrors.NewForbidden(domain.ErrStaffRequired.Error())
+			}
+
+			if actor.IsSuperAdmin() {
+				return next(w, r)
+			}
+
+			// Get shopID from URL route parameter if present
+			shopIDStr := chi.URLParam(r, "shopID")
+			if shopIDStr != "" {
+				shopID, err := uuid.Parse(shopIDStr)
+				if err != nil {
+					return apperrors.NewBadRequest("invalid shop id")
+				}
+				if !actor.HasPermission(shopID, permission) {
+					return apperrors.NewForbidden("insufficient permission")
+				}
+			}
+
+			return next(w, r)
+		}
+	}
+}
+
 func (s *authorizer) LoadActor(
 	exec transaction.Executor,
 ) appmiddleware.Middleware {
@@ -137,15 +174,41 @@ func (s *authorizer) LoadActor(
 				return apperrors.NewUnauthorized("authentication required")
 			}
 
-			actor, err := s.actorSvc.
-				Load(
-					r.Context(),
-					exec,
-					authCtx.UserID,
-					authCtx.StaffID,
-				)
+			actor, err := s.actorSvc.Load(r.Context(), exec,
+				authCtx.UserID,
+				authCtx.StaffID,
+			)
 			if err != nil {
 				return err
+			}
+
+			ctx := context.WithValue(
+				r.Context(),
+				actorContextKey{},
+				actor,
+			)
+
+			return next(w, r.WithContext(ctx))
+		}
+	}
+}
+
+func (s *authorizer) OptionalLoadActor(
+	exec transaction.Executor,
+) appmiddleware.Middleware {
+	return func(next apphttp.AppHandler) apphttp.AppHandler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			authCtx, ok := authendomain.GetAuthContext(r.Context())
+			if !ok {
+				return next(w, r)
+			}
+
+			actor, err := s.actorSvc.Load(r.Context(), exec,
+				authCtx.UserID,
+				authCtx.StaffID,
+			)
+			if err != nil {
+				return next(w, r)
 			}
 
 			ctx := context.WithValue(

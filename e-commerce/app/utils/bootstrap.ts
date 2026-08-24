@@ -1,5 +1,6 @@
 // app/utils/bootstrap.ts
 import { triggerSessionExpired } from '~/composables/useSessionState'
+import { mapErrorMessage } from '~/utils/errorMessages'
 
 export const bootstrapConfig = {
   /**
@@ -26,7 +27,7 @@ export const bootstrapConfig = {
    * Helper utility to fetch from the service core API endpoint.
    * Includes credentials so cookies flow through the proxy.
    */
-  async fetchApi<T>(endpoint: string, options?: Parameters<typeof $fetch>[1]): Promise<T> {
+  async fetchApi<T>(endpoint: string, options?: Parameters<typeof $fetch>[1] & { skipSessionExpiredCheck?: boolean }): Promise<T> {
     const baseUrl = this.getApiBaseUrl().replace(/\/$/, '')
     const cleanEndpoint = endpoint.replace(/^\//, '')
     const url = `${baseUrl}/${cleanEndpoint}`
@@ -41,10 +42,19 @@ export const bootstrapConfig = {
         ...options
       })
     } catch (err: any) {
-      if (import.meta.client && (err.status === 401 || err.status === 403)) {
-        triggerSessionExpired()
+      if (err && typeof err === 'object') {
+        err.friendlyMessage = mapErrorMessage(err)
+      }
+      const isAuthEndpoint = cleanEndpoint.startsWith('auth/') || cleanEndpoint === 'profile' || cleanEndpoint.startsWith('users/me')
+      if (import.meta.client && !options?.skipSessionExpiredCheck && !isAuthEndpoint && (err.status === 401 || err.status === 403)) {
+        const isLoggedIn = useCookie('is_logged_in')
+        if (isLoggedIn.value === 'true') {
+          triggerSessionExpired()
+        }
       }
       throw err
     }
   }
 }
+
+

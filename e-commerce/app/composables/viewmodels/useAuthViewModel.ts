@@ -4,14 +4,15 @@ import { authService } from '~/services/authService'
 import { supabaseService } from '~/services/supabaseService'
 import type { UserMe, SignUpRequest, VerifyRequest, SignInRequest, UpdateProfileRequest } from '~/types/auth'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
+import { clearSessionExpired, clearAuthAlert } from '~/composables/useSessionState'
+import { useCart } from '~/composables/useCart'
+import { useAddress } from '~/composables/useAddress'
+
+let fetchCurrentUserPromise: Promise<void> | null = null
+let currentFetchSeq = 0
 
 export const useAuthViewModel = () => {
-  const currentUser = useState<UserMe | null>('auth_currentUser', () => null)
-  const challengeId = useState<string | null>('auth_challengeId', () => null)
-  const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
-  const isInitialized = useState<boolean>('auth_isInitialized', () => false)
-  const globalAlert = useGlobalAlert()
-
   const getCookieOptions = () => {
     const rememberMeCookie = useCookie('remember_me')
     const isRemembered = rememberMeCookie.value === 'true'
@@ -21,91 +22,164 @@ export const useAuthViewModel = () => {
     }
   }
 
+  const currentUser = useState<UserMe | null>('auth_currentUser', () => {
+    const isLoggedIn = useCookie('is_logged_in')
+    if (isLoggedIn.value === 'true') {
+      const cachedProfile = useCookie<Partial<UserMe> | null>('user_profile')
+      if (cachedProfile.value && (cachedProfile.value.id || cachedProfile.value.name)) {
+        return { ...(cachedProfile.value as UserMe) }
+      }
+    }
+    return null
+  })
+
+  const challengeId = useState<string | null>('auth_challengeId', () => null)
+  const registrationEmail = useState<string | null>('auth_registrationEmail', () => null)
+  const isInitialized = useState<boolean>('auth_isInitialized', () => {
+    const isLoggedIn = useCookie('is_logged_in')
+    const rememberMe = useCookie('remember_me')
+    if (isLoggedIn.value !== 'true' && rememberMe.value !== 'true') {
+      return true
+    }
+    if (isLoggedIn.value === 'true') {
+      const cachedProfile = useCookie<Partial<UserMe> | null>('user_profile')
+      if (cachedProfile.value && (cachedProfile.value.id || cachedProfile.value.name)) {
+        return true
+      }
+    }
+    return false
+  })
+  const globalAlert = useGlobalAlert()
+
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isAuthenticated = computed(() => currentUser.value !== null)
 
   /**
-   * Safe method to fetch the current logged-in user.
+   * Safe method to fetch the current logged-in user with in-flight deduplication.
    */
-  const fetchCurrentUser = async (cookieHeader?: string) => {
+  const fetchCurrentUser = (cookieHeader?: string, force = false): Promise<void> => {
+    // If already initialized and not forcing, reuse existing session
+    if (!force && isInitialized.value) {
+      return Promise.resolve()
+    }
+
+    // In client environment: if not forced and there is no indication that a session exists,
+    // mark as initialized and unauthenticated without hitting /auth/me
+    if (!force && import.meta.client && !cookieHeader) {
+      const isLoggedIn = useCookie('is_logged_in')
+      const rememberMe = useCookie('remember_me')
+      const isGooglePending = sessionStorage.getItem('google_auth_pending') === '1'
+
+      if (isLoggedIn.value !== 'true' && rememberMe.value !== 'true' && !isGooglePending) {
+        currentUser.value = null
+        isInitialized.value = true
+        return Promise.resolve()
+      }
+    }
+
+    // If not forcing and a request is already in flight, return existing promise
+    if (!force && fetchCurrentUserPromise) {
+      return fetchCurrentUserPromise
+    }
+
+    // Force supersedes any in-flight request
+    const thisFetchSeq = ++currentFetchSeq
     isLoading.value = true
     error.value = null
-    try {
-      const response = await authService.getMe(cookieHeader)
-      if (response && response.is_authenticated && response.account_type === 'customer') {
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
 
-        isLoggedIn.value = 'true'
+    const promise = (async () => {
+      try {
+        const response = await authService.getMe(cookieHeader)
 
-        let profileDetails: any = null
-        try {
-          const profileRes = await authService.getProfile(cookieHeader)
-          if (profileRes && profileRes.profile) {
-            profileDetails = profileRes.profile
-          }
-        } catch (profileErr) {
-          console.warn('Failed to fetch profile details from Golang backend:', profileErr)
-        }
+        // Ignore response if superseded by a newer forced request
+        if (thisFetchSeq !== currentFetchSeq) return
 
-        let avatarUrlVal: string | null = profileDetails?.AvatarURL || null
-        if (import.meta.client) {
+        if (response && response.is_authenticated && response.account_type === 'customer') {
+          clearSessionExpired()
+          clearAuthAlert()
+          const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+          const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
+
+          isLoggedIn.value = 'true'
+
+          let profileDetails: any = null
           try {
-            const urls = await supabaseService.getAvatarUrls(profileDetails?.user_id || response.account_id)
-            if (urls) {
-              avatarUrlVal = urls.signedUrl || urls.publicUrl
+            const profileRes = await authService.getProfile(cookieHeader)
+            if (profileRes && profileRes.profile) {
+              profileDetails = profileRes.profile
             }
-          } catch (avatarErr) {
-            console.warn('Failed to load user avatar from Supabase:', avatarErr)
+          } catch (profileErr) {
+            console.warn('Failed to fetch profile details from Golang backend:', profileErr)
           }
-        }
 
-        if (profileDetails) {
-          userProfile.value = {
-            id: profileDetails.user_id,
-            name: profileDetails.Name || 'Customer',
-            username: profileDetails.Username || 'customer',
-            email: userProfile.value?.email || '',
-            phone: profileDetails.Phone || '',
-            last_login_at: profileDetails.LastLoginAt || new Date().toISOString(),
-            avatarUrl: avatarUrlVal
+          // Do not treat external Google avatar as app profile image; only use Supabase avatar
+          let avatarUrlVal: string | null = null
+          if (import.meta.client) {
+            try {
+              const urls = await supabaseService.getAvatarUrls(profileDetails?.user_id || response.account_id)
+              if (urls) {
+                avatarUrlVal = urls.signedUrl || urls.publicUrl
+              }
+            } catch (avatarErr) {
+              console.warn('Failed to load user avatar from Supabase:', avatarErr)
+            }
           }
-        } else if (!userProfile.value) {
-          userProfile.value = {
-            id: response.account_id,
-            name: 'Customer',
-            username: 'customer',
-            phone: '',
-            last_login_at: new Date().toISOString(),
-            avatarUrl: avatarUrlVal
+
+          if (profileDetails) {
+            userProfile.value = {
+              id: profileDetails.user_id,
+              name: profileDetails.Name || 'Customer',
+              username: profileDetails.Username || 'customer',
+              email: userProfile.value?.email || '',
+              phone: profileDetails.Phone || '',
+              last_login_at: profileDetails.LastLoginAt || new Date().toISOString(),
+              avatarUrl: avatarUrlVal
+            }
+          } else if (!userProfile.value) {
+            userProfile.value = {
+              id: response.account_id,
+              name: 'Customer',
+              username: 'customer',
+              phone: '',
+              last_login_at: new Date().toISOString(),
+              avatarUrl: avatarUrlVal
+            }
+          } else {
+            // Re-create object to guarantee Vue reactivity triggers across all components
+            userProfile.value = {
+              ...userProfile.value,
+              id: response.account_id,
+              avatarUrl: avatarUrlVal
+            }
           }
+
+          currentUser.value = { ...(userProfile.value as UserMe) }
         } else {
-          // Re-create object to guarantee Vue reactivity triggers across all components
-          userProfile.value = {
-            ...userProfile.value,
-            id: response.account_id,
-            avatarUrl: avatarUrlVal
+          clearLocalSession()
+          currentUser.value = null
+          if (response && response.message && response.message !== 'Unauthorized') {
+            error.value = response.message
           }
         }
-
-        currentUser.value = { ...(userProfile.value as UserMe) }
-      } else {
+      } catch (err: any) {
+        if (thisFetchSeq !== currentFetchSeq) return
         clearLocalSession()
         currentUser.value = null
-        if (response && response.message) {
-          error.value = response.message
+        error.value = mapErrorMessage(err, 'Gagal memuat status pengguna. Silakan coba lagi.')
+        console.warn('Failed to fetch user state:', err)
+      } finally {
+        if (thisFetchSeq === currentFetchSeq) {
+          isLoading.value = false
+          isInitialized.value = true
+          fetchCurrentUserPromise = null
         }
       }
-    } catch (err: any) {
-      clearLocalSession()
-      currentUser.value = null
-      error.value = err.data?.message || err.message || 'Failed to fetch user state'
-      console.warn('Failed to fetch user state:', err)
-    } finally {
-      isLoading.value = false
-      isInitialized.value = true
-    }
+    })()
+
+    fetchCurrentUserPromise = promise
+    return promise
   }
 
   /**
@@ -129,11 +203,17 @@ export const useAuthViewModel = () => {
         rememberMe
       })
       if (response.message === 'login success') {
-        if (import.meta.client) {
-          localStorage.removeItem('chia-florist-cart-cache')
-        }
-        // Fetch profile to populate global user state
-        await fetchCurrentUser()
+        clearSessionExpired()
+        clearAuthAlert()
+        clearLocalSession()
+
+        // Set login state
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
+        isLoggedIn.value = 'true'
+
+        // Force fetch profile to establish global user state
+        await fetchCurrentUser(undefined, true)
 
         if (!isAuthenticated.value) {
           clearLocalSession()
@@ -141,10 +221,6 @@ export const useAuthViewModel = () => {
           error.value = errMsg
           throw new Error(errMsg)
         }
-
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-        isLoggedIn.value = 'true'
 
         if (currentUser.value) {
           userProfile.value = {
@@ -164,12 +240,16 @@ export const useAuthViewModel = () => {
           currentUser.value = { ...userProfile.value as UserMe }
         }
 
+        // Force load fresh cart and address for this account
+        useCart().loadCart(true).catch((err) => console.warn('Failed to load cart on login:', err))
+        useAddress().fetchAddresses(true).catch((err) => console.warn('Failed to load addresses on login:', err))
+
         globalAlert.showSuccess('Signed In Successfully', `Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Login failed. Please check your credentials.'
+      error.value = mapErrorMessage(err, 'Masuk gagal. Silakan periksa kredensial Anda.')
       currentUser.value = null
       throw err
     } finally {
@@ -187,11 +267,16 @@ export const useAuthViewModel = () => {
     try {
       const response = await authService.signInWithGoogle()
       if (response.message === 'login success') {
-        if (import.meta.client) {
-          localStorage.removeItem('chia-florist-cart-cache')
-        }
-        // Fetch profile to populate global user state
-        await fetchCurrentUser()
+        clearSessionExpired()
+        clearAuthAlert()
+        clearLocalSession()
+
+        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
+        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
+        isLoggedIn.value = 'true'
+
+        // Force fetch profile to populate global user state
+        await fetchCurrentUser(undefined, true)
 
         if (!isAuthenticated.value) {
           clearLocalSession()
@@ -200,20 +285,20 @@ export const useAuthViewModel = () => {
           throw new Error(errMsg)
         }
 
-        const userProfile = useCookie<Partial<UserMe> | null>('user_profile', getCookieOptions())
-        const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
-        isLoggedIn.value = 'true'
-
         if (currentUser.value) {
           userProfile.value = { ...currentUser.value }
         }
+
+        // Force load fresh cart and address for this account
+        useCart().loadCart(true).catch((err) => console.warn('Failed to load cart on google login:', err))
+        useAddress().fetchAddresses(true).catch((err) => console.warn('Failed to load addresses on google login:', err))
 
         globalAlert.showSuccess('Signed In Successfully', `Welcome back, ${currentUser.value?.name || 'Customer'}!`)
         return true
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Google Login failed. Please try again.'
+      error.value = mapErrorMessage(err, 'Masuk dengan Google gagal. Silakan coba lagi.')
       currentUser.value = null
       throw err
     } finally {
@@ -245,7 +330,7 @@ export const useAuthViewModel = () => {
       }
       throw new Error('Registration did not return a verification challenge.')
     } catch (err: any) {
-      error.value = err.data?.message || 'Registration failed. Please check the inputs.'
+      error.value = mapErrorMessage(err, 'Pendaftaran gagal. Silakan periksa data yang Anda masukkan.')
       throw err
     } finally {
       isLoading.value = false
@@ -277,6 +362,8 @@ export const useAuthViewModel = () => {
 
       const response = await authService.verify(reqData)
       if (response.message === 'verify success') {
+        clearSessionExpired()
+        clearAuthAlert()
         let name = 'Verified User'
         let username = 'user'
         let email = ''
@@ -293,13 +380,12 @@ export const useAuthViewModel = () => {
           localStorage.removeItem('register_name')
           localStorage.removeItem('register_username')
           localStorage.removeItem('register_phone')
-          localStorage.removeItem('chia-florist-cart-cache')
         }
         challengeId.value = null
         registrationEmail.value = null
 
-        // Fetch profile to verify session permissions
-        await fetchCurrentUser()
+        // Force fetch profile to verify session permissions
+        await fetchCurrentUser(undefined, true)
 
         if (!isAuthenticated.value) {
           clearLocalSession()
@@ -315,17 +401,23 @@ export const useAuthViewModel = () => {
           username,
           email,
           phone,
-          last_login_at: new Date().toISOString()
+          last_login_at: new Date().toISOString(),
+          avatarUrl: currentUser.value?.avatarUrl || null
         }
         const isLoggedIn = useCookie('is_logged_in', getCookieOptions())
         isLoggedIn.value = 'true'
         currentUser.value = { ...(userProfile.value as UserMe) }
+
+        // Force load fresh cart and address for verified account
+        useCart().loadCart(true).catch((err) => console.warn('Failed to load cart on verify:', err))
+        useAddress().fetchAddresses(true).catch((err) => console.warn('Failed to load addresses on verify:', err))
+
         globalAlert.showSuccess('Verification Successful', `Welcome to Chia Florist, ${name}.`)
         return true
       }
       return false
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'OTP Verification failed. Please check the code.'
+      error.value = mapErrorMessage(err, 'Verifikasi OTP gagal. Silakan periksa kode yang Anda masukkan.')
       throw err
     } finally {
       isLoading.value = false
@@ -343,13 +435,51 @@ export const useAuthViewModel = () => {
     userProfile.value = null
     const rememberMeCookie = useCookie('remember_me')
     rememberMeCookie.value = null
+
+    // Clear composable states
+    try {
+      useCart().clearCart()
+    } catch (e) {
+      console.warn('Error clearing cart state:', e)
+    }
+    try {
+      useAddress().clearAddresses()
+    } catch (e) {
+      console.warn('Error clearing address state:', e)
+    }
+
+    const lastPaymentInfo = useState('last-payment-info')
+    if (lastPaymentInfo) lastPaymentInfo.value = null
+
     if (import.meta.client) {
-      localStorage.removeItem('auth_challenge_id')
-      localStorage.removeItem('register_email')
-      localStorage.removeItem('register_name')
-      localStorage.removeItem('register_username')
-      localStorage.removeItem('register_phone')
-      localStorage.removeItem('chia-florist-cart-cache')
+      try {
+        sessionStorage.removeItem('chia-last-payment-info')
+        sessionStorage.removeItem('google_auth_pending')
+
+        localStorage.removeItem('auth_challenge_id')
+        localStorage.removeItem('register_email')
+        localStorage.removeItem('register_name')
+        localStorage.removeItem('register_username')
+        localStorage.removeItem('register_phone')
+        localStorage.removeItem('chia-florist-cart-cache')
+        localStorage.removeItem('chia-florist-addresses-cache')
+
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (
+            key.startsWith('cart_attr_') ||
+            key.startsWith('custom_design_') ||
+            key.startsWith('address_') ||
+            key.includes('address')
+          )) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+      } catch (e) {
+        console.error('Error clearing local storage on session clear:', e)
+      }
     }
   }
 
@@ -396,7 +526,7 @@ export const useAuthViewModel = () => {
       }
       return { success: false, message: 'Update failed: Empty response' }
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to update profile'
+      error.value = mapErrorMessage(err, 'Gagal memperbarui profil.')
       return { success: false, message: error.value }
     } finally {
       isLoading.value = false
@@ -419,7 +549,7 @@ export const useAuthViewModel = () => {
       const response = await authService.forgotPassword({ email })
       return response
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to request password reset.'
+      error.value = mapErrorMessage(err, 'Gagal mengirim permintaan reset kata sandi.')
       throw err
     } finally {
       isLoading.value = false
@@ -436,7 +566,7 @@ export const useAuthViewModel = () => {
       const response = await authService.verifyForgotPassword({ challenge_id: challengeIdVal, otp })
       return response
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'OTP Verification failed.'
+      error.value = mapErrorMessage(err, 'Verifikasi kode gagal. Silakan periksa kode yang Anda masukkan.')
       throw err
     } finally {
       isLoading.value = false
@@ -453,7 +583,7 @@ export const useAuthViewModel = () => {
       const response = await authService.resetPassword({ challenge_id: challengeIdVal, new_password: newPassword })
       return response
     } catch (err: any) {
-      error.value = err.data?.message || err.message || 'Failed to reset password.'
+      error.value = mapErrorMessage(err, 'Gagal mereset kata sandi. Silakan coba lagi.')
       throw err
     } finally {
       isLoading.value = false

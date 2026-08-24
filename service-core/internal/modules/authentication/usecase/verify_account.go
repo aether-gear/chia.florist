@@ -3,12 +3,12 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
 	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
 	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
+	"service-core/internal/modules/authentication/infra/service"
 	"service-core/internal/modules/authentication/repository"
 	authorzDomain "service-core/internal/modules/authorization/domain"
 	authorzRepo "service-core/internal/modules/authorization/repository"
@@ -20,19 +20,17 @@ import (
 )
 
 type VerifyAccountUsecase struct {
-	executor         transaction.Executor
-	transactor       transaction.Transactor
-	accountRepo      repository.AccountRepository
-	pwHasher         repository.PasswordHasher
-	tokenHasher      repository.TokenHasher
-	userRepo         userRepo.UserRepository
-	customerRepo     customerRepo.CustomerRepository
-	membershipRepo   authorzRepo.StaffMembershipRepository
-	challengeRepo    repository.VerificationChallengeRepository
-	tokenSvc         repository.TokenService
-	sessionRepo      repository.SessionRepository
-	refreshTokenRepo repository.RefreshTokenRepository
-	auditLogger      applogger.AuditLogger
+	executor       transaction.Executor
+	transactor     transaction.Transactor
+	accountRepo    repository.AccountRepository
+	pwHasher       repository.PasswordHasher
+	userRepo       userRepo.UserRepository
+	customerRepo   customerRepo.CustomerRepository
+	membershipRepo authorzRepo.StaffMembershipRepository
+	challengeRepo  repository.VerificationChallengeRepository
+	sessionIssuer  repository.SessionIssuerService
+	auditLogger    applogger.AuditLogger
+	sysLogger      applogger.Logger
 }
 
 func NewVerifyAccountUsecase(
@@ -50,21 +48,35 @@ func NewVerifyAccountUsecase(
 	refreshTokenRepo repository.RefreshTokenRepository,
 	auditLogger applogger.AuditLogger,
 ) *VerifyAccountUsecase {
+	sessionIssuer := service.NewSessionIssuerService(
+		transactor,
+		tokenSvc,
+		tokenHasher,
+		sessionRepo,
+		refreshTokenRepo,
+		accountRepo,
+	)
+
 	return &VerifyAccountUsecase{
-		executor:         executor,
-		transactor:       transactor,
-		accountRepo:      accountRepo,
-		pwHasher:         pwHasher,
-		tokenHasher:      tokenHasher,
-		userRepo:         userRepo,
-		customerRepo:     customerRepo,
-		membershipRepo:   membershipRepo,
-		challengeRepo:    challengeRepo,
-		tokenSvc:         tokenSvc,
-		sessionRepo:      sessionRepo,
-		refreshTokenRepo: refreshTokenRepo,
-		auditLogger:      auditLogger,
+		executor:       executor,
+		transactor:     transactor,
+		accountRepo:    accountRepo,
+		pwHasher:       pwHasher,
+		userRepo:       userRepo,
+		customerRepo:   customerRepo,
+		membershipRepo: membershipRepo,
+		challengeRepo:  challengeRepo,
+		sessionIssuer:  sessionIssuer,
+		auditLogger:    auditLogger,
 	}
+}
+
+func (u *VerifyAccountUsecase) SetSessionIssuer(sessionIssuer repository.SessionIssuerService) {
+	u.sessionIssuer = sessionIssuer
+}
+
+func (u *VerifyAccountUsecase) SetSysLogger(sysLogger applogger.Logger) {
+	u.sysLogger = sysLogger
 }
 
 type VerifyAccountParams struct {
@@ -81,93 +93,54 @@ type VerifyAccountResult struct {
 func (u *VerifyAccountUsecase) Execute(
 	ctx context.Context,
 	input VerifyAccountParams,
-) (*VerifyAccountResult, error) {
+) (result *VerifyAccountResult, err error) {
 	now := appclock.Now()
 
-	challenge, err := u.challengeRepo.
-		GetByID(ctx, u.executor, input.ChallengeID)
+	audit := &applogger.AuditScope{
+		Category: "user_action",
+		Action:   "verify_account",
+		Resource: "account",
+		Metadata: map[string]any{"challenge_id": input.ChallengeID.String()},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, u.sysLogger, audit, &err)()
+
+	challenge, err := u.challengeRepo.GetByID(ctx, u.executor, input.ChallengeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get challenge: %w", err)
 	}
 	if challenge == nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_account",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge not found"},
-		})
+		audit.SetReason("challenge not found")
 		return nil, apperrors.NewNotFound(domain.ErrNotFoundChallenge.Error())
 	}
-
 	if challenge.ConsumedAt != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_account",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge already consumed"},
-		})
+		audit.SetReason("challenge already consumed")
 		return nil, apperrors.NewConflict(domain.ErrConsumedChallenge.Error())
 	}
 	if challenge.VerifiedAt != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_account",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge already verified"},
-		})
+		audit.SetReason("challenge already verified")
 		return nil, apperrors.NewConflict(domain.ErrVerifiedChallenge.Error())
 	}
 	if challenge.ExpiresAt.Before(now) {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_account",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "challenge expired"},
-		})
+		audit.SetReason("challenge expired")
 		return nil, apperrors.NewConflict(domain.ErrExpiredChallenge.Error())
 	}
 	if challenge.AttemptCount >= 5 {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_account",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "reason": "maximum attempts reached"},
-		})
+		audit.SetReason("maximum attempts reached")
 		return nil, apperrors.NewConflict(domain.ErrMaxAttemptReached.Error())
 	}
 
-	if err := u.pwHasher.
-		Compare(
-			challenge.CodeHash,
-			input.OTP,
-		); err != nil {
+	if err := u.pwHasher.Compare(
+		challenge.CodeHash,
+		input.OTP,
+	); err != nil {
 		challenge.AttemptCount++
 
-		if err := u.challengeRepo.
-			Save(
-				ctx,
-				u.executor,
-				*challenge,
-			); err != nil {
-			return nil, fmt.Errorf(
-				"failed to update challenge attempts: %w",
-				err,
-			)
+		if err := u.challengeRepo.Save(ctx, u.executor, *challenge); err != nil {
+			return nil, fmt.Errorf("failed to update challenge attempts: %w", err)
 		}
 
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "verify_account",
-			Resource: "account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"challenge_id": input.ChallengeID.String(), "attempt_count": challenge.AttemptCount, "reason": "invalid otp"},
-		})
-
+		audit.SetReason("invalid otp")
+		audit.SetMeta("attempt_count", challenge.AttemptCount)
 		return nil, apperrors.NewUnauthorized(domain.ErrInvalidOTP.Error())
 	}
 
@@ -175,42 +148,41 @@ func (u *VerifyAccountUsecase) Execute(
 	challenge.ConsumedAt = &now
 
 	var (
+		accountID  uuid.UUID
 		staffID    *uuid.UUID
 		customerID *uuid.UUID
 		roleCodes  []authorzDomain.RoleCode
 	)
 
-	account, err := u.accountRepo.
-		GetByUserID(ctx, u.executor, *challenge.UserID)
+	account, err := u.accountRepo.GetByUserID(ctx, u.executor, *challenge.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 	if account != nil {
+		accountID = account.ID
+		audit.SetResourceID(account.ID.String())
+
 		switch account.Type {
 		case domain.AccountTypeCustomer:
-			cust, err := u.customerRepo.
-				GetByUserID(ctx, u.executor, account.UserID)
+			cust, err := u.customerRepo.GetByUserID(ctx, u.executor, account.UserID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get customer profile: %w", err)
 			}
 			if cust != nil {
 				customerID = &cust.ID
 			}
+
 		case domain.AccountTypeStaff:
-			memberStaff, err := u.membershipRepo.
-				GetByAccountID(ctx, u.executor, account.ID)
+			memberStaff, err := u.membershipRepo.GetByAccountID(ctx, u.executor, account.ID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get staff membership: %w", err)
 			}
 			if memberStaff != nil {
 				staffID = &memberStaff.StaffID
-				roles, err := u.membershipRepo.
-					ListRolesByAccountIDAndStaffID(
-						ctx,
-						u.executor,
-						account.ID,
-						memberStaff.StaffID,
-					)
+				roles, err := u.membershipRepo.ListRolesByAccountIDAndStaffID(ctx, u.executor,
+					account.ID,
+					memberStaff.StaffID,
+				)
 				if err != nil {
 					return nil, fmt.Errorf("failed to list staff roles: %w", err)
 				}
@@ -222,98 +194,36 @@ func (u *VerifyAccountUsecase) Execute(
 		}
 	}
 
-	sessionID := uuid.New()
-	accessTkn, err := u.tokenSvc.
-		Generate(repository.GenerateTokenParams{
-			UserID:     *challenge.UserID,
-			SessionID:  sessionID,
-			StaffID:    staffID,
-			CustomerID: customerID,
-			Roles:      roleCodes,
-			Type:       domain.TokenTypeAccess,
-			Duration:   30 * time.Minute,
-		})
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %w", err)
-	}
+	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.challengeRepo.Save(ctx, exec, *challenge); err != nil {
+			return fmt.Errorf("failed to consume challenge: %w", err)
+		}
 
-	refreshTkn, err := u.tokenSvc.
-		Generate(repository.GenerateTokenParams{
-			UserID:     *challenge.UserID,
-			SessionID:  sessionID,
-			StaffID:    staffID,
-			CustomerID: customerID,
-			Roles:      roleCodes,
-			Type:       domain.TokenTypeRefresh,
-			Duration:   7 * 24 * time.Hour,
-		})
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %w", err)
-	}
+		if err := u.accountRepo.ActivateByUserID(ctx, exec, *challenge.UserID); err != nil {
+			return fmt.Errorf("failed to activate account: %w", err)
+		}
 
-	session := domain.Session{
-		ID:        sessionID,
-		UserID:    *challenge.UserID,
-		UserAgent: input.UserAgent,
-		IPAddress: input.IPAddress,
-		ExpiresAt: now.Add(7 * 24 * time.Hour),
-		CreatedAt: now,
-	}
-
-	refreshTknHashed := u.tokenHasher.Hash(refreshTkn.Token)
-	refreshToken := domain.RefreshToken{
-		ID:        uuid.New(),
-		SessionID: session.ID,
-		TokenHash: refreshTknHashed,
-		ExpiresAt: now.Add(7 * 24 * time.Hour),
-		CreatedAt: now,
-	}
-
-	err = u.transactor.WithinTransaction(
-		ctx,
-		func(exec transaction.Executor) error {
-			if err := u.challengeRepo.
-				Save(ctx, exec, *challenge); err != nil {
-				return fmt.Errorf("failed to consume challenge: %w", err)
-			}
-
-			if err := u.accountRepo.
-				ActivateByUserID(ctx, exec, *challenge.UserID); err != nil {
-				return fmt.Errorf("failed to activate account: %w", err)
-			}
-
-			if err := u.sessionRepo.
-				Save(ctx, exec, session); err != nil {
-				return fmt.Errorf("failed to save session %w", err)
-			}
-
-			if err := u.refreshTokenRepo.
-				Save(ctx, exec, refreshToken); err != nil {
-				return fmt.Errorf("failed to save refresh token %w", err)
-			}
-
-			return nil
-		},
-	)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	result := VerifyAccountResult{
-		AccessToken:  accessTkn,
-		RefreshToken: refreshTkn,
+	sessionRes, err := u.sessionIssuer.Issue(ctx, repository.IssueSessionParams{
+		UserID:     *challenge.UserID,
+		AccountID:  accountID,
+		UserAgent:  input.UserAgent,
+		IPAddress:  input.IPAddress,
+		StaffID:    staffID,
+		CustomerID: customerID,
+		Roles:      roleCodes,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if account != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category:   "user_action",
-			Action:     "verify_account",
-			Resource:   "account",
-			ResourceID: account.ID.String(),
-			Outcome:    applogger.OutcomeSuccess,
-			Metadata:   map[string]any{"challenge_id": input.ChallengeID.String()},
-		})
-	}
-
-	return &result, nil
+	return &VerifyAccountResult{
+		AccessToken:  sessionRes.AccessToken,
+		RefreshToken: sessionRes.RefreshToken,
+	}, nil
 }

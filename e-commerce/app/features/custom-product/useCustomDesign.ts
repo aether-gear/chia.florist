@@ -249,9 +249,35 @@ export const useCustomDesign = () => {
   const updateScale = () => {
     if (_manualZoom) return
     const el = containerRef.value as HTMLElement | null
-    if (!el) return
-    const pad = 64
-    boardScale.value = Math.max(0.25, Math.min((el.offsetWidth - pad) / boardW.value, (el.offsetHeight - pad) / boardH.value, 1.1))
+
+    let containerW = el?.offsetWidth || 0
+    let containerH = el?.offsetHeight || 0
+
+    if (typeof window !== 'undefined') {
+      if (!containerW) containerW = window.innerWidth
+      if (!containerH) containerH = window.innerHeight - 130
+    }
+    if (!containerW || !containerH) return
+
+    const isMobile = containerW < 768
+    // On mobile, account for top crest, bottom crest, summary bar, and bottom toolbar
+    const padH = isMobile ? 24 : 64
+    const padV = isMobile ? 120 : 72
+
+    const availW = Math.max(100, containerW - padH)
+    const availH = Math.max(100, containerH - padV)
+
+    const scaleW = availW / boardW.value
+    const scaleH = availH / boardH.value
+
+    const fitScale = Math.min(scaleW, scaleH)
+    boardScale.value = Math.max(0.2, Math.min(fitScale, 1.15))
+  }
+
+  const setZoom = (percentOrScale: number) => {
+    _manualZoom = true
+    const scale = percentOrScale > 2 ? percentOrScale / 100 : percentOrScale
+    boardScale.value = Math.max(0.2, Math.min(1.5, Math.round(scale * 100) / 100))
   }
 
   const zoomIn = () => {
@@ -295,7 +321,7 @@ export const useCustomDesign = () => {
     bottomCrest.value.secondary = rand(BG_PRESETS)
   }
 
-  watch(physicalSize, () => updateScale())
+  watch([physicalSize, () => topCrest.value.enabled, () => bottomCrest.value.enabled], () => updateScale())
 
   const bringToFront = (id: string) => {
     const idx = elements.value.findIndex(e => e.id === id)
@@ -350,24 +376,36 @@ export const useCustomDesign = () => {
     (e.target as HTMLInputElement).value = ''
   }
 
+  const getPointerCoords = (e: MouseEvent | TouchEvent) => {
+    if ('touches' in e && e.touches.length > 0) {
+      return { clientX: e.touches[0]!.clientX, clientY: e.touches[0]!.clientY }
+    }
+    if ('changedTouches' in e && (e as TouchEvent).changedTouches.length > 0) {
+      return { clientX: (e as TouchEvent).changedTouches[0]!.clientX, clientY: (e as TouchEvent).changedTouches[0]!.clientY }
+    }
+    const me = e as MouseEvent
+    return { clientX: me.clientX, clientY: me.clientY }
+  }
+
   let _suppressBrushPlace = false
-  const handleBrushMousedown = (e: MouseEvent, id: string) => {
+  const handleBrushMousedown = (e: MouseEvent | TouchEvent, id: string) => {
     selectedId.value = id
     _suppressBrushPlace = true
     startDragEl(e, id)
   }
 
-  const handleBoardClick = (e: MouseEvent) => {
+  const handleBoardClick = (e: MouseEvent | TouchEvent) => {
     if (_suppressBrushPlace) { _suppressBrushPlace = false; return }
     if (isBrushMode.value) {
       const board = getBoardEl()
       if (!board) return
       const r = board.getBoundingClientRect()
+      const { clientX, clientY } = getPointerCoords(e)
       const stroke: BrushStroke = {
         id: 'br-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         type: 'brush', brushType: brushType.value,
-        x: ((e.clientX - r.left) / r.width) * 100,
-        y: ((e.clientY - r.top) / r.height) * 100,
+        x: ((clientX - r.left) / r.width) * 100,
+        y: ((clientY - r.top) / r.height) * 100,
         size: brushSize.value, color: brushColor.value, rotation: brushRotation.value,
       }
       elements.value.push(stroke)
@@ -383,33 +421,37 @@ export const useCustomDesign = () => {
   let _dragBX = 0, _dragBY = 0, _dragElX0 = 0, _dragElY0 = 0
   let _divStartY = 0, _divStartR = 0
 
-  const startDragEl = (e: MouseEvent, id: string) => {
+  const startDragEl = (e: MouseEvent | TouchEvent, id: string) => {
     if (is3DMode.value) return
-    e.stopPropagation(); e.preventDefault()
+    e.stopPropagation()
+    if (e.cancelable) e.preventDefault()
     bringToFront(id)
     const board = getBoardEl(); if (!board) return
+    const { clientX, clientY } = getPointerCoords(e)
     _rect = board.getBoundingClientRect(); _draggingEl = true; _dragElId = id
-    _dragBX = (e.clientX - _rect.left) / _rect.width * 100
-    _dragBY = (e.clientY - _rect.top) / _rect.height * 100
+    _dragBX = (clientX - _rect.left) / _rect.width * 100
+    _dragBY = (clientY - _rect.top) / _rect.height * 100
     const el = elements.value.find(e => e.id === id)
     if (el) { _dragElX0 = el.x; _dragElY0 = el.y }
   }
 
-  const startDragDiv = (e: MouseEvent) => {
+  const startDragDiv = (e: MouseEvent | TouchEvent) => {
     if (is3DMode.value) return
-    e.stopPropagation(); e.preventDefault()
+    e.stopPropagation()
+    if (e.cancelable) e.preventDefault()
     const board = getBoardEl(); if (!board) return
+    const { clientY } = getPointerCoords(e)
     _rect = board.getBoundingClientRect(); _draggingDiv = true
-    _divStartY = e.clientY; _divStartR = heightRatio.value
+    _divStartY = clientY; _divStartR = heightRatio.value
   }
 
-  const onMouseMove = (e: MouseEvent) => {
+  const onPointerMove = (clientX: number, clientY: number) => {
     // 3D orbit drag
     if (_3dDragging && is3DMode.value) {
-      const dx = e.clientX - _3dLastX
-      const dy = e.clientY - _3dLastY
-      _3dLastX = e.clientX
-      _3dLastY = e.clientY
+      const dx = clientX - _3dLastX
+      const dy = clientY - _3dLastY
+      _3dLastX = clientX
+      _3dLastY = clientY
       rotateY.value = Math.max(-15, Math.min(rotateY.value + dx * 0.35, 15))
       rotateX.value = Math.max(-15, Math.min(rotateX.value - dy * 0.35, 15))
       return
@@ -417,16 +459,35 @@ export const useCustomDesign = () => {
     if (_draggingEl) {
       const el = elements.value.find(ev => ev.id === _dragElId)
       if (el) {
-        el.x = Math.max(-5, Math.min(_dragElX0 + ((e.clientX - _rect.left) / _rect.width * 100 - _dragBX), 95))
-        el.y = Math.max(-5, Math.min(_dragElY0 + ((e.clientY - _rect.top) / _rect.height * 100 - _dragBY), 95))
+        el.x = Math.max(-5, Math.min(_dragElX0 + ((clientX - _rect.left) / _rect.width * 100 - _dragBX), 95))
+        el.y = Math.max(-5, Math.min(_dragElY0 + ((clientY - _rect.top) / _rect.height * 100 - _dragBY), 95))
       }
     }
     if (_draggingDiv) {
-      heightRatio.value = Math.max(0.25, Math.min(_divStartR + (e.clientY - _divStartY) / _rect.height, 0.75))
+      heightRatio.value = Math.max(0.25, Math.min(_divStartR + (clientY - _divStartY) / _rect.height, 0.75))
+    }
+  }
+
+  const onMouseMove = (e: MouseEvent) => {
+    onPointerMove(e.clientX, e.clientY)
+  }
+
+  const onTouchMove = (e: TouchEvent) => {
+    if (_draggingEl || _draggingDiv || _3dDragging) {
+      if (e.cancelable) e.preventDefault()
+    }
+    if (e.touches && e.touches[0]) {
+      onPointerMove(e.touches[0].clientX, e.touches[0].clientY)
     }
   }
 
   const onMouseUp = () => {
+    _draggingEl = false
+    _draggingDiv = false
+    _3dDragging = false
+  }
+
+  const onTouchEnd = () => {
     _draggingEl = false
     _draggingDiv = false
     _3dDragging = false
@@ -445,12 +506,13 @@ export const useCustomDesign = () => {
     }
   }
 
-  const start3DDrag = (e: MouseEvent) => {
+  const start3DDrag = (e: MouseEvent | TouchEvent) => {
     if (!is3DMode.value) return
-    e.preventDefault()
+    if (e.cancelable) e.preventDefault()
     _3dDragging = true
-    _3dLastX = e.clientX
-    _3dLastY = e.clientY
+    const { clientX, clientY } = getPointerCoords(e)
+    _3dLastX = clientX
+    _3dLastY = clientY
   }
 
   // Computed: dynamic shading based on rotation angles
@@ -772,7 +834,7 @@ export const useCustomDesign = () => {
     }, 3000)
   }
 
-  const saveDraft = () => {
+  const saveDraft = (silent = false) => {
     if (!import.meta.client) return
     try {
       const draft = {
@@ -788,7 +850,9 @@ export const useCustomDesign = () => {
       localStorage.setItem(DEFAULT_DRAFT_KEY, JSON.stringify(draft))
       isDirty.value = false
       showMoreMenu.value = false
-      useGlobalAlert().showSuccess('Draft Saved', 'Your flower board design draft has been saved.')
+      if (!silent) {
+        useGlobalAlert().showSuccess('Draft Saved', 'Your flower board design draft has been saved.')
+      }
     } catch (err) {
       console.warn('Failed to save custom board draft:', err)
     }
@@ -893,9 +957,9 @@ export const useCustomDesign = () => {
     boardBorderStyle, boardCornerStyle, centerBorderStyle, upperCornerStyle, lowerCornerStyle, floralSec,
     selectedEl, selectedImg, selectedBrush, imgElements, brushElements,
     baseSizePrice, brushFee, uniqueColors, colorFee, borderFee, accessoriesFee, mediaFee, totalPrice,
-    updateScale, zoomIn, zoomOut, resetZoom, randomizeDesign, bringToFront, deleteSelected,
+    updateScale, setZoom, zoomIn, zoomOut, resetZoom, randomizeDesign, bringToFront, deleteSelected,
     handleDrop, handleFileInput, handleBrushMousedown, handleBoardClick,
-    startDragEl, startDragDiv, onMouseMove, onMouseUp, onKeyDown,
+    startDragEl, startDragDiv, onMouseMove, onMouseUp, onTouchMove, onTouchEnd, onKeyDown,
     generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign,
     isDirty, draftSavedNotice, saveToastNotice, saveToastMessage, showMoreMenu, showLeaveConfirm, triggerToast,
     // 3D view

@@ -28,6 +28,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- intelligence-layer (FastAPI AI Server) --- #
+  intelligence-layer:
+    build:
+      context: ./intelligence-layer
+      dockerfile: Dockerfile
+    image: chia-florist/intelligence-layer:local
+    container_name: chia-intelligence-layer
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # --- service-core (Go REST API) --- #
   service-core:
     build:
@@ -43,6 +60,7 @@ services:
       POSTGRES_DB_PORT: 5432
       MY_APP_SAYA_HOST: 0.0.0.0
       MY_APP_SAYA_PORT: 7129
+      INTELLIGENCE_LAYER_BASE_URL: http://intelligence-layer:8000/api/v1
     ports:
       - "7129:7129"
     depends_on:

@@ -137,4 +137,22 @@ export interface CheckOrderPaymentStatusResponse {
   synced: boolean
 }
 
+// ─── Order Tracking Timeline API ─────────────────────────────────
+
+export interface TimelineEvent {
+  status: string
+  description: string
+  location?: string
+  timestamp: string
+}
+
+export interface GetOrderTrackingTimelineResponse {
+  order_id: string
+  shipment_id: string
+  courier: string
+  tracking_number?: string
+  timeline: TimelineEvent[]
+}
+
+
 

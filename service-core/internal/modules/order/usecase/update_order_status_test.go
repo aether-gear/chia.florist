@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -377,14 +378,20 @@ func (m *uosMockProductRepo) Delete(_ context.Context, _ transaction.Executor, _
 }
 
 type uosMockLogisticsProvider struct {
-	calledInput *shipping.CreateOrderInput
-	result      *shipping.CreateOrderResult
-	err         error
+	calledInput     *shipping.CreateOrderInput
+	result          *shipping.CreateOrderResult
+	err             error
+	canceledOrderNo string
 }
 
 func (m *uosMockLogisticsProvider) CreateOrder(_ context.Context, input shipping.CreateOrderInput) (*shipping.CreateOrderResult, error) {
 	m.calledInput = &input
 	return m.result, m.err
+}
+
+func (m *uosMockLogisticsProvider) CancelOrder(_ context.Context, komerceOrderNo string) error {
+	m.canceledOrderNo = komerceOrderNo
+	return nil
 }
 
 func (m *uosMockLogisticsProvider) TrackShipment(_ context.Context, _ shipping.TrackShipmentInput) ([]shipping.TrackingEvent, error) {
@@ -1472,5 +1479,92 @@ func TestUpdateOrderStatus_ShippedExplicitMultiShipment(t *testing.T) {
 
 	if *res.Shipments[1].TrackingNumber != track2 {
 		t.Errorf("expected tracking 2 %s, got %v", track2, res.Shipments[1].TrackingNumber)
+	}
+}
+
+func TestUpdateOrderStatus_Shipped_LogisticsRollbackOnDBFailure(t *testing.T) {
+	orderID := uuid.New()
+	customerID := uuid.New()
+	addressID := uuid.New()
+	shopID := uuid.New()
+
+	order := &orderDomain.Order{
+		ID:          orderID,
+		CustomerID:  customerID,
+		AddressID:   addressID,
+		Status:      orderDomain.OrderStatusProcessing,
+		ShippingFee: 10000,
+	}
+
+	courierCode := "jne"
+	courierService := "reg"
+	items := []orderDomain.OrderItem{
+		{
+			ID:             uuid.New(),
+			OrderID:        orderID,
+			ShopID:         shopID,
+			Quantity:       1,
+			Subtotal:       50000,
+			CourierCode:    &courierCode,
+			CourierService: &courierService,
+		},
+	}
+
+	orderRepoMock := &uosMockOrderRepo{order: order}
+	orderItemRepoMock := &uosMockOrderItemRepo{items: items}
+	inventoryRepoMock := &uosMockInventoryRepo{}
+	paymentRepoMock := &uosMockPaymentRepo{
+		payment: &paymentDomain.Payment{
+			OrderID: orderID,
+			Status:  paymentDomain.PaymentStatusPaid,
+		},
+	}
+	productRepoMock := &uosMockProductRepo{}
+	shipmentRepoMock := &uosMockShipmentRepo{err: errors.New("db failure")}
+	customerAddrMock := &uosMockAddressRepo{addr: &addressDomain.CustomerAddress{
+		ID: addressID,
+		Detail: addressDomain.AddressDetail{
+			DistrictID: "456",
+		},
+	}}
+	shopAddrMock := &uosMockShopAddressRepo{addr: &addressDomain.ShopAddress{
+		ShopID: shopID,
+		Detail: addressDomain.AddressDetail{
+			DistrictID: "123",
+		},
+	}}
+	logisticsMock := &uosMockLogisticsProvider{
+		result: &shipping.CreateOrderResult{
+			KomerceOrderNo: "KOMERCE-ORDER-123",
+			TrackingNumber: "TRACK123",
+		},
+	}
+
+	uc := NewUpdateOrderStatusUsecase(
+		&uosMockExecutor{},
+		&uosMockTransactor{},
+		orderRepoMock,
+		orderItemRepoMock,
+		inventoryRepoMock,
+		paymentRepoMock,
+		productRepoMock,
+		shipmentRepoMock,
+		customerAddrMock,
+		shopAddrMock,
+		logisticsMock,
+		&uosMockAuditLogger{},
+	)
+
+	_, err := uc.Execute(context.Background(), UpdateOrderStatusInput{
+		OrderID: orderID,
+		Status:  orderDomain.OrderStatusShipped,
+	})
+
+	if err == nil {
+		t.Fatal("expected error due to DB transaction failure, got nil")
+	}
+
+	if logisticsMock.canceledOrderNo != "KOMERCE-ORDER-123" {
+		t.Errorf("expected canceled order number 'KOMERCE-ORDER-123', got %q", logisticsMock.canceledOrderNo)
 	}
 }

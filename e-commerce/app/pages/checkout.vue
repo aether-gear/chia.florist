@@ -12,6 +12,11 @@ import type { UserAddress } from '~/types/address'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import { triggerAuthAlert } from '~/composables/useSessionState'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
+import { mapErrorMessage } from '~/utils/errorMessages'
+
+definePageMeta({
+  middleware: 'auth'
+})
 
 useHead({
   title: 'Secure Checkout - Chia Florist',
@@ -20,17 +25,20 @@ useHead({
   ]
 })
 
+import { useStoreSelection } from '~/composables/useStoreSelection'
+
 const route = useRoute()
 const { cart, orders, loadCart, flushCart, cartSubtotal, checkoutToOrder, formatRupiah } = useCart()
 const addressVm = useAddress()
 const authVm = useAuthViewModel()
+const storeSelection = useStoreSelection()
 const globalAlert = useGlobalAlert()
 
 // State Management untuk Checkout & Shipping
 const checkoutData = ref<CheckoutResponse | null>(null)
 const isLoadingCheckout = ref(false)
 const isLoadingCalculate = ref(false)
-const discount = ref(0)
+const isInitialMountComplete = ref(false)
 const selectedAddressId = ref('')
 const isProcessing = ref(false)
 
@@ -45,12 +53,10 @@ const paymentInfoState = useState<any>('last-payment-info', () => null)
 
 const fetchShops = async () => {
   try {
-    const res = await bootstrapConfig.fetchApi<{ shops: { id: string; name: string }[] }>('/shops')
-    if (res && res.shops) {
-      res.shops.forEach(s => {
-        shopsMap.value[s.id] = s.name
-      })
-    }
+    const shops = await storeSelection.fetchActiveShops()
+    shops.forEach(s => {
+      shopsMap.value[s.id] = s.name
+    })
   } catch (err) {
     console.error('Failed to fetch shops:', err)
   }
@@ -220,7 +226,9 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
 // Muat data checkout saat halaman dibuka
 onMounted(async () => {
-  await authVm.fetchCurrentUser()
+  if (!authVm.isInitialized.value) {
+    await authVm.fetchCurrentUser()
+  }
   await fetchShops()
   if (!authVm.isAuthenticated.value) {
     triggerAuthAlert('warning', 'Please sign in to proceed with checkout.')
@@ -340,6 +348,9 @@ onMounted(async () => {
     navigateTo('/cart')
   } finally {
     isLoadingCheckout.value = false
+    setTimeout(() => {
+      isInitialMountComplete.value = true
+    }, 100)
   }
 })
 
@@ -476,7 +487,7 @@ let addressTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan alamat untuk kalkulasi ulang ongkir
 watch(selectedAddressId, (newId, oldId) => {
-  if (newId && newId !== oldId && !isLoadingCheckout.value) {
+  if (isInitialMountComplete.value && newId && newId !== oldId && !isLoadingCheckout.value) {
     isLoadingCalculate.value = true
     if (addressTimeout) {
       clearTimeout(addressTimeout)
@@ -491,7 +502,7 @@ let paymentMethodTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Pantau perubahan metode pembayaran untuk kalkulasi ulang ongkir
 watch(selectedPaymentMethodId, (newId, oldId) => {
-  if (newId && newId !== oldId && !isLoadingCheckout.value) {
+  if (isInitialMountComplete.value && newId && newId !== oldId && !isLoadingCheckout.value) {
     isLoadingCalculate.value = true
     if (paymentMethodTimeout) {
       clearTimeout(paymentMethodTimeout)
@@ -567,14 +578,14 @@ const livePaymentFee = computed(() => {
   return activeMethod ? activeMethod.fee : 0
 })
 const liveTotalPayment = computed(() => {
-  if (!checkoutData.value) return cartSubtotal.value - discount.value
+  if (!checkoutData.value) return cartSubtotal.value
   if (checkoutData.value.selected_payment_method?.id === selectedPaymentMethodId.value) {
-    return checkoutData.value.total - discount.value
+    return checkoutData.value.total
   }
   const sub = checkoutData.value.subtotal
   const ship = checkoutData.value.total_shipping
   const fee = livePaymentFee.value
-  return sub + ship + fee - discount.value
+  return sub + ship + fee
 })
 
 // Eksekusi checkout memindahkan state item keranjang ke invoice order profile
@@ -688,13 +699,13 @@ const handlePlaceOrder = async () => {
       'Order placed successfully! Redirecting to secure payment page...',
       [
         { label: 'Pay Now', onClick: () => navigateTo(`/payment?orderId=${result.order_id}`) },
-        { label: 'My Orders', onClick: () => navigateTo('/profile') }
+        { label: 'My Orders', onClick: () => navigateTo('/profile/orders') }
       ]
     )
     navigateTo(`/payment?orderId=${result.order_id}`)
   } catch (err: any) {
     console.error('Checkout processing error:', err)
-    globalAlert.showError('Checkout Failed', err.data?.message || err.message || 'Failed to process checkout. Please try again.')
+    globalAlert.showError('Checkout Failed', mapErrorMessage(err, 'Failed to process checkout. Please try again.'))
   } finally {
     isProcessing.value = false
   }
@@ -758,7 +769,7 @@ const handlePlaceOrder = async () => {
                 <h2 class="font-extrabold text-gray-900 text-lg">Shipping Destination</h2>
               </div>
               <CButton
-                to="/profile"
+                to="/profile/addresses"
                 variant="outline"
                 size="sm"
                 class="text-xs"
@@ -784,7 +795,7 @@ const handlePlaceOrder = async () => {
               <p class="text-xs text-gray-500 max-w-sm mx-auto">Please add your event delivery location in your profile settings before continuing.</p>
               <div class="pt-2">
                 <CButton
-                  to="/profile"
+                  to="/profile/addresses"
                   variant="primary"
                   size="sm"
                 >
@@ -906,11 +917,6 @@ const handlePlaceOrder = async () => {
                         <span class="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">Qty: {{ item.quantity }}</span>
                         <span>•</span>
                         <span>{{ formatRupiah(item.price) }}</span>
-                        <span v-if="(item as any).size" class="text-gray-400">• Size: {{ (item as any).size }}</span>
-                        <div v-if="(item as any).color" class="flex items-center gap-1 text-gray-400">
-                          <span>• Color:</span>
-                          <span :style="{ backgroundColor: (item as any).color }" class="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block"></span>
-                        </div>
                         <span v-if="(item as any).custom_design || item.product_variant_type === 'custom'" class="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-emerald-200">
                           Custom Design
                         </span>
@@ -1099,11 +1105,6 @@ const handlePlaceOrder = async () => {
                 <span class="text-gray-900 font-bold">
                   {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
                 </span>
-              </div>
-              
-              <div class="flex justify-between items-center text-emerald-700" v-if="discount > 0">
-                <span>Promo Discount</span>
-                <span class="font-bold">-{{ formatRupiah(discount) }}</span>
               </div>
               
               <div class="border-t border-gray-100 pt-4 flex justify-between items-baseline">

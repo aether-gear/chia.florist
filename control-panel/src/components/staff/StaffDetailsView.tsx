@@ -14,7 +14,8 @@ import {
 import { Button } from '../ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import StaffAccountsList from './StaffAccountsList';
-import type { Staff, StaffAccountMember } from '@/models/Staff';
+import StaffShopPermissionsSection from './StaffShopPermissionsSection';
+import type { Staff, StaffAccountMember, StaffShopPermission, SaveStaffShopPermissionPayload } from '@/models/Staff';
 
 interface StaffDetailsViewProps {
   staff: Staff;
@@ -23,6 +24,9 @@ interface StaffDetailsViewProps {
   onEditStaff: () => void;
   onBindAccount: () => void;
   onUnbindAccount: (accountId: string) => Promise<void>;
+  fetchShopPermissions?: (staffId: string) => Promise<StaffShopPermission[]>;
+  saveShopPermission?: (staffId: string, payload: SaveStaffShopPermissionPayload) => Promise<void>;
+  deleteShopPermission?: (staffId: string, shopId: string) => Promise<void>;
   loading?: boolean;
 }
 
@@ -33,8 +37,12 @@ export default function StaffDetailsView({
   onEditStaff,
   onBindAccount,
   onUnbindAccount,
+  fetchShopPermissions,
+  saveShopPermission,
+  deleteShopPermission,
   loading = false,
 }: StaffDetailsViewProps) {
+
   const [copiedId, setCopiedId] = useState(false);
 
   const fallbackInitials = staff.name
@@ -241,7 +249,19 @@ export default function StaffDetailsView({
             loading={loading}
           />
         </div>
+
+        {/* Shop Access & Permissions Section */}
+        {fetchShopPermissions && saveShopPermission && deleteShopPermission && (
+          <StaffShopPermissionsSection
+            staffId={staff.id}
+            staffName={staff.name}
+            fetchPermissions={fetchShopPermissions}
+            savePermission={saveShopPermission}
+            deletePermission={deleteShopPermission}
+          />
+        )}
       </div>
     </div>
   );
 }
+

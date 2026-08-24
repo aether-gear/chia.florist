@@ -6,9 +6,12 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
+	shopDomain "service-core/internal/modules/shop/domain"
 	"service-core/internal/modules/shop/usecase"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -40,6 +43,34 @@ func NewShopHandler(
 		getShopCouriers:  getShopCouriers,
 		getShopProducts:  getShopProducts,
 	}
+}
+
+func (h *ShopHandler) resolveShopID(r *http.Request) (uuid.UUID, error) {
+	param := chi.URLParam(r, "shopID")
+	if param == "" {
+		param = chi.URLParam(r, "id")
+	}
+	if param == "" {
+		return uuid.Nil, apperrors.NewBadRequest("invalid shop id")
+	}
+
+	if parsed, err := uuid.Parse(param); err == nil {
+		return parsed, nil
+	}
+
+	if h.getShop == nil {
+		return uuid.Nil, apperrors.NewNotFound("shop not found")
+	}
+
+	shop, err := h.getShop.GetBySlug(r.Context(), param)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if shop == nil {
+		return uuid.Nil, apperrors.NewNotFound("shop not found")
+	}
+
+	return shop.ID, nil
 }
 
 func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
@@ -78,6 +109,29 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 		input.ApprovalStatus = &approvalParam
 	}
 
+	actor, ok := authzSvc.GetActor(r.Context())
+	if ok && actor.StaffID != nil && !actor.IsSuperAdmin() {
+		allAssigned := actor.GetAssignedShopIDs()
+		var assignedIDs []uuid.UUID
+		for _, sID := range allAssigned {
+			if actor.HasPermission(sID, authzDomain.PermissionShopView) || actor.HasPermission(sID, authzDomain.PermissionOrderRead) {
+				assignedIDs = append(assignedIDs, sID)
+			}
+		}
+
+		if len(assignedIDs) == 0 {
+			res := listShopsResponse{
+				Page:  page,
+				Limit: limit,
+				Total: 0,
+				Shops: []getShopResponse{},
+			}
+			apphttp.WriteJSON(w, http.StatusOK, res)
+			return nil
+		}
+		input.ShopIDs = assignedIDs
+	}
+
 	shops, total, err := h.findShops.Execute(r.Context(), input)
 	if err != nil {
 		return err
@@ -111,14 +165,31 @@ func (h *ShopHandler) FindShops(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *ShopHandler) GetShopByID(w http.ResponseWriter, r *http.Request) error {
-	id, err := apphttp.ParamUUID(r, "id")
-	if err != nil {
+	param := chi.URLParam(r, "shopID")
+	if param == "" {
+		param = chi.URLParam(r, "id")
+	}
+	if param == "" {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
-	result, err := h.getShop.GetByID(r.Context(), id)
-	if err != nil {
-		return err
+	var result *shopDomain.Shop
+	if parsed, err := uuid.Parse(param); err == nil {
+		var getErr error
+		result, getErr = h.getShop.GetByID(r.Context(), parsed)
+		if getErr != nil {
+			return getErr
+		}
+	} else {
+		var getErr error
+		result, getErr = h.getShop.GetBySlug(r.Context(), param)
+		if getErr != nil {
+			return getErr
+		}
+	}
+
+	if result == nil {
+		return apperrors.NewNotFound("shop not found")
 	}
 
 	response := map[string]getShopResponse{
@@ -197,11 +268,10 @@ func (h *ShopHandler) SaveShop(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-
 func (h *ShopHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) error {
-	shopID, err := apphttp.ParamUUID(r, "shopID")
+	shopID, err := h.resolveShopID(r)
 	if err != nil {
-		return apperrors.NewBadRequest("invalid shop id")
+		return err
 	}
 
 	result, err := h.getShopAddresses.Execute(r.Context(), shopID)
@@ -235,9 +305,9 @@ func (h *ShopHandler) GetShopAddresses(w http.ResponseWriter, r *http.Request) e
 }
 
 func (h *ShopHandler) GetShopCouriers(w http.ResponseWriter, r *http.Request) error {
-	shopID, err := apphttp.ParamUUID(r, "shopID")
+	shopID, err := h.resolveShopID(r)
 	if err != nil {
-		return apperrors.NewBadRequest("invalid shop id")
+		return err
 	}
 
 	result, err := h.getShopCouriers.Execute(r.Context(), shopID)
@@ -261,9 +331,9 @@ func (h *ShopHandler) GetShopCouriers(w http.ResponseWriter, r *http.Request) er
 }
 
 func (h *ShopHandler) GetShopProducts(w http.ResponseWriter, r *http.Request) error {
-	shopID, err := apphttp.ParamUUID(r, "shopID")
+	shopID, err := h.resolveShopID(r)
 	if err != nil {
-		return apperrors.NewBadRequest("invalid shop id")
+		return err
 	}
 
 	result, err := h.getShopProducts.Execute(r.Context(), shopID)
@@ -305,9 +375,9 @@ func (h *ShopHandler) DeleteShop(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewUnauthorized("authentication required")
 	}
 
-	shopID, err := apphttp.ParamUUID(r, "shopID")
+	shopID, err := h.resolveShopID(r)
 	if err != nil {
-		return apperrors.NewBadRequest("invalid shop id")
+		return err
 	}
 
 	if err := h.deleteShop.Execute(r.Context(), *actor, shopID); err != nil {

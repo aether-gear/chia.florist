@@ -117,6 +117,9 @@ func (m *coMockAccountRepo) UpdatePasswordByUserID(_ context.Context, _ transact
 func (m *coMockAccountRepo) DeleteByUserID(_ context.Context, _ transaction.Executor, _ uuid.UUID) error {
 	return nil
 }
+func (m *coMockAccountRepo) UpdateLastLoginAt(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ time.Time) error {
+	return nil
+}
 
 // --- payment method repo ---
 
@@ -289,6 +292,43 @@ func (m *coMockOrderItemRepo) SaveBulk(_ context.Context, _ transaction.Executor
 
 func (m *coMockOrderItemRepo) AssignShipment(_ context.Context, _ transaction.Executor, _ uuid.UUID, _ []uuid.UUID) error {
 	return nil
+}
+
+// --- custom design repo ---
+
+type coMockCustomDesignRepo struct {
+	designs []orderDomain.OrderItemCustomDesign
+}
+
+func (m *coMockCustomDesignRepo) Save(_ context.Context, _ transaction.Executor, d orderDomain.OrderItemCustomDesign) error {
+	m.designs = append(m.designs, d)
+	return nil
+}
+func (m *coMockCustomDesignRepo) SaveBulk(_ context.Context, _ transaction.Executor, ds []orderDomain.OrderItemCustomDesign) error {
+	m.designs = append(m.designs, ds...)
+	return nil
+}
+func (m *coMockCustomDesignRepo) GetByOrderItemID(_ context.Context, _ transaction.Executor, id uuid.UUID) (*orderDomain.OrderItemCustomDesign, error) {
+	for _, d := range m.designs {
+		if d.OrderItemID == id {
+			return &d, nil
+		}
+	}
+	return nil, nil
+}
+func (m *coMockCustomDesignRepo) ListByOrderItemIDs(_ context.Context, _ transaction.Executor, ids []uuid.UUID) (map[uuid.UUID]orderDomain.OrderItemCustomDesign, error) {
+	res := make(map[uuid.UUID]orderDomain.OrderItemCustomDesign)
+	for _, d := range m.designs {
+		for _, id := range ids {
+			if d.OrderItemID == id {
+				res[id] = d
+			}
+		}
+	}
+	return res, nil
+}
+func (m *coMockCustomDesignRepo) ListByOrderID(_ context.Context, _ transaction.Executor, _ uuid.UUID) ([]orderDomain.OrderItemCustomDesign, error) {
+	return m.designs, nil
 }
 
 // --- invoice repos ---
@@ -529,6 +569,7 @@ func buildUCWith(
 		accountRepo,
 		orderStore,
 		&coMockOrderItemRepo{items: map[uuid.UUID][]orderDomain.OrderItem{}},
+		&coMockCustomDesignRepo{},
 		&coMockInvoiceRepo{},
 		&coMockInvoiceItemRepo{},
 		paymentStore,
@@ -1026,15 +1067,14 @@ func TestCreateOrder_InvariantCartItemsRemovedAfterOrder(t *testing.T) {
 	method := coDefaultMethod(methodID, "qris")
 	pricing := coDefaultPricing(productID, shopID)
 
-	cartRepo := &coMockCartRepo{
-		cart: &cartDomain.Cart{
-			ID:         uuid.New(),
-			CustomerID: customerID,
-			Items: []cartDomain.CartItem{
-				{ID: uuid.New(), ProductID: &productID, ShopID: shopID, Quantity: 2},
-			},
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items: []cartDomain.CartItem{
+			{ID: uuid.New(), ProductID: &productID, ShopID: shopID, Quantity: 2},
 		},
 	}
+	cartRepo := &coMockCartRepo{cart: cart}
 	gateway := &coMockGateway{chargeResp: coDefaultChargeResp(uuid.New().String())}
 
 	uc := buildUC(nil, gateway,
@@ -1054,7 +1094,153 @@ func TestCreateOrder_InvariantCartItemsRemovedAfterOrder(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !cartRepo.saved {
-		t.Error("expected cart to be saved (items removed) after order creation")
+		t.Error("expected cart to be saved after order creation")
+	}
+	if len(cart.Items) == 0 || cart.Items[0].DeletedAt == nil {
+		t.Errorf("expected standard cart item to be marked as deleted (DeletedAt != nil), got %+v", cart.Items)
+	}
+}
+
+func TestCreateOrder_CustomCartItemsRemovedAfterOrder(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	customCartItemID := uuid.New()
+	shopID := uuid.New()
+	methodID := uuid.New()
+	user := coDefaultUser()
+	acc := coDefaultAccount(user.ID)
+	method := coDefaultMethod(methodID, "qris")
+
+	pricing := &orderRepo.PricingResult{
+		Subtotal:         650000,
+		TotalShippingFee: 15000,
+		GrandTotal:       665000,
+		Shops: []orderRepo.PricingShopResult{
+			{
+				ShopID:   shopID,
+				ShopName: "Florist Kage",
+				Items: []orderRepo.PricingItemResult{
+					{
+						ProductID:   nil,
+						CartItemID:  &customCartItemID,
+						IsCustom:    true,
+						ProductName: "(Custom Flower Board)",
+						Quantity:    1,
+						UnitPrice:   650000,
+						Subtotal:    650000,
+					},
+				},
+				SelectedCourier: orderRepo.SelectedCourierResult{Code: "jne", Service: "REG", Fee: 15000},
+			},
+		},
+	}
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items: []cartDomain.CartItem{
+			{
+				ID:                 customCartItemID,
+				ProductVariantType: cartDomain.ProductVariantTypeCustom,
+				ProductID:          nil,
+				ShopID:             shopID,
+				Quantity:           1,
+			},
+		},
+	}
+	cartRepo := &coMockCartRepo{cart: cart}
+	gateway := &coMockGateway{chargeResp: coDefaultChargeResp(uuid.New().String())}
+
+	uc := buildUC(nil, gateway,
+		&coMockPricingService{result: pricing},
+		&coMockPaymentMethodRepo{method: method},
+		&coMockPaymentAccountRepo{},
+		&coMockUserRepo{user: user},
+		&coMockAccountRepo{account: acc},
+		&coMockInventoryRepo{},
+		&coMockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{}},
+		&coMockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
+		cartRepo,
+	)
+
+	input := CreateOrderInput{
+		UserID:          uuid.New(),
+		CustomerID:      customerID,
+		AddressID:       uuid.New(),
+		PaymentMethodID: methodID,
+		Shops: []OrderShopInput{
+			{
+				ShopID:   shopID,
+				ShopName: "Florist Kage",
+				Items: []OrderItemInput{
+					{
+						ProductID:    nil,
+						CartItemID:   &customCartItemID,
+						IsCustom:     true,
+						CustomDesign: []byte(`{"layout":{"size":"medium"}}`),
+						ProductName:  "(Custom Flower Board)",
+						Quantity:     1,
+					},
+				},
+			},
+		},
+	}
+
+	_, err := uc.Execute(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cartRepo.saved {
+		t.Error("expected cart to be saved after custom order creation")
+	}
+	if len(cart.Items) == 0 || cart.Items[0].DeletedAt == nil {
+		t.Errorf("expected custom cart item to be marked as deleted (DeletedAt != nil), got %+v", cart.Items)
+	}
+}
+
+func TestCreateOrder_CartItemShopMismatch_RemovedAfterOrder(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	productID := uuid.New()
+	cartShopID := uuid.New()
+	orderShopID := uuid.New()
+	methodID := uuid.New()
+	user := coDefaultUser()
+	acc := coDefaultAccount(user.ID)
+	method := coDefaultMethod(methodID, "qris")
+	pricing := coDefaultPricing(productID, orderShopID)
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items: []cartDomain.CartItem{
+			{ID: uuid.New(), ProductID: &productID, ShopID: cartShopID, Quantity: 2},
+		},
+	}
+	cartRepo := &coMockCartRepo{cart: cart}
+	gateway := &coMockGateway{chargeResp: coDefaultChargeResp(uuid.New().String())}
+
+	uc := buildUC(nil, gateway,
+		&coMockPricingService{result: pricing},
+		&coMockPaymentMethodRepo{method: method},
+		&coMockPaymentAccountRepo{},
+		&coMockUserRepo{user: user},
+		&coMockAccountRepo{account: acc},
+		&coMockInventoryRepo{},
+		&coMockPaymentRepo{payments: map[uuid.UUID]*paymentDomain.Payment{}},
+		&coMockOrderRepo{orders: map[uuid.UUID]*orderDomain.Order{}},
+		cartRepo,
+	)
+
+	_, err := uc.Execute(ctx, coInput(customerID, methodID, false, productID, orderShopID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cartRepo.saved {
+		t.Error("expected cart to be saved after order creation")
+	}
+	if len(cart.Items) == 0 || cart.Items[0].DeletedAt == nil {
+		t.Errorf("expected standard cart item with shop mismatch to be marked as deleted (DeletedAt != nil), got %+v", cart.Items)
 	}
 }
 
