@@ -122,12 +122,12 @@ func (s *pricingServiceImpl) Calculate(
 					if ci, ok := cartItemMap[*item.CartItemID]; ok {
 						if ci.ProductVariantType == cartDomain.ProductVariantTypeCustom || ci.ProductID == nil {
 							item.IsCustom = true
-							if len(item.CustomDesign) == 0 {
-								item.CustomDesign = ci.CustomDesign
-							}
-						} else if item.ProductID == nil {
+							item.CustomDesign = ci.CustomDesign
+						} else {
+							item.IsCustom = false
 							item.ProductID = ci.ProductID
 						}
+						item.ItemOptions = ci.ItemOptions
 					}
 				}
 			}
@@ -292,15 +292,22 @@ func (s *pricingServiceImpl) Calculate(
 				return nil, apperrors.NewConflict(fmt.Sprintf("%s is out of stock", product.Name))
 			}
 
+			normOptions := shopItem.ItemOptions.Normalized()
+			unitPrice := productDomain.CalculateStandardProductPrice(
+				product.Price,
+				normOptions.Size,
+				normOptions.Jambul,
+			)
 
-			itemSubtotal := product.Price * int64(shopItem.Quantity)
+			itemSubtotal := unitPrice * int64(shopItem.Quantity)
 			shopSubtotal += itemSubtotal
 			totalSubtotal += itemSubtotal
 
-			weight := defaultShippingWeightGrams
+			baseWeight := defaultShippingWeightGrams
 			if product.Weight != nil {
-				weight = int(*product.Weight)
+				baseWeight = int(*product.Weight)
 			}
+			weight := productDomain.GetStandardProductWeight(normOptions.Size, baseWeight)
 
 			itemWeight := weight * shopItem.Quantity
 			shopItemsWeight += itemWeight
@@ -310,9 +317,10 @@ func (s *pricingServiceImpl) Calculate(
 				ProductID:   &pID,
 				CartItemID:  shopItem.CartItemID,
 				IsCustom:    false,
+				ItemOptions: normOptions,
 				ProductName: product.Name,
 				Quantity:    shopItem.Quantity,
-				UnitPrice:   product.Price,
+				UnitPrice:   unitPrice,
 				Subtotal:    itemSubtotal,
 				WeightGrams: itemWeight,
 			})

@@ -22,6 +22,9 @@ type OrderItem struct {
 	UnitPrice int64
 	Subtotal  int64
 
+	// ItemOptions captures variant specifications for standard products (size and floral jambul)
+	ItemOptions cartDomain.ItemOptions
+
 	// CourierCode is the selected courier code
 	// for the shop that owns this item
 	CourierCode *string

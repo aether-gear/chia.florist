@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	cartDomain "service-core/internal/modules/cart/domain"
@@ -39,7 +40,8 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 			subtotal,
 			courier_code,
 			courier_service,
-			shipping_fee_total
+			shipping_fee_total,
+			item_options
 		FROM
 			order_items
 		WHERE
@@ -54,6 +56,7 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.OrderItem, error) {
 		var item domain.OrderItem
+		var rawOptions []byte
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
@@ -69,7 +72,12 @@ func (r *orderItemRepositoryImpl) ListByOrderID(
 			&item.CourierCode,
 			&item.CourierService,
 			&item.ShippingFee,
+			&rawOptions,
 		)
+		if len(rawOptions) > 0 {
+			_ = json.Unmarshal(rawOptions, &item.ItemOptions)
+		}
+		item.ItemOptions = item.ItemOptions.Normalized()
 		return item, err
 	})
 	if err != nil {
@@ -99,9 +107,10 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 			subtotal,
 			courier_code,
 			courier_service,
-			shipping_fee_total
+			shipping_fee_total,
+			item_options
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
 		ON CONFLICT (id)
 		DO UPDATE SET
 			order_id = EXCLUDED.order_id,
@@ -116,7 +125,8 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 			subtotal = EXCLUDED.subtotal,
 			courier_code = EXCLUDED.courier_code,
 			courier_service = EXCLUDED.courier_service,
-			shipping_fee_total = EXCLUDED.shipping_fee_total
+			shipping_fee_total = EXCLUDED.shipping_fee_total,
+			item_options = EXCLUDED.item_options
 	`
 
 	for _, item := range items {
@@ -128,6 +138,8 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 				variantType = cartDomain.ProductVariantTypeStandard
 			}
 		}
+
+		optBytes, _ := json.Marshal(item.ItemOptions.Normalized())
 
 		_, err := exec.Exec(ctx, query,
 			item.ID,
@@ -144,6 +156,7 @@ func (r *orderItemRepositoryImpl) SaveBulk(
 			item.CourierCode,
 			item.CourierService,
 			item.ShippingFee,
+			string(optBytes),
 		)
 		if err != nil {
 			return fmt.Errorf("query to save order item: %w", err)
@@ -177,7 +190,8 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 			subtotal,
 			courier_code,
 			courier_service,
-			shipping_fee_total
+			shipping_fee_total,
+			item_options
 		FROM
 			order_items
 		WHERE
@@ -197,6 +211,7 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.OrderItem, error) {
 		var item domain.OrderItem
+		var rawOptions []byte
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
@@ -212,7 +227,12 @@ func (r *orderItemRepositoryImpl) ListByOrderIDs(
 			&item.CourierCode,
 			&item.CourierService,
 			&item.ShippingFee,
+			&rawOptions,
 		)
+		if len(rawOptions) > 0 {
+			_ = json.Unmarshal(rawOptions, &item.ItemOptions)
+		}
+		item.ItemOptions = item.ItemOptions.Normalized()
 		return item, err
 	})
 	if err != nil {
@@ -242,7 +262,8 @@ func (r *orderItemRepositoryImpl) ListByShipmentID(
 			subtotal,
 			courier_code,
 			courier_service,
-			shipping_fee_total
+			shipping_fee_total,
+			item_options
 		FROM
 			order_items
 		WHERE
@@ -257,6 +278,7 @@ func (r *orderItemRepositoryImpl) ListByShipmentID(
 
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.OrderItem, error) {
 		var item domain.OrderItem
+		var rawOptions []byte
 		err := row.Scan(
 			&item.ID,
 			&item.OrderID,
@@ -272,7 +294,12 @@ func (r *orderItemRepositoryImpl) ListByShipmentID(
 			&item.CourierCode,
 			&item.CourierService,
 			&item.ShippingFee,
+			&rawOptions,
 		)
+		if len(rawOptions) > 0 {
+			_ = json.Unmarshal(rawOptions, &item.ItemOptions)
+		}
+		item.ItemOptions = item.ItemOptions.Normalized()
 		return item, err
 	})
 	if err != nil {

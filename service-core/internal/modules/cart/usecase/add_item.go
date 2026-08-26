@@ -46,6 +46,7 @@ func NewAddItemUsecase(
 type AddItemInput struct {
 	CustomerID, ProductID, ShopID uuid.UUID
 	Quantity                      int
+	ItemOptions                   domain.ItemOptions
 }
 
 const MaxCartItemQuantity = 80
@@ -122,15 +123,7 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
 	}
 
-	targetQuantity := input.Quantity
-	if existingItem := cart.FindItem(
-		input.ProductID,
-		input.ShopID,
-	); existingItem != nil &&
-		existingItem.DeletedAt == nil {
-
-		targetQuantity += existingItem.Quantity
-	}
+	targetQuantity := cart.TotalProductQuantity(input.ProductID, input.ShopID) + input.Quantity
 	if targetQuantity > inventory.Available() {
 		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}
@@ -139,6 +132,7 @@ func (u *AddItemUsecase) Execute(
 		input.ProductID,
 		input.ShopID,
 		input.Quantity,
+		input.ItemOptions,
 	); err != nil {
 		return apperrors.NewInvalidInput(err.Error())
 	}

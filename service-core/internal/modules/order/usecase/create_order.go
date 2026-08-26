@@ -36,6 +36,7 @@ type OrderItemInput struct {
 	ProductID    *uuid.UUID
 	CartItemID   *uuid.UUID
 	IsCustom     bool
+	ItemOptions  cartDomain.ItemOptions
 	CustomDesign json.RawMessage
 	ProductName  string
 	Quantity     int
@@ -233,6 +234,7 @@ func (u *CreateOrderUsecase) Execute(
 				Quantity:           itemRes.Quantity,
 				UnitPrice:          itemRes.UnitPrice,
 				Subtotal:           itemRes.Subtotal,
+				ItemOptions:        itemRes.ItemOptions,
 				CourierCode:        courierCode,
 				CourierService:     courierService,
 				ShippingFee:        shopRes.SelectedCourier.Fee,
@@ -256,6 +258,17 @@ func (u *CreateOrderUsecase) Execute(
 					}
 					if len(rawDesign) == 0 && itemIdx < len(inputShop.Items) && len(inputShop.Items[itemIdx].CustomDesign) > 0 {
 						rawDesign = inputShop.Items[itemIdx].CustomDesign
+					}
+				}
+
+				if len(rawDesign) == 0 && itemRes.CartItemID != nil && u.cartRepo != nil {
+					if userCart, err := u.cartRepo.GetWithItemsByCustomerID(ctx, u.executor, input.CustomerID); err == nil && userCart != nil {
+						for _, ci := range userCart.Items {
+							if ci.ID == *itemRes.CartItemID && len(ci.CustomDesign) > 0 {
+								rawDesign = ci.CustomDesign
+								break
+							}
+						}
 					}
 				}
 
@@ -630,6 +643,7 @@ func (u *CreateOrderUsecase) validateAndCalculatePricing(
 					ProductID:    item.ProductID,
 					CartItemID:   item.CartItemID,
 					IsCustom:     item.IsCustom,
+					ItemOptions:  item.ItemOptions,
 					CustomDesign: item.CustomDesign,
 					Quantity:     item.Quantity,
 				},

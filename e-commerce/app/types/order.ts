@@ -1,5 +1,5 @@
-// app/types/order.ts
 import type { CustomDesignPayload } from '~/composables/useCart'
+import type { ItemOptions } from '~/types/cart'
 
 export interface CreateOrderPaymentInput {
   id: string
@@ -11,9 +11,17 @@ export interface CreateOrderCourierInput {
 }
 
 export interface CreateOrderItemInput {
-  product_id: string
+  product_id?: string
+  cart_item_id?: string
+  product_variant_type?: 'standard' | 'custom'
+  item_type?: 'standard' | 'custom'
+  is_custom?: boolean
   name: string
   quantity: number
+  item_options?: ItemOptions
+  size?: string
+  jambul?: string
+  custom_design?: CustomDesignPayload
 }
 
 export interface CreateOrderShopInput {
@@ -83,8 +91,10 @@ export interface BackendOrderPayment {
 
 export interface BackendOrderItem {
   id: string
-  product_id: string
+  product_id: string | null
   product_name: string
+  product_variant_type?: 'standard' | 'custom'
+  is_custom?: boolean
   quantity: number
   unit_price: number
   subtotal: number
@@ -93,6 +103,7 @@ export interface BackendOrderItem {
   courier_code: string
   courier_service: string
   shipping_fee: number
+  item_options?: ItemOptions
 }
 
 export interface BackendOrder {

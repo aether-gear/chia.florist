@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	cartDomain "service-core/internal/modules/cart/domain"
 	query "service-core/internal/shared/query"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ type PricingItemInput struct {
 	ProductID    *uuid.UUID
 	CartItemID   *uuid.UUID
 	IsCustom     bool
+	ItemOptions  cartDomain.ItemOptions
 	CustomDesign json.RawMessage
 	Quantity     int
 }
@@ -35,6 +37,7 @@ type PricingItemResult struct {
 	ProductID   *uuid.UUID
 	CartItemID  *uuid.UUID
 	IsCustom    bool
+	ItemOptions cartDomain.ItemOptions
 	ProductName string
 	Quantity    int
 	UnitPrice   int64

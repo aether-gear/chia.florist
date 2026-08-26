@@ -42,12 +42,12 @@ Endpoints are organized by access level: **Public** and **Authenticated Customer
     - [X] List My Addresses
     - [X] Save My Address
     - [X] Delete My Address
-  - [ ] Cart
-    - [ ] Get Cart
-    - [ ] Add Item
-    - [ ] Update Item
-    - [ ] Remove Item
-    - [ ] Remove Custom Item
+  - [X] Cart
+    - [X] Get Cart
+    - [X] Add Item
+    - [X] Update Item
+    - [X] Remove Item
+    - [X] Remove Custom Item
   - [ ] Checkout
     - [ ] Estimate Checkout
     - [ ] Calculate Checkout
@@ -991,7 +991,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 ```json
 {
   "cart_id": "f1e2d3c4-b5a6-7890-fedc-ba0987654321",
-  "total": 170000,
+  "total": 220000,
   "items": [
     {
       "cart_item_id": "d1a2b3c4-e5f6-7890-abcd-ef1234567890",
@@ -1001,9 +1001,13 @@ These endpoints require a valid customer session set via the Sign In or Verify A
       "shop_name":  "Chia Medan Satria",
       "shop_slug":  "chia-medan-satria",
       "name":       "Anniversary Flower Stand",
-      "price":      85000,
+      "price":      110000,
       "quantity":   2,
-      "subtotal":   170000,
+      "subtotal":   220000,
+      "item_options": {
+        "size": "medium",
+        "jambul": "top"
+      },
       "images": {
         "thumbnail": "https://example.com/thumbnail.jpg"
       }
@@ -1060,8 +1064,23 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 
 - **Method**: `POST`
 - **Endpoint**: `/carts/items`
-- **Description**: Add a standard catalog product or custom-designed flower board item to the customer's cart. The item type is specified by `product_variant_type`.
+- **Description**: Add a standard catalog product or custom-designed flower board item to the customer's cart. Standard items support pick-style option selections (`size` and `jambul`) using a strictly non-negative additive pricing model.
 - **Authentication**: Customer
+
+#### Standard Product Pricing Rules
+
+Standard board unit pricing is strictly additive and non-negative:
+$$\text{UnitPrice} = \max(0, \text{base\_price} + \text{size\_addon} + \text{jambul\_addon})$$
+
+- **Size Options**:
+  - `small` (1.5 × 2.0m - Compact): `+ Rp 0` (Weight: 1,500g)
+  - `medium` (1.8 × 2.5m - Standard): `+ Rp 50.000` (Weight: 2,500g)
+  - `large` (2.0 × 3.0m - Grand): `+ Rp 100.000` (Weight: 4,000g)
+- **Floral Crest (Jambul) Options**:
+  - `none`: `+ Rp 0`
+  - `top`: `+ Rp 25.000`
+  - `bottom`: `+ Rp 25.000`
+  - `both`: `+ Rp 50.000`
 
 #### Request Body (Standard Product Item)
 
@@ -1070,7 +1089,11 @@ These endpoints require a valid customer session set via the Sign In or Verify A
   "product_variant_type": "standard",
   "product_id": "9886edf6-087b-48e7-b00a-d79dd092e8d4",
   "shop_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-  "quantity": 1
+  "quantity": 1,
+  "item_options": {
+    "size": "medium",
+    "jambul": "both"
+  }
 }
 ```
 
@@ -1118,6 +1141,7 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `product_id`           | string | Optional | Product UUID. Required when `product_variant_type` is `"standard"`. |
 | `shop_id`              | string | Yes      | Shop UUID where the item is purchased. |
 | `quantity`             | int    | Yes      | Quantity of items (`> 0`). |
+| `item_options`         | object | Optional | Optional variant attributes (`size`: `"small"` \| `"medium"` \| `"large"`, `jambul`: `"none"` \| `"top"` \| `"bottom"` \| `"both"`). |
 | `product_name`         | string | Optional | Human-readable title for custom products. Required when `product_variant_type` is `"custom"`. |
 | `physical_size_id`     | string | Optional | Physical size identifier (e.g. `"medium"`). Required when `product_variant_type` is `"custom"`. |
 | `custom_design`        | object | Optional | Full v1.0.0 canvas design JSON snapshot payload. Required when `product_variant_type` is `"custom"`. |
@@ -1168,11 +1192,64 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `400 Bad Request`  | `shopID` or `productID` is not a valid UUID, or `quantity` is `< 0`. |
 | `401 Unauthorized` | Missing or invalid session. |
 
+### Update Item by ID (Quantity and/or Options)
+
+- **Method**: `PUT` or `PATCH`
+- **Endpoint**: `/carts/items/{cartItemID}`
+- **Description**: Update the quantity and/or `item_options` (size, jambul) of a specific cart item identified by its unique `cartItemID`. Supports both standard and custom items. If `item_options` is omitted, the item retains its existing options. If changing `item_options` produces a combination that already exists in the cart for the same product and shop, the quantities are automatically merged and the target item is soft-deleted.
+- **Authentication**: Customer
+- **Request Body (Quantity only — preserves current options)**:
+  ```json
+  {
+    "quantity": 3
+  }
+  ```
+- **Request Body (With optional options update)**:
+  ```json
+  {
+    "quantity": 2,
+    "item_options": {
+      "size": "large",
+      "jambul": "both"
+    }
+  }
+  ```
+
+#### Path Parameters
+
+| Parameter    | Type          | Description                             |
+|--------------|---------------|-----------------------------------------|
+| `cartItemID` | UUID (string) | The unique cart item ID to update.      |
+
+#### Request Fields
+
+| Field                   | Type     | Required | Description                                                    |
+|-------------------------|----------|----------|----------------------------------------------------------------|
+| `quantity`              | integer  | Yes      | Updated item quantity (must be `> 0`).                         |
+| `item_options`          | object   | No       | Optional variant options object. If omitted, existing options are preserved. |
+| `item_options.size`     | string   | No       | `"small"` (+Rp 0), `"medium"` (+Rp 50.000), `"large"` (+Rp 100.000). |
+| `item_options.jambul`   | string   | No       | `"none"` (+Rp 0), `"top"` (+Rp 25.000), `"bottom"` (+Rp 25.000), `"both"` (+Rp 50.000). |
+
+#### Response `200 OK`
+
+```json
+{ "message": "item updated" }
+```
+
+#### Error Responses
+
+| Status              | Condition                                                         |
+|---------------------|-------------------------------------------------------------------|
+| `400 Bad Request`   | Invalid `cartItemID`, missing request body, or `quantity <= 0`.  |
+| `401 Unauthorized`  | Missing or invalid session.                                       |
+| `404 Not Found`     | Cart or cart item not found.                                      |
+| `409 Conflict`      | Insufficient stock at fulfillment shop across all styles.         |
+
 ### Change Item Shop
 
 - **Method**: `PATCH`
 - **Endpoint**: `/carts/items/{cartItemID}/shop`
-- **Description**: Update the fulfillment shop for an existing cart item (standard or custom) prior to checkout. For standard items, stock at the target shop is validated. If the same product already exists under the target shop in the cart, quantities are merged.
+- **Description**: Update the fulfillment shop for an existing cart item (standard or custom) prior to checkout. For standard items, stock at the target shop is validated. If the exact same product and style already exists under the target shop in the cart, quantities are merged; distinct styles remain separate items.
 - **Authentication**: Customer
 - **Request Body**:
   ```json
@@ -1208,12 +1285,43 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `404 Not Found`    | Cart item not found or target shop not found/inactive. |
 | `409 Conflict`     | Target shop has insufficient stock for standard catalog product. |
 
-### Remove Item
+### Remove Item by ID
+
+- **Method**: `DELETE`
+- **Endpoint**: `/carts/items/{cartItemID}`
+- **Description**: Remove a specific item (standard or custom) from the cart by its unique cart item ID.
+- **Authentication**: Customer
+- **Request Body**: None
+
+#### Path Parameters
+
+| Parameter    | Type          | Description                         |
+|--------------|---------------|-------------------------------------|
+| `cartItemID` | UUID (string) | The unique ID of the item to remove. |
+
+#### Response `200 OK`
+
+```json
+{ "message": "item removed" }
+```
+
+#### Error Responses
+
+| Status             | Condition |
+|--------------------|-----------|
+| `400 Bad Request`  | `cartItemID` is not a valid UUID. |
+| `401 Unauthorized` | Missing or invalid session. |
+| `404 Not Found`    | Cart item not found in cart. |
+
+### Remove Item by Product & Shop (Legacy)
 
 - **Method**: `DELETE`
 - **Endpoint**: `/carts/items/{shopID}/{productID}`
-- **Description**: Remove a specific standard item from the cart entirely by product ID.
+- **Description**: Remove a standard item from the cart by product and shop ID. Optional query parameters `size` and `jambul` can be supplied to target a specific style when multiple styles of the same product exist.
 - **Authentication**: Customer
+- **Query Parameters**:
+  - `size` (optional, string): e.g. `"small"`, `"medium"`, `"large"`.
+  - `jambul` (optional, string): e.g. `"none"`, `"top"`, `"bottom"`, `"both"`.
 - **Request Body**: None
 
 #### Path Parameters
@@ -1236,11 +1344,11 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 | `400 Bad Request`  | `shopID` or `productID` is not a valid UUID. |
 | `401 Unauthorized` | Missing or invalid session. |
 
-### Remove Custom Item
+### Remove Custom Item (Legacy)
 
 - **Method**: `DELETE`
 - **Endpoint**: `/carts/items/custom/{cartItemID}`
-- **Description**: Remove a specific custom-designed item from the cart using its `cart_item_id`.
+- **Description**: Legacy alias for removing a custom-designed item by its `cart_item_id`.
 - **Authentication**: Customer
 - **Request Body**: None
 
@@ -1282,7 +1390,11 @@ These endpoints require a valid customer session set via the Sign In or Verify A
           {
             "product_variant_type": "standard",
             "product_id": "string (UUID, required for standard)",
-            "quantity": 1
+            "quantity": 1,
+            "item_options": {
+              "size": "medium",
+              "jambul": "top"
+            }
           },
           {
             "product_variant_type": "custom",
@@ -1488,7 +1600,11 @@ These endpoints require a valid customer session set via the Sign In or Verify A
           {
             "product_variant_type": "standard",
             "product_id": "string (UUID, required for standard)",
-            "quantity": 1
+            "quantity": 1,
+            "item_options": {
+              "size": "medium",
+              "jambul": "both"
+            }
           },
           {
             "product_variant_type": "custom",
@@ -1666,6 +1782,10 @@ These endpoints require a valid customer session set via the Sign In or Verify A
 					"quantity": 3,
 					"unit_price": 150000,
 					"subtotal": 450000,
+					"item_options": {
+						"size": "small",
+						"jambul": "none"
+					},
 					"shop_id": "7e5e335a-ec5b-4399-a8f6-1ea7dd8f0974",
 					"shop_name": "dayum",
 					"courier_code": "tiki",
@@ -1999,7 +2119,11 @@ These endpoints require a valid customer session set via the Sign In or Verify A
             "product_variant_type": "standard",
             "product_id": "e7b0c950-6d33-4f51-b851-93c10a421234",
             "name": "Prosperity Grand Opening Stand",
-            "quantity": 1
+            "quantity": 1,
+            "item_options": {
+              "size": "large",
+              "jambul": "both"
+            }
           },
           {
             "product_variant_type": "custom",

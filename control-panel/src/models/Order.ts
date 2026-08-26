@@ -1,3 +1,8 @@
+export interface ItemOptions {
+  size?: 'small' | 'medium' | 'large' | string;
+  jambul?: 'none' | 'top' | 'bottom' | 'both' | string;
+}
+
 export interface OrderItem {
   id: string;
   shipment_id?: string | null;
@@ -13,6 +18,7 @@ export interface OrderItem {
   courier_code?: string | null;
   courier_service?: string | null;
   shipping_fee: number;
+  item_options?: ItemOptions | null;
 }
 
 export interface PaymentChannelData {

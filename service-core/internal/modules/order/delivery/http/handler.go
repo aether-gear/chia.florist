@@ -12,6 +12,7 @@ import (
 	authenDomain "service-core/internal/modules/authentication/domain"
 	authzDomain "service-core/internal/modules/authorization/domain"
 	authzSvc "service-core/internal/modules/authorization/infra/service"
+	cartDomain "service-core/internal/modules/cart/domain"
 	orderDomain "service-core/internal/modules/order/domain"
 	"service-core/internal/modules/order/usecase"
 	paymentDomain "service-core/internal/modules/payment/domain"
@@ -91,6 +92,15 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			}
 		}
 
+		var itemOptsResp *orderItemOptionsResponse
+		if item.ProductID != nil && variantType == "standard" {
+			normOpts := item.ItemOptions.Normalized()
+			itemOptsResp = &orderItemOptionsResponse{
+				Size:   normOpts.Size,
+				Jambul: normOpts.Jambul,
+			}
+		}
+
 		items[j] = orderItemResponse{
 			ID:                 item.ID.String(),
 			ShipmentID:         shipmentIDStr,
@@ -106,6 +116,7 @@ func buildOrderResponse(o usecase.OrderSearchResult) orderResponse {
 			CourierCode:        item.CourierCode,
 			CourierService:     item.CourierService,
 			ShippingFeeTotal:   item.ShippingFee,
+			ItemOptions:        itemOptsResp,
 			CustomDesign:       customDesignResp,
 		}
 	}
@@ -723,12 +734,25 @@ func (h *orderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) error
 				}
 			}
 
+			var opt cartDomain.ItemOptions
+			if itemReq.ItemOptions != nil {
+				opt.Size = itemReq.ItemOptions.Size
+				opt.Jambul = itemReq.ItemOptions.Jambul
+			}
+			if itemReq.Size != "" && opt.Size == "" {
+				opt.Size = itemReq.Size
+			}
+			if itemReq.Jambul != "" && opt.Jambul == "" {
+				opt.Jambul = itemReq.Jambul
+			}
+
 			itemsInput = append(
 				itemsInput,
 				usecase.OrderItemInput{
 					ProductID:    productID,
 					CartItemID:   cartItemID,
 					IsCustom:     isCustom,
+					ItemOptions:  opt.Normalized(),
 					CustomDesign: itemReq.CustomDesign,
 					ProductName:  productName,
 					Quantity:     itemReq.Quantity,

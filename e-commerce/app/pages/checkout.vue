@@ -88,6 +88,23 @@ const toggleCategory = (type: string) => {
   openedCategories.value[type] = !openedCategories.value[type]
 }
 
+const formatItemSize = (item: any): string => {
+  const size = item.item_options?.size || item.size
+  if (size === 'small') return '1.5 × 2.0m (Small)'
+  if (size === 'medium') return '1.8 × 2.5m (Medium)'
+  if (size === 'large') return '2.0 × 3.0m (Large)'
+  return size || '1.5 × 2.0m (Small)'
+}
+
+const formatItemJambul = (item: any): string => {
+  const jambul = item.item_options?.jambul || item.jambul
+  if (jambul === 'none') return 'None'
+  if (jambul === 'top') return 'Top Crest'
+  if (jambul === 'bottom') return 'Bottom Crest'
+  if (jambul === 'both') return 'Both (Top & Bottom)'
+  return 'None'
+}
+
 // Map untuk menyimpan opsi kurir per toko
 const courierOptionsMap = ref<Record<string, CheckoutCourierOption[]>>({})
 
@@ -98,13 +115,20 @@ const selectedCouriers = ref<Record<string, { code: string; service: string }>>(
 const isBuyNow = computed(() => route.query.buyNow === 'true')
 const buyNowItem = computed<CartItem | null>(() => {
   if (!isBuyNow.value) return null
+  const size = (route.query.size as string) || 'small'
+  const jambul = (route.query.jambul as string) || 'none'
   return {
     id: route.query.id as string,
     name: route.query.name as string,
     price: Number(route.query.price || 0),
     image: (route.query.image as string) || '',
     quantity: Number(route.query.qty || 1),
-    size: (route.query.size as string) || undefined,
+    size: size,
+    jambul: jambul,
+    itemOptions: {
+      size: size as any,
+      jambul: jambul as any
+    },
     color: (route.query.color as string) || undefined,
     shopId: (route.query.shopId as string) || '99ef0062-1040-4574-a4be-0123abce5670'
   }
@@ -121,7 +145,7 @@ const checkoutItems = computed(() => {
 // Helper to merge custom items into CheckoutResponse
 const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
   const customItems = checkoutItems.value.filter(item => item.isCustom)
-  
+
   let merged: CheckoutResponse
   if (!res) {
     const defaultAddr = addressVm.addresses.value.find(a => a.address_id === selectedAddressId.value) || addressVm.addresses.value.find(a => a.is_default) || addressVm.addresses.value[0]
@@ -143,7 +167,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       total: 0,
       payment_methods: []
     }
-    
+
     // Group ALL items by shopId
     const itemsByShop: Record<string, typeof checkoutItems.value> = {}
     checkoutItems.value.forEach(item => {
@@ -153,55 +177,88 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
       }
       itemsByShop[sId].push(item)
     })
-    
+
     Object.keys(itemsByShop).forEach(sId => {
       const items = itemsByShop[sId] || []
       const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
-      
+
       const shopEntry: CheckoutShop = {
         shop_id: sId,
         name: shopsMap.value[sId] || 'Chia Florist',
         subtotal: subtotal,
         total: subtotal,
         selected_courier: null,
-        items: items.map(item => ({
-          product_id: item.id,
-          shop_id: sId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          subtotal: item.price * item.quantity,
-          size: item.size,
-          color: item.color
-        })),
+        items: items.map(item => {
+          const itemOptions = item.itemOptions || {
+            size: (item.size || 'small') as any,
+            jambul: (item.jambul || 'none') as any
+          }
+          return {
+            product_id: item.productId || item.id,
+            cart_item_id: item.cartItemId || item.id,
+            shop_id: sId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            subtotal: item.price * item.quantity,
+            item_options: itemOptions,
+            size: itemOptions.size,
+            jambul: itemOptions.jambul,
+            color: item.color
+          }
+        }),
         cost_couriers: []
       }
       merged.shops.push(shopEntry)
     })
-    
+
     merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
     merged.total_shipping = 0
     merged.total = merged.subtotal
-    
+
     return merged
   } else {
     merged = JSON.parse(JSON.stringify(res))
   }
 
-  // 1. Gabungkan atribut lokal (size, color, price) untuk produk reguler & kustom
+  // Preserve payment methods and selected payment method if present in response
+  if (res?.payment_methods && res.payment_methods.length > 0) {
+    paymentMethods.value = res.payment_methods
+  }
+  if (res?.selected_payment_method) {
+    merged.selected_payment_method = res.selected_payment_method
+    const matchIdx = paymentMethods.value.findIndex(m => m.id === res.selected_payment_method?.id)
+    if (matchIdx !== -1) {
+      paymentMethods.value[matchIdx] = { ...paymentMethods.value[matchIdx], ...res.selected_payment_method }
+    }
+  }
+
+  // 1. Gabungkan atribut lokal (size, jambul, color, price) untuk produk reguler & kustom
   merged.shops.forEach(shop => {
     if (!shop.name) {
       shop.name = shopsMap.value[shop.shop_id] || 'Chia Florist'
     }
     shop.items.forEach(item => {
       const localItem = checkoutItems.value.find(i =>
-        i.id === item.product_id ||
+        (item.cart_item_id && (i.cartItemId === item.cart_item_id || i.id === item.cart_item_id)) ||
+        (!item.cart_item_id && (i.productId === item.product_id || i.id === item.product_id)) ||
         (i.isCustom && ((item as any).product_variant_type === 'custom' || (item as any).item_type === 'custom'))
       )
+
+      const backendOptions = item.item_options
+      const localOptions = localItem?.itemOptions
+
+      const resolvedSize = backendOptions?.size || localOptions?.size || localItem?.size || item.size || 'small'
+      const resolvedJambul = backendOptions?.jambul || localOptions?.jambul || localItem?.jambul || (item as any).jambul || 'none'
+
+      item.item_options = {
+        size: resolvedSize as any,
+        jambul: resolvedJambul as any
+      }
+      item.size = resolvedSize
+      item.jambul = resolvedJambul
+
       if (localItem) {
-        if (localItem.size) {
-          (item as any).size = localItem.size
-        }
         if (localItem.color) {
           (item as any).color = localItem.color
         }
@@ -210,8 +267,54 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
         }
       }
     })
-    
-    // Hitung ulang subtotal dan total toko reguler
+
+    // 2. Sinkronkan opsi kurir dan kurir aktif per toko
+    if (shop.cost_couriers && shop.cost_couriers.length > 0) {
+      courierOptionsMap.value[shop.shop_id] = shop.cost_couriers
+    }
+
+    if (!shop.selected_courier) {
+      const activeSelection = selectedCouriers.value[shop.shop_id]
+      if (activeSelection && shop.cost_couriers) {
+        const match = shop.cost_couriers.find(c => c.code === activeSelection.code && c.service === activeSelection.service)
+        if (match) {
+          shop.selected_courier = {
+            code: match.code,
+            service: match.service,
+            fee: match.fee
+          }
+        }
+      }
+      // Jika belum ada kurir terpilih, ambil opsi kurir pertama (default)
+      if (!shop.selected_courier && shop.cost_couriers && shop.cost_couriers.length > 0) {
+        const firstOption = shop.cost_couriers[0]!
+        shop.selected_courier = {
+          code: firstOption.code,
+          service: firstOption.service,
+          fee: firstOption.fee
+        }
+        selectedCouriers.value[shop.shop_id] = {
+          code: firstOption.code,
+          service: firstOption.service
+        }
+      }
+    } else {
+      selectedCouriers.value[shop.shop_id] = {
+        code: shop.selected_courier.code,
+        service: shop.selected_courier.service
+      }
+      // Update fee in courierOptionsMap for the selected courier so dropdown displays accurate fee
+      if (courierOptionsMap.value[shop.shop_id]) {
+        const optMatch = courierOptionsMap.value[shop.shop_id].find(
+          c => c.code === shop.selected_courier?.code && c.service === shop.selected_courier?.service
+        )
+        if (optMatch) {
+          optMatch.fee = shop.selected_courier.fee
+        }
+      }
+    }
+
+    // 3. Hitung ulang subtotal dan total toko reguler
     shop.subtotal = shop.items.reduce((acc, i) => acc + i.subtotal, 0)
     const fee = shop.selected_courier ? shop.selected_courier.fee : 0
     shop.total = shop.subtotal + fee
@@ -219,7 +322,8 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
 
   merged.subtotal = merged.shops.reduce((acc, s) => acc + s.subtotal, 0)
   merged.total_shipping = merged.shops.reduce((acc, s) => acc + (s.selected_courier ? s.selected_courier.fee : 0), 0)
-  merged.total = merged.subtotal + merged.total_shipping
+  const currentPayMethodFee = merged.selected_payment_method?.fee ?? (paymentMethods.value.find(m => m.id === selectedPaymentMethodId.value)?.fee || 0)
+  merged.total = merged.subtotal + merged.total_shipping + currentPayMethodFee
 
   return merged
 }
@@ -278,10 +382,20 @@ onMounted(async () => {
           custom_design: item.customDesign
         })
       } else {
+        const itemOptions = item.itemOptions || {
+          size: (item.size || 'small') as any,
+          jambul: (item.jambul || 'none') as any
+        }
+
         shopsPayloadMap[shopId].push({
+          product_variant_type: 'standard',
           item_type: 'standard',
-          product_id: item.id,
-          quantity: item.quantity
+          product_id: item.productId || item.id,
+          cart_item_id: item.cartItemId || item.id,
+          quantity: item.quantity,
+          item_options: itemOptions,
+          size: itemOptions.size,
+          jambul: itemOptions.jambul
         })
       }
     })
@@ -341,6 +455,11 @@ onMounted(async () => {
           }
         }
       })
+
+      // Run initial calculate with selected courier and payment method to get exact rate
+      if (selectedAddressId.value && selectedPaymentMethodId.value) {
+        await runCalculate()
+      }
     }
   } catch (err) {
     console.error('Failed to initialize checkout:', err)
@@ -383,7 +502,11 @@ const runCalculate = async () => {
       }
 
       const shopItemsPayload = shop.items.map(item => {
-        const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
+        const localItem = checkoutItems.value.find(i =>
+          (item.cart_item_id && (i.cartItemId === item.cart_item_id || i.id === item.cart_item_id)) ||
+          (!item.cart_item_id && i.id === item.product_id) ||
+          (i.isCustom && ((item as any).product_variant_type === 'custom' || (item as any).item_type === 'custom'))
+        )
         if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
           const design = localItem?.customDesign || item.custom_design
           const cartItemId = item.cart_item_id || localItem?.cartItemId || localItem?.id || item.product_id
@@ -398,11 +521,20 @@ const runCalculate = async () => {
             custom_design: design
           }
         }
+        const itemOptions = item.item_options || localItem?.itemOptions || {
+          size: (item.size || localItem?.size || 'small') as any,
+          jambul: (item.jambul || (item as any).jambul || localItem?.jambul || 'none') as any
+        }
+
         return {
           product_variant_type: 'standard' as const,
           item_type: 'standard' as const,
           product_id: item.product_id,
-          quantity: item.quantity
+          cart_item_id: item.cart_item_id || localItem?.cartItemId,
+          quantity: item.quantity,
+          item_options: itemOptions,
+          size: itemOptions.size,
+          jambul: itemOptions.jambul
         }
       })
 
@@ -447,11 +579,25 @@ const runCalculate = async () => {
     checkoutData.value = mergedData
 
     if (res) {
+      if (res.selected_payment_method) {
+        const matchIdx = paymentMethods.value.findIndex(m => m.id === res.selected_payment_method?.id)
+        if (matchIdx !== -1) {
+          paymentMethods.value[matchIdx] = { ...paymentMethods.value[matchIdx], ...res.selected_payment_method }
+        }
+      }
       res.shops.forEach(shop => {
         if (shop.selected_courier) {
           selectedCouriers.value[shop.shop_id] = {
             code: shop.selected_courier.code,
             service: shop.selected_courier.service
+          }
+          if (courierOptionsMap.value[shop.shop_id]) {
+            const optMatch = courierOptionsMap.value[shop.shop_id].find(
+              c => c.code === shop.selected_courier?.code && c.service === shop.selected_courier?.service
+            )
+            if (optMatch) {
+              optMatch.fee = shop.selected_courier.fee
+            }
           }
         }
       })
@@ -558,8 +704,11 @@ const handleCourierChange = (shopId: string, event: Event) => {
 }
 
 // Helper untuk mencocokkan URL gambar lokal
-const getCartProductImage = (productId: string): string => {
-  const localItem = checkoutItems.value.find(i => i.id === productId)
+const getCartProductImage = (productId: string, cartItemId?: string): string => {
+  const localItem = checkoutItems.value.find(i =>
+    (cartItemId && (i.cartItemId === cartItemId || i.id === cartItemId)) ||
+    (!cartItemId && i.id === productId)
+  )
   return localItem?.image || '/images/custom-preview.png'
 }
 
@@ -571,21 +720,14 @@ const liveShippingFee = computed(() => {
   return checkoutData.value ? checkoutData.value.total_shipping : 0
 })
 const livePaymentFee = computed(() => {
-  if (checkoutData.value?.selected_payment_method?.id === selectedPaymentMethodId.value) {
-    return checkoutData.value.selected_payment_method.fee
+  if (checkoutData.value?.selected_payment_method && checkoutData.value.selected_payment_method.id === selectedPaymentMethodId.value) {
+    return Number(checkoutData.value.selected_payment_method.fee || 0)
   }
   const activeMethod = paymentMethods.value.find(m => m.id === selectedPaymentMethodId.value)
-  return activeMethod ? activeMethod.fee : 0
+  return activeMethod ? Number(activeMethod.fee || 0) : 0
 })
 const liveTotalPayment = computed(() => {
-  if (!checkoutData.value) return cartSubtotal.value
-  if (checkoutData.value.selected_payment_method?.id === selectedPaymentMethodId.value) {
-    return checkoutData.value.total
-  }
-  const sub = checkoutData.value.subtotal
-  const ship = checkoutData.value.total_shipping
-  const fee = livePaymentFee.value
-  return sub + ship + fee
+  return liveSubtotal.value + liveShippingFee.value + livePaymentFee.value
 })
 
 // Eksekusi checkout memindahkan state item keranjang ke invoice order profile
@@ -620,7 +762,11 @@ const handlePlaceOrder = async () => {
           service: courier.service
         },
         items: shop.items.map(item => {
-          const localItem = checkoutItems.value.find(i => i.id === item.product_id || (i.isCustom && (item.product_variant_type === 'custom' || item.item_type === 'custom')))
+          const localItem = checkoutItems.value.find(i =>
+            (item.cart_item_id && (i.cartItemId === item.cart_item_id || i.id === item.cart_item_id)) ||
+            (!item.cart_item_id && i.id === item.product_id) ||
+            (i.isCustom && ((item as any).product_variant_type === 'custom' || (item as any).item_type === 'custom'))
+          )
           if (localItem?.isCustom || item.product_variant_type === 'custom' || item.item_type === 'custom') {
             const design = localItem?.customDesign || item.custom_design
             const cartItemId = item.cart_item_id || localItem?.cartItemId || localItem?.id || item.product_id
@@ -635,12 +781,21 @@ const handlePlaceOrder = async () => {
               custom_design: design
             }
           }
+          const itemOptions = item.item_options || localItem?.itemOptions || {
+            size: (item.size || localItem?.size || 'small') as any,
+            jambul: (item.jambul || (item as any).jambul || localItem?.jambul || 'none') as any
+          }
+
           return {
             product_variant_type: 'standard' as const,
             item_type: 'standard' as const,
             product_id: item.product_id,
+            cart_item_id: item.cart_item_id || localItem?.cartItemId,
             name: item.name,
-            quantity: item.quantity
+            quantity: item.quantity,
+            item_options: itemOptions,
+            size: itemOptions.size,
+            jambul: itemOptions.jambul
           }
         })
       }
@@ -655,7 +810,7 @@ const handlePlaceOrder = async () => {
     }
 
     const result = await orderService.createOrder(payload)
-    
+
     const paymentInfo = {
       orderId: result.order_id,
       instruction: result.instruction,
@@ -715,7 +870,7 @@ const handlePlaceOrder = async () => {
 <template>
   <div class="min-h-screen bg-gray-50/50 py-10 sm:py-14 font-sans">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      
+
       <!-- Page Navigation & Title Header -->
       <div class="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -757,10 +912,10 @@ const handlePlaceOrder = async () => {
 
       <!-- Main Checkout Layout -->
       <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-        
+
         <!-- Left Column: Checkout Steps & Forms -->
         <div class="lg:col-span-8 space-y-6">
-          
+
           <!-- STEP 1: Alamat Pengiriman -->
           <div class="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
             <div class="flex items-center justify-between border-b border-gray-100 pb-4">
@@ -777,7 +932,7 @@ const handlePlaceOrder = async () => {
                 <span>Manage Addresses</span>
               </CButton>
             </div>
-            
+
             <div v-if="addressVm.isLoading.value" class="flex flex-col items-center justify-center py-8 space-y-3">
               <div class="w-6 h-6 rounded-full border-2 border-gray-200 border-t-[#1b4332] animate-spin"></div>
               <p class="text-gray-400 text-xs font-medium">Loading destination addresses...</p>
@@ -806,27 +961,27 @@ const handlePlaceOrder = async () => {
 
             <!-- Address Radio Card Selection -->
             <div v-else class="space-y-3">
-              <label 
-                v-for="addr in addressVm.addresses.value" 
+              <label
+                v-for="addr in addressVm.addresses.value"
                 :key="addr.address_id"
                 :class="[
                   'border rounded-2xl p-4.5 sm:p-5 flex items-start gap-4 cursor-pointer transition-all duration-200 select-none',
-                  selectedAddressId === addr.address_id 
-                    ? 'border-[#1b4332] bg-emerald-50/25 ring-1 ring-[#1b4332] shadow-2xs' 
+                  selectedAddressId === addr.address_id
+                    ? 'border-[#1b4332] bg-emerald-50/25 ring-1 ring-[#1b4332] shadow-2xs'
                     : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50/50',
                   (isLoadingCalculate || isLoadingCheckout) ? 'opacity-60 pointer-events-none cursor-not-allowed' : ''
                 ]"
               >
                 <!-- Custom Radio Button Indicator -->
                 <div class="mt-0.5 relative flex items-center justify-center shrink-0">
-                  <input 
-                    type="radio" 
-                    v-model="selectedAddressId" 
-                    :value="addr.address_id" 
+                  <input
+                    type="radio"
+                    v-model="selectedAddressId"
+                    :value="addr.address_id"
                     :disabled="isLoadingCalculate || isLoadingCheckout"
-                    class="sr-only" 
+                    class="sr-only"
                   />
-                  <div 
+                  <div
                     class="w-5 h-5 rounded-full border transition-all flex items-center justify-center"
                     :class="selectedAddressId === addr.address_id ? 'border-[#1b4332] bg-[#1b4332]' : 'border-gray-300 bg-white'"
                   >
@@ -878,9 +1033,9 @@ const handlePlaceOrder = async () => {
 
             <!-- Shops and items -->
             <div v-if="checkoutData" class="space-y-6">
-              <div 
-                v-for="shop in checkoutData.shops" 
-                :key="shop.shop_id" 
+              <div
+                v-for="shop in checkoutData.shops"
+                :key="shop.shop_id"
                 class="border border-gray-200/80 rounded-2xl p-5 sm:p-6 space-y-5 bg-white shadow-2xs"
               >
                 <!-- Header Toko -->
@@ -896,19 +1051,19 @@ const handlePlaceOrder = async () => {
                     Subtotal: {{ formatRupiah(shop.subtotal) }}
                   </span>
                 </div>
-                
+
                 <!-- Items list in this shop -->
                 <div class="divide-y divide-gray-100">
-                  <div 
-                    v-for="item in shop.items" 
-                    :key="item.product_id" 
+                  <div
+                    v-for="(item, itemIdx) in shop.items"
+                    :key="item.cart_item_id || item.product_id || itemIdx"
                     class="flex gap-4 items-center py-4 first:pt-0 last:pb-0"
                   >
                     <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0 relative">
-                      <img 
-                        :src="getCartProductImage(item.product_id || '')" 
-                        :alt="item.name" 
-                        class="w-full h-full object-cover" 
+                      <img
+                        :src="getCartProductImage(item.product_id || '', item.cart_item_id)"
+                        :alt="item.name"
+                        class="w-full h-full object-cover"
                       />
                     </div>
                     <div class="flex-1 min-w-0">
@@ -917,9 +1072,27 @@ const handlePlaceOrder = async () => {
                         <span class="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">Qty: {{ item.quantity }}</span>
                         <span>•</span>
                         <span>{{ formatRupiah(item.price) }}</span>
-                        <span v-if="(item as any).custom_design || item.product_variant_type === 'custom'" class="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-emerald-200">
+
+                        <span
+                          v-if="(item as any).custom_design || item.product_variant_type === 'custom'"
+                          class="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-emerald-200"
+                        >
                           Custom Design
                         </span>
+                        <template v-else>
+                          <span
+                            v-if="item.item_options?.size || item.size"
+                            class="bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded text-[11px] font-semibold"
+                          >
+                            Size: {{ formatItemSize(item) }}
+                          </span>
+                          <span
+                            v-if="item.item_options?.jambul || item.jambul"
+                            class="bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded text-[11px] font-semibold border border-emerald-100"
+                          >
+                            Jambul: {{ formatItemJambul(item) }}
+                          </span>
+                        </template>
                       </div>
                     </div>
                     <div class="text-sm sm:text-base font-extrabold text-gray-900 text-right shrink-0">
@@ -938,14 +1111,14 @@ const handlePlaceOrder = async () => {
                   </div>
 
                   <div class="flex items-center w-full sm:w-auto">
-                    <select 
+                    <select
                       :value="getCourierSelectValue(shop.shop_id)"
                       @change="handleCourierChange(shop.shop_id, $event)"
                       :disabled="isLoadingCalculate || isLoadingCheckout"
                       class="w-full sm:w-auto bg-white border border-gray-200 rounded-xl text-xs sm:text-sm px-4 py-3 outline-none focus:border-[#4ade80] focus:ring-2 focus:ring-[#4ade80]/20 transition-all font-bold cursor-pointer text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
                     >
-                      <option 
-                        v-for="courier in getCourierOptions(shop.shop_id)" 
+                      <option
+                        v-for="courier in getCourierOptions(shop.shop_id)"
                         :key="courier.code + '|' + courier.service"
                         :value="courier.code + '|' + courier.service"
                       >
@@ -980,7 +1153,7 @@ const handlePlaceOrder = async () => {
               <span class="w-7 h-7 rounded-full bg-[#1b4332] text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
               <h2 class="font-extrabold text-gray-900 text-lg">Payment Gateway Channel</h2>
             </div>
-            
+
             <div class="space-y-4">
               <div v-if="paymentMethods.length === 0" class="text-center py-8 border-2 border-dashed border-gray-200 rounded-2xl p-4">
                 <p class="text-sm text-gray-500 font-medium">No payment channels currently available.</p>
@@ -988,9 +1161,9 @@ const handlePlaceOrder = async () => {
 
               <div v-else class="space-y-3.5">
                 <!-- Iterate over payment categories (types) -->
-                <div 
-                  v-for="type in paymentMethodTypes" 
-                  :key="type" 
+                <div
+                  v-for="type in paymentMethodTypes"
+                  :key="type"
                   class="border border-gray-200 rounded-2xl overflow-hidden transition-all duration-200"
                   :class="[openedCategories[type] ? 'border-[#1b4332] shadow-2xs' : 'hover:border-gray-300']"
                 >
@@ -1020,13 +1193,13 @@ const handlePlaceOrder = async () => {
                       <span>{{ formatPaymentType(type) }}</span>
                     </div>
 
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      class="w-4 h-4 text-gray-400 transition-transform duration-200" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="w-4 h-4 text-gray-400 transition-transform duration-200"
                       :class="[openedCategories[type] ? 'rotate-180 text-gray-700' : '']"
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor" 
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
                       stroke-width="2.5"
                     >
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -1034,31 +1207,31 @@ const handlePlaceOrder = async () => {
                   </button>
 
                   <!-- Accordion Content: Vertical Flat Radio List -->
-                  <div 
-                    v-show="openedCategories[type]" 
+                  <div
+                    v-show="openedCategories[type]"
                     class="p-4 bg-white border-t border-gray-100 flex flex-col space-y-2.5"
                   >
-                    <label 
-                      v-for="method in paymentMethodsGroupedByType[type]" 
+                    <label
+                      v-for="method in paymentMethodsGroupedByType[type]"
                       :key="method.id"
                       :class="[
                         'border rounded-xl px-4 py-3 flex items-center justify-between gap-3.5 cursor-pointer transition-all duration-200 select-none',
-                        selectedPaymentMethodId === method.id 
-                          ? 'border-[#1b4332] bg-emerald-50/25 ring-1 ring-[#1b4332] shadow-2xs' 
+                        selectedPaymentMethodId === method.id
+                          ? 'border-[#1b4332] bg-emerald-50/25 ring-1 ring-[#1b4332] shadow-2xs'
                           : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50/50',
                         (isLoadingCalculate || isLoadingCheckout) ? 'opacity-60 pointer-events-none cursor-not-allowed' : ''
                       ]"
                     >
                       <div class="flex items-center gap-3">
                         <div class="relative flex items-center justify-center shrink-0">
-                          <input 
-                            type="radio" 
-                            v-model="selectedPaymentMethodId" 
-                            :value="method.id" 
+                          <input
+                            type="radio"
+                            v-model="selectedPaymentMethodId"
+                            :value="method.id"
                             :disabled="isLoadingCalculate || isLoadingCheckout"
-                            class="sr-only" 
+                            class="sr-only"
                           />
-                          <div 
+                          <div
                             class="w-4.5 h-4.5 rounded-full border transition-all flex items-center justify-center"
                             :class="selectedPaymentMethodId === method.id ? 'border-[#1b4332] bg-[#1b4332]' : 'border-gray-300 bg-white'"
                           >
@@ -1088,13 +1261,13 @@ const handlePlaceOrder = async () => {
         <div class="lg:col-span-4 space-y-6 sticky top-24">
           <div class="bg-white border border-gray-100 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
             <h2 class="font-extrabold text-gray-900 text-lg border-b border-gray-100 pb-4">Billing Summary</h2>
-            
+
             <div class="space-y-3.5 text-xs sm:text-sm font-medium text-gray-600">
               <div class="flex justify-between items-center">
                 <span>Items Subtotal</span>
                 <span class="text-gray-900 font-bold">{{ formatRupiah(liveSubtotal) }}</span>
               </div>
-              
+
               <div class="flex justify-between items-center">
                 <span>Shipping Cost</span>
                 <span class="text-gray-900 font-bold">{{ formatRupiah(liveShippingFee) }}</span>
@@ -1106,7 +1279,7 @@ const handlePlaceOrder = async () => {
                   {{ livePaymentFee > 0 ? formatRupiah(livePaymentFee) : 'Free' }}
                 </span>
               </div>
-              
+
               <div class="border-t border-gray-100 pt-4 flex justify-between items-baseline">
                 <span class="text-sm font-bold text-gray-900">Total Bill</span>
                 <span class="text-2xl font-black text-[#1b4332] tracking-tight">
@@ -1116,7 +1289,7 @@ const handlePlaceOrder = async () => {
             </div>
 
             <!-- Primary CTA Action Button using CButton -->
-            <CButton 
+            <CButton
               @click="handlePlaceOrder"
               :disabled="isProcessing || addressVm.addresses.value.length === 0 || isLoadingCalculate || paymentMethods.length === 0 || !selectedPaymentMethodId"
               :loading="isProcessing"
@@ -1128,7 +1301,7 @@ const handlePlaceOrder = async () => {
               <span>Confirm & Pay Now</span>
             </CButton>
           </div>
-          
+
           <!-- Cryptographic Security Card -->
           <div class="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 flex gap-3.5 items-start text-emerald-900">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

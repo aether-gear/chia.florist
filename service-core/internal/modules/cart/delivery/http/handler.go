@@ -142,7 +142,12 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 			continue
 		}
 
-		price := productData.Product.Price
+		normOpts := item.ItemOptions.Normalized()
+		price := productDomain.CalculateStandardProductPrice(
+			productData.Product.Price,
+			normOpts.Size,
+			normOpts.Jambul,
+		)
 		quantity := item.Quantity
 		subtotal := price * int64(quantity)
 
@@ -163,6 +168,10 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) error {
 			Quantity:           quantity,
 			Subtotal:           subtotal,
 			Image:              image,
+			ItemOptions: &itemOptionsResponse{
+				Size:   normOpts.Size,
+				Jambul: normOpts.Jambul,
+			},
 		})
 
 		total += subtotal
@@ -218,7 +227,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 	} else {
-		// Standard path — existing logic preserved
+		// Standard path
 		if req.ProductID == nil {
 			return apperrors.NewBadRequest("product_id is required for standard items")
 		}
@@ -230,11 +239,24 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) error {
 			return apperrors.NewBadRequest("invalid quantity")
 		}
 
+		var opt domain.ItemOptions
+		if req.ItemOptions != nil {
+			opt.Size = req.ItemOptions.Size
+			opt.Jambul = req.ItemOptions.Jambul
+		}
+		if req.Size != "" && opt.Size == "" {
+			opt.Size = req.Size
+		}
+		if req.Jambul != "" && opt.Jambul == "" {
+			opt.Jambul = req.Jambul
+		}
+
 		input := usecase.AddItemInput{
-			CustomerID: *authCtx.CustomerID,
-			ProductID:  productID,
-			ShopID:     shopID,
-			Quantity:   req.Quantity,
+			CustomerID:  *authCtx.CustomerID,
+			ProductID:   productID,
+			ShopID:      shopID,
+			Quantity:    req.Quantity,
+			ItemOptions: opt.Normalized(),
 		}
 		if err := h.addItem.Execute(r.Context(), input); err != nil {
 			return err
@@ -278,14 +300,92 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid quantity")
 	}
 
+	var opt *domain.ItemOptions
+	if req.ItemOptions != nil || req.Size != "" || req.Jambul != "" {
+		var o domain.ItemOptions
+		if req.ItemOptions != nil {
+			o.Size = req.ItemOptions.Size
+			o.Jambul = req.ItemOptions.Jambul
+		}
+		if req.Size != "" && o.Size == "" {
+			o.Size = req.Size
+		}
+		if req.Jambul != "" && o.Jambul == "" {
+			o.Jambul = req.Jambul
+		}
+		norm := o.Normalized()
+		opt = &norm
+	}
+
 	input := usecase.UpdateItemInput{
-		CustomerID: *authCtx.CustomerID,
-		ProductID:  productID,
-		ShopID:     shopID,
-		Quantity:   req.Quantity,
+		CustomerID:  *authCtx.CustomerID,
+		ProductID:   productID,
+		ShopID:      shopID,
+		Quantity:    req.Quantity,
+		ItemOptions: opt,
 	}
 
 	if err := h.updateItem.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "item updated",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *CartHandler) UpdateItemByID(w http.ResponseWriter, r *http.Request) error {
+	var req updateItemByIDRequest
+
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewBadRequest("invalid request body")
+	}
+
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	cartItemID, err := apphttp.ParamUUID(r, "cartItemID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid cart item id")
+	}
+
+	if req.Quantity <= 0 {
+		return apperrors.NewBadRequest("invalid quantity")
+	}
+
+	var opt *domain.ItemOptions
+	if req.ItemOptions != nil || req.Size != "" || req.Jambul != "" {
+		var o domain.ItemOptions
+		if req.ItemOptions != nil {
+			o.Size = req.ItemOptions.Size
+			o.Jambul = req.ItemOptions.Jambul
+		}
+		if req.Size != "" && o.Size == "" {
+			o.Size = req.Size
+		}
+		if req.Jambul != "" && o.Jambul == "" {
+			o.Jambul = req.Jambul
+		}
+		norm := o.Normalized()
+		opt = &norm
+	}
+
+	input := usecase.UpdateItemByIDInput{
+		CustomerID:  *authCtx.CustomerID,
+		CartItemID:  cartItemID,
+		Quantity:    req.Quantity,
+		ItemOptions: opt,
+	}
+
+	if err := h.updateItem.ExecuteByID(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -316,13 +416,53 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
+	var opt *domain.ItemOptions
+	qSize := r.URL.Query().Get("size")
+	qJambul := r.URL.Query().Get("jambul")
+	if qSize != "" || qJambul != "" {
+		norm := domain.ItemOptions{Size: qSize, Jambul: qJambul}.Normalized()
+		opt = &norm
+	}
+
 	input := usecase.RemoveItemInput{
-		CustomerID: *authCtx.CustomerID,
-		ProductID:  productID,
-		ShopID:     shopID,
+		CustomerID:  *authCtx.CustomerID,
+		ProductID:   productID,
+		ShopID:      shopID,
+		ItemOptions: opt,
 	}
 
 	if err := h.removeItem.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "item removed",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *CartHandler) RemoveItemByID(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	cartItemID, err := apphttp.ParamUUID(r, "cartItemID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid cart item id")
+	}
+
+	input := usecase.RemoveItemByIDInput{
+		CustomerID: *authCtx.CustomerID,
+		CartItemID: cartItemID,
+	}
+
+	if err := h.removeItem.ExecuteByID(r.Context(), input); err != nil {
 		return err
 	}
 
@@ -411,6 +551,14 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 			if item.IsCustom || item.ProductID == nil {
 				variantType = "custom"
 			}
+			normOpts := item.ItemOptions.Normalized()
+			var itemOpts *itemOptionsResponse
+			if !item.IsCustom && item.ProductID != nil {
+				itemOpts = &itemOptionsResponse{
+					Size:   normOpts.Size,
+					Jambul: normOpts.Jambul,
+				}
+			}
 			itemsResponse = append(itemsResponse, checkoutItemResponse{
 				ProductID:          item.ProductID,
 				CartItemID:         item.CartItemID,
@@ -421,6 +569,7 @@ func (h *CartHandler) Checkout(w http.ResponseWriter, r *http.Request) error {
 				Price:              item.Price,
 				Quantity:           item.Quantity,
 				Subtotal:           item.Subtotal,
+				ItemOptions:        itemOpts,
 			})
 		}
 
@@ -529,6 +678,14 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 			if item.IsCustom || item.ProductID == nil {
 				variantType = "custom"
 			}
+			normOpts := item.ItemOptions.Normalized()
+			var itemOpts *itemOptionsResponse
+			if !item.IsCustom && item.ProductID != nil {
+				itemOpts = &itemOptionsResponse{
+					Size:   normOpts.Size,
+					Jambul: normOpts.Jambul,
+				}
+			}
 			itemsResponse = append(itemsResponse, checkoutItemResponse{
 				ProductID:          item.ProductID,
 				CartItemID:         item.CartItemID,
@@ -539,6 +696,7 @@ func (h *CartHandler) CheckoutEstimate(w http.ResponseWriter, r *http.Request) e
 				Price:              item.Price,
 				Quantity:           item.Quantity,
 				Subtotal:           item.Subtotal,
+				ItemOptions:        itemOpts,
 			})
 		}
 
@@ -692,10 +850,23 @@ func (h *CartHandler) parseCheckoutInput(
 				return usecase.CheckoutInput{}, apperrors.NewBadRequest("invalid quantity")
 			}
 
+			var opt domain.ItemOptions
+			if itemReq.ItemOptions != nil {
+				opt.Size = itemReq.ItemOptions.Size
+				opt.Jambul = itemReq.ItemOptions.Jambul
+			}
+			if itemReq.Size != "" && opt.Size == "" {
+				opt.Size = itemReq.Size
+			}
+			if itemReq.Jambul != "" && opt.Jambul == "" {
+				opt.Jambul = itemReq.Jambul
+			}
+
 			items = append(items, usecase.CheckoutItemInput{
 				ProductID:    productID,
 				CartItemID:   cartItemID,
 				IsCustom:     isCustom,
+				ItemOptions:  opt.Normalized(),
 				CustomDesign: itemReq.CustomDesign,
 				Quantity:     itemReq.Quantity,
 			})

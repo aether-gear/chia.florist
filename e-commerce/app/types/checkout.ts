@@ -1,5 +1,5 @@
-// app/types/checkout.ts
 import type { CustomDesignPayload } from '~/composables/useCart'
+import type { ItemOptions } from '~/types/cart'
 
 export interface CheckoutAddress {
   id: string
@@ -33,7 +33,9 @@ export interface CheckoutItem {
   product_variant_type?: 'standard' | 'custom'
   item_type?: 'standard' | 'custom'
   custom_design?: CustomDesignPayload
+  item_options?: ItemOptions
   size?: string
+  jambul?: string
   color?: string
 }
 
@@ -82,6 +84,9 @@ export interface CheckoutShopItemInput {
   quantity: number
   unit_price?: number
   custom_design?: CustomDesignPayload
+  item_options?: ItemOptions
+  size?: string
+  jambul?: string
 }
 
 export type CheckoutItemInput = CheckoutShopItemInput

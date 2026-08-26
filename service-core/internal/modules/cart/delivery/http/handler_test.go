@@ -82,3 +82,19 @@ func TestParseCheckoutInput_CustomDirectItemWithoutProductID(t *testing.T) {
 		t.Errorf("expected ProductID to be nil for custom product, got %v", item.ProductID)
 	}
 }
+
+func TestUpdateItemRequest_UnmarshalOptions(t *testing.T) {
+	body := `{"quantity": 3, "size": "large", "jambul": "top"}`
+	var req updateItemRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatalf("unexpected error unmarshaling updateItemRequest: %v", err)
+	}
+	if req.Quantity != 3 {
+		t.Errorf("expected quantity 3, got %d", req.Quantity)
+	}
+	if req.Size != "large" || req.Jambul != "top" {
+		t.Errorf("expected size large and jambul top, got size=%s jambul=%s", req.Size, req.Jambul)
+	}
+}
+
+

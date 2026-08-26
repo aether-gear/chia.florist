@@ -5,6 +5,7 @@ import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Glob
 import { logError } from '~/utils/errorMessages'
 
 import { migrateToV3, calculateDesignChecksum, normalizeHexColor } from '~/features/custom-product/migrate'
+import type { ItemOptions } from '~/types/cart'
 import type {
   TypographySpec, BoardSectionSpec, BorderSpec, CrestSpec,
   BaseElement, ImageElement, BrushElement, DesignElement,
@@ -25,6 +26,7 @@ export const migrateCustomDesignPayload = (raw: any): CustomDesignPayloadV3 => {
 
 export interface CartItem {
   id: string
+  productId?: string
   cartItemId?: string
   name: string
   price: number
@@ -33,6 +35,8 @@ export interface CartItem {
   quantity: number
   size?: string
   color?: string
+  jambul?: string
+  itemOptions?: ItemOptions
   isCustom?: boolean
   itemType?: 'standard' | 'custom'
   productVariantType?: 'standard' | 'custom'
@@ -63,6 +67,11 @@ export interface Order {
 interface PendingEntry {
   quantity: number
   shopId: string
+  isCustom?: boolean
+  customDesign?: CustomDesignPayload
+  name?: string
+  size?: string
+  price?: number
   timeoutId: ReturnType<typeof setTimeout> | null
 }
 
@@ -349,15 +358,20 @@ export const useCart = () => {
                   const parsed = JSON.parse(savedAttr)
                   if (parsed.size) size = parsed.size
                   if (parsed.color) color = parsed.color
-                  if (parsed.price) price = Number(parsed.price)
                 } catch (e) {
                   console.error('Failed to parse saved cart attributes:', e)
                 }
               }
             }
 
+            const itemOptions = item.item_options || {
+              size: (item.size || 'small') as 'small' | 'medium' | 'large',
+              jambul: (item.jambul || 'none') as 'none' | 'top' | 'bottom' | 'both'
+            }
+
             return {
-              id: item.product_id || cartItemId,
+              id: cartItemId,
+              productId: item.product_id,
               cartItemId: cartItemId,
               name: item.name,
               price: price,
@@ -371,7 +385,9 @@ export const useCart = () => {
               isCustom: false,
               itemType: 'standard',
               productVariantType: 'standard',
-              size: size, 
+              itemOptions: itemOptions,
+              size: itemOptions.size || size,
+              jambul: itemOptions.jambul || 'none',
               color: color
             }
           })
@@ -413,15 +429,28 @@ export const useCart = () => {
     const pendingKeys = Object.keys(pendingUpdates)
     if (pendingKeys.length === 0) return
 
-    const updatePromises = pendingKeys.map(async (productId) => {
-      const pending = pendingUpdates[productId]
+    const updatePromises = pendingKeys.map(async (cartItemId) => {
+      const pending = pendingUpdates[cartItemId]
       if (!pending) return
       clearTimeout(pending.timeoutId ?? undefined)
       const qty = pending.quantity
-      const shopId = pending.shopId
-      delete pendingUpdates[productId]
+      delete pendingUpdates[cartItemId]
       try {
-        await cartService.updateItem(shopId, productId, qty)
+        if (pending.isCustom) {
+          await cartService.removeItemById(cartItemId)
+          await cartService.addItem({
+            product_variant_type: 'custom',
+            item_type: 'custom',
+            shop_id: pending.shopId || '99ef0062-1040-4574-a4be-0123abce5670',
+            quantity: qty,
+            product_name: pending.name,
+            physical_size_id: pending.size || 'medium',
+            unit_price: pending.price,
+            custom_design: pending.customDesign
+          })
+        } else {
+          await cartService.updateItemById(cartItemId, qty)
+        }
       } catch (err) {
         logError('useCart', err)
       }
@@ -432,9 +461,10 @@ export const useCart = () => {
 
   const addToCart = async (item: Omit<CartItem, 'quantity'>, qty = 1) => {
     if (import.meta.client && !item.isCustom) {
-      localStorage.setItem(`cart_attr_${item.id}`, JSON.stringify({
+      localStorage.setItem(`cart_attr_${item.productId || item.id}`, JSON.stringify({
         size: item.size,
         color: item.color,
+        jambul: item.jambul,
         price: item.price
       }))
     }
@@ -460,21 +490,22 @@ export const useCart = () => {
           console.error('Failed to add custom item to backend cart:', err)
         }
       } else {
+        const localId = item.id || `custom-${Date.now()}`
         const existingItem = cart.value.find(
-          i => i.id === item.id || (i.isCustom && i.name === item.name && i.size === item.size && i.color === item.color)
+          i => i.isCustom && i.name === item.name && i.size === item.size && i.color === item.color
         )
         if (existingItem) {
           existingItem.quantity += qty
           if (designPayload) existingItem.customDesign = designPayload
         } else {
-          cart.value.push({ ...item, customDesign: designPayload, quantity: qty, itemType: 'custom' })
+          cart.value.push({ ...item, id: localId, customDesign: designPayload, quantity: qty, itemType: 'custom' })
         }
       }
       
       if (import.meta.client && designPayload) {
         try {
           localStorage.setItem(`custom_design_${item.id}`, JSON.stringify(designPayload))
-          console.info('[Chia Florist] Custom Design Payload v1.0.0 (persisted):', designPayload)
+          console.info('[Chia Florist] Custom Design Payload (persisted):', designPayload)
         } catch (e) {
           console.warn('Could not persist custom design to localStorage:', e)
         }
@@ -485,13 +516,20 @@ export const useCart = () => {
     if (isLoggedIn.value === 'true') {
       try {
         const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
+        const itemOptions = item.itemOptions || {
+          size: (item.size || 'small') as 'small' | 'medium' | 'large',
+          jambul: (item.jambul || 'none') as 'none' | 'top' | 'bottom' | 'both'
+        }
         
         await cartService.addItem({ 
           product_variant_type: 'standard',
           item_type: 'standard',
-          product_id: item.id, 
+          product_id: item.productId || item.id, 
           shop_id: shopId, 
-          quantity: qty
+          quantity: qty,
+          item_options: itemOptions,
+          size: itemOptions.size,
+          jambul: itemOptions.jambul
         })
         
         await loadCart(true)
@@ -499,48 +537,52 @@ export const useCart = () => {
         console.error(err)
       }
     } else {
-      const existingItem = cart.value.find(i => i.id === item.id)
-      if (existingItem) existingItem.quantity += qty
-      else cart.value.push({ ...item, quantity: qty, itemType: 'standard' })
+      const prodId = item.productId || item.id
+      const targetSize = item.itemOptions?.size || item.size || 'small'
+      const targetJambul = item.itemOptions?.jambul || item.jambul || 'none'
+      const existingItem = cart.value.find(i => 
+        !i.isCustom &&
+        (i.productId === prodId || i.id === prodId) && 
+        (i.itemOptions?.size || i.size || 'small') === targetSize &&
+        (i.itemOptions?.jambul || i.jambul || 'none') === targetJambul
+      )
+      if (existingItem) {
+        existingItem.quantity += qty
+      } else {
+        const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        cart.value.push({ ...item, id: localId, productId: prodId, quantity: qty, itemType: 'standard' })
+      }
     }
   }
 
   const removeFromCart = async (id: string, size?: string, color?: string) => {
-    if (import.meta.client) {
-      localStorage.removeItem(`cart_attr_${id}`)
-    }
-    const item = cart.value.find(i => i.id === id)
+    const item = cart.value.find(i => i.id === id || i.cartItemId === id)
     if (!item) return
 
-    if (item.isCustom) {
-      cart.value = cart.value.filter(i => i.id !== id)
-      if (isLoggedIn.value === 'true') {
-        try {
-          const cartItemId = item.cartItemId || id
-          await cartService.removeCustomItem(cartItemId)
-          await loadCart(true)
-        } catch (err) {
-          console.error('Failed to remove custom item from backend:', err)
-        }
-      }
-      return
+    if (import.meta.client) {
+      localStorage.removeItem(`cart_attr_${item.productId || item.id}`)
     }
+
+    const cartItemId = item.cartItemId || item.id
 
     if (isLoggedIn.value === 'true') {
       try {
-        const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
-        await cartService.removeItem(shopId, id)
+        if (item.isCustom) {
+          await cartService.removeItemById(cartItemId)
+        } else {
+          await cartService.removeItemById(cartItemId)
+        }
         await loadCart(true)
       } catch (err) {
-        console.error(err)
+        console.error('Failed to remove item from backend:', err)
       }
     } else {
-      cart.value = cart.value.filter(i => i.id !== id)
+      cart.value = cart.value.filter(i => i.id !== id && i.cartItemId !== id)
     }
   }
 
   const updateQuantity = async (id: string, size: string | undefined, color: string | undefined, change: number) => {
-    const item = cart.value.find(i => i.id === id)
+    const item = cart.value.find(i => i.id === id || i.cartItemId === id)
     if (!item) return
 
     const MAX_CART_QTY = 80
@@ -554,19 +596,25 @@ export const useCart = () => {
     item.quantity = newQty
 
     if (isLoggedIn.value === 'true') {
+      const cartItemId = item.cartItemId || item.id
       const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
 
-      if (pendingUpdates[id]?.timeoutId) {
-        clearTimeout(pendingUpdates[id].timeoutId!)
+      if (pendingUpdates[cartItemId]?.timeoutId) {
+        clearTimeout(pendingUpdates[cartItemId].timeoutId!)
       }
 
-      pendingUpdates[id] = {
+      pendingUpdates[cartItemId] = {
         quantity: newQty,
         shopId,
+        isCustom: item.isCustom,
+        customDesign: item.customDesign,
+        name: item.name,
+        size: item.size,
+        price: item.price,
         timeoutId: setTimeout(async () => {
           try {
             if (item.isCustom) {
-              await cartService.removeCustomItem(id)
+              await cartService.removeItemById(cartItemId)
               const designPayload = item.customDesign ? migrateCustomDesignPayload(item.customDesign) : undefined
               await cartService.addItem({
                 product_variant_type: 'custom',
@@ -579,13 +627,13 @@ export const useCart = () => {
                 custom_design: designPayload
               })
             } else {
-              await cartService.updateItem(shopId, id, newQty)
+              await cartService.updateItemById(cartItemId, newQty)
             }
             await loadCart(true)
           } catch (err) {
             console.error('Backend sync failed:', err)
           } finally {
-            delete pendingUpdates[id]
+            delete pendingUpdates[cartItemId]
           }
         }, 400) as any
       }
@@ -608,29 +656,20 @@ export const useCart = () => {
       await flushCart() // Ensure no race condition with pending additions/updates
       for (const item of orderItems) {
         if (import.meta.client) {
-          localStorage.removeItem(`cart_attr_${item.id}`)
+          localStorage.removeItem(`cart_attr_${item.productId || item.id}`)
         }
-        if (item.isCustom) {
-          try {
-            const cartItemId = (item as any).cartItemId || item.id
-            await cartService.removeCustomItem(cartItemId)
-          } catch (err) {
-            console.error(`Failed to remove custom item ${item.id} from backend cart on checkout:`, err)
-          }
-        } else {
-          try {
-            const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
-            await cartService.removeItem(shopId, item.id)
-          } catch (err) {
-            console.error(`Failed to remove item ${item.id} from backend cart on checkout:`, err)
-          }
+        const cartItemId = item.cartItemId || item.id
+        try {
+          await cartService.removeItemById(cartItemId)
+        } catch (err) {
+          console.error(`Failed to remove item ${cartItemId} from backend cart on checkout:`, err)
         }
       }
       await loadCart(true)
     } else {
       for (const item of orderItems) {
         if (import.meta.client) {
-          localStorage.removeItem(`cart_attr_${item.id}`)
+          localStorage.removeItem(`cart_attr_${item.productId || item.id}`)
         }
       }
     }

@@ -23,8 +23,8 @@ const productAvailabilityMap = useState<Record<string, { slug: string; name: str
 const fetchingIdentifiers = new Set<string>()
 
 const fetchCartItemsAvailability = async () => {
-  const standardItems = cart.value.filter(i => !i.isCustom && (i.slug || i.id))
-  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.id).filter(Boolean))]
+  const standardItems = cart.value.filter(i => !i.isCustom && (i.slug || i.productId || i.id))
+  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.productId || i.id).filter(Boolean))]
 
   const promises = uniqueIdentifiers.map(async (identifier) => {
     if (identifier && !productAvailabilityMap.value[identifier] && !fetchingIdentifiers.has(identifier)) {
@@ -70,8 +70,8 @@ const getAvailableShopsForItem = (item: any) => {
   if (item.isCustom) {
     return activeShops.value
   }
-  const identifier = item.slug || item.id
-  const avail = productAvailabilityMap.value[identifier] || (item.id ? productAvailabilityMap.value[item.id] : null)
+  const identifier = item.slug || item.productId || item.id
+  const avail = productAvailabilityMap.value[identifier] || (item.productId ? productAvailabilityMap.value[item.productId] : null) || (item.id ? productAvailabilityMap.value[item.id] : null)
   if (Array.isArray(avail)) {
     const inStockSlugs = avail.filter(a => a.stock > 0).map(a => a.name)
     const filtered = activeShops.value.filter(s => inStockSlugs.includes(s.slug) || s.id === item.shopId)
@@ -266,7 +266,7 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
               </span>
             </div>
 
-            <div v-for="(item, idx) in group.items" :key="item.id || idx" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
+            <div v-for="(item, idx) in group.items" :key="item.cartItemId || item.id || idx" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
               <div class="w-full sm:w-28 h-28 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 relative">
                 <img 
                   :src="item.image || '/images/custom-preview.png'" 
@@ -280,13 +280,21 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
                 <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div class="min-w-0 flex-1">
                     <h3 class="font-bold text-gray-900 text-lg leading-snug break-words">{{ item.name }}</h3>
-                    <div class="flex flex-wrap gap-2.5 mt-2 text-xs text-gray-500 font-medium">
+                    <div class="flex flex-wrap gap-2 mt-2 text-xs text-gray-500 font-medium">
                       <span v-if="item.isCustom" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold flex items-center gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
                         </svg>
                         <span>Custom Board</span>
                       </span>
+                      <template v-else>
+                        <span v-if="item.itemOptions?.size || item.size" class="bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-md font-semibold text-[11px]">
+                          Size: {{ item.itemOptions?.size ? (item.itemOptions.size === 'small' ? '1.5 × 2.0m (Small)' : item.itemOptions.size === 'medium' ? '1.8 × 2.5m (Medium)' : '2.0 × 3.0m (Large)') : item.size }}
+                        </span>
+                        <span v-if="item.itemOptions?.jambul || item.jambul" class="bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-md font-semibold text-[11px]">
+                          Jambul: {{ (item.itemOptions?.jambul || item.jambul) === 'none' ? 'None' : (item.itemOptions?.jambul || item.jambul) === 'top' ? 'Top Crest' : (item.itemOptions?.jambul || item.jambul) === 'bottom' ? 'Bottom Crest' : 'Both (Top & Bottom)' }}
+                        </span>
+                      </template>
                     </div>
 
                     <!-- Store Branch Transfer Dropdown (PATCH /carts/items/{cartItemID}/shop) -->

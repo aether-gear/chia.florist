@@ -1,6 +1,5 @@
-// app/services/cartService.ts
 import { bootstrapConfig } from '~/utils/bootstrap'
-import type { BackendCartResponse } from '~/types/cart'
+import type { BackendCartResponse, ItemOptions } from '~/types/cart'
 import type { CheckoutRequest, CheckoutResponse } from '~/types/checkout'
 import type { CustomDesignPayload } from '~/composables/useCart'
 
@@ -12,6 +11,9 @@ export interface AddCartItemPayload {
   product_name?: string
   physical_size_id?: string
   unit_price?: number
+  item_options?: ItemOptions
+  size?: string
+  jambul?: string
   custom_design?: CustomDesignPayload
 }
 
@@ -36,14 +38,30 @@ export const cartService = {
     })
   },
 
+  async updateItemById(cartItemId: string, quantity: number, options?: ItemOptions): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}`, {
+      method: 'PUT',
+      body: {
+        quantity,
+        ...(options ? { item_options: options, size: options.size, jambul: options.jambul } : {})
+      }
+    })
+  },
+
   async removeItem(shopId: string, productId: string): Promise<{ message: string }> {
     return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${shopId}/${productId}`, {
       method: 'DELETE'
     })
   },
 
+  async removeItemById(cartItemId: string): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}`, {
+      method: 'DELETE'
+    })
+  },
+
   async removeCustomItem(cartItemId: string): Promise<{ message: string }> {
-    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/custom/${cartItemId}`, {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}`, {
       method: 'DELETE'
     })
   },
