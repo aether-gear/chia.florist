@@ -37,7 +37,8 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			ci.product_id,
 			ci.shop_id,
 			ci.quantity,
-			ci.custom_design
+			ci.custom_design,
+			ci.item_options
 		FROM carts c
 		LEFT JOIN
 			cart_items ci ON ci.cart_id = c.id
@@ -68,6 +69,7 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			shopID             *uuid.UUID
 			quantity           *int
 			customDesign       []byte
+			rawOptions         []byte
 		)
 
 		err := rows.Scan(
@@ -81,6 +83,7 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			&shopID,
 			&quantity,
 			&customDesign,
+			&rawOptions,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("mapping cart with items model to domain failed: %w", err)
@@ -101,12 +104,19 @@ func (r *cartRepositoryImpl) GetWithItemsByCustomerID(
 			if ProductVariantType != nil && *ProductVariantType == string(domain.ProductVariantTypeCustom) {
 				it = domain.ProductVariantTypeCustom
 			}
+
+			var itemOptions domain.ItemOptions
+			if len(rawOptions) > 0 {
+				_ = json.Unmarshal(rawOptions, &itemOptions)
+			}
+
 			cart.Items = append(cart.Items, domain.CartItem{
 				ID:                 *itemID,
 				ProductVariantType: it,
 				ProductID:          productID,
 				ShopID:             *shopID,
 				Quantity:           *quantity,
+				ItemOptions:        itemOptions.Normalized(),
 				CustomDesign:       json.RawMessage(customDesign),
 			})
 		}
@@ -159,20 +169,21 @@ func (r *cartRepositoryImpl) Save(
 ) error {
 	const insertStandardQuery = `
 		INSERT INTO cart_items (
+			id,
 			cart_id,
 			product_variant_type,
 			product_id,
 			shop_id,
-			quantity
+			quantity,
+			item_options
 		)
-		VALUES ($1,'standard',$2,$3,$4)
-		ON CONFLICT (cart_id, product_id)
-		WHERE deleted_at IS NULL
-			AND product_variant_type = 'standard'
+		VALUES ($1,$2,'standard',$3,$4,$5,$6::jsonb)
+		ON CONFLICT (id)
 		DO UPDATE SET
-			shop_id    = EXCLUDED.shop_id,
-			quantity   = EXCLUDED.quantity,
-			updated_at = NOW()
+			shop_id      = EXCLUDED.shop_id,
+			quantity     = EXCLUDED.quantity,
+			item_options = EXCLUDED.item_options,
+			updated_at   = NOW()
 	`
 
 	const insertCustomQuery = `
@@ -184,7 +195,7 @@ func (r *cartRepositoryImpl) Save(
 	        quantity,
 	        custom_design
 	    )
-	    VALUES ($1,$2,'custom',$3,$4,$5)
+	    VALUES ($1,$2,'custom',$3,$4,$5::jsonb)
 	    ON CONFLICT (id)
 	    DO UPDATE SET
 	        shop_id       = EXCLUDED.shop_id,
@@ -210,6 +221,10 @@ func (r *cartRepositoryImpl) Save(
 			continue
 		}
 
+		if item.ID == uuid.Nil {
+			item.ID = uuid.New()
+		}
+
 		var (
 			query     string
 			args      []any
@@ -219,22 +234,29 @@ func (r *cartRepositoryImpl) Save(
 		switch item.ProductVariantType {
 		case domain.ProductVariantTypeCustom:
 			query = insertCustomQuery
+			var customDesignArg any
+			if len(item.CustomDesign) > 0 {
+				customDesignArg = string(item.CustomDesign)
+			}
 			args = []any{
 				item.ID,
 				cart.ID,
 				item.ShopID,
 				item.Quantity,
-				item.CustomDesign,
+				customDesignArg,
 			}
 			errFormat = "insert custom cart item failed: %w"
 
 		case domain.ProductVariantTypeStandard:
 			query = insertStandardQuery
+			optBytes, _ := json.Marshal(item.ItemOptions.Normalized())
 			args = []any{
+				item.ID,
 				cart.ID,
 				item.ProductID,
 				item.ShopID,
 				item.Quantity,
+				string(optBytes),
 			}
 			errFormat = "insert standard cart item failed: %w"
 

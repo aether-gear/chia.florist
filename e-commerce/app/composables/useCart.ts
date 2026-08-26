@@ -5,6 +5,7 @@ import { formatRupiah } from '~/utils/formatter' // Import Formatter Rupiah Glob
 import { logError } from '~/utils/errorMessages'
 
 import { migrateToV3, calculateDesignChecksum, normalizeHexColor } from '~/features/custom-product/migrate'
+import type { ItemOptions } from '~/types/cart'
 import type {
   TypographySpec, BoardSectionSpec, BorderSpec, CrestSpec,
   BaseElement, ImageElement, BrushElement, DesignElement,
@@ -33,6 +34,8 @@ export interface CartItem {
   quantity: number
   size?: string
   color?: string
+  jambul?: string
+  itemOptions?: ItemOptions
   isCustom?: boolean
   itemType?: 'standard' | 'custom'
   productVariantType?: 'standard' | 'custom'
@@ -349,11 +352,15 @@ export const useCart = () => {
                   const parsed = JSON.parse(savedAttr)
                   if (parsed.size) size = parsed.size
                   if (parsed.color) color = parsed.color
-                  if (parsed.price) price = Number(parsed.price)
                 } catch (e) {
                   console.error('Failed to parse saved cart attributes:', e)
                 }
               }
+            }
+
+            const itemOptions = item.item_options || {
+              size: (item.size || 'small') as 'small' | 'medium' | 'large',
+              jambul: (item.jambul || 'none') as 'none' | 'top' | 'bottom' | 'both'
             }
 
             return {
@@ -371,7 +378,9 @@ export const useCart = () => {
               isCustom: false,
               itemType: 'standard',
               productVariantType: 'standard',
-              size: size, 
+              itemOptions: itemOptions,
+              size: itemOptions.size || size,
+              jambul: itemOptions.jambul || 'none',
               color: color
             }
           })
@@ -435,6 +444,7 @@ export const useCart = () => {
       localStorage.setItem(`cart_attr_${item.id}`, JSON.stringify({
         size: item.size,
         color: item.color,
+        jambul: item.jambul,
         price: item.price
       }))
     }
@@ -485,13 +495,20 @@ export const useCart = () => {
     if (isLoggedIn.value === 'true') {
       try {
         const shopId = item.shopId || '99ef0062-1040-4574-a4be-0123abce5670'
+        const itemOptions = item.itemOptions || {
+          size: (item.size || 'small') as 'small' | 'medium' | 'large',
+          jambul: (item.jambul || 'none') as 'none' | 'top' | 'bottom' | 'both'
+        }
         
         await cartService.addItem({ 
           product_variant_type: 'standard',
           item_type: 'standard',
           product_id: item.id, 
           shop_id: shopId, 
-          quantity: qty
+          quantity: qty,
+          item_options: itemOptions,
+          size: itemOptions.size,
+          jambul: itemOptions.jambul
         })
         
         await loadCart(true)
@@ -499,7 +516,13 @@ export const useCart = () => {
         console.error(err)
       }
     } else {
-      const existingItem = cart.value.find(i => i.id === item.id)
+      const targetSize = item.itemOptions?.size || item.size || 'small'
+      const targetJambul = item.itemOptions?.jambul || item.jambul || 'none'
+      const existingItem = cart.value.find(i => 
+        i.id === item.id && 
+        (i.itemOptions?.size || i.size || 'small') === targetSize &&
+        (i.itemOptions?.jambul || i.jambul || 'none') === targetJambul
+      )
       if (existingItem) existingItem.quantity += qty
       else cart.value.push({ ...item, quantity: qty, itemType: 'standard' })
     }

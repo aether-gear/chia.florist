@@ -501,6 +501,16 @@ export const OrderDetailInspector: React.FC<OrderDetailInspectorProps> = ({
                       <td className="p-3">
                         <div className="font-semibold text-foreground flex items-center gap-1.5 flex-wrap">
                           <span>{item.product_name}</span>
+                          {item.item_options?.size && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-muted text-muted-foreground border border-border/50">
+                              Size: {item.item_options.size === 'small' ? '1.5 × 2.0m' : item.item_options.size === 'medium' ? '1.8 × 2.5m' : item.item_options.size === 'large' ? '2.0 × 3.0m' : item.item_options.size}
+                            </span>
+                          )}
+                          {item.item_options?.jambul && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                              Jambul: {item.item_options.jambul === 'none' ? 'None' : item.item_options.jambul === 'top' ? 'Top' : item.item_options.jambul === 'bottom' ? 'Bottom' : item.item_options.jambul === 'both' ? 'Both' : item.item_options.jambul}
+                            </span>
+                          )}
                           {isMyItem && (
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/15 text-primary">
                               Your Shop

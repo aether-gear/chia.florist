@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	authenDomain "service-core/internal/modules/authentication/domain"
+	cartDomain "service-core/internal/modules/cart/domain"
 	orderRepo "service-core/internal/modules/order/repository"
 	transaction "service-core/internal/shared/transaction"
 
@@ -30,6 +31,7 @@ type CheckoutItemInput struct {
 	ProductID    *uuid.UUID
 	CartItemID   *uuid.UUID
 	IsCustom     bool
+	ItemOptions  cartDomain.ItemOptions
 	CustomDesign json.RawMessage
 	Quantity     int
 }
@@ -70,6 +72,7 @@ type CheckoutItemResult struct {
 	ProductID   *uuid.UUID
 	CartItemID  *uuid.UUID
 	IsCustom    bool
+	ItemOptions cartDomain.ItemOptions
 	ShopID      uuid.UUID
 	Name        string
 	Price       int64
@@ -156,6 +159,7 @@ func (u *CheckoutUsecase) Execute(
 					ProductID:    item.ProductID,
 					CartItemID:   item.CartItemID,
 					IsCustom:     item.IsCustom,
+					ItemOptions:  item.ItemOptions,
 					CustomDesign: item.CustomDesign,
 					Quantity:     item.Quantity,
 				},
@@ -220,6 +224,7 @@ func (u *CheckoutUsecase) Execute(
 					ProductID:   item.ProductID,
 					CartItemID:  item.CartItemID,
 					IsCustom:    item.IsCustom,
+					ItemOptions: item.ItemOptions,
 					ShopID:      shop.ShopID,
 					Name:        item.ProductName,
 					Price:       item.UnitPrice,

@@ -1,4 +1,7 @@
-// app/types/cart.ts
+export interface ItemOptions {
+  size: 'small' | 'medium' | 'large'
+  jambul: 'none' | 'top' | 'bottom' | 'both'
+}
 
 export interface BackendCartItem {
   cart_item_id: string
@@ -14,6 +17,7 @@ export interface BackendCartItem {
   images: {
     thumbnail?: string | null
   }
+  item_options?: ItemOptions
   custom_design?: Record<string, any>
 }
 

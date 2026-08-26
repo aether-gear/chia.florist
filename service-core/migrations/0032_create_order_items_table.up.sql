@@ -19,6 +19,8 @@ CREATE TABLE order_items (
     unit_price BIGINT NOT NULL,
     subtotal BIGINT NOT NULL,
 
+    item_options JSONB NOT NULL DEFAULT '{}',
+
     CONSTRAINT fk_order_items_order_id
         FOREIGN KEY (order_id)
         REFERENCES orders(id)

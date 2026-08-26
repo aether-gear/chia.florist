@@ -80,8 +80,76 @@ watch(productId, (newId) => {
 
 const activeImage = ref(product.value?.images?.[0] || '')
 const selectedColor = ref(product.value?.colors?.[0] || '')
-const selectedSize = ref('1.8m') // Default ukuran tengah standar
+const selectedSize = ref<'small' | 'medium' | 'large'>('small')
+const selectedJambul = ref<'none' | 'top' | 'bottom' | 'both'>('none')
+const isJambulEnabled = ref(false)
+const isJambulTop = ref(false)
+const isJambulBottom = ref(false)
 const quantity = ref(1)
+
+const SIZE_OPTIONS = [
+  { id: 'small', name: 'Small (1.5 × 2.0m)', dimension: '1.5 × 2.0m', label: 'Small', addon: 0 },
+  { id: 'medium', name: 'Medium (1.8 × 2.5m)', dimension: '1.8 × 2.5m', label: 'Medium', addon: 50000 },
+  { id: 'large', name: 'Large (2.0 × 3.0m)', dimension: '2.0 × 3.0m', label: 'Large', addon: 100000 }
+] as const
+
+const JAMBUL_POSITION_OPTIONS = [
+  { id: 'top', name: 'Jambul Atas', label: 'Top Crest', addon: 25000 },
+  { id: 'bottom', name: 'Jambul Bawah', label: 'Bottom Crest', addon: 25000 },
+  { id: 'both', name: 'Jambul Atas & Bawah', label: 'Top & Bottom', addon: 50000 }
+] as const
+
+const JAMBUL_OPTIONS = [
+  { id: 'none', name: 'Tanpa Jambul', label: 'None', addon: 0 },
+  ...JAMBUL_POSITION_OPTIONS
+] as const
+
+const updateJambulFromSelections = () => {
+  if (isJambulTop.value && isJambulBottom.value) {
+    selectedJambul.value = 'both'
+    isJambulEnabled.value = true
+  } else if (isJambulTop.value) {
+    selectedJambul.value = 'top'
+    isJambulEnabled.value = true
+  } else if (isJambulBottom.value) {
+    selectedJambul.value = 'bottom'
+    isJambulEnabled.value = true
+  } else {
+    selectedJambul.value = 'none'
+    isJambulEnabled.value = false
+  }
+}
+
+const handleToggleMainJambul = () => {
+  if (!isJambulEnabled.value) {
+    isJambulEnabled.value = true
+    isJambulTop.value = true
+    isJambulBottom.value = true
+    selectedJambul.value = 'both'
+  } else {
+    isJambulEnabled.value = false
+    isJambulTop.value = false
+    isJambulBottom.value = false
+    selectedJambul.value = 'none'
+  }
+}
+
+const handleToggleTopJambul = () => {
+  isJambulTop.value = !isJambulTop.value
+  updateJambulFromSelections()
+}
+
+const handleToggleBottomJambul = () => {
+  isJambulBottom.value = !isJambulBottom.value
+  updateJambulFromSelections()
+}
+
+const jambulHeaderLabel = computed(() => {
+  if (selectedJambul.value === 'both') return 'Jambul Atas & Bawah (+Rp 50.000)'
+  if (selectedJambul.value === 'top') return 'Jambul Atas (+Rp 25.000)'
+  if (selectedJambul.value === 'bottom') return 'Jambul Bawah (+Rp 25.000)'
+  return 'Tanpa Jambul'
+})
 
 // Filter only branches with active stock (> 0) for this product
 const inStockBranches = computed(() => {
@@ -118,7 +186,11 @@ watch(product, (newProduct) => {
   if (newProduct) {
     if (!activeImage.value) activeImage.value = newProduct.images[0] || ''
     if (!selectedColor.value) selectedColor.value = newProduct.colors[0] || ''
-    selectedSize.value = '1.8m'
+    selectedSize.value = 'small'
+    selectedJambul.value = 'none'
+    isJambulEnabled.value = false
+    isJambulTop.value = false
+    isJambulBottom.value = false
     quantity.value = 1
 
     selectAvailableBranchForProduct()
@@ -248,17 +320,16 @@ const selectedBranchStock = computed(() => {
   return 0
 })
 
-// FIX DINAMIS: Kalkulasi perubahan harga berdasarkan modifikasi ukuran (Size)
+// Non-negative additive pricing model for regular products:
+// Baseline price = Small size + None jambul.
 const displayPrice = computed(() => {
   if (!product.value) return 0
   const basePrice = Number(product.value.price)
-  
-  if (selectedSize.value === '1.5m') {
-    return basePrice - 20000 // Jika ukuran kecil, potong Rp20.000
-  } else if (selectedSize.value === '2m') {
-    return basePrice + 30000 // Jika ukuran jumbo, tambah Rp30.000
-  }
-  return basePrice
+  const sizeOption = SIZE_OPTIONS.find(s => s.id === selectedSize.value)
+  const sizeAddon = sizeOption ? sizeOption.addon : 0
+  const jambulOption = JAMBUL_OPTIONS.find(j => j.id === selectedJambul.value)
+  const jambulAddon = jambulOption ? jambulOption.addon : 0
+  return Math.max(0, basePrice + sizeAddon + jambulAddon)
 })
 
 const handleAddToCart = () => {
@@ -272,14 +343,19 @@ const handleAddToCart = () => {
   addToCart({
     id: product.value.id,
     name: product.value.name,
-    price: displayPrice.value, // Kirim harga ter-kalkulasi baru ke keranjang
+    price: displayPrice.value,
     image: activeImage.value,
     size: selectedSize.value,
+    jambul: selectedJambul.value,
+    itemOptions: {
+      size: selectedSize.value,
+      jambul: selectedJambul.value
+    },
     color: selectedColor.value,
     shopId: resolvedShopId.value,
     isCustom: false
   }, quantity.value)
-  
+
   globalAlert.showSuccess(
     'Added to Cart',
     `${product.value.name} (Qty: ${quantity.value}) has been added to your shopping cart.`,
@@ -307,6 +383,7 @@ const handleBuyNow = () => {
       price: displayPrice.value.toString(),
       image: activeImage.value,
       size: selectedSize.value,
+      jambul: selectedJambul.value,
       color: selectedColor.value,
       qty: quantity.value.toString(),
       shopId: resolvedShopId.value
@@ -321,7 +398,7 @@ useHead({
 
 <template>
   <div class="max-w-7xl mx-auto px-8 py-12 mt-10 font-sans">
-    
+
     <div v-if="isLoading" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
       <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1b4332]"></div>
       <p class="text-gray-500 font-medium animate-pulse text-sm">Loading product details...</p>
@@ -350,11 +427,11 @@ useHead({
       </nav>
 
       <div class="grid grid-cols-1 md:grid-cols-12 gap-12">
-        
+
         <div class="md:col-span-7 flex flex-col-reverse md:flex-row gap-6">
           <div class="flex md:flex-col gap-4">
-            <button 
-              v-for="(img, idx) in product.images" 
+            <button
+              v-for="(img, idx) in product.images"
               :key="idx"
               @click="activeImage = img"
               :class="['w-20 h-20 border-2 rounded-lg overflow-hidden transition-all', activeImage === img ? 'border-[#1b4332] scale-105 shadow-sm' : 'border-gray-100']"
@@ -398,8 +475,147 @@ useHead({
           </div>
           <p class="text-gray-600 text-sm leading-relaxed border-b border-gray-100 pb-6">{{ product.description }}</p>
 
+          <!-- 1. Size Selection (Ukuran Papan) -->
+          <div class="space-y-2 border-b border-gray-100 pb-6">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+                <span>Ukuran Papan (Size)</span>
+              </label>
+              <span class="text-xs font-semibold text-emerald-700">
+                {{ SIZE_OPTIONS.find(s => s.id === selectedSize)?.name }}
+              </span>
+            </div>
+            <div class="grid grid-cols-3 gap-2.5">
+              <button
+                v-for="opt in SIZE_OPTIONS"
+                :key="opt.id"
+                type="button"
+                @click="selectedSize = opt.id"
+                :class="[
+                  selectedSize === opt.id
+                    ? 'border-[#1b4332] bg-emerald-50/60 ring-2 ring-[#1b4332] shadow-xs'
+                    : 'border-gray-200 bg-white hover:border-emerald-300 hover:bg-gray-50/50'
+                ]"
+                class="p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all cursor-pointer group"
+              >
+                <span class="text-xs font-extrabold text-gray-900 group-hover:text-emerald-800">{{ opt.label }}</span>
+                <span class="text-[11px] text-gray-500 font-medium mt-0.5">{{ opt.dimension }}</span>
+                <span class="text-[11px] font-bold mt-1" :class="opt.addon > 0 ? 'text-emerald-700' : 'text-gray-400'">
+                  {{ opt.addon > 0 ? `+${formatRupiah(opt.addon)}` : 'Included' }}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Jambul Bunga (Floral Crest) -->
+          <div class="space-y-2 border-b border-gray-100 pb-6">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-.778.099-1.533.284-2.253" />
+                </svg>
+                <span>Jambul Bunga (Floral Crest)</span>
+              </label>
+              <span class="text-xs font-semibold text-emerald-700">
+                {{ jambulHeaderLabel }}
+              </span>
+            </div>
+
+            <!-- Simple Checkmark Row with Notes (No style border or container) -->
+            <div
+              @click="handleToggleMainJambul"
+              class="flex items-start gap-2.5 cursor-pointer py-1 select-none group"
+            >
+              <div
+                class="w-4 h-4 mt-0.5 rounded border flex items-center justify-center transition-all shrink-0"
+                :class="isJambulEnabled ? 'bg-[#1b4332] border-[#1b4332] text-white shadow-2xs' : 'border-gray-300 bg-white group-hover:border-emerald-600'"
+              >
+                <svg v-if="isJambulEnabled" xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-xs font-bold text-gray-800 group-hover:text-emerald-900 transition-colors">
+                  Tambah Hiasan Jambul Bunga
+                </span>
+                <span class="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                  Pasang mahkota jambul bunga segar untuk bagian atas dan/atau bawah papan bunga (+Rp 25.000 / posisi).
+                </span>
+              </div>
+            </div>
+
+            <!-- Selection Box for Positions (Can checkmark 1 or 2 of them) -->
+            <div v-if="isJambulEnabled" class="grid grid-cols-2 gap-2.5 pt-1 pl-6">
+              <!-- Jambul Atas Selection Box -->
+              <div
+                @click="handleToggleTopJambul"
+                :class="[
+                  isJambulTop
+                    ? 'border-[#1b4332] bg-emerald-50/60 ring-2 ring-[#1b4332] shadow-xs'
+                    : 'border-gray-200 bg-white hover:border-emerald-300 hover:bg-gray-50/50'
+                ]"
+                class="p-2.5 rounded-xl border flex items-center justify-between cursor-pointer select-none transition-all group"
+              >
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0"
+                    :class="isJambulTop ? 'bg-[#1b4332] border-[#1b4332] text-white' : 'border-gray-300 bg-white group-hover:border-emerald-600'"
+                  >
+                    <svg v-if="isJambulTop" xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-xs font-bold text-gray-900 group-hover:text-emerald-800">Jambul Atas</span>
+                    <span class="text-[10px] text-gray-500">Mahkota atas</span>
+                  </div>
+                </div>
+                <span class="text-[11px] font-bold text-emerald-700">+{{ formatRupiah(25000) }}</span>
+              </div>
+
+              <!-- Jambul Bawah Selection Box -->
+              <div
+                @click="handleToggleBottomJambul"
+                :class="[
+                  isJambulBottom
+                    ? 'border-[#1b4332] bg-emerald-50/60 ring-2 ring-[#1b4332] shadow-xs'
+                    : 'border-gray-200 bg-white hover:border-emerald-300 hover:bg-gray-50/50'
+                ]"
+                class="p-2.5 rounded-xl border flex items-center justify-between cursor-pointer select-none transition-all group"
+              >
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0"
+                    :class="isJambulBottom ? 'bg-[#1b4332] border-[#1b4332] text-white' : 'border-gray-300 bg-white group-hover:border-emerald-600'"
+                  >
+                    <svg v-if="isJambulBottom" xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-xs font-bold text-gray-900 group-hover:text-emerald-800">Jambul Bawah</span>
+                    <span class="text-[10px] text-gray-500">Mahkota bawah</span>
+                  </div>
+                </div>
+                <span class="text-[11px] font-bold text-emerald-700">+{{ formatRupiah(25000) }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- Size & Jambul Pick-Style Options -->
+          <!-- <div class="space-y-5 pt-1">
+          </div> -->
+
           <!-- Inactive Product Notice Banner -->
-          <div v-if="product.status === 'inactive'" class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-800 flex items-center gap-2">
+          <div
+            v-if="product.status === 'inactive'"
+            class="
+              p-4 bg-amber-50 border border-amber-200 rounded-2xl
+              text-xs font-semibold text-amber-800 flex items-center gap-2
+            "
+          >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
             </svg>
@@ -408,27 +624,27 @@ useHead({
 
           <!-- Store / Branch Availability Selection (In-Stock Branches Only) -->
           <div v-if="inStockBranches.length > 0 && product.status !== 'inactive'" class="space-y-3 pt-2">
-            <label class="text-sm font-semibold text-gray-800 flex items-center justify-between">
-              <span>Fulfilling Branch:</span>
+            <label class="text-xs font-bold text-gray-800 flex items-center justify-between">
+              <span class="flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
+                </svg>
+                <span>Fulfilling Branch:</span>
+              </span>
               <span class="text-xs font-normal text-gray-500">Available in-stock stores</span>
             </label>
             <div class="space-y-2">
-              <div 
-                v-for="avail in inStockBranches" 
+              <div
+                v-for="avail in inStockBranches"
                 :key="avail.name"
                 @click="handleSelectFulfillingBranch(avail)"
                 :class="[
-                  selectedShopSlug === avail.name ? 'border-[#1b4332] bg-emerald-50/60 ring-1 ring-[#1b4332] cursor-pointer' : 
+                  selectedShopSlug === avail.name ? 'border-[#1b4332] bg-emerald-50/60 ring-1 ring-[#1b4332] cursor-pointer' :
                   'border-gray-200 bg-white hover:border-emerald-300 cursor-pointer'
                 ]"
                 class="p-3 rounded-xl border flex items-center justify-between transition-all group"
               >
-                <div class="flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 group-hover:text-emerald-700 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m13.5 10.5h7.5a2.25 2.25 0 002.25-2.25V10.5M3 10.5l9-7.5 9 7.5" />
-                  </svg>
-                  <span class="text-xs font-bold text-gray-800 group-hover:text-emerald-800 transition-colors">{{ avail.slug }}</span>
-                </div>
+                <span class="text-xs font-bold text-gray-800 group-hover:text-emerald-800 transition-colors">{{ avail.slug }}</span>
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-emerald-700">
                     {{ avail.stock }} in stock
@@ -438,8 +654,8 @@ useHead({
               </div>
             </div>
             <!-- Inline Warning Below Branch List -->
-            <div 
-              v-if="branchWarning || !selectedShopSlug" 
+            <div
+              v-if="branchWarning || !selectedShopSlug"
               class="mt-2.5 p-3 rounded-xl flex items-center gap-2 text-xs font-semibold transition-all"
               :class="branchWarning ? 'bg-red-50 text-red-700 border border-red-200 shadow-2xs' : 'bg-amber-50 text-amber-800 border border-amber-200/80'"
             >
@@ -466,17 +682,17 @@ useHead({
             </div>
 
             <div class="flex-1 flex gap-3 w-full">
-              <button 
+              <button
                 :disabled="!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)"
-                @click="handleAddToCart()" 
+                @click="handleAddToCart()"
                 :class="[(!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 bg-gray-50' : 'border-2 border-[#1b4332] text-[#1b4332] bg-white hover:bg-emerald-50/50 cursor-pointer']"
                 class="flex-1 font-bold py-3 rounded-xl transition text-sm"
               >
                 {{ product.status === 'inactive' ? 'Not For Sale' : (selectedShopSlug && selectedBranchStock <= 0) ? 'Out of Stock' : 'Add to Cart' }}
               </button>
-              <button 
+              <button
                 :disabled="!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)"
-                @click="handleBuyNow()" 
+                @click="handleBuyNow()"
                 :class="[(!product.available || product.status === 'inactive' || (!!selectedShopSlug && selectedBranchStock <= 0)) ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'bg-[#1b4332] hover:bg-[#143326] text-white cursor-pointer']"
                 class="flex-1 font-bold py-3 rounded-xl transition shadow-sm text-sm"
               >

@@ -1,6 +1,5 @@
-// app/services/cartService.ts
 import { bootstrapConfig } from '~/utils/bootstrap'
-import type { BackendCartResponse } from '~/types/cart'
+import type { BackendCartResponse, ItemOptions } from '~/types/cart'
 import type { CheckoutRequest, CheckoutResponse } from '~/types/checkout'
 import type { CustomDesignPayload } from '~/composables/useCart'
 
@@ -12,6 +11,9 @@ export interface AddCartItemPayload {
   product_name?: string
   physical_size_id?: string
   unit_price?: number
+  item_options?: ItemOptions
+  size?: string
+  jambul?: string
   custom_design?: CustomDesignPayload
 }
 

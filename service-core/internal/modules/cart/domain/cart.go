@@ -20,19 +20,26 @@ type Cart struct {
 	UpdatedAt *time.Time
 }
 
-func (c *Cart) AddItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
+func (c *Cart) AddItem(productID uuid.UUID, shopID uuid.UUID, qty int, options ...ItemOptions) error {
 	if qty <= 0 {
 		return ErrInvalidQuantity
+	}
+
+	var opt ItemOptions
+	if len(options) > 0 {
+		opt = options[0].Normalized()
+	} else {
+		opt = ItemOptions{}.Normalized()
 	}
 
 	for i := range c.Items {
 		item := &c.Items[i]
 		// Skip custom items,
 		// they are never deduplicated by product_id
-		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+		if item.DeletedAt != nil || item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
-		if *item.ProductID == productID && item.ShopID == shopID {
+		if *item.ProductID == productID && item.ShopID == shopID && item.ItemOptions.Equals(opt) {
 			item.Quantity += qty
 			return nil
 		}
@@ -45,6 +52,7 @@ func (c *Cart) AddItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		ProductID:          &pid,
 		ShopID:             shopID,
 		Quantity:           qty,
+		ItemOptions:        opt,
 	})
 
 	return nil
@@ -70,9 +78,16 @@ func (c *Cart) AddCustomItem(shopID uuid.UUID, qty int, design json.RawMessage) 
 	return nil
 }
 
-func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
+func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int, options ...ItemOptions) error {
 	if qty < 0 {
 		return ErrInvalidQuantity
+	}
+
+	var opt ItemOptions
+	if len(options) > 0 {
+		opt = options[0].Normalized()
+	} else {
+		opt = ItemOptions{}.Normalized()
 	}
 
 	for i := range c.Items {
@@ -82,7 +97,7 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
-		if *item.ProductID == productID && item.ShopID == shopID {
+		if *item.ProductID == productID && item.ShopID == shopID && item.ItemOptions.Equals(opt) {
 			if qty == 0 {
 				now := appclock.Now()
 				item.DeletedAt = &now
@@ -106,9 +121,74 @@ func (c *Cart) SetItem(productID uuid.UUID, shopID uuid.UUID, qty int) error {
 		ProductID:          &pid,
 		ShopID:             shopID,
 		Quantity:           qty,
+		ItemOptions:        opt,
 		DeletedAt:          nil,
 	})
 
+	return nil
+}
+
+// UpdateItemByID updates the quantity and/or ItemOptions of the standard cart item
+// identified by cartItemID. If newOptions differs from the current item's
+// options, and another standard item with the same productID+shopID+newOptions already
+// exists, the two items are merged (quantities summed) and the original is
+// soft-deleted. Returns ErrCartItemNotFound if no active standard item matches cartItemID.
+func (c *Cart) UpdateItemByID(
+	cartItemID uuid.UUID,
+	qty int,
+	options ...ItemOptions,
+) error {
+	if qty <= 0 {
+		return ErrInvalidQuantity
+	}
+
+	var target *CartItem
+	for i := range c.Items {
+		item := &c.Items[i]
+		if item.ID == cartItemID && item.DeletedAt == nil &&
+			item.ProductVariantType == ProductVariantTypeStandard && item.ProductID != nil {
+			target = item
+			break
+		}
+	}
+	if target == nil {
+		return ErrCartItemNotFound
+	}
+
+	var opt ItemOptions
+	if len(options) > 0 {
+		opt = options[0].Normalized()
+	} else {
+		opt = target.ItemOptions.Normalized()
+	}
+
+	// If options haven't changed, simply update quantity
+	if target.ItemOptions.Equals(opt) {
+		target.Quantity = qty
+		return nil
+	}
+
+	// Options changed — check if another active standard item with the new options already exists
+	productID := *target.ProductID
+	shopID := target.ShopID
+	for i := range c.Items {
+		item := &c.Items[i]
+		if item.ID == cartItemID || item.DeletedAt != nil ||
+			item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+			continue
+		}
+		if *item.ProductID == productID && item.ShopID == shopID && item.ItemOptions.Equals(opt) {
+			// Merge: add quantity to existing item, soft-delete the target item
+			item.Quantity += qty
+			now := appclock.Now()
+			target.DeletedAt = &now
+			return nil
+		}
+	}
+
+	// No collision — update options and quantity in place
+	target.ItemOptions = opt
+	target.Quantity = qty
 	return nil
 }
 
@@ -170,27 +250,37 @@ func (c *Cart) RemoveCustomItem(cartItemID uuid.UUID) bool {
 	return false
 }
 
-func (c *Cart) HasItem(productID uuid.UUID, shopID uuid.UUID) bool {
+func (c *Cart) HasItem(productID uuid.UUID, shopID uuid.UUID, options ...ItemOptions) bool {
 	for i := range c.Items {
 		item := &c.Items[i]
-		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+		if item.DeletedAt != nil || item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
-			return true
+			if len(options) == 0 || item.ItemOptions.Equals(options[0]) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func (c *Cart) FindItem(productID uuid.UUID, shopID uuid.UUID) *CartItem {
+func (c *Cart) FindItem(productID uuid.UUID, shopID uuid.UUID, options ...ItemOptions) *CartItem {
+	var opt *ItemOptions
+	if len(options) > 0 {
+		normalized := options[0].Normalized()
+		opt = &normalized
+	}
+
 	for i := range c.Items {
 		item := &c.Items[i]
-		if item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
+		if item.DeletedAt != nil || item.ProductVariantType == ProductVariantTypeCustom || item.ProductID == nil {
 			continue
 		}
 		if *item.ProductID == productID && item.ShopID == shopID {
-			return item
+			if opt == nil || item.ItemOptions.Equals(*opt) {
+				return item
+			}
 		}
 	}
 

@@ -46,6 +46,7 @@ func NewAddItemUsecase(
 type AddItemInput struct {
 	CustomerID, ProductID, ShopID uuid.UUID
 	Quantity                      int
+	ItemOptions                   domain.ItemOptions
 }
 
 const MaxCartItemQuantity = 80
@@ -126,6 +127,7 @@ func (u *AddItemUsecase) Execute(
 	if existingItem := cart.FindItem(
 		input.ProductID,
 		input.ShopID,
+		input.ItemOptions,
 	); existingItem != nil &&
 		existingItem.DeletedAt == nil {
 
@@ -139,6 +141,7 @@ func (u *AddItemUsecase) Execute(
 		input.ProductID,
 		input.ShopID,
 		input.Quantity,
+		input.ItemOptions,
 	); err != nil {
 		return apperrors.NewInvalidInput(err.Error())
 	}

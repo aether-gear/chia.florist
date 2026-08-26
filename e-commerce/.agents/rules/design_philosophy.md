@@ -63,4 +63,3 @@ This rule establishes the design principles, UI standards, and component guideli
 
 ### 10. Icon & Emoji Usage Policy
 - **Clickable Elements Only**: Icons/emojis are permitted ONLY inside interactive elements (buttons, action triggers). Do NOT use decorative icons in static headings or body text.
-

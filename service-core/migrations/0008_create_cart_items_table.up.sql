@@ -10,6 +10,7 @@ CREATE TABLE cart_items (
 
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     custom_design JSONB,
+    item_options JSONB NOT NULL DEFAULT '{}',
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -37,8 +38,8 @@ CREATE TABLE cart_items (
         )
 );
 
-CREATE UNIQUE INDEX unique_standard_product_per_cart
-ON cart_items(cart_id, product_id)
+CREATE UNIQUE INDEX IF NOT EXISTS unique_standard_product_with_options_per_cart
+ON cart_items(cart_id, product_id, shop_id, item_options)
 WHERE deleted_at IS NULL AND product_variant_type = 'standard';
 
 CREATE INDEX idx_cart_items_cart_id

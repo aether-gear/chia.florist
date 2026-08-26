@@ -7,15 +7,28 @@ import (
 
 // ---- Request DTOs ----
 
+type orderItemOptionsRequest struct {
+	Size   string `json:"size,omitempty"`
+	Jambul string `json:"jambul,omitempty"`
+}
+
+type orderItemOptionsResponse struct {
+	Size   string `json:"size,omitempty"`
+	Jambul string `json:"jambul,omitempty"`
+}
+
 type createOrderItemRequest struct {
-	ProductID          *string         `json:"product_id,omitempty"`
-	CartItemID         *string         `json:"cart_item_id,omitempty"`
-	ProductVariantType string          `json:"product_variant_type,omitempty"`
-	ItemType           string          `json:"item_type,omitempty"`
-	IsCustom           *bool           `json:"is_custom,omitempty"`
-	ProductName        string          `json:"name"`
-	Quantity           int             `json:"quantity"`
-	CustomDesign       json.RawMessage `json:"custom_design,omitempty"`
+	ProductID          *string                  `json:"product_id,omitempty"`
+	CartItemID         *string                  `json:"cart_item_id,omitempty"`
+	ProductVariantType string                   `json:"product_variant_type,omitempty"`
+	ItemType           string                   `json:"item_type,omitempty"`
+	IsCustom           *bool                    `json:"is_custom,omitempty"`
+	ProductName        string                   `json:"name"`
+	Quantity           int                      `json:"quantity"`
+	ItemOptions        *orderItemOptionsRequest `json:"item_options,omitempty"`
+	Size               string                   `json:"size,omitempty"`
+	Jambul             string                   `json:"jambul,omitempty"`
+	CustomDesign       json.RawMessage          `json:"custom_design,omitempty"`
 }
 
 type createOrderPaymentRequest struct {
@@ -115,6 +128,7 @@ type orderItemResponse struct {
 	CourierCode        *string                        `json:"courier_code,omitempty"`
 	CourierService     *string                        `json:"courier_service,omitempty"`
 	ShippingFeeTotal   int64                          `json:"shipping_fee"`
+	ItemOptions        *orderItemOptionsResponse      `json:"item_options,omitempty"`
 	CustomDesign       *orderItemCustomDesignResponse `json:"custom_design,omitempty"`
 }
 

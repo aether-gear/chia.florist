@@ -596,3 +596,79 @@ func ExtractDesignSummary(design CustomDesignPayload) (
 	return physicalSizeID, previewURL, headerUpper, bodyUpper, headerLower, bodyLower
 }
 
+const (
+	StandardSizeSmall  = "small"
+	StandardSizeMedium = "medium"
+	StandardSizeLarge  = "large"
+
+	StandardJambulNone   = "none"
+	StandardJambulTop    = "top"
+	StandardJambulBottom = "bottom"
+	StandardJambulBoth   = "both"
+
+	StandardSizeAddonSmall  int64 = 0
+	StandardSizeAddonMedium int64 = 50000
+	StandardSizeAddonLarge  int64 = 100000
+
+	StandardJambulAddonNone   int64 = 0
+	StandardJambulAddonTop    int64 = 25000
+	StandardJambulAddonBottom int64 = 25000
+	StandardJambulAddonBoth   int64 = 50000
+)
+
+// CalculateStandardProductPrice computes the non-negative authoritative unit price
+// by adding non-negative size and jambul add-ons to basePrice.
+func CalculateStandardProductPrice(basePrice int64, size string, jambul string) int64 {
+	sizeNorm := strings.ToLower(strings.TrimSpace(size))
+	var sizeAddon int64
+	switch sizeNorm {
+	case StandardSizeMedium:
+		sizeAddon = StandardSizeAddonMedium
+	case StandardSizeLarge:
+		sizeAddon = StandardSizeAddonLarge
+	case StandardSizeSmall:
+		fallthrough
+	default:
+		sizeAddon = StandardSizeAddonSmall
+	}
+
+	jambulNorm := strings.ToLower(strings.TrimSpace(jambul))
+	var jambulAddon int64
+	switch jambulNorm {
+	case StandardJambulTop:
+		jambulAddon = StandardJambulAddonTop
+	case StandardJambulBottom:
+		jambulAddon = StandardJambulAddonBottom
+	case StandardJambulBoth:
+		jambulAddon = StandardJambulAddonBoth
+	case StandardJambulNone:
+		fallthrough
+	default:
+		jambulAddon = StandardJambulAddonNone
+	}
+
+	total := basePrice + sizeAddon + jambulAddon
+	if total < 0 {
+		return 0
+	}
+	return total
+}
+
+// GetStandardProductWeight returns estimated shipping weight in grams based on board size.
+func GetStandardProductWeight(size string, defaultWeight int) int {
+	sizeNorm := strings.ToLower(strings.TrimSpace(size))
+	switch sizeNorm {
+	case StandardSizeSmall:
+		return 1500
+	case StandardSizeMedium:
+		return 2500
+	case StandardSizeLarge:
+		return 4000
+	default:
+		if defaultWeight > 0 {
+			return defaultWeight
+		}
+		return 2500
+	}
+}
+

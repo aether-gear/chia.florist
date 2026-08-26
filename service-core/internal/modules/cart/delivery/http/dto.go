@@ -6,18 +6,39 @@ import (
 	"github.com/google/uuid"
 )
 
+type itemOptionsRequest struct {
+	Size   string `json:"size,omitempty"`
+	Jambul string `json:"jambul,omitempty"`
+}
+
+type itemOptionsResponse struct {
+	Size   string `json:"size,omitempty"`
+	Jambul string `json:"jambul,omitempty"`
+}
+
 type addItemRequest struct {
-	ProductVariantType string          `json:"product_variant_type"` // "standard" | "custom"; defaults to "standard"
-	ProductID          *string         `json:"product_id,omitempty"` // required when product_variant_type == "standard"
-	ShopID             string          `json:"shop_id"`
-	Quantity           int             `json:"quantity"`
-	ProductName        string          `json:"product_name,omitempty"`     // required when product_variant_type == "custom"
-	PhysicalSizeID     string          `json:"physical_size_id,omitempty"` // required when product_variant_type == "custom"
-	CustomDesign       json.RawMessage `json:"custom_design,omitempty"`    // required when product_variant_type == "custom"
+	ProductVariantType string              `json:"product_variant_type"` // "standard" | "custom"; defaults to "standard"
+	ItemType           string              `json:"item_type,omitempty"`
+	ProductID          *string             `json:"product_id,omitempty"` // required when product_variant_type == "standard"
+	ShopID             string              `json:"shop_id"`
+	Quantity           int                 `json:"quantity"`
+	ProductName        string              `json:"product_name,omitempty"`     // required when product_variant_type == "custom"
+	PhysicalSizeID     string              `json:"physical_size_id,omitempty"` // required when product_variant_type == "custom"
+	CustomDesign       json.RawMessage     `json:"custom_design,omitempty"`    // required when product_variant_type == "custom"
+	ItemOptions        *itemOptionsRequest `json:"item_options,omitempty"`
+	Size               string              `json:"size,omitempty"`
+	Jambul             string              `json:"jambul,omitempty"`
 }
 
 type updateItemRequest struct {
 	Quantity int `json:"quantity"`
+}
+
+type updateItemByIDRequest struct {
+	Quantity    int                 `json:"quantity"`
+	ItemOptions *itemOptionsRequest `json:"item_options,omitempty"`
+	Size        string              `json:"size,omitempty"`
+	Jambul      string              `json:"jambul,omitempty"`
 }
 
 type changeItemShopRequest struct {
@@ -48,17 +69,21 @@ type cartItemView struct {
 	Subtotal           int64                `json:"subtotal"`
 	Quantity           int                  `json:"quantity"`
 	Image              productImageResponse `json:"images"`
+	ItemOptions        *itemOptionsResponse `json:"item_options,omitempty"`
 	CustomDesign       json.RawMessage      `json:"custom_design,omitempty"`
 }
 
 type checkoutItemRequest struct {
-	ProductID          *string         `json:"product_id,omitempty"`
-	CartItemID         *string         `json:"cart_item_id,omitempty"`
-	ProductVariantType string          `json:"product_variant_type,omitempty"`
-	ItemType           string          `json:"item_type,omitempty"`
-	IsCustom           *bool           `json:"is_custom,omitempty"`
-	Quantity           int             `json:"quantity"`
-	CustomDesign       json.RawMessage `json:"custom_design,omitempty"`
+	ProductID          *string             `json:"product_id,omitempty"`
+	CartItemID         *string             `json:"cart_item_id,omitempty"`
+	ProductVariantType string              `json:"product_variant_type,omitempty"`
+	ItemType           string              `json:"item_type,omitempty"`
+	IsCustom           *bool               `json:"is_custom,omitempty"`
+	Quantity           int                 `json:"quantity"`
+	ItemOptions        *itemOptionsRequest `json:"item_options,omitempty"`
+	Size               string              `json:"size,omitempty"`
+	Jambul             string              `json:"jambul,omitempty"`
+	CustomDesign       json.RawMessage     `json:"custom_design,omitempty"`
 }
 
 type selectedCourierRequest struct {
@@ -98,15 +123,16 @@ type checkoutCouriersResponse struct {
 }
 
 type checkoutItemResponse struct {
-	ProductID          *uuid.UUID `json:"product_id,omitempty"`
-	CartItemID         *uuid.UUID `json:"cart_item_id,omitempty"`
-	ProductVariantType string     `json:"product_variant_type"`
-	IsCustom           bool       `json:"is_custom"`
-	ShopID             uuid.UUID  `json:"shop_id"`
-	Name               string     `json:"name"`
-	Price              int64      `json:"price"`
-	Quantity           int        `json:"quantity"`
-	Subtotal           int64      `json:"subtotal"`
+	ProductID          *uuid.UUID           `json:"product_id,omitempty"`
+	CartItemID         *uuid.UUID           `json:"cart_item_id,omitempty"`
+	ProductVariantType string               `json:"product_variant_type"`
+	IsCustom           bool                 `json:"is_custom"`
+	ShopID             uuid.UUID            `json:"shop_id"`
+	Name               string               `json:"name"`
+	Price              int64                `json:"price"`
+	Quantity           int                  `json:"quantity"`
+	Subtotal           int64                `json:"subtotal"`
+	ItemOptions        *itemOptionsResponse `json:"item_options,omitempty"`
 }
 
 type selectedCourierResponse struct {
