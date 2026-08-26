@@ -213,7 +213,8 @@ func (r *cartRepositoryImpl) Save(
 			AND deleted_at IS NULL
 	`
 
-	for _, item := range cart.Items {
+	for i := range cart.Items {
+		item := &cart.Items[i]
 		if item.DeletedAt != nil {
 			if _, err := exec.Exec(ctx, softDeleteByIDQuery, item.ID); err != nil {
 				return fmt.Errorf("soft-delete cart item failed: %w", err)

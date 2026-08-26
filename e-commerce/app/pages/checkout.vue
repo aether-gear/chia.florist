@@ -194,8 +194,8 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
             jambul: (item.jambul || 'none') as any
           }
           return {
-            product_id: item.id,
-            cart_item_id: item.cartItemId,
+            product_id: item.productId || item.id,
+            cart_item_id: item.cartItemId || item.id,
             shop_id: sId,
             name: item.name,
             price: item.price,
@@ -241,7 +241,7 @@ const mergeCustomItems = (res: CheckoutResponse | null): CheckoutResponse => {
     shop.items.forEach(item => {
       const localItem = checkoutItems.value.find(i =>
         (item.cart_item_id && (i.cartItemId === item.cart_item_id || i.id === item.cart_item_id)) ||
-        (!item.cart_item_id && i.id === item.product_id) ||
+        (!item.cart_item_id && (i.productId === item.product_id || i.id === item.product_id)) ||
         (i.isCustom && ((item as any).product_variant_type === 'custom' || (item as any).item_type === 'custom'))
       )
 
@@ -390,7 +390,7 @@ onMounted(async () => {
         shopsPayloadMap[shopId].push({
           product_variant_type: 'standard',
           item_type: 'standard',
-          product_id: item.id,
+          product_id: item.productId || item.id,
           cart_item_id: item.cartItemId || item.id,
           quantity: item.quantity,
           item_options: itemOptions,

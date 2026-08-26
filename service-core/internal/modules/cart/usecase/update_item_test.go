@@ -45,11 +45,12 @@ func TestUpdateItemByID_Success(t *testing.T) {
 
 	uc := NewUpdateItemUsecase(exec, tx, cartR, invR, prodR)
 
+	opt := cartDomain.ItemOptions{Size: "large", Jambul: "both"}
 	err := uc.ExecuteByID(ctx, UpdateItemByIDInput{
 		CustomerID:  customerID,
 		CartItemID:  cartItemID,
 		Quantity:    4,
-		ItemOptions: cartDomain.ItemOptions{Size: "large", Jambul: "both"},
+		ItemOptions: &opt,
 	})
 
 	if err != nil {
@@ -65,6 +66,109 @@ func TestUpdateItemByID_Success(t *testing.T) {
 	}
 	if cart.Items[0].ItemOptions.Size != "large" || cart.Items[0].ItemOptions.Jambul != "both" {
 		t.Errorf("expected options large+both, got %+v", cart.Items[0].ItemOptions)
+	}
+}
+
+func TestUpdateItemByID_NilOptions_PreservesExistingOptions(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	shopID := uuid.New()
+	productID := uuid.New()
+	optLarge := cartDomain.ItemOptions{Size: "large", Jambul: "both"}
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items:      []cartDomain.CartItem{},
+	}
+	_ = cart.AddItem(productID, shopID, 2, optLarge)
+	cartItemID := cart.Items[0].ID
+
+	cartR := &mockSaveCartRepository{cart: cart}
+	invR := &mockAddItemInvRepo{
+		inv: &inventoryDomain.Inventory{
+			ProductID:  productID,
+			ShopID:     shopID,
+			TotalStock: 20,
+		},
+	}
+	prodR := &mockAddItemProdRepo{
+		prod: &productDomain.Product{
+			ID:     productID,
+			Name:   "Papan Bunga",
+			Status: productDomain.ProductStatusActive,
+		},
+	}
+	tx := &mockTransactor{}
+	exec := &mockExecutor{}
+
+	uc := NewUpdateItemUsecase(exec, tx, cartR, invR, prodR)
+
+	// Update with ItemOptions == nil (quantity-only update)
+	err := uc.ExecuteByID(ctx, UpdateItemByIDInput{
+		CustomerID:  customerID,
+		CartItemID:  cartItemID,
+		Quantity:    6,
+		ItemOptions: nil,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cart.Items[0].Quantity != 6 {
+		t.Errorf("expected quantity 6, got %d", cart.Items[0].Quantity)
+	}
+	if !cart.Items[0].ItemOptions.Equals(optLarge) {
+		t.Errorf("expected options %+v to be preserved, got %+v", optLarge, cart.Items[0].ItemOptions)
+	}
+}
+
+func TestUpdateItemByID_MultiStyle_StockExceeded(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	shopID := uuid.New()
+	productID := uuid.New()
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items:      []cartDomain.CartItem{},
+	}
+	_ = cart.AddItem(productID, shopID, 2, cartDomain.ItemOptions{Size: "small", Jambul: "none"})
+	_ = cart.AddItem(productID, shopID, 3, cartDomain.ItemOptions{Size: "large", Jambul: "top"})
+	largeItemID := cart.Items[1].ID
+
+	cartR := &mockSaveCartRepository{cart: cart}
+	invR := &mockAddItemInvRepo{
+		inv: &inventoryDomain.Inventory{
+			ProductID:  productID,
+			ShopID:     shopID,
+			TotalStock: 6, // Total available stock is 6 across all styles
+		},
+	}
+	prodR := &mockAddItemProdRepo{
+		prod: &productDomain.Product{
+			ID:     productID,
+			Name:   "Papan Bunga",
+			Status: productDomain.ProductStatusActive,
+		},
+	}
+	tx := &mockTransactor{}
+	exec := &mockExecutor{}
+
+	uc := NewUpdateItemUsecase(exec, tx, cartR, invR, prodR)
+
+	// Try increasing large item from 3 to 5 (Total in cart would be 2 small + 5 large = 7 > 6)
+	err := uc.ExecuteByID(ctx, UpdateItemByIDInput{
+		CustomerID:  customerID,
+		CartItemID:  largeItemID,
+		Quantity:    5,
+		ItemOptions: nil,
+	})
+
+	if err == nil {
+		t.Fatalf("expected error due to total stock exceeded across styles, got nil")
 	}
 }
 
@@ -139,5 +243,116 @@ func TestUpdateItemByID_CartItemNotFound(t *testing.T) {
 
 	if err == nil {
 		t.Fatalf("expected error for non-existent cart item, got nil")
+	}
+}
+
+func TestUpdateItemByID_CustomItem_Success(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	shopID := uuid.New()
+	cartItemID := uuid.New()
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items: []cartDomain.CartItem{
+			{
+				ID:                 cartItemID,
+				ProductVariantType: cartDomain.ProductVariantTypeCustom,
+				ProductID:          nil,
+				ShopID:             shopID,
+				Quantity:           1,
+			},
+		},
+	}
+
+	cartR := &mockSaveCartRepository{cart: cart}
+	invR := &mockAddItemInvRepo{}
+	prodR := &mockAddItemProdRepo{}
+	tx := &mockTransactor{}
+	exec := &mockExecutor{}
+
+	uc := NewUpdateItemUsecase(exec, tx, cartR, invR, prodR)
+
+	err := uc.ExecuteByID(ctx, UpdateItemByIDInput{
+		CustomerID: customerID,
+		CartItemID: cartItemID,
+		Quantity:   3,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error updating custom item: %v", err)
+	}
+
+	if !cartR.saved {
+		t.Errorf("expected cart to be saved")
+	}
+	if cart.Items[0].Quantity != 3 {
+		t.Errorf("expected quantity 3, got %d", cart.Items[0].Quantity)
+	}
+}
+
+func TestUpdateItem_Execute_NoOptions_PreservesOptions(t *testing.T) {
+	ctx := context.Background()
+	customerID := uuid.New()
+	shopID := uuid.New()
+	productID := uuid.New()
+	optLarge := cartDomain.ItemOptions{Size: "large", Jambul: "both"}
+
+	cart := &cartDomain.Cart{
+		ID:         uuid.New(),
+		CustomerID: customerID,
+		Items: []cartDomain.CartItem{
+			{
+				ID:                 uuid.New(),
+				ProductVariantType: cartDomain.ProductVariantTypeStandard,
+				ProductID:          &productID,
+				ShopID:             shopID,
+				Quantity:           2,
+				ItemOptions:        optLarge,
+			},
+		},
+	}
+
+	cartR := &mockSaveCartRepository{cart: cart}
+	invR := &mockAddItemInvRepo{
+		inv: &inventoryDomain.Inventory{
+			ProductID:  productID,
+			ShopID:     shopID,
+			TotalStock: 20,
+		},
+	}
+	prodR := &mockAddItemProdRepo{
+		prod: &productDomain.Product{
+			ID:     productID,
+			Name:   "Papan Bunga",
+			Status: productDomain.ProductStatusActive,
+		},
+	}
+	tx := &mockTransactor{}
+	exec := &mockExecutor{}
+
+	uc := NewUpdateItemUsecase(exec, tx, cartR, invR, prodR)
+
+	// Execute without options (e.g. PUT /{shopID}/{productID})
+	err := uc.Execute(ctx, UpdateItemInput{
+		CustomerID: customerID,
+		ProductID:  productID,
+		ShopID:     shopID,
+		Quantity:   5,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cart.Items) != 1 {
+		t.Fatalf("expected 1 item in cart, got %d (duplicated)", len(cart.Items))
+	}
+	if cart.Items[0].Quantity != 5 {
+		t.Errorf("expected quantity 5, got %d", cart.Items[0].Quantity)
+	}
+	if !cart.Items[0].ItemOptions.Equals(optLarge) {
+		t.Errorf("expected options %+v to be preserved, got %+v", optLarge, cart.Items[0].ItemOptions)
 	}
 }

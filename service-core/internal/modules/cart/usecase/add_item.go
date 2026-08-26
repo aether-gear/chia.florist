@@ -123,16 +123,7 @@ func (u *AddItemUsecase) Execute(
 		return apperrors.NewConflict(domain.ErrProductAlreadyAssignedToShop.Error())
 	}
 
-	targetQuantity := input.Quantity
-	if existingItem := cart.FindItem(
-		input.ProductID,
-		input.ShopID,
-		input.ItemOptions,
-	); existingItem != nil &&
-		existingItem.DeletedAt == nil {
-
-		targetQuantity += existingItem.Quantity
-	}
+	targetQuantity := cart.TotalProductQuantity(input.ProductID, input.ShopID) + input.Quantity
 	if targetQuantity > inventory.Available() {
 		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}

@@ -38,14 +38,30 @@ export const cartService = {
     })
   },
 
+  async updateItemById(cartItemId: string, quantity: number, options?: ItemOptions): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}`, {
+      method: 'PUT',
+      body: {
+        quantity,
+        ...(options ? { item_options: options, size: options.size, jambul: options.jambul } : {})
+      }
+    })
+  },
+
   async removeItem(shopId: string, productId: string): Promise<{ message: string }> {
     return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${shopId}/${productId}`, {
       method: 'DELETE'
     })
   },
 
+  async removeItemById(cartItemId: string): Promise<{ message: string }> {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}`, {
+      method: 'DELETE'
+    })
+  },
+
   async removeCustomItem(cartItemId: string): Promise<{ message: string }> {
-    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/custom/${cartItemId}`, {
+    return bootstrapConfig.fetchApi<{ message: string }>(`/carts/items/${cartItemId}`, {
       method: 'DELETE'
     })
   },

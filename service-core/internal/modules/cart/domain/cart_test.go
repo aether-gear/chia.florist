@@ -145,3 +145,258 @@ func TestCart_UpdateItemByID_InvalidQuantity(t *testing.T) {
 		t.Errorf("expected ErrInvalidQuantity for -1, got %v", err)
 	}
 }
+
+func TestCart_SetItem_NoOptions_UpdatesExistingItemInPlace(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shopID := uuid.New()
+	customOpt := domain.ItemOptions{Size: "large", Jambul: "top"}
+
+	// Add item with non-default options
+	_ = cart.AddItem(productID, shopID, 2, customOpt)
+	targetID := cart.Items[0].ID
+
+	// SetItem without options (as happens when PUT /carts/items/{shopID}/{productID} is called)
+	err := cart.SetItem(productID, shopID, 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should update existing item in-place without duplicating
+	if len(cart.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d (item was duplicated)", len(cart.Items))
+	}
+	if cart.Items[0].ID != targetID {
+		t.Errorf("expected item ID to remain %v, got %v", targetID, cart.Items[0].ID)
+	}
+	if cart.Items[0].Quantity != 7 {
+		t.Errorf("expected quantity 7, got %d", cart.Items[0].Quantity)
+	}
+	// ItemOptions should be preserved
+	if !cart.Items[0].ItemOptions.Equals(customOpt) {
+		t.Errorf("expected options %+v to be preserved, got %+v", customOpt, cart.Items[0].ItemOptions)
+	}
+}
+
+func TestCart_UpdateItemByID_CustomItem(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	shopID := uuid.New()
+	_ = cart.AddCustomItem(shopID, 1, []byte(`{"version":"1.0"}`))
+	customItemID := cart.Items[0].ID
+
+	err := cart.UpdateItemByID(customItemID, 3)
+	if err != nil {
+		t.Fatalf("unexpected error updating custom item by ID: %v", err)
+	}
+
+	if cart.Items[0].Quantity != 3 {
+		t.Errorf("expected custom item quantity 3, got %d", cart.Items[0].Quantity)
+	}
+}
+
+func TestCart_RemoveItemByID(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shopID := uuid.New()
+
+	_ = cart.AddItem(productID, shopID, 1, domain.ItemOptions{Size: "small", Jambul: "none"})
+	_ = cart.AddItem(productID, shopID, 2, domain.ItemOptions{Size: "large", Jambul: "top"})
+	item1ID := cart.Items[0].ID
+	item2ID := cart.Items[1].ID
+
+	// Remove item 2 specifically by its ID
+	removed := cart.RemoveItemByID(item2ID)
+	if !removed {
+		t.Fatalf("expected RemoveItemByID to return true")
+	}
+
+	if cart.Items[0].DeletedAt != nil {
+		t.Errorf("expected item 1 to remain active (not deleted)")
+	}
+	if cart.Items[1].DeletedAt == nil {
+		t.Errorf("expected item 2 to be soft-deleted")
+	}
+
+	// Remove item 1
+	removed = cart.RemoveItemByID(item1ID)
+	if !removed {
+		t.Fatalf("expected RemoveItemByID to return true for item 1")
+	}
+	if cart.Items[0].DeletedAt == nil {
+		t.Errorf("expected item 1 to be soft-deleted")
+	}
+
+	// Non-existent ID returns false
+	if cart.RemoveItemByID(uuid.New()) {
+		t.Errorf("expected RemoveItemByID to return false for non-existent item")
+	}
+}
+
+func TestCart_RemoveItem_WithOptions(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shopID := uuid.New()
+	optSmall := domain.ItemOptions{Size: "small", Jambul: "none"}
+	optLarge := domain.ItemOptions{Size: "large", Jambul: "top"}
+
+	_ = cart.AddItem(productID, shopID, 1, optSmall)
+	_ = cart.AddItem(productID, shopID, 2, optLarge)
+
+	// Remove item matching optLarge specifically
+	removed := cart.RemoveItem(productID, shopID, optLarge)
+	if !removed {
+		t.Fatalf("expected RemoveItem with options to return true")
+	}
+
+	if cart.Items[0].DeletedAt != nil {
+		t.Errorf("expected first item (optSmall) to remain active")
+	}
+	if cart.Items[1].DeletedAt == nil {
+		t.Errorf("expected second item (optLarge) to be deleted")
+	}
+}
+
+func TestCart_SameProduct_DifferentStyles_CoexistAndModify(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shopID := uuid.New()
+	optSmall := domain.ItemOptions{Size: "small", Jambul: "none"}
+	optLarge := domain.ItemOptions{Size: "large", Jambul: "both"}
+
+	_ = cart.AddItem(productID, shopID, 2, optSmall)
+	_ = cart.AddItem(productID, shopID, 3, optLarge)
+
+	if len(cart.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(cart.Items))
+	}
+	smallItemID := cart.Items[0].ID
+	largeItemID := cart.Items[1].ID
+
+	// Update large item quantity only (no options passed)
+	err := cart.UpdateItemByID(largeItemID, 5)
+	if err != nil {
+		t.Fatalf("unexpected error updating large item: %v", err)
+	}
+
+	// Ensure large item updated in place and small item is untouched
+	if len(cart.Items) != 2 {
+		t.Fatalf("expected still 2 items, got %d", len(cart.Items))
+	}
+	if cart.Items[0].ID != smallItemID || cart.Items[0].Quantity != 2 || !cart.Items[0].ItemOptions.Equals(optSmall) {
+		t.Errorf("small item was unexpectedly modified: %+v", cart.Items[0])
+	}
+	if cart.Items[1].ID != largeItemID || cart.Items[1].Quantity != 5 || !cart.Items[1].ItemOptions.Equals(optLarge) {
+		t.Errorf("large item options or quantity unexpected: %+v", cart.Items[1])
+	}
+}
+
+func TestCart_ChangeItemShop_DifferentStyles_DoNotMerge(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shop1 := uuid.New()
+	shop2 := uuid.New()
+
+	optSmall := domain.ItemOptions{Size: "small", Jambul: "none"}
+	optLarge := domain.ItemOptions{Size: "large", Jambul: "both"}
+
+	// Shop 2 has Small
+	_ = cart.AddItem(productID, shop2, 2, optSmall)
+	// Shop 1 has Large
+	_ = cart.AddItem(productID, shop1, 3, optLarge)
+	largeItemID := cart.Items[1].ID
+
+	// Move large item from Shop 1 to Shop 2
+	ok := cart.ChangeItemShop(largeItemID, shop2)
+	if !ok {
+		t.Fatalf("expected ChangeItemShop to succeed")
+	}
+
+	// Both items should be active in Shop 2 as separate items (not merged into Small)
+	if cart.Items[0].DeletedAt != nil {
+		t.Errorf("expected Small item to remain active")
+	}
+	if cart.Items[1].DeletedAt != nil {
+		t.Errorf("expected Large item to remain active (not soft-deleted)")
+	}
+	if cart.Items[1].ShopID != shop2 {
+		t.Errorf("expected Large item shop_id to be shop2")
+	}
+	if cart.Items[0].Quantity != 2 || cart.Items[1].Quantity != 3 {
+		t.Errorf("expected quantities 2 and 3, got %d and %d", cart.Items[0].Quantity, cart.Items[1].Quantity)
+	}
+}
+
+func TestCart_ChangeItemShop_SameStyle_Merges(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shop1 := uuid.New()
+	shop2 := uuid.New()
+
+	optLarge := domain.ItemOptions{Size: "large", Jambul: "both"}
+
+	// Shop 2 has Large (qty 2)
+	_ = cart.AddItem(productID, shop2, 2, optLarge)
+	// Shop 1 has Large (qty 3)
+	_ = cart.AddItem(productID, shop1, 3, optLarge)
+	shop1LargeItemID := cart.Items[1].ID
+
+	// Move Large item from Shop 1 to Shop 2 (same product and same style)
+	ok := cart.ChangeItemShop(shop1LargeItemID, shop2)
+	if !ok {
+		t.Fatalf("expected ChangeItemShop to succeed")
+	}
+
+	// Should merge into Shop 2 Large item (qty 5) and soft-delete Shop 1 item
+	if cart.Items[0].Quantity != 5 {
+		t.Errorf("expected merged quantity 5, got %d", cart.Items[0].Quantity)
+	}
+	if cart.Items[1].DeletedAt == nil {
+		t.Errorf("expected moved item to be soft-deleted after merge")
+	}
+}
+
+func TestCart_TotalProductQuantity(t *testing.T) {
+	cart := &domain.Cart{
+		ID:         uuid.New(),
+		CustomerID: uuid.New(),
+	}
+	productID := uuid.New()
+	shopID := uuid.New()
+
+	_ = cart.AddItem(productID, shopID, 2, domain.ItemOptions{Size: "small", Jambul: "none"})
+	_ = cart.AddItem(productID, shopID, 3, domain.ItemOptions{Size: "large", Jambul: "top"})
+	item1ID := cart.Items[0].ID
+
+	// Total across all styles
+	total := cart.TotalProductQuantity(productID, shopID)
+	if total != 5 {
+		t.Errorf("expected total 5, got %d", total)
+	}
+
+	// Total excluding item 1
+	totalExcl := cart.TotalProductQuantity(productID, shopID, item1ID)
+	if totalExcl != 3 {
+		t.Errorf("expected total excluding item1 to be 3, got %d", totalExcl)
+	}
+}

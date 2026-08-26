@@ -41,6 +41,7 @@ func NewUpdateItemUsecase(
 type UpdateItemInput struct {
 	CustomerID, ProductID, ShopID uuid.UUID
 	Quantity                      int
+	ItemOptions                   *domain.ItemOptions
 }
 
 func (u *UpdateItemUsecase) Execute(
@@ -79,7 +80,12 @@ func (u *UpdateItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrCartNotFound.Error())
 	}
 
-	if !cart.HasItem(input.ProductID, input.ShopID) {
+	var opts []domain.ItemOptions
+	if input.ItemOptions != nil {
+		opts = append(opts, *input.ItemOptions)
+	}
+
+	if !cart.HasItem(input.ProductID, input.ShopID, opts...) {
 		return apperrors.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
@@ -93,7 +99,13 @@ func (u *UpdateItemUsecase) Execute(
 		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
 	}
 
-	if input.Quantity > inventory.Available() {
+	totalProductQty := cart.TotalProductQuantity(input.ProductID, input.ShopID)
+	if existing := cart.FindItem(input.ProductID, input.ShopID, opts...); existing != nil && existing.DeletedAt == nil {
+		totalProductQty = totalProductQty - existing.Quantity + input.Quantity
+	} else {
+		totalProductQty = totalProductQty + input.Quantity
+	}
+	if totalProductQty > inventory.Available() {
 		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
 	}
 
@@ -101,6 +113,7 @@ func (u *UpdateItemUsecase) Execute(
 		input.ProductID,
 		input.ShopID,
 		input.Quantity,
+		opts...,
 	); err != nil {
 		return apperrors.NewInvalidInput(err.Error())
 	}
@@ -126,7 +139,7 @@ type UpdateItemByIDInput struct {
 	CustomerID  uuid.UUID
 	CartItemID  uuid.UUID
 	Quantity    int
-	ItemOptions domain.ItemOptions
+	ItemOptions *domain.ItemOptions
 }
 
 func (u *UpdateItemUsecase) ExecuteByID(
@@ -150,45 +163,52 @@ func (u *UpdateItemUsecase) ExecuteByID(
 	var targetItem *domain.CartItem
 	for i := range cart.Items {
 		item := &cart.Items[i]
-		if item.ID == input.CartItemID && item.DeletedAt == nil &&
-			item.ProductVariantType == domain.ProductVariantTypeStandard && item.ProductID != nil {
+		if item.ID == input.CartItemID && item.DeletedAt == nil {
 			targetItem = item
 			break
 		}
 	}
-	if targetItem == nil || targetItem.ProductID == nil {
+	if targetItem == nil {
 		return apperrors.NewNotFound(domain.ErrCartItemNotFound.Error())
 	}
 
-	inventory, err := u.inventoryRepo.GetByProductIDAndShopID(ctx, u.executor,
-		*targetItem.ProductID,
-		targetItem.ShopID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to load inventory by product and shop: %w", err)
-	}
-	if inventory == nil {
-		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
+	if targetItem.ProductVariantType == domain.ProductVariantTypeStandard && targetItem.ProductID != nil {
+		inventory, err := u.inventoryRepo.GetByProductIDAndShopID(ctx, u.executor,
+			*targetItem.ProductID,
+			targetItem.ShopID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to load inventory by product and shop: %w", err)
+		}
+		if inventory == nil {
+			return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
+		}
+
+		product, err := u.productRepo.GetByID(ctx, u.executor,
+			*targetItem.ProductID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve product: %w", err)
+		}
+		if product == nil {
+			return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
+		}
+
+		totalProductQty := cart.TotalProductQuantity(*targetItem.ProductID, targetItem.ShopID, targetItem.ID) + input.Quantity
+		if totalProductQty > inventory.Available() {
+			return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
+		}
 	}
 
-	product, err := u.productRepo.GetByID(ctx, u.executor,
-		*targetItem.ProductID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve product: %w", err)
-	}
-	if product == nil {
-		return apperrors.NewNotFound(domain.ErrProductNotFound.Error())
-	}
-
-	if input.Quantity > inventory.Available() {
-		return apperrors.NewConflict(domain.ErrInsufficientStock.Error())
+	var opts []domain.ItemOptions
+	if input.ItemOptions != nil {
+		opts = append(opts, *input.ItemOptions)
 	}
 
 	if err := cart.UpdateItemByID(
 		input.CartItemID,
 		input.Quantity,
-		input.ItemOptions,
+		opts...,
 	); err != nil {
 		return apperrors.NewInvalidInput(err.Error())
 	}

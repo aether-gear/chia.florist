@@ -31,7 +31,10 @@ type addItemRequest struct {
 }
 
 type updateItemRequest struct {
-	Quantity int `json:"quantity"`
+	Quantity    int                 `json:"quantity"`
+	ItemOptions *itemOptionsRequest `json:"item_options,omitempty"`
+	Size        string              `json:"size,omitempty"`
+	Jambul      string              `json:"jambul,omitempty"`
 }
 
 type updateItemByIDRequest struct {

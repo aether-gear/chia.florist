@@ -369,8 +369,10 @@ func NewRouter(c *Container) *chi.Mux {
 			r.Route("/items", func(r chi.Router) {
 				r.Post("/", chains.CustomerOnly(cartHandler.AddItem))
 				r.Put("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.UpdateItem))
+				r.Put("/{cartItemID}", chains.CustomerOnly(cartHandler.UpdateItemByID))
 				r.Patch("/{cartItemID}", chains.CustomerOnly(cartHandler.UpdateItemByID))
 				r.Patch("/{cartItemID}/shop", chains.CustomerOnly(cartHandler.ChangeItemShop))
+				r.Delete("/{cartItemID}", chains.CustomerOnly(cartHandler.RemoveItemByID))
 				r.Delete("/{shopID}/{productID}", chains.CustomerOnly(cartHandler.RemoveItem))
 				r.Delete("/custom/{cartItemID}", chains.CustomerOnly(cartHandler.RemoveCustomItem))
 			})

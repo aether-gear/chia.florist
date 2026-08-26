@@ -300,11 +300,29 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid quantity")
 	}
 
+	var opt *domain.ItemOptions
+	if req.ItemOptions != nil || req.Size != "" || req.Jambul != "" {
+		var o domain.ItemOptions
+		if req.ItemOptions != nil {
+			o.Size = req.ItemOptions.Size
+			o.Jambul = req.ItemOptions.Jambul
+		}
+		if req.Size != "" && o.Size == "" {
+			o.Size = req.Size
+		}
+		if req.Jambul != "" && o.Jambul == "" {
+			o.Jambul = req.Jambul
+		}
+		norm := o.Normalized()
+		opt = &norm
+	}
+
 	input := usecase.UpdateItemInput{
-		CustomerID: *authCtx.CustomerID,
-		ProductID:  productID,
-		ShopID:     shopID,
-		Quantity:   req.Quantity,
+		CustomerID:  *authCtx.CustomerID,
+		ProductID:   productID,
+		ShopID:      shopID,
+		Quantity:    req.Quantity,
+		ItemOptions: opt,
 	}
 
 	if err := h.updateItem.Execute(r.Context(), input); err != nil {
@@ -343,23 +361,28 @@ func (h *CartHandler) UpdateItemByID(w http.ResponseWriter, r *http.Request) err
 		return apperrors.NewBadRequest("invalid quantity")
 	}
 
-	var opt domain.ItemOptions
-	if req.ItemOptions != nil {
-		opt.Size = req.ItemOptions.Size
-		opt.Jambul = req.ItemOptions.Jambul
-	}
-	if req.Size != "" && opt.Size == "" {
-		opt.Size = req.Size
-	}
-	if req.Jambul != "" && opt.Jambul == "" {
-		opt.Jambul = req.Jambul
+	var opt *domain.ItemOptions
+	if req.ItemOptions != nil || req.Size != "" || req.Jambul != "" {
+		var o domain.ItemOptions
+		if req.ItemOptions != nil {
+			o.Size = req.ItemOptions.Size
+			o.Jambul = req.ItemOptions.Jambul
+		}
+		if req.Size != "" && o.Size == "" {
+			o.Size = req.Size
+		}
+		if req.Jambul != "" && o.Jambul == "" {
+			o.Jambul = req.Jambul
+		}
+		norm := o.Normalized()
+		opt = &norm
 	}
 
 	input := usecase.UpdateItemByIDInput{
 		CustomerID:  *authCtx.CustomerID,
 		CartItemID:  cartItemID,
 		Quantity:    req.Quantity,
-		ItemOptions: opt.Normalized(),
+		ItemOptions: opt,
 	}
 
 	if err := h.updateItem.ExecuteByID(r.Context(), input); err != nil {
@@ -393,13 +416,53 @@ func (h *CartHandler) RemoveItem(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.NewBadRequest("invalid shop id")
 	}
 
+	var opt *domain.ItemOptions
+	qSize := r.URL.Query().Get("size")
+	qJambul := r.URL.Query().Get("jambul")
+	if qSize != "" || qJambul != "" {
+		norm := domain.ItemOptions{Size: qSize, Jambul: qJambul}.Normalized()
+		opt = &norm
+	}
+
 	input := usecase.RemoveItemInput{
-		CustomerID: *authCtx.CustomerID,
-		ProductID:  productID,
-		ShopID:     shopID,
+		CustomerID:  *authCtx.CustomerID,
+		ProductID:   productID,
+		ShopID:      shopID,
+		ItemOptions: opt,
 	}
 
 	if err := h.removeItem.Execute(r.Context(), input); err != nil {
+		return err
+	}
+
+	response := map[string]string{
+		"message": "item removed",
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, response)
+	return nil
+}
+
+func (h *CartHandler) RemoveItemByID(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required")
+	}
+
+	cartItemID, err := apphttp.ParamUUID(r, "cartItemID")
+	if err != nil {
+		return apperrors.NewBadRequest("invalid cart item id")
+	}
+
+	input := usecase.RemoveItemByIDInput{
+		CustomerID: *authCtx.CustomerID,
+		CartItemID: cartItemID,
+	}
+
+	if err := h.removeItem.ExecuteByID(r.Context(), input); err != nil {
 		return err
 	}
 

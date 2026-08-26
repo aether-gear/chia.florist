@@ -23,8 +23,8 @@ const productAvailabilityMap = useState<Record<string, { slug: string; name: str
 const fetchingIdentifiers = new Set<string>()
 
 const fetchCartItemsAvailability = async () => {
-  const standardItems = cart.value.filter(i => !i.isCustom && (i.slug || i.id))
-  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.id).filter(Boolean))]
+  const standardItems = cart.value.filter(i => !i.isCustom && (i.slug || i.productId || i.id))
+  const uniqueIdentifiers = [...new Set(standardItems.map(i => i.slug || i.productId || i.id).filter(Boolean))]
 
   const promises = uniqueIdentifiers.map(async (identifier) => {
     if (identifier && !productAvailabilityMap.value[identifier] && !fetchingIdentifiers.has(identifier)) {
@@ -70,8 +70,8 @@ const getAvailableShopsForItem = (item: any) => {
   if (item.isCustom) {
     return activeShops.value
   }
-  const identifier = item.slug || item.id
-  const avail = productAvailabilityMap.value[identifier] || (item.id ? productAvailabilityMap.value[item.id] : null)
+  const identifier = item.slug || item.productId || item.id
+  const avail = productAvailabilityMap.value[identifier] || (item.productId ? productAvailabilityMap.value[item.productId] : null) || (item.id ? productAvailabilityMap.value[item.id] : null)
   if (Array.isArray(avail)) {
     const inStockSlugs = avail.filter(a => a.stock > 0).map(a => a.name)
     const filtered = activeShops.value.filter(s => inStockSlugs.includes(s.slug) || s.id === item.shopId)
@@ -266,7 +266,7 @@ const onQtyKeydown = (e: KeyboardEvent, id: string, size: string | undefined, co
               </span>
             </div>
 
-            <div v-for="(item, idx) in group.items" :key="item.id || idx" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
+            <div v-for="(item, idx) in group.items" :key="item.cartItemId || item.id || idx" class="flex flex-col sm:flex-row gap-6 py-6 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
               <div class="w-full sm:w-28 h-28 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 relative">
                 <img 
                   :src="item.image || '/images/custom-preview.png'" 
