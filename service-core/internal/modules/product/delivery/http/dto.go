@@ -101,3 +101,13 @@ type productStatsResponse struct {
 
 	Thumbnail *string `json:"thumbnail"`
 }
+
+type generateCustomDesignAIRequest struct {
+	Prompt           string `json:"prompt"`
+	Occasion         string `json:"occasion,omitempty"`
+	PreferredPalette string `json:"preferred_palette,omitempty"`
+	Recipient        string `json:"recipient,omitempty"`
+	Sender           string `json:"sender,omitempty"`
+	PhysicalSizeID   string `json:"physical_size_id,omitempty"`
+}
+

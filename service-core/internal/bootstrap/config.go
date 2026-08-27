@@ -21,6 +21,7 @@ type Config struct {
 	PaymentSync       config.PaymentSyncConfig
 	PaymentExpiry     config.PaymentExpiryConfig
 	IntelligenceLayer config.IntelligenceLayerConfig
+	GenAI             config.GenAIConfig
 }
 
 func LoadConfig() Config {
@@ -63,5 +64,6 @@ func LoadConfig() Config {
 		PaymentSync:       config.LoadPaymentSyncConfig(),
 		PaymentExpiry:     config.LoadPaymentExpiryConfig(),
 		IntelligenceLayer: config.LoadIntelligenceLayerConfig(),
+		GenAI:             config.LoadGenAIConfig(),
 	}
 }

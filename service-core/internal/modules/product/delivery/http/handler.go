@@ -8,18 +8,20 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	appmultipart "service-core/internal/common/http/multipart"
+	authdomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/product/usecase"
 
 	"github.com/google/uuid"
 )
 
 type ProductHandler struct {
-	findProducts    *usecase.FindProductsUsecase
-	getProduct      *usecase.GetProductUsecase
-	saveProduct     *usecase.SaveProductUsecase
-	deleteProduct   *usecase.DeleteProductUsecase
-	addProductImage *usecase.AddProductImagesUsecase
-	getProductStats *usecase.GetProductStatsUsecase
+	findProducts         *usecase.FindProductsUsecase
+	getProduct           *usecase.GetProductUsecase
+	saveProduct          *usecase.SaveProductUsecase
+	deleteProduct        *usecase.DeleteProductUsecase
+	addProductImage      *usecase.AddProductImagesUsecase
+	getProductStats      *usecase.GetProductStatsUsecase
+	generateCustomDesign *usecase.GenerateCustomDesignUsecase
 }
 
 func NewProductHandler(
@@ -29,14 +31,16 @@ func NewProductHandler(
 	deleteProduct *usecase.DeleteProductUsecase,
 	addProductImage *usecase.AddProductImagesUsecase,
 	getProductStats *usecase.GetProductStatsUsecase,
+	generateCustomDesign *usecase.GenerateCustomDesignUsecase,
 ) *ProductHandler {
 	return &ProductHandler{
-		findProducts:    findProducts,
-		getProduct:      getProduct,
-		saveProduct:     saveProduct,
-		deleteProduct:   deleteProduct,
-		addProductImage: addProductImage,
-		getProductStats: getProductStats,
+		findProducts:         findProducts,
+		getProduct:           getProduct,
+		saveProduct:          saveProduct,
+		deleteProduct:        deleteProduct,
+		addProductImage:      addProductImage,
+		getProductStats:      getProductStats,
+		generateCustomDesign: generateCustomDesign,
 	}
 }
 
@@ -439,3 +443,37 @@ func (h *ProductHandler) GetProductStats(w http.ResponseWriter, r *http.Request)
 	apphttp.WriteJSON(w, http.StatusOK, response)
 	return nil
 }
+
+func (h *ProductHandler) GenerateCustomDesignAI(w http.ResponseWriter, r *http.Request) error {
+	authCtx, ok := authdomain.GetAuthContext(r.Context())
+	if !ok || !authCtx.IsAuthenticated {
+		return apperrors.NewUnauthorized("authentication required")
+	}
+	if authCtx.CustomerID == nil {
+		return apperrors.NewForbidden("customer account required for AI generation")
+	}
+
+	var req generateCustomDesignAIRequest
+	if err := apphttp.DecodeJSON(r, &req); err != nil {
+		return apperrors.NewInvalidInput("invalid request payload")
+	}
+
+	input := usecase.GenerateCustomDesignInput{
+		CustomerID:       *authCtx.CustomerID,
+		Prompt:           req.Prompt,
+		Occasion:         req.Occasion,
+		PreferredPalette: req.PreferredPalette,
+		Recipient:        req.Recipient,
+		Sender:           req.Sender,
+		PhysicalSizeID:   req.PhysicalSizeID,
+	}
+
+	result, err := h.generateCustomDesign.Execute(r.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	apphttp.WriteJSON(w, http.StatusOK, result)
+	return nil
+}
+

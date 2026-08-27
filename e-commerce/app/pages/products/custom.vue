@@ -8,6 +8,7 @@ import {
   ReviewModal,
   FinalizeChoiceOverlay,
   ThankYouOverlay,
+  AiAssistantModal,
   TOOL_TABS
 } from '~/features/custom-product'
 import { useCart } from '~/composables/useCart'
@@ -15,7 +16,10 @@ import { useGlobalAlert } from '~/composables/useGlobalAlert'
 import { useAuthViewModel } from '~/composables/viewmodels/useAuthViewModel'
 import '~/features/custom-product/custom-product.css'
 
-definePageMeta({ layout: false })
+definePageMeta({
+  layout: false,
+  middleware: 'auth'
+})
 useHead({
   title: 'Chia Florist — Board Designer (v3.0)',
   meta: [{ name: 'description', content: 'Design your custom flower board with our interactive canvas designer.' }]
@@ -154,7 +158,17 @@ onUnmounted(() => {
         <span class="dr-dot hidden sm:inline">◆</span>
         <span class="dr-page-title">Board Designer</span>
       </div>
-      <div class="dr-nav-right">
+      <div class="dr-nav-right flex items-center gap-2">
+        <!-- AI Generate Trigger Button -->
+        <button
+          class="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+          @click="design.showAiModal = true"
+          title="Open AI Board Designer"
+        >
+          <span>✨</span>
+          <span class="hidden sm:inline">AI Generate</span>
+        </button>
+
         <!-- Zoom controls -->
         <div class="dr-zoom-controls">
           <button class="dr-zoom-btn" @click="design.zoomOut()" title="Zoom out (Ctrl+-)">
@@ -308,6 +322,11 @@ onUnmounted(() => {
       </div>
 
       <!-- ═══ MODALS & OVERLAYS ═════════════════════════════════════════ -->
+      <AiAssistantModal
+        :show="design.showAiModal"
+        @close="design.showAiModal = false"
+        @apply="design.applyDesignPayload"
+      />
       <FinalizeChoiceOverlay
         :show="design.showFinalizeChoice"
         @close="design.showFinalizeChoice = false"

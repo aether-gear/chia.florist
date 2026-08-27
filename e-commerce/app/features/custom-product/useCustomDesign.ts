@@ -10,7 +10,7 @@ import {
   FONTS, CORNERS, BORDER_STYLES, SIZES, BRUSH_COLORS,
   BORDER_COLORS, BG_PRESETS, DEFAULT_DRAFT_KEY
 } from './constants'
-import { normalizeHexColor, calculateDesignChecksum } from './migrate'
+import { normalizeHexColor, calculateDesignChecksum, migrateToV3 } from './migrate'
 import { useGlobalAlert } from '~/composables/useGlobalAlert'
 
 export const useCustomDesign = () => {
@@ -60,6 +60,7 @@ export const useCustomDesign = () => {
   const showReview = ref(false)
   const showFinalizeChoice = ref(false)
   const showThankYou = ref(false)
+  const showAiModal = ref(false)
 
   const brushType = ref<BrushType>('flower')
   const brushColor = ref('#e85d75')
@@ -948,9 +949,128 @@ export const useCustomDesign = () => {
     }
   })
 
+  // Apply AI-generated or imported CustomDesignPayload
+  const applyDesignPayload = (rawPayload: any) => {
+    try {
+      const payload = migrateToV3(rawPayload)
+      if (payload.layout) {
+        physicalSize.value = payload.layout.physicalSizeId || 'medium'
+        heightRatio.value = payload.layout.upperHeightRatio || 0.58
+        if (payload.layout.border) {
+          border.value = {
+            style: payload.layout.border.style || 'solid',
+            color: payload.layout.border.colorHex || '#F5C842',
+            width: payload.layout.border.widthPx || 12,
+            center: payload.layout.border.showCenterDivider ?? true
+          }
+        }
+      }
+
+      if (payload.sections?.upper) {
+        const u = payload.sections.upper
+        upper.value = {
+          headerText: u.header?.text || '',
+          bodyText: u.body?.text || '',
+          headerFontSize: u.header?.fontSizePx || 36,
+          bodyFontSize: u.body?.fontSizePx || 20,
+          headerFont: u.header?.fontId || 'playfair',
+          bodyFont: u.body?.fontId || 'inter',
+          headerAlign: u.header?.alignment || 'center',
+          bodyAlign: u.body?.alignment || 'center',
+          bgColor: u.bgColorHex || '#ffffff',
+          headerColor: u.header?.fontColorHex || '#1c1813',
+          bodyColor: u.body?.fontColorHex || '#4a4a4a',
+          cornerStyle: u.cornerStyle || 'none',
+          opacityPercent: u.opacityPercent ?? 100
+        }
+      }
+
+      if (payload.sections?.lower) {
+        const l = payload.sections.lower
+        lower.value = {
+          headerText: l.header?.text || '',
+          bodyText: l.body?.text || '',
+          headerFontSize: l.header?.fontSizePx || 26,
+          bodyFontSize: l.body?.fontSizePx || 22,
+          headerFont: l.header?.fontId || 'bebas',
+          bodyFont: l.body?.fontId || 'inter',
+          headerAlign: l.header?.alignment || 'center',
+          bodyAlign: l.body?.alignment || 'center',
+          bgColor: l.bgColorHex || '#ffffff',
+          headerColor: l.header?.fontColorHex || '#1c1813',
+          bodyColor: l.body?.fontColorHex || '#4a4a4a',
+          cornerStyle: l.cornerStyle || 'none',
+          opacityPercent: l.opacityPercent ?? 100
+        }
+      }
+
+      if (payload.decorations) {
+        if (payload.decorations.topCrest) {
+          const tc = payload.decorations.topCrest
+          topCrest.value = {
+            enabled: tc.visible ?? true,
+            style: tc.variantId || 'classic',
+            primary: tc.primaryColorHex || '#10b981',
+            secondary: tc.secondaryColorHex || '#ecfdf5',
+            size: tc.scalePercent || 40
+          }
+        }
+        if (payload.decorations.bottomCrest) {
+          const bc = payload.decorations.bottomCrest
+          bottomCrest.value = {
+            enabled: bc.visible ?? true,
+            style: bc.variantId || 'classic',
+            primary: bc.primaryColorHex || '#10b981',
+            secondary: bc.secondaryColorHex || '#ecfdf5',
+            size: bc.scalePercent || 40
+          }
+        }
+      }
+
+      if (Array.isArray(payload.elements)) {
+        elements.value = payload.elements.map((el: any) => {
+          if (el.type === 'image') {
+            return {
+              id: el.id,
+              type: 'image',
+              src: el.src || '',
+              frame: el.frameStyle || 'square',
+              x: el.transform?.xPercent || 15,
+              y: el.transform?.yPercent || 15,
+              width: el.transform?.scalePercent || 22,
+              zoom: el.crop?.zoom || 1,
+              cropX: el.crop?.xPercent || 50,
+              cropY: el.crop?.yPercent || 50,
+              zIndex: el.transform?.zIndex || 10
+            }
+          }
+          return {
+            id: el.id,
+            type: 'brush',
+            brushType: el.brushType || 'flower',
+            x: el.transform?.xPercent || 50,
+            y: el.transform?.yPercent || 50,
+            size: el.transform?.scalePercent || 48,
+            color: el.colorHex || '#E85D75',
+            rotation: el.transform?.rotationDeg || 0,
+            zIndex: el.transform?.zIndex || 10
+          }
+        })
+      }
+
+      isDirty.value = true
+      saveDraft()
+      updateScale()
+      triggerToast('✨ AI Flower Board Design Applied!')
+    } catch (err) {
+      console.error('Failed to apply design payload:', err)
+      useGlobalAlert().showError('Failed to Apply Design', 'Could not apply the generated design configuration.')
+    }
+  }
+
   return reactive({
     upper, lower, heightRatio, border, topCrest, bottomCrest, elements,
-    activeTab, activeSection, selectedId, physicalSize, showReview, showFinalizeChoice, showThankYou,
+    activeTab, activeSection, selectedId, physicalSize, showReview, showFinalizeChoice, showThankYou, showAiModal,
     brushType, brushColor, brushSize, brushRotation, isBrushMode,
     containerRef, boardRef, boardScale, snapshotDataUrl, snapshotLoading,
     boardW, boardH, getFont, sec, upperH, lowerH,
@@ -960,7 +1080,7 @@ export const useCustomDesign = () => {
     updateScale, setZoom, zoomIn, zoomOut, resetZoom, randomizeDesign, bringToFront, deleteSelected,
     handleDrop, handleFileInput, handleBrushMousedown, handleBoardClick,
     startDragEl, startDragDiv, onMouseMove, onMouseUp, onTouchMove, onTouchEnd, onKeyDown,
-    generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign,
+    generateBoardSnapshot, buildCustomDesignPayload, loadDraft, saveDraft, clearDraft, resetDesign, applyDesignPayload,
     isDirty, draftSavedNotice, saveToastNotice, saveToastMessage, showMoreMenu, showLeaveConfirm, triggerToast,
     // 3D view
     is3DMode, rotateX, rotateY, toggle3DMode, start3DDrag, board3dShadingStyle

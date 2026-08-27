@@ -6,6 +6,7 @@ import (
 	applimiter "service-core/internal/common/limiter"
 	applogger "service-core/internal/common/logger"
 
+	"service-core/internal/infra/genai"
 	"service-core/internal/infra/shipping"
 	appconfig "service-core/internal/shared/config"
 	imgSvc "service-core/internal/shared/image"
@@ -80,14 +81,16 @@ type Container struct {
 	paymentMethodRepo    paymentRepo.PaymentMethodRepository
 	paymentGateway       paymentgateway.Provider
 	IntelligenceProvider intelligencelayer.Provider
+	GenAIProvider        genai.Provider
 
-	FindProducts     productUsecase.FindProductsUsecase
-	GetProduct       productUsecase.GetProductUsecase
-	SaveProduct      productUsecase.SaveProductUsecase
-	DeleteProduct    productUsecase.DeleteProductUsecase
-	AddProductImages productUsecase.AddProductImagesUsecase
-	GetProductStats  productUsecase.GetProductStatsUsecase
-	CreateInventory  inventoryUsecase.CreateInventoryUsecase
+	FindProducts         productUsecase.FindProductsUsecase
+	GetProduct           productUsecase.GetProductUsecase
+	SaveProduct          productUsecase.SaveProductUsecase
+	DeleteProduct        productUsecase.DeleteProductUsecase
+	AddProductImages     productUsecase.AddProductImagesUsecase
+	GetProductStats      productUsecase.GetProductStatsUsecase
+	GenerateCustomDesign productUsecase.GenerateCustomDesignUsecase
+	CreateInventory      inventoryUsecase.CreateInventoryUsecase
 	UpdateInventory  inventoryUsecase.UpdateInventoryUsecase
 	DeleteInventory  inventoryUsecase.DeleteInventoryUsecase
 
@@ -331,6 +334,8 @@ func NewContainer(cfg Config,
 		)
 	}
 
+	genAIProvider := genai.NewClient(cfg.GenAI)
+
 	processPaymentWebhook := *paymentUsecase.NewProcessPaymentWebhookUsecase(
 		paymentRepo,
 		paymentEventRepo,
@@ -357,6 +362,7 @@ func NewContainer(cfg Config,
 		paymentMethodRepo:    paymentMethodRepo,
 		paymentGateway:       infra.PaymentGateway,
 		IntelligenceProvider: intelligenceProvider,
+		GenAIProvider:        genAIProvider,
 
 		FindProducts: *productUsecase.
 			NewFindProductsUsecase(
@@ -405,6 +411,11 @@ func NewContainer(cfg Config,
 				slugGen,
 				imageVariantProvider,
 				infra.StorageProvider,
+			),
+		GenerateCustomDesign: *productUsecase.
+			NewGenerateCustomDesignUsecase(
+				genAIProvider,
+				cfg.GenAI.MaxRequestsPerHour,
 			),
 		CreateInventory: *inventoryUsecase.
 			NewCreateInventoryUsecase(inventoryRepo,

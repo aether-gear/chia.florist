@@ -137,6 +137,7 @@ func NewRouter(c *Container) *chi.Mux {
 			&c.DeleteProduct,
 			&c.AddProductImages,
 			&c.GetProductStats,
+			&c.GenerateCustomDesign,
 		)
 
 		inventoryHandler = inventoryH.NewInventoryHandler(
@@ -303,6 +304,10 @@ func NewRouter(c *Container) *chi.Mux {
 				r.Delete("/", chains.StaffAdminOnly(productHandler.DeleteProduct))
 				r.Post("/images", chains.StaffOnly(productHandler.AddProductImages))
 			})
+		})
+
+		r.Route("/custom-products", func(r chi.Router) {
+			r.Post("/ai/generate", chains.CustomerOnly(productHandler.GenerateCustomDesignAI))
 		})
 
 		r.Route("/auth", func(r chi.Router) {

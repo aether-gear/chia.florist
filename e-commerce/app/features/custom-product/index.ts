@@ -12,3 +12,5 @@ export { default as BottomNav } from './components/BottomNav.vue'
 export { default as ReviewModal } from './components/ReviewModal.vue'
 export { default as FinalizeChoiceOverlay } from './components/FinalizeChoiceOverlay.vue'
 export { default as ThankYouOverlay } from './components/ThankYouOverlay.vue'
+export { default as AiAssistantModal } from './components/AiAssistantModal.vue'
+
