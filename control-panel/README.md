@@ -1,73 +1,34 @@
-# React + TypeScript + Vite
+# Chia Florist — Control Panel
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Internal staff and administration dashboard for Chia Florist, providing order fulfillment workspaces, shop management, staff permissions, courier assignments, and operational analytics.
 
-Currently, two official plugins are available:
+## Setup & Running Locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+# Install dependencies
+npm ci
 
-## React Compiler
+# Start development server
+npm run dev
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# Build for production
+npm run build
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Run type checks and linter
+npm run lint
+npx tsc --noEmit
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Versioning & Commit Guidelines
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+`control-panel` releases are automated via GitHub Actions and **Release Please** (Current baseline: `control-panel-v0.5.0`).
+Production builds are deployed to Netlify on release.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Commit Type | Version Bump | Example |
+| :--- | :--- | :--- |
+| `fix:` / `perf:` | **Patch** (`0.5.0` → `0.5.1`) | `fix(staff): resolve assigned shop switcher state` |
+| `feat:` | **Minor** (`0.5.0` → `0.6.0`) | `feat(orders): add date range filter in global view` |
+| `feat!:` / `BREAKING CHANGE:` | **Major** (or minor pre-1.0) | `feat!: refactor staff assignment workflow UI` |
+| `docs:` / `test:` / `chore:` | *No release* | `chore: fix lint rule violations in orders page` |
+
+See root [docs/VERSIONING_AND_RELEASES.md](../docs/VERSIONING_AND_RELEASES.md) for full monorepo guidelines.

@@ -1,6 +1,7 @@
 // app/features/custom-product/migrate.ts
 
 import type { CustomDesignPayloadV3 } from './types'
+import { CUSTOM_PRODUCT_SCHEMA_VERSION, CUSTOM_PRODUCT_ENGINE_VERSION } from './constants'
 
 // Validate 6-digit hex color format (#RRGGBB)
 export const normalizeHexColor = (color: string | undefined, fallback = '#FFFFFF'): string => {
@@ -33,7 +34,7 @@ export const migrateToV3 = (raw: any): CustomDesignPayloadV3 => {
   }
 
   // Already v3.0.0 structured payload
-  if (raw.metadata && raw.metadata.version === '3.0.0' && raw.layout && raw.sections) {
+  if (raw.metadata && raw.metadata.version === CUSTOM_PRODUCT_SCHEMA_VERSION && raw.layout && raw.sections) {
     const payload = raw as CustomDesignPayloadV3
     if (!payload.metadata.checksum) {
       payload.metadata.checksum = calculateDesignChecksum(payload)
@@ -64,8 +65,8 @@ export const migrateToV3 = (raw: any): CustomDesignPayloadV3 => {
 
   const payload: CustomDesignPayloadV3 = {
     metadata: {
-      version: '3.0.0',
-      editorVersion: metadata.editorVersion || '3.0.0',
+      version: CUSTOM_PRODUCT_SCHEMA_VERSION,
+      editorVersion: metadata.editorVersion || CUSTOM_PRODUCT_ENGINE_VERSION,
       platform: metadata.platform || 'web',
       locale: metadata.locale || 'id-ID',
       createdAt: metadata.createdAt || raw.generatedAt || new Date().toISOString(),

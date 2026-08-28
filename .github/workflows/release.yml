@@ -1,0 +1,31 @@
+# Chia Florist — Automated Monorepo CI Versioning & Releases
+#
+# This workflow uses Google Release Please to:
+#   1. Track conventional commits per module path (service-core, e-commerce, control-panel, intelligence-layer).
+#   2. Open/maintain a Release PR with updated CHANGELOG.md and bumped version.
+#   3. On merge of the Release PR, automatically create the component Git tag (e.g. service-core-v0.14.0) and GitHub Release.
+#
+# Trigger: Push to main branch
+
+name: Release — Monorepo Versioning
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release Please (SemVer & Changelog)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Release Please
+        uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
