@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chia.florist/schemas/custom-product-v3.schema.json",
+  "title": "ChiaFloristCustomDesignPayloadV3",
+  "description": "Standardized canonical payload contract for Chia Florist DIY and AI flower board custom designs.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "layout",
+    "sections",
+    "decorations",
+    "elements",
+    "assets"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["version", "editorVersion", "checksum"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "3.0.0",
+          "description": "Custom design schema version"
+        },
+        "editorVersion": {
+          "type": "string",
+          "description": "Design engine editor version (e.g. 3.1.0)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["web", "mobile", "ai-generator", "admin-panel"],
+          "default": "web"
+        },
+        "locale": {
+          "type": "string",
+          "default": "id-ID"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "checksum": {
+          "type": "string",
+          "description": "Payload integrity checksum"
+        },
+        "featureFlags": {
+          "type": "object"
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "required": ["physicalSizeId", "aspectRatioId", "upperHeightRatio", "border"],
+      "properties": {
+        "physicalSizeId": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "aspectRatioId": {
+          "type": "string",
+          "enum": ["portrait-3-4", "landscape-4-3", "square-1-1"]
+        },
+        "upperHeightRatio": {
+          "type": "number",
+          "minimum": 0.25,
+          "maximum": 0.75
+        },
+        "border": {
+          "type": "object",
+          "required": ["style", "colorHex", "widthPx", "showCenterDivider"],
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": ["none", "solid", "double", "dashed", "dotted", "groove", "ridge", "ornate"]
+            },
+            "colorHex": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "widthPx": {
+              "type": "number",
+              "minimum": 0
+            },
+            "showCenterDivider": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "required": ["upper", "lower"],
+      "properties": {
+        "upper": { "$ref": "#/$defs/BoardSection" },
+        "lower": { "$ref": "#/$defs/BoardSection" }
+      }
+    },
+    "decorations": {
+      "type": "object",
+      "required": ["topCrest", "bottomCrest"],
+      "properties": {
+        "topCrest": { "$ref": "#/$defs/CrestSpec" },
+        "bottomCrest": { "$ref": "#/$defs/CrestSpec" }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/ImageElement" },
+          { "$ref": "#/$defs/BrushElement" }
+        ]
+      }
+    },
+    "assets": {
+      "type": "object",
+      "properties": {
+        "previewBase64": { "type": ["string", "null"] },
+        "previewAssetId": { "type": ["string", "null"] },
+        "previewUrl": { "type": ["string", "null"] },
+        "bucketPath": { "type": ["string", "null"] },
+        "storageProvider": {
+          "type": ["string", "null"],
+          "enum": ["supabase", "s3", "local", null]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "TypographySpec": {
+      "type": "object",
+      "required": ["text", "fontId", "fontSizePx", "fontColorHex", "alignment"],
+      "properties": {
+        "text": { "type": ["string", "null"] },
+        "fontId": {
+          "type": "string",
+          "enum": ["inter", "playfair", "dancing", "bebas", "merriweather", "pacifico"]
+        },
+        "fontSizePx": { "type": "number" },
+        "fontColorHex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "alignment": { "type": "string", "enum": ["left", "center", "right"] }
+      }
+    },
+    "BoardSection": {
+      "type": "object",
+      "required": ["bgColorHex", "cornerStyle", "header", "body"],
+      "properties": {
+        "bgColorHex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "cornerStyle": {
+          "type": "string",
+          "enum": ["none", "rounded", "cut", "ornate", "floral"]
+        },
+        "opacityPercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "header": { "$ref": "#/$defs/TypographySpec" },
+        "body": { "$ref": "#/$defs/TypographySpec" }
+      }
+    },
+    "CrestSpec": {
+      "type": "object",
+      "required": ["visible", "variantId", "primaryColorHex", "secondaryColorHex", "scalePercent"],
+      "properties": {
+        "visible": { "type": "boolean" },
+        "variantId": { "type": "string", "enum": ["classic", "modern", "grand"] },
+        "primaryColorHex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "secondaryColorHex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "scalePercent": { "type": "number", "minimum": 10, "maximum": 300 }
+      }
+    },
+    "TransformSpec": {
+      "type": "object",
+      "required": ["xPercent", "yPercent", "scalePercent", "rotationDeg", "zIndex"],
+      "properties": {
+        "xPercent": { "type": "number" },
+        "yPercent": { "type": "number" },
+        "scalePercent": { "type": "number" },
+        "rotationDeg": { "type": "number" },
+        "zIndex": { "type": "integer" }
+      }
+    },
+    "ImageElement": {
+      "type": "object",
+      "required": ["id", "type", "src", "frameStyle", "crop", "transform"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "const": "image" },
+        "src": { "type": "string" },
+        "frameStyle": { "type": "string", "enum": ["none", "square", "circle"] },
+        "crop": {
+          "type": "object",
+          "required": ["xPercent", "yPercent", "zoom"],
+          "properties": {
+            "xPercent": { "type": "number" },
+            "yPercent": { "type": "number" },
+            "zoom": { "type": "number" }
+          }
+        },
+        "transform": { "$ref": "#/$defs/TransformSpec" }
+      }
+    },
+    "BrushElement": {
+      "type": "object",
+      "required": ["id", "type", "brushType", "colorHex", "transform"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "const": "brush" },
+        "brushType": { "type": "string", "enum": ["flower", "rose"] },
+        "colorHex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "transform": { "$ref": "#/$defs/TransformSpec" }
+      }
+    }
+  }
+}

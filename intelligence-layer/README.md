@@ -61,3 +61,17 @@ Verify the neural network architecture and data loader outputs using `pytest`:
 ```bash
 pytest
 ```
+
+## Versioning & Commit Guidelines
+
+`intelligence-layer` releases are automated via GitHub Actions and **Release Please** (Current baseline: `intelligence-layer-v0.3.0`).
+FastAPI Docker images are automatically built and published to GHCR upon release.
+
+| Commit Type | Version Bump | Example |
+| :--- | :--- | :--- |
+| `fix:` / `perf:` | **Patch** (`0.3.0` → `0.3.1`) | `fix(sku): resolve edge case in demand anomaly scorer` |
+| `feat:` | **Minor** (`0.3.0` → `0.4.0`) | `feat(ml): integrate chat-to-generate flower board model` |
+| `feat!:` / `BREAKING CHANGE:` | **Major** (or minor pre-1.0) | `feat!: update inference input payload contract to v3` |
+| `docs:` / `test:` / `chore:` | *No release* | `docs: document 4 ML models for workflows` |
+
+See root [docs/VERSIONING_AND_RELEASES.md](../docs/VERSIONING_AND_RELEASES.md) for full monorepo guidelines.

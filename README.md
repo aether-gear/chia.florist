@@ -56,7 +56,7 @@ This project is built with a **modular architecture**, with each layer has their
 
 | Layer           | Technology       |
 | --------------- | ---------------- |
-| Frontend        | Next.js / Vue    |
+| Frontend        | Nuxt & React     |
 | Backend         | Golang           |
 | AI / ML         | FastAPI (Python) |
 | Database        | PostgreSQL, Supabase       |
@@ -65,10 +65,10 @@ This project is built with a **modular architecture**, with each layer has their
 ## Objective
 
 - [ ] Deliver a **working modular system before June**
-- [ ] Enable **parallel development across multiple teams**
-- [ ] Provide a **real-world backend + AI integration experience**
-- [ ] Build a **portfolio-ready system with production mindset**
-- [ ] Ensure all development is **tracked via GitHub Issues**
+- [X] Enable **parallel development across multiple teams**
+- [X] Provide a **real-world backend + AI integration experience**
+- [X] Build a **portfolio-ready system with production mindset**
+- [X] Ensure all development is **tracked via GitHub Issues**
 
 ## Development Workflow
 
@@ -76,10 +76,25 @@ This project is built with a **modular architecture**, with each layer has their
 * Each module can be developed independently
 * Start with **mock data → integrate later**
 * Focus on:
-
   * API contracts first
   * Clear separation of concerns
   * Incremental delivery
+
+## Versioning & Commit Guidelines
+
+This monorepo uses automated independent semantic versioning powered by **Release Please**. Release bumps track **actual modified file paths**, so you should use **domain-first scopes** (`order`, `auth`, `custom-product`, `shipping`, `staff`).
+
+For full documentation and cross-module commit behavior, see [docs/VERSIONING_AND_RELEASES.md](docs/VERSIONING_AND_RELEASES.md).
+
+| Commit Prefix | Release Bump | Example |
+| :--- | :--- | :--- |
+| `fix:` / `perf:` | **Patch** (`0.14.0` $\rightarrow$ `0.14.1`) | `fix(auth): resolve session leakage` |
+| `feat:` | **Minor** (`0.14.0` $\rightarrow$ `0.15.0`) | `feat(shipping): add multi-courier tracking` |
+| `feat!:` / `BREAKING CHANGE:` | **Major** (or minor pre-1.0) | `feat!: restructure order payload schema` |
+| `docs:` / `chore:` / `test:` | *No release* | `docs: update API documentation` |
+
+* **Cross-Module Commits**: If a commit (e.g. `feat(custom-product): ...`) changes files in both `service-core/` and `e-commerce/`, Release Please automatically bumps and generates changelogs for **both** modules.
+
 
 ## Philosophy
 

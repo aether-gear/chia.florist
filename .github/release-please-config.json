@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bump-minor-pre-major": true,
+  "packages": {
+    "service-core": {
+      "release-type": "simple",
+      "package-name": "service-core",
+      "component": "service-core",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "e-commerce": {
+      "release-type": "node",
+      "package-name": "e-commerce",
+      "component": "e-commerce",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "control-panel": {
+      "release-type": "node",
+      "package-name": "control-panel",
+      "component": "control-panel",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "intelligence-layer": {
+      "release-type": "python",
+      "package-name": "intelligence-layer",
+      "component": "intelligence-layer",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}

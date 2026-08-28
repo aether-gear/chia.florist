@@ -16,7 +16,7 @@ on:
       - 'control-panel/**'
       - '.github/workflows/ci-control-panel.yml'
     tags:
-      - 'v*'
+      - 'control-panel-v*'
   pull_request:
     branches:
       - main

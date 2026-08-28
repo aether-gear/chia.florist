@@ -2,6 +2,9 @@
 
 import type { FontId, CornerStyle, BorderStyle, ToolTab } from './types'
 
+export const CUSTOM_PRODUCT_SCHEMA_VERSION = '3.0.0'
+export const CUSTOM_PRODUCT_ENGINE_VERSION = '3.1.0'
+
 export const FONTS: { id: FontId; label: string; family: string }[] = [
   { id: 'inter', label: 'Inter', family: "'Inter', sans-serif" },
   { id: 'playfair', label: 'Playfair', family: "'Playfair Display', serif" },
