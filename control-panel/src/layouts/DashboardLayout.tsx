@@ -82,6 +82,13 @@ export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  // Close mobile sidebar on route change
+  React.useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
   const { logout, userEmail: authEmail } = useAuth();
   const { data: authData, isAdmin } = useAuthMeViewModel();
   const { profile: staffProfile, loading: isProfileLoading } = useStaffProfileViewModel();
@@ -225,22 +232,28 @@ export default function DashboardLayout() {
   const renderSidebarContent = () => (
     <div className="flex h-full flex-col bg-zinc-100 dark:bg-zinc-900">
       <div className="flex h-16 shrink-0 items-center px-6 gap-2.5 border-b border-border/30">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-          <svg
-            className="w-4.5 h-4.5 text-primary"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 22c0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10 0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10z" />
-          </svg>
-        </div>
-        <span className="font-display font-bold text-base tracking-tight text-foreground">
-          chia.florist
-        </span>
+        <Link
+          to="/"
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+        >
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+            <svg
+              className="w-4.5 h-4.5 text-primary"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 22c0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10 0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10z" />
+            </svg>
+          </div>
+          <span className="font-display font-bold text-base tracking-tight text-foreground">
+            chia.florist
+          </span>
+        </Link>
       </div>
 
       {/* Admin badge */}
@@ -278,6 +291,7 @@ export default function DashboardLayout() {
                       <Link
                         key={item.name}
                         to={item.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
                         className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 ease-out active:scale-[0.98] ${
                           isActive
                             ? 'bg-primary text-primary-foreground font-semibold shadow-sm shadow-primary/5'
@@ -308,7 +322,7 @@ export default function DashboardLayout() {
   return (
     <div className="min-h-screen bg-background flex text-foreground font-sans antialiased">
       {/* Mobile sidebar */}
-      <Sheet>
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-border/40 bg-background/95 backdrop-blur-md w-full fixed top-0 z-10 h-16 text-foreground">
           <div className="flex items-center">
             <SheetTrigger asChild>
