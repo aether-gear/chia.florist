@@ -1,5 +1,5 @@
 import { DollarSign, ShoppingBag, CreditCard, Truck, AlertTriangle } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import type {
   OrderMetricsResponse,
   PaymentMetricsResponse,
@@ -133,13 +133,8 @@ export default function AnalyticsOverviewTab({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartPoints} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gmvGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142.4, 71.8%, 29.2%)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="hsl(142.4, 71.8%, 29.2%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={chartPoints} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/40" />
                 <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
                 <YAxis
                   axisLine={false}
@@ -162,8 +157,14 @@ export default function AnalyticsOverviewTab({
                     return null;
                   }}
                 />
-                <Area type="monotone" dataKey="gmv" stroke="hsl(142.4, 71.8%, 29.2%)" strokeWidth={2.5} fillOpacity={1} fill="url(#gmvGrad)" />
-              </AreaChart>
+                <Bar
+                  dataKey="gmv"
+                  name="GMV"
+                  fill="hsl(var(--primary))"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={48}
+                />
+              </BarChart>
             </ResponsiveContainer>
           )}
         </div>

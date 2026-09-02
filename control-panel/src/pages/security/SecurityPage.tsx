@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ShieldAlert, ShieldX, Activity, CheckCircle2, ShieldCheck, Trash2, Eye, FolderOpen, ListFilter } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceArea } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceArea } from 'recharts';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { fetchApi } from '../../lib/api';
@@ -1021,7 +1021,7 @@ export default function SecurityPage() {
         </div>
         <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
+            <BarChart
               data={threatData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
               onMouseDown={(e) => { if (e && e.activeLabel) setRefAreaLeft(Number(e.activeLabel)); }}
@@ -1045,16 +1045,6 @@ export default function SecurityPage() {
               }}
               style={{ userSelect: 'none' }}
             >
-              <defs>
-                <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorAllowed" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <XAxis
                 dataKey="time"
                 type="number"
@@ -1090,13 +1080,13 @@ export default function SecurityPage() {
                   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 }}
               />
-              <Area type="monotone" dataKey="allowed" name="Allowed Traffic" stroke="#10b981" fillOpacity={1} fill="url(#colorAllowed)" />
-              <Area type="monotone" dataKey="blocked" name="Blocked Threats" stroke="#ef4444" fillOpacity={1} fill="url(#colorBlocked)" />
+              <Bar dataKey="allowed" name="Allowed Traffic" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={20} />
+              <Bar dataKey="blocked" name="Blocked Threats" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={20} />
 
               {refAreaLeft !== null && refAreaRight !== null ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#8884d8" />
               ) : null}
-            </AreaChart>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
