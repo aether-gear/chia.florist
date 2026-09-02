@@ -3,6 +3,17 @@ export interface ItemOptions {
   jambul?: 'none' | 'top' | 'bottom' | 'both' | string;
 }
 
+export interface OrderItemCustomDesign {
+  version?: number;
+  physical_size_id?: string;
+  preview_url?: string;
+  header_text_upper?: string;
+  body_text_upper?: string;
+  header_text_lower?: string;
+  body_text_lower?: string;
+  design_snapshot?: Record<string, any>;
+}
+
 export interface OrderItem {
   id: string;
   shipment_id?: string | null;
@@ -19,6 +30,7 @@ export interface OrderItem {
   courier_service?: string | null;
   shipping_fee: number;
   item_options?: ItemOptions | null;
+  custom_design?: OrderItemCustomDesign | null;
 }
 
 export interface PaymentChannelData {

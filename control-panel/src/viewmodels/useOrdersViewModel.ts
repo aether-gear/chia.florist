@@ -2,7 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchApi } from '../lib/api';
 import type { OrdersResponse } from '../models/Order';
 
-export function useOrdersViewModel(fixedShopId?: string) {
+export interface UseOrdersViewModelOptions {
+  enabled?: boolean;
+}
+
+export function useOrdersViewModel(fixedShopId?: string, options?: UseOrdersViewModelOptions) {
+  const enabled = options?.enabled ?? true;
   const [data, setData] = useState<OrdersResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isSwitchingCategory, setIsSwitchingCategory] = useState<boolean>(false);
@@ -11,7 +16,7 @@ export function useOrdersViewModel(fixedShopId?: string) {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(20);
   const [sort, setSort] = useState<string>('latest:desc');
-  const [searchNumber, setSearchNumber] = useState<string>('');
+  const [searchNumber, setSearchNumberState] = useState<string>('');
   const [statusFilter, setStatusFilterState] = useState<string>('');
   const [shopFilter, setShopFilterState] = useState<string>(fixedShopId || '');
   const [fromDate, setFromDateState] = useState<string>('');
@@ -84,63 +89,63 @@ export function useOrdersViewModel(fixedShopId?: string) {
     }
   }, [fixedShopId]);
 
-  // Throttled category switching with a locked spinner window
   const setStatusFilter = useCallback((newStatus: string) => {
     setStatusFilterState(newStatus);
     setIsSwitchingCategory(true);
-    setLoading(true);
     setPage(1);
+  }, []);
+
+  const setShopFilter = useCallback((newShop: string) => {
+    if (fixedShopId !== undefined) return;
+    setShopFilterState(newShop);
+    setPage(1);
+  }, [fixedShopId]);
+
+  const setFromDate = useCallback((date: string) => {
+    setFromDateState(date);
+    setPage(1);
+  }, []);
+
+  const setToDate = useCallback((date: string) => {
+    setToDateState(date);
+    setPage(1);
+  }, []);
+
+  const setSearchNumber = useCallback((search: string) => {
+    setSearchNumberState(search);
+    setPage(1);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    const minThrottleDelay = new Promise(resolve => setTimeout(resolve, 350));
+    // Small debounce for typing search, immediate for other filters
+    const isSearchTyping = Boolean(searchNumber);
+    const delay = isSearchTyping ? 300 : isSwitchingCategory ? 150 : 0;
 
-    debounceTimerRef.current = setTimeout(async () => {
-      const fetchPromise = fetchOrders(1, limit, sort, searchNumber, newStatus, effectiveShop, fromDate, toDate);
-      await Promise.all([fetchPromise, minThrottleDelay]);
-    }, 50);
-  }, [limit, sort, searchNumber, effectiveShop, fromDate, toDate, fetchOrders]);
+    debounceTimerRef.current = setTimeout(() => {
+      fetchOrders(page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate);
+    }, delay);
 
-  const setShopFilter = useCallback((newShop: string) => {
-    if (fixedShopId !== undefined) return;
-    setShopFilterState(newShop);
-    setLoading(true);
-    setPage(1);
-    fetchOrders(1, limit, sort, searchNumber, statusFilter, newShop, fromDate, toDate);
-  }, [fixedShopId, limit, sort, searchNumber, statusFilter, fromDate, toDate, fetchOrders]);
-
-  const setFromDate = useCallback((date: string) => {
-    setFromDateState(date);
-    setLoading(true);
-    setPage(1);
-    fetchOrders(1, limit, sort, searchNumber, statusFilter, effectiveShop, date, toDate);
-  }, [limit, sort, searchNumber, statusFilter, effectiveShop, toDate, fetchOrders]);
-
-  const setToDate = useCallback((date: string) => {
-    setToDateState(date);
-    setLoading(true);
-    setPage(1);
-    fetchOrders(1, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, date);
-  }, [limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, fetchOrders]);
-
-  useEffect(() => {
-    fetchOrders(page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate);
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [page, limit, sort, searchNumber, effectiveShop, fromDate, toDate, fetchOrders]);
+  }, [enabled, page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate, fetchOrders, isSwitchingCategory]);
 
   const refresh = useCallback(() => {
+    if (!enabled) return Promise.resolve();
     return fetchOrders(page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate);
-  }, [fetchOrders, page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate]);
+  }, [enabled, fetchOrders, page, limit, sort, searchNumber, statusFilter, effectiveShop, fromDate, toDate]);
 
   return {
     data,
-    loading: loading || isSwitchingCategory,
+    loading: (!enabled) || loading || isSwitchingCategory,
     isSwitchingCategory,
     error,
     page,

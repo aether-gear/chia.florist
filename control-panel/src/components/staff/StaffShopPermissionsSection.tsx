@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import {
-  Store,
+  Warehouse,
   Plus,
   Shield,
   Trash2,
@@ -94,7 +94,7 @@ export default function StaffShopPermissionsSection({
       case 'shop:update':
         return (
           <span key={permKey} className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <Store className="h-3 w-3" /> Shop Settings
+            <Warehouse className="h-3 w-3" /> Shop Settings
           </span>
         );
       case 'product:create':
@@ -191,7 +191,7 @@ export default function StaffShopPermissionsSection({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
-                    <Store className="h-4 w-4" />
+                    <Warehouse className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
                     <h5 className="text-sm font-semibold text-foreground truncate">
@@ -257,4 +257,3 @@ export default function StaffShopPermissionsSection({
     </div>
   );
 }
-

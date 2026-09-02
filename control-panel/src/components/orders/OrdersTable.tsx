@@ -1,5 +1,5 @@
 import React from 'react';
-import { PackageOpen, ArrowUpDown, Clock, Truck, Loader2 } from 'lucide-react';
+import { PackageOpen, ArrowUpDown, Clock, Truck, Loader2, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
 import EmptyState from '../EmptyState';
@@ -180,7 +180,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
               <Card
                 key={order.id}
                 onClick={() => onSelectOrder(order.id)}
-                className={`cursor-pointer transition-all border shadow-none hover:border-primary/50 select-none rounded-xl ${
+                className={`group cursor-pointer transition-all border shadow-none hover:border-primary/50 select-none rounded-xl ${
                   isSelected
                     ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/45'
                     : 'border-border/60 bg-card hover:bg-muted/10'
@@ -189,7 +189,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                 <CardContent className="p-4 space-y-2.5">
                   {/* Card Header: Order Number & Date / Expiration */}
                   <div className="flex justify-between items-start gap-2">
-                    <span className="font-semibold font-mono text-sm tracking-tight text-foreground">
+                    <span className="font-semibold font-mono text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
                       {order.number}
                     </span>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -246,12 +246,17 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                     )}
                   </div>
 
-                  {/* Card Footer: Truncated ID & Total Price */}
+                  {/* Card Footer: Truncated ID, Total Price, & View Details */}
                   <div className="flex justify-between items-center border-t border-border/40 pt-2 mt-1">
                     <span className="text-[10px] text-muted-foreground font-mono">
                       ID: {order.id.slice(0, 8)}...
                     </span>
-                    <span className="text-sm font-bold text-primary font-mono">{formatCurrency(order.total)}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-primary font-mono">{formatCurrency(order.total)}</span>
+                      <span className="text-xs font-semibold text-primary inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                        Manage <ArrowRight className="h-3 w-3" />
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

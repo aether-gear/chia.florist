@@ -1,5 +1,5 @@
 import React from 'react';
-import { Store, RefreshCw, Calendar, X } from 'lucide-react';
+import { Warehouse, RefreshCw, Calendar, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import SearchInput from '../SearchInput';
 
@@ -67,7 +67,7 @@ export const OrderFilters: React.FC<OrderFiltersProps> = ({
         <div className="flex flex-col gap-2.5 p-4 rounded-2xl border border-border/60 bg-muted/20">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Store className="w-3.5 h-3.5 text-primary" />
+              <Warehouse className="w-3.5 h-3.5 text-primary" />
               {isAdmin ? 'Shops Overview' : 'Your Assigned Shops'}
             </span>
             <span className="text-xs text-muted-foreground font-medium">
@@ -104,7 +104,7 @@ export const OrderFilters: React.FC<OrderFiltersProps> = ({
                       : 'bg-background hover:bg-muted text-muted-foreground border-border/80'
                   }`}
                 >
-                  <Store className="w-3.5 h-3.5 text-current shrink-0" />
+                  <Warehouse className="w-3.5 h-3.5 text-current shrink-0" />
                   <span>{shop.name}</span>
                   {shop.slug && (
                     <span

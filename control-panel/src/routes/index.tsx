@@ -6,6 +6,7 @@ import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import SecurityPage from '../pages/security/SecurityPage';
 import OrdersPage from '../pages/orders/OrdersPage';
+import OrderDetailPage from '../pages/orders/OrderDetailPage';
 import StaffProfileSettings from '../pages/staff-profile/StaffProfileSettings';
 import ProductsPage from '../pages/dashboard/ProductsPage';
 
@@ -34,6 +35,7 @@ export default function AppRoutes() {
             <Route path="/products" element={<ProductsPage />} />
 
             <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:orderId" element={<OrderDetailPage />} />
             <Route path="/shipments" element={<Navigate to="/orders" replace />} />
             
             {/* Profile Routes */}

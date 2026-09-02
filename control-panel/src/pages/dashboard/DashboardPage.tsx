@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -7,18 +8,17 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useDashboardViewModel } from '../../viewmodels/useDashboardViewModel';
-import { useOrderActionsViewModel } from '../../viewmodels/useOrderActionsViewModel';
 import DashboardKpiCards from './components/DashboardKpiCards';
 import DashboardAIInsights from './components/DashboardAIInsights';
 import DashboardEcommerceView from './components/DashboardEcommerceView';
 import DashboardAIView from './components/DashboardAIView';
 import DashboardCyberView from './components/DashboardCyberView';
 import SecurityDetailSheet from './components/SecurityDetailSheet';
-import OrderDetailSheet from '../../components/orders/OrderDetailSheet';
 import type { Order } from '../../models/Order';
 import type { SecurityEventLog } from '../../viewmodels/useDashboardViewModel';
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const {
     activeTab,
     setActiveTab,
@@ -39,10 +39,6 @@ export default function DashboardPage() {
     setSelectedForecastProductId,
     forecastData,
     forecastLoading,
-    selectedOrder,
-    setSelectedOrder,
-    isOrderDetailOpen,
-    setIsOrderDetailOpen,
     selectedSecurityLog,
     setSelectedSecurityLog,
     isSecurityDetailOpen,
@@ -52,11 +48,8 @@ export default function DashboardPage() {
     refresh,
   } = useDashboardViewModel();
 
-  const orderActions = useOrderActionsViewModel();
-
   const handleInspectOrder = (order: Order) => {
-    setSelectedOrder(order);
-    setIsOrderDetailOpen(true);
+    navigate(`/orders/${order.id}`);
   };
 
   const handleInspectSecurityLog = (log: SecurityEventLog) => {
@@ -235,30 +228,6 @@ export default function DashboardPage() {
       </div>
 
       {/* 5. Detail Inspection Drawers (Right Overlay Sheet) */}
-      <OrderDetailSheet
-        order={selectedOrder}
-        isOpen={isOrderDetailOpen}
-        onOpenChange={setIsOrderDetailOpen}
-        submitting={orderActions.submitting}
-        onStartProcessing={async (orderId) => {
-          await orderActions.updateOrderStatus(orderId, 'processing');
-          refresh();
-        }}
-        onDispatchOrder={async (orderId, shipments) => {
-          await orderActions.updateOrderStatus(orderId, 'shipped', undefined, undefined, shipments);
-          refresh();
-        }}
-        onUpdateShipmentStatus={async (shipmentId, status) => {
-          await orderActions.updateShipmentStatus(shipmentId, status);
-          refresh();
-        }}
-        onUpdateWaybill={async (shipmentId, details) => {
-          await orderActions.updateShipmentDetails(shipmentId, details);
-          refresh();
-        }}
-        fetchOrderTracking={orderActions.fetchOrderTracking}
-      />
-
       <SecurityDetailSheet
         log={selectedSecurityLog}
         isOpen={isSecurityDetailOpen}

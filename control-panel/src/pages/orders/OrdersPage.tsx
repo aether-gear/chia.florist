@@ -1,17 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BarChart3 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useOrdersViewModel } from '../../viewmodels/useOrdersViewModel';
-import { useOrderActionsViewModel, type ShipmentDispatchPayload } from '../../viewmodels/useOrderActionsViewModel';
 import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import { fetchApi } from '../../lib/api';
 import OrderFilters, { type ShopOption } from '../../components/orders/OrderFilters';
 import OrdersTable from '../../components/orders/OrdersTable';
-import OrderDetailInspector from '../../components/orders/OrderDetailInspector';
 
 export default function OrdersPage() {
-  const { isAdmin } = useAuthMeViewModel();
+  const navigate = useNavigate();
+  const { isAdmin, loading: authLoading } = useAuthMeViewModel();
+  const [shopsList, setShopsList] = useState<ShopOption[]>([]);
+  const [shopsLoaded, setShopsLoaded] = useState<boolean>(false);
+  const shopsFetchedRef = useRef(false);
+
+  // For admins: orders can be loaded immediately across all shops
+  // For staff: wait until shops are loaded so the initial fetch directly targets their assigned shop
+  const isOrdersEnabled = !authLoading && (isAdmin || shopsLoaded);
+
   const {
     data,
     loading,
@@ -33,19 +40,7 @@ export default function OrdersPage() {
     setFromDate,
     setToDate,
     refresh,
-  } = useOrdersViewModel();
-
-  const {
-    submitting,
-    fetchOrderTracking,
-    updateOrderStatus,
-    updateShipmentStatus,
-    updateShipmentDetails,
-  } = useOrderActionsViewModel();
-
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [shopsList, setShopsList] = useState<ShopOption[]>([]);
-  const shopsFetchedRef = useRef(false);
+  } = useOrdersViewModel(undefined, { enabled: isOrdersEnabled });
 
   useEffect(() => {
     if (shopsFetchedRef.current) return;
@@ -63,10 +58,11 @@ export default function OrdersPage() {
       })
       .catch((err) => {
         console.error('Failed to load shops for order filter', err);
+      })
+      .finally(() => {
+        setShopsLoaded(true);
       });
   }, [isAdmin, setShopFilter]);
-
-  const selectedOrder = data?.orders.find((o) => o.id === selectedOrderId) || null;
 
   const handleSort = () => {
     const currentDirection = sort.split(':')[1];
@@ -75,27 +71,8 @@ export default function OrdersPage() {
     setPage(1);
   };
 
-  const handleStartProcessing = async (orderId: string) => {
-    await updateOrderStatus(orderId, 'processing');
-    refresh();
-  };
-
-  const handleDispatchOrder = async (orderId: string, shipments: ShipmentDispatchPayload[]) => {
-    await updateOrderStatus(orderId, 'shipped', undefined, undefined, shipments);
-    refresh();
-  };
-
-  const handleUpdateShipmentStatus = async (shipmentId: string, status: string) => {
-    await updateShipmentStatus(shipmentId, status);
-    refresh();
-  };
-
-  const handleUpdateWaybill = async (
-    shipmentId: string,
-    details: { tracking_number?: string; courier?: string; service?: string }
-  ) => {
-    await updateShipmentDetails(shipmentId, details);
-    refresh();
+  const handleSelectOrder = (orderId: string) => {
+    navigate(`/orders/${orderId}`);
   };
 
   return (
@@ -106,7 +83,7 @@ export default function OrdersPage() {
           <div>
             <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Orders</h2>
             <p className="text-muted-foreground text-sm">
-              Verify payments, fulfill shipments, and manage orders
+              Verify payments, fulfill shipments, and manage customer orders
             </p>
           </div>
           {isAdmin && (
@@ -149,7 +126,6 @@ export default function OrdersPage() {
             }}
             onStatusChange={(status) => {
               setStatusFilter(status);
-              setSelectedOrderId(null);
             }}
             onShopChange={(shop) => setShopFilter(shop)}
             onFromDateChange={(date) => setFromDate(date)}
@@ -157,45 +133,21 @@ export default function OrdersPage() {
             onRefresh={refresh}
           />
 
-          {/* Master-Detail Split Workspace Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* LEFT PANE: Master Order Cards List */}
-            <div className={`lg:col-span-5 flex flex-col space-y-4 ${selectedOrderId ? 'hidden lg:flex' : 'flex'}`}>
-              <OrdersTable
-                orders={data?.orders || []}
-                total={data?.total || 0}
-                page={page}
-                limit={limit}
-                sort={sort}
-                loading={loading}
-                isSwitchingCategory={isSwitchingCategory}
-                error={error}
-                selectedOrderId={selectedOrderId}
-                onSelectOrder={(id) => setSelectedOrderId(id)}
-                onSortChange={handleSort}
-                onPageChange={setPage}
-              />
-            </div>
-
-            {/* RIGHT PANE: Order Action & Detail Inspector */}
-            <div
-              className={`lg:col-span-7 border border-border/80 rounded-2xl bg-card flex flex-col lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain pr-0.5 ${
-                !selectedOrderId
-                  ? 'hidden lg:flex items-center justify-center p-12 text-center text-muted-foreground min-h-[400px]'
-                  : 'flex'
-              }`}
-            >
-              <OrderDetailInspector
-                order={selectedOrder}
-                submitting={submitting}
-                onClose={() => setSelectedOrderId(null)}
-                onStartProcessing={handleStartProcessing}
-                onDispatchOrder={handleDispatchOrder}
-                onUpdateShipmentStatus={handleUpdateShipmentStatus}
-                onUpdateWaybill={handleUpdateWaybill}
-                fetchOrderTracking={fetchOrderTracking}
-              />
-            </div>
+          {/* Full-Width Orders List */}
+          <div className="w-full">
+            <OrdersTable
+              orders={data?.orders || []}
+              total={data?.total || 0}
+              page={page}
+              limit={limit}
+              sort={sort}
+              loading={loading}
+              isSwitchingCategory={isSwitchingCategory}
+              error={error}
+              onSelectOrder={handleSelectOrder}
+              onSortChange={handleSort}
+              onPageChange={setPage}
+            />
           </div>
         </div>
       </div>

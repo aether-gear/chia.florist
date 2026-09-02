@@ -54,8 +54,12 @@ filter: brightness(1.02) contrast(1.25);
 
 ---
 
-## 🎛️ 6. Overlay Right Panel Drawer Rule
+## 🎛️ 5. Panel & Modal Usage Guidelines
 
-*   **Mandatory Panel Standard**: ALWAYS use the global **Overlay Right Panel** (`Sheet` drawer component with `w-full sm:max-w-none md:w-[48vw] md:min-w-[480px]`) for any data input, entity creation, editing, account binding, or permission assignment workflows (e.g. creating staff, editing staff, binding user accounts, assigning shop permissions).
-*   **No Center Modals/Popups for Inputs**: Avoid using centered modal dialogs for multi-field forms or editing. All input, editing, and configuration forms must slide in from the right edge as a full-height overlay panel with sticky header and action footer.
+*   **Overlay Right Panel Drawer (`Sheet`) for Form Inputs & Actions**:
+    *   ALWAYS use the global **Overlay Right Panel** (`Sheet` drawer component with `w-full sm:max-w-none md:w-[48vw] md:min-w-[480px]`) for any data input, entity creation, editing, account binding, or permission assignment workflows (e.g. creating staff, editing staff, binding user accounts, assigning shop permissions, split-shipment creation).
+    *   Do **not** use centered modal dialogs for multi-field forms or editing. All input and configuration forms must slide in from the right edge as a full-height overlay panel with sticky header and action footer.
+*   **Overlay Panel / Dialog (`Dialog`) for Detail Inspection**:
+    *   Use centered **Overlay Panels** (`Dialog` modal with `max-w-2xl` or `max-w-3xl`, clean backdrop, rounded corners, and max-height scrolling) for read-only detail inspections, item previews, log deep-dives, and telemetry inspect views.
+    *   *Rule of thumb*: **Overlay panel used for detail inspection, and right panel used for input forms.**
 

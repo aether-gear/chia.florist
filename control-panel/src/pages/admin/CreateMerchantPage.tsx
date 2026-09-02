@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 // Removed Card component imports since sections are now borderless and backgroundless
-import { Loader2, Store } from 'lucide-react';
+import { Loader2, Warehouse } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 const schema = z.object({
@@ -51,7 +51,7 @@ export default function CreateMerchantPage() {
     <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-300">
       <div className="mb-8 flex items-center space-x-4">
         <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-          <Store className="h-6 w-6 text-primary" />
+          <Warehouse className="h-6 w-6 text-primary" />
         </div>
         <div>
           <h2 className="text-2xl font-bold font-display tracking-tight text-foreground">Create Merchant (Staff)</h2>

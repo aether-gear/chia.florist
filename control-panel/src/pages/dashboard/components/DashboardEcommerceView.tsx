@@ -8,7 +8,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { ShoppingBag, Eye, CheckCircle2, Clock, Truck, XCircle, Store } from 'lucide-react';
+import { ShoppingBag, Eye, CheckCircle2, Clock, Truck, XCircle, Warehouse } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
@@ -302,7 +302,7 @@ export const DashboardEcommerceView: React.FC<DashboardEcommerceViewProps> = ({
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
-                          <Store className="w-3 h-3 text-muted-foreground/70" />
+                          <Warehouse className="w-3 h-3 text-muted-foreground/70" />
                           {shopName}
                         </span>
                       </TableCell>

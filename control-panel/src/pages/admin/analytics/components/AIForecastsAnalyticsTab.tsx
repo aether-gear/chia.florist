@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Cpu,
   Package,
-  Store,
+  Warehouse,
   ShieldCheck,
   Zap,
 } from 'lucide-react';
@@ -425,7 +425,7 @@ export default function AIForecastsAnalyticsTab({ shopId: propShopId }: Props) {
                       <div className="min-w-0">
                         <div className="font-semibold text-xs text-foreground truncate">{item.product_name}</div>
                         <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Store className="h-3 w-3" />
+                          <Warehouse className="h-3 w-3" />
                           <span>{item.shop_name}</span>
                         </div>
                       </div>

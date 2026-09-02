@@ -72,27 +72,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, []);
 
+  const inFlightSessionPromiseRef = React.useRef<Promise<boolean> | null>(null);
+
   const checkSession = useCallback(async (): Promise<boolean> => {
-    try {
-      setError(null);
-      const result: AuthMeResponse = await fetchApi('/auth/staff/me');
-      if (result && result.is_authenticated) {
-        setUser(result);
-        setIsAuthenticated(true);
-        const email = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
-        setUserEmail(email);
-        return true;
-      } else {
+    if (inFlightSessionPromiseRef.current) {
+      return inFlightSessionPromiseRef.current;
+    }
+
+    const sessionPromise = (async () => {
+      try {
+        setError(null);
+        const result: AuthMeResponse = await fetchApi('/auth/staff/me');
+        if (result && result.is_authenticated) {
+          setUser(result);
+          setIsAuthenticated(true);
+          const email = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+          setUserEmail(email);
+          return true;
+        } else {
+          invalidateSession();
+          return false;
+        }
+      } catch (err: any) {
+        console.warn('Session verification failed:', err?.message || err);
         invalidateSession();
         return false;
+      } finally {
+        setIsLoading(false);
+        inFlightSessionPromiseRef.current = null;
       }
-    } catch (err: any) {
-      console.warn('Session verification failed:', err?.message || err);
-      invalidateSession();
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
+    })();
+
+    inFlightSessionPromiseRef.current = sessionPromise;
+    return sessionPromise;
   }, [invalidateSession]);
 
   const login = useCallback(async (email: string, rememberMe: boolean) => {
