@@ -241,7 +241,7 @@ export default function OrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="flex-1 space-y-8 p-6 sm:p-8 xl:p-12">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 xl:p-12 animate-in fade-in duration-200">
         <Breadcrumb items={breadcrumbItems} />
         <div className="py-16 text-center">
           <EmptyState
@@ -276,7 +276,7 @@ export default function OrderDetailPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-8 p-6 sm:p-8 xl:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 xl:p-12 animate-in fade-in slide-in-from-right-4 duration-300">
         {/* 1. Breadcrumb Navigation */}
         <Breadcrumb items={breadcrumbItems} className="text-sm font-medium" />
 

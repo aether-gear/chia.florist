@@ -63,7 +63,7 @@ export default function AddMerchantAccountPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-300">
+    <div className="max-w-2xl mx-auto py-10 animate-in fade-in slide-in-from-left-4 duration-300">
       <div className="mb-8 flex items-center space-x-4">
         <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center">
           <Users className="h-6 w-6 text-primary" />

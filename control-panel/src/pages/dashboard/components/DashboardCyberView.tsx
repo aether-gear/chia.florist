@@ -83,7 +83,7 @@ export const DashboardCyberView: React.FC<DashboardCyberViewProps> = ({
   }, [securityLogs]);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
       {/* 1. Cyber Posture & Active Policies Stats Row */}
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 pb-6 border-b border-border/60">
         <div className="p-3.5 rounded-xl bg-muted/40 border border-border/40 space-y-1">

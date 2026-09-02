@@ -388,7 +388,7 @@ export default function DashboardLayout() {
           </div>
         </header>
         <main className="flex-1">
-          <div className="mx-auto max-w-7xl py-4 sm:p-8 animate-in fade-in duration-300">
+          <div key={location.pathname} className="mx-auto max-w-7xl py-4 sm:p-8 animate-in fade-in slide-in-from-left-4 duration-300">
             <Outlet />
           </div>
         </main>

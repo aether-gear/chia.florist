@@ -45,7 +45,7 @@ export default function PaymentAnalyticsTab({ data, loading }: Props) {
   const colors = ['hsl(142.4, 71.8%, 29.2%)', '#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899'];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
       {/* Payment KPI Grid - SecurityPage Borderless Style */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 border-b border-border/60 pb-8">
         <div className="space-y-2">

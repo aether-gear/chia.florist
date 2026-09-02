@@ -48,7 +48,7 @@ export const DashboardAIView: React.FC<DashboardAIViewProps> = ({
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
       {/* 1. Interactive AI Demand Forecast Analyzer */}
       <div className="p-6 rounded-2xl bg-primary/5 border border-primary/15 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-primary/15">

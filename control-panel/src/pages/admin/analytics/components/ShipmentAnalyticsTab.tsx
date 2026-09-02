@@ -43,7 +43,7 @@ export default function ShipmentAnalyticsTab({ data, loading }: Props) {
   const couriers = Array.isArray(data?.couriers) ? data.couriers : [];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
       {/* Shipment KPI Grid - SecurityPage Borderless Style */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 border-b border-border/60 pb-8">
         <div className="space-y-2">

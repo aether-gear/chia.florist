@@ -922,7 +922,7 @@ export default function SecurityPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in slide-in-from-left-4 duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Security Monitoring</h2>

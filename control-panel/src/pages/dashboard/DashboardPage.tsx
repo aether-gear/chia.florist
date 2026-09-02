@@ -65,7 +65,7 @@ export default function DashboardPage() {
   ] as const;
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-300">
+    <div className="space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
       {/* 1. Header & Global Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
         <div>
@@ -133,8 +133,8 @@ export default function DashboardPage() {
         loading={loading}
       />
 
-      {/* 3. Domain Navigation Tabs (Borderless Selection Pills) */}
-      <div className="flex gap-1 overflow-x-auto pb-1 w-full border-b border-border/40 scrollbar-none">
+      {/* 3. Section Navigation Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border/60">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -163,7 +163,7 @@ export default function DashboardPage() {
       )}
 
       {/* 4. Active Tab Content */}
-      <div className="pt-2">
+      <div key={activeTab} className="pt-2 animate-in fade-in slide-in-from-left-4 duration-300">
         {activeTab === 'overview' && (
           <div className="space-y-10">
             {/* Overview Mid Grid: E-Commerce Velocity + Live AI Advisories */}

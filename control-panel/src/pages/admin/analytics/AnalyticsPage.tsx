@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-12 p-6 sm:p-8 lg:p-12 animate-in fade-in slide-in-from-left-4 duration-300">
 
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
           )}
 
           {/* Active Tab View Content */}
-          <div className="pt-2">
+          <div key={activeTab} className="pt-2 animate-in fade-in slide-in-from-left-4 duration-300">
             {activeTab === 'overview' && (
               <AnalyticsOverviewTab
                 orderData={orderMetrics}

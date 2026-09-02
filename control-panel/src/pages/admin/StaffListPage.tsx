@@ -159,7 +159,7 @@ export default function StaffListPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in duration-300">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in slide-in-from-left-4 duration-300">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -520,7 +520,7 @@ export default function StaffListPage() {
 
             {/* Right Column: LinkedIn-Style Staff Details View */}
             {isDetailOpen && activeStaff && (
-              <div ref={detailSectionRef} className="col-span-12 lg:col-span-7 sticky top-20">
+              <div ref={detailSectionRef} className="col-span-12 lg:col-span-7 sticky top-20 animate-in fade-in slide-in-from-right-4 duration-300">
                 <StaffDetailsView
                   staff={activeStaff}
                   accounts={accountsMap[activeStaff.id] || []}

@@ -41,7 +41,7 @@ export default function ProductInventoryAnalyticsTab({
   const topByVolume = Array.isArray(productData?.top_by_volume) ? productData.top_by_volume : [];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
       {/* Inventory & Financial KPI Grid - SecurityPage Borderless Style */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 border-b border-border/60 pb-8">
         <div className="space-y-2">

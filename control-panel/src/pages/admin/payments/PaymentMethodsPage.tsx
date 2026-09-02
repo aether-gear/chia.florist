@@ -32,11 +32,11 @@ export default function PaymentMethodsPage() {
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-8 p-6 sm:p-8 lg:p-12 animate-in fade-in slide-in-from-left-4 duration-300">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Payment Methods</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Payment Methods</h2>
+            <p className="text-muted-foreground text-sm">
               View all supported payment methods on the platform.
             </p>
           </div>
@@ -44,7 +44,7 @@ export default function PaymentMethodsPage() {
 
         <div className="space-y-6">
           <div className="pb-4 border-b border-border/60 mb-6">
-            <h3 className="font-bold text-lg">Available Methods</h3>
+            <h3 className="text-xl font-bold font-display tracking-tight text-foreground">Available Methods</h3>
             <p className="text-muted-foreground text-sm">
               These are the payment channels available for processing customer payments.
             </p>
