@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { fetchApi } from '../lib/api';
+import { clearStaffProfileCache, prefetchStaffProfile } from '../viewmodels/useStaffProfileViewModel';
 
 export interface AuthRole {
   code: string;
@@ -35,29 +36,48 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ADMIN_EMAILS = ['test@test.com'];
 
-export function getStoredAuthState(): { isAuthenticated: boolean; userEmail: string } {
+export function getStoredAuthState(): {
+  isAuthenticated: boolean;
+  userEmail: string;
+  user: AuthMeResponse | null;
+} {
   const localAuth = localStorage.getItem('isAuthenticated') === 'true';
   const sessionAuth = sessionStorage.getItem('isAuthenticated') === 'true';
   const email = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
+  let storedUser: AuthMeResponse | null = null;
+  try {
+    const rawUser = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
+    if (rawUser) {
+      storedUser = JSON.parse(rawUser);
+    }
+  } catch {
+    // ignore parse error
+  }
   return {
     isAuthenticated: localAuth || sessionAuth,
     userEmail: email,
+    user: storedUser,
   };
 }
 
 export function clearAuthStorage(): void {
   localStorage.removeItem('isAuthenticated');
   localStorage.removeItem('userEmail');
+  localStorage.removeItem('authUser');
+  localStorage.removeItem('authProfile');
   sessionStorage.removeItem('isAuthenticated');
   sessionStorage.removeItem('userEmail');
+  sessionStorage.removeItem('authUser');
+  sessionStorage.removeItem('authProfile');
+  clearStaffProfileCache();
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const initialStorage = getStoredAuthState();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialStorage.isAuthenticated);
   const [userEmail, setUserEmail] = useState<string>(initialStorage.userEmail);
-  const [user, setUser] = useState<AuthMeResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<AuthMeResponse | null>(initialStorage.user);
+  const [isLoading, setIsLoading] = useState<boolean>(initialStorage.isAuthenticated && !initialStorage.user);
   const [error, setError] = useState<string | null>(null);
 
   const hasAdminRole = user?.roles?.some((r) => r.code === 'staff_admin') ?? false;
@@ -70,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setError(null);
     setIsLoading(false);
+    clearStaffProfileCache();
   }, []);
 
   const inFlightSessionPromiseRef = React.useRef<Promise<boolean> | null>(null);
@@ -88,6 +109,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAuthenticated(true);
           const email = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail') || '';
           setUserEmail(email);
+          const isRemembered = localStorage.getItem('isAuthenticated') === 'true';
+          const storage = isRemembered ? localStorage : sessionStorage;
+          storage.setItem('authUser', JSON.stringify(result));
           return true;
         } else {
           invalidateSession();
@@ -118,8 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(true);
     setUserEmail(email);
 
-    // Fetch user details immediately after login
-    await checkSession();
+    // Warm up session and staff profile in parallel before navigating to dashboard
+    await Promise.allSettled([
+      checkSession(),
+      prefetchStaffProfile(storage),
+    ]);
   }, [checkSession]);
 
   const logout = useCallback(async () => {

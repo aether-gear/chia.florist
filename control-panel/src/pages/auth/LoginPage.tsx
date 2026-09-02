@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,7 +10,6 @@ import AuthLayout from '@/layouts/AuthLayout';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { isAuthenticated, isLoading, login } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -21,10 +20,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      const redirectPath = (location.state as any)?.from?.pathname || '/';
-      navigate(redirectPath, { replace: true });
+      navigate('/', { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate, location]);
+  }, [isAuthenticated, isLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,8 +42,7 @@ export default function LoginPage() {
       });
 
       await login(email, rememberMe);
-      const redirectPath = (location.state as any)?.from?.pathname || '/';
-      navigate(redirectPath, { replace: true });
+      navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {

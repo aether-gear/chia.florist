@@ -3,8 +3,12 @@ export const API_BASE_URL = '/api/core';
 export function clearAuthStorage(): void {
   localStorage.removeItem('isAuthenticated');
   localStorage.removeItem('userEmail');
+  localStorage.removeItem('authUser');
+  localStorage.removeItem('authProfile');
   sessionStorage.removeItem('isAuthenticated');
   sessionStorage.removeItem('userEmail');
+  sessionStorage.removeItem('authUser');
+  sessionStorage.removeItem('authProfile');
 }
 
 const PUBLIC_AUTH_ENDPOINTS = [

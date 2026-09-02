@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type NavigationItem = {
   name: string;
@@ -83,7 +84,7 @@ export default function DashboardLayout() {
 
   const { logout, userEmail: authEmail } = useAuth();
   const { data: authData, isAdmin } = useAuthMeViewModel();
-  const { profile: staffProfile } = useStaffProfileViewModel();
+  const { profile: staffProfile, loading: isProfileLoading } = useStaffProfileViewModel();
 
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
@@ -95,15 +96,33 @@ export default function DashboardLayout() {
 
 
   const renderProfileDropdown = () => {
+    if (isProfileLoading && !staffProfile) {
+      return (
+        <div className="flex items-center gap-2 p-1.5 px-2.5 rounded-xl border border-border/40 bg-muted/20 animate-pulse select-none">
+          <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+          <div className="hidden sm:flex flex-col text-left min-w-[90px] max-w-[180px] gap-1.5 py-0.5">
+            <Skeleton className="h-3 w-20 rounded" />
+            <Skeleton className="h-2 w-14 rounded" />
+          </div>
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0 ml-0.5" />
+        </div>
+      );
+    }
+
     const fallbackInitials = staffProfile?.Name
       ? staffProfile.Name.split(' ')
           .map((n) => n[0])
           .join('')
           .substring(0, 2)
           .toUpperCase()
+      : staffProfile?.Username
+      ? staffProfile.Username.substring(0, 2).toUpperCase()
       : isAdmin
       ? 'AD'
       : 'ST';
+
+    const displayName = staffProfile?.Name || (staffProfile?.Username ? `@${staffProfile.Username}` : 'Staff Member');
+    const displayHandle = staffProfile?.Username ? `@${staffProfile.Username}` : '';
 
     return (
       <DropdownMenu>
@@ -113,7 +132,7 @@ export default function DashboardLayout() {
               {staffProfile?.AvatarURL && (
                 <AvatarImage
                   src={staffProfile.AvatarURL}
-                  alt={staffProfile.Name}
+                  alt={displayName}
                   className="object-cover"
                 />
               )}
@@ -123,11 +142,13 @@ export default function DashboardLayout() {
             </Avatar>
             <div className="hidden sm:flex flex-col text-left min-w-0 max-w-[180px]">
               <span className="text-xs font-bold text-foreground truncate">
-                {staffProfile?.Name || (isAdmin ? 'Administrator' : 'Staff User')}
+                {displayName}
               </span>
-              <span className="text-[10px] text-muted-foreground font-medium truncate">
-                {staffProfile?.Username ? `@${staffProfile.Username}` : userEmail || 'Staff'}
-              </span>
+              {displayHandle && (
+                <span className="text-[10px] text-muted-foreground font-medium truncate">
+                  {displayHandle}
+                </span>
+              )}
             </div>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0 ml-0.5" />
           </button>
@@ -140,7 +161,7 @@ export default function DashboardLayout() {
                 {staffProfile?.AvatarURL && (
                   <AvatarImage
                     src={staffProfile.AvatarURL}
-                    alt={staffProfile.Name}
+                    alt={displayName}
                     className="object-cover"
                   />
                 )}
@@ -150,7 +171,7 @@ export default function DashboardLayout() {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-bold text-foreground truncate">
-                  {staffProfile?.Name || 'Staff Member'}
+                  {displayName}
                 </div>
                 {staffProfile?.Username && (
                   <div className="text-[11px] text-muted-foreground font-medium truncate">
@@ -160,9 +181,11 @@ export default function DashboardLayout() {
               </div>
             </div>
 
-            <div className="text-[11px] font-mono text-muted-foreground/80 truncate mb-2" title={userEmail}>
-              {userEmail}
-            </div>
+            {userEmail && (
+              <div className="text-[11px] font-mono text-muted-foreground/80 truncate mb-2" title={userEmail}>
+                {userEmail}
+              </div>
+            )}
 
             <div>
               {isAdmin ? (
