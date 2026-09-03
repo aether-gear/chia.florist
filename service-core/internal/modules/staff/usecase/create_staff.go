@@ -50,7 +50,15 @@ type CreateStaffInput struct {
 func (u *CreateStaffUsecase) Execute(
 	ctx context.Context,
 	input CreateStaffInput,
-) error {
+) (err error) {
+	audit := &applogger.AuditScope{
+		Category: "user_action",
+		Action:   "create_staff_profile",
+		Resource: "staff",
+		Metadata: map[string]any{"name": input.Name, "username": input.Username},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
+
 	if input.Name == "" {
 		return apperrors.NewBadRequest("name is required")
 	}
@@ -70,6 +78,9 @@ func (u *CreateStaffUsecase) Execute(
 	newUserID := uuid.New()
 	newStaffID := uuid.New()
 
+	audit.SetResourceID(newStaffID.String())
+	audit.SetMeta("user_id", newUserID.String())
+
 	newUser := userRepo.CreateUserProps{
 		ID:        newUserID,
 		Name:      input.Name,
@@ -87,7 +98,7 @@ func (u *CreateStaffUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.userRepo.CreateUser(ctx, exec, newUser); err != nil {
 			return fmt.Errorf("failed to create user for staff: %w", err)
 		}
@@ -96,18 +107,4 @@ func (u *CreateStaffUsecase) Execute(
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	u.auditLogger.Log(ctx, applogger.AuditEvent{
-		Category:   "user_action",
-		Action:     "create_staff_profile",
-		Resource:   "staff",
-		ResourceID: staff.ID.String(),
-		Outcome:    applogger.OutcomeSuccess,
-		Metadata:   map[string]any{"name": input.Name, "username": input.Username, "user_id": newUserID.String()},
-	})
-
-	return nil
 }

@@ -93,8 +93,6 @@ func (u *SyncPendingPaymentsUsecase) Execute(ctx context.Context) {
 		return
 	}
 	if len(payments) == 0 {
-		msg = "no pending gateway payments in window"
-		u.logger.Info(ctx, msg)
 		return
 	}
 

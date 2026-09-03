@@ -56,7 +56,19 @@ type RemoveStaffAccountInput struct {
 func (u *RemoveStaffAccountUsecase) Execute(
 	ctx context.Context,
 	input RemoveStaffAccountInput,
-) error {
+) (err error) {
+	audit := &applogger.AuditScope{
+		Category:   "user_action",
+		Action:     "remove_staff_account",
+		Resource:   "staff_account",
+		ResourceID: input.AccountID.String(),
+		Metadata: map[string]any{
+			"staff_id":   input.StaffID.String(),
+			"account_id": input.AccountID.String(),
+		},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
+
 	if input.ActorAccountID == input.AccountID {
 		return apperrors.NewBadRequest("cannot remove own account from staff")
 	}
@@ -69,13 +81,6 @@ func (u *RemoveStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to verify actor membership: %w", err)
 	}
 	if actorMembership == nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "remove_staff_account",
-			Resource: "staff_account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"staff_id": input.StaffID.String(), "account_id": input.AccountID.String(), "reason": "actor membership not found"},
-		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -95,13 +100,6 @@ func (u *RemoveStaffAccountUsecase) Execute(
 		}
 	}
 	if !foundAdmin {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "remove_staff_account",
-			Resource: "staff_account",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"staff_id": input.StaffID.String(), "account_id": input.AccountID.String(), "reason": "actor lacks admin role"},
-		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -132,7 +130,9 @@ func (u *RemoveStaffAccountUsecase) Execute(
 		return apperrors.NewNotFound("target account not found")
 	}
 
-	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	audit.SetMeta("user_id", targetAccount.UserID.String())
+
+	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.membershipRepo.DeleteByAccountIDAndStaffID(ctx, exec,
 			input.AccountID,
 			input.StaffID,
@@ -154,18 +154,4 @@ func (u *RemoveStaffAccountUsecase) Execute(
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	u.auditLogger.Log(ctx, applogger.AuditEvent{
-		Category:   "user_action",
-		Action:     "remove_staff_account",
-		Resource:   "staff_account",
-		ResourceID: input.AccountID.String(),
-		Outcome:    applogger.OutcomeSuccess,
-		Metadata:   map[string]any{"staff_id": input.StaffID.String(), "account_id": input.AccountID.String(), "user_id": targetAccount.UserID.String()},
-	})
-
-	return nil
 }

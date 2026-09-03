@@ -495,7 +495,6 @@ func NewContainer(cfg Config,
 				infra.TransactionExecutor,
 				staffRepo,
 				membershipRepo,
-				auditLogger,
 			),
 		UpdateStaff: *staffUsecase.
 			NewUpdateStaffUsecase(

@@ -242,7 +242,7 @@ func setupTestHandler(staffID, accountID uuid.UUID) (*staffHandler, *testStaffRe
 
 	createUC := usecase.NewCreateStaffUsecase(sRepo, uRepo, exec, tx, audit)
 	addUC := usecase.NewAddStaffAccountUsecase(exec, tx, aRepo, hasher, uRepo, sRepo, mRepo, rRepo, audit)
-	listUC := usecase.NewListStaffAccountsUsecase(exec, sRepo, mRepo, audit)
+	listUC := usecase.NewListStaffAccountsUsecase(exec, sRepo, mRepo)
 	updateUC := usecase.NewUpdateStaffUsecase(exec, tx, sRepo, mRepo, audit)
 	deleteUC := usecase.NewDeleteStaffUsecase(exec, tx, sRepo, mRepo, userDeletionSvc, audit)
 	removeUC := usecase.NewRemoveStaffAccountUsecase(exec, tx, sRepo, mRepo, aRepo, sessionRepo, audit)

@@ -58,6 +58,7 @@ func TrackAudit(
 
 		if err != nil {
 			outcome = OutcomeFailure
+			meta["error"] = err.Error()
 			if scope.Reason != "" {
 				meta["reason"] = scope.Reason
 			} else {

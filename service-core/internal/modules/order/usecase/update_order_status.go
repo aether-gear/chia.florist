@@ -117,35 +117,16 @@ func (u *UpdateOrderStatusUsecase) Execute(
 	ctx context.Context,
 	input UpdateOrderStatusInput,
 ) (res *UpdateOrderStatusResult, err error) {
-	var oldStatus string
-	defer func() {
-		if err != nil {
-			u.auditLogger.Log(ctx, applogger.AuditEvent{
-				Category:   "user_action",
-				Action:     "update_order_status",
-				Resource:   "order",
-				ResourceID: input.OrderID.String(),
-				Outcome:    applogger.OutcomeFailure,
-				Metadata: map[string]any{
-					"error":      err.Error(),
-					"old_status": oldStatus,
-					"new_status": string(input.Status),
-				},
-			})
-		} else {
-			u.auditLogger.Log(ctx, applogger.AuditEvent{
-				Category:   "user_action",
-				Action:     "update_order_status",
-				Resource:   "order",
-				ResourceID: input.OrderID.String(),
-				Outcome:    applogger.OutcomeSuccess,
-				Metadata: map[string]any{
-					"old_status": oldStatus,
-					"new_status": string(input.Status),
-				},
-			})
-		}
-	}()
+	audit := &applogger.AuditScope{
+		Category:   "user_action",
+		Action:     "update_order_status",
+		Resource:   "order",
+		ResourceID: input.OrderID.String(),
+		Metadata: map[string]any{
+			"new_status": string(input.Status),
+		},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
 
 	order, err := u.orderRepo.GetByID(ctx, u.executor,
 		input.OrderID,
@@ -157,7 +138,7 @@ func (u *UpdateOrderStatusUsecase) Execute(
 		return nil, apperrors.NewNotFound("order not found")
 	}
 
-	oldStatus = string(order.Status)
+	audit.SetMeta("old_status", string(order.Status))
 
 	// When confirming an unconfirmed order,
 	// invoke the domain Confirm method to stamp

@@ -44,7 +44,9 @@ func (j *PaymentSyncJob) Start(ctx context.Context) {
 			j.logger.Info(ctx, "payment sync job: stopped")
 			return
 		case <-ticker.C:
-			j.logger.Info(ctx, "payment sync job: tick — running reconciliation")
+			if j.logger != nil {
+				j.logger.Debug(ctx, "payment sync job: tick — running reconciliation")
+			}
 			j.syncUsecase.Execute(ctx)
 		}
 	}

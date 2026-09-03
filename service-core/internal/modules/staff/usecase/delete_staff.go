@@ -52,7 +52,16 @@ type DeleteStaffInput struct {
 func (u *DeleteStaffUsecase) Execute(
 	ctx context.Context,
 	input DeleteStaffInput,
-) error {
+) (err error) {
+	audit := &applogger.AuditScope{
+		Category:   "user_action",
+		Action:     "delete_staff",
+		Resource:   "staff",
+		ResourceID: input.StaffID.String(),
+		Metadata:   map[string]any{"staff_id": input.StaffID.String()},
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
+
 	actorMembership, err := u.membershipRepo.GetByAccountIDAndStaffID(ctx, u.executor,
 		input.ActorAccountID,
 		input.ActorStaffID,
@@ -61,13 +70,6 @@ func (u *DeleteStaffUsecase) Execute(
 		return fmt.Errorf("failed to verify actor membership: %w", err)
 	}
 	if actorMembership == nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "delete_staff",
-			Resource: "staff",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"staff_id": input.StaffID.String(), "reason": "actor membership not found"},
-		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -87,13 +89,6 @@ func (u *DeleteStaffUsecase) Execute(
 		}
 	}
 	if !foundAdmin {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "delete_staff",
-			Resource: "staff",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{"staff_id": input.StaffID.String(), "reason": "actor lacks admin role"},
-		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -105,7 +100,9 @@ func (u *DeleteStaffUsecase) Execute(
 		return apperrors.NewNotFound(staffDomain.ErrNotFoundStaff.Error())
 	}
 
-	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	audit.SetMeta("user_id", staff.UserID.String())
+
+	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.staffRepo.Delete(ctx, exec,
 			input.StaffID,
 		); err != nil {
@@ -126,18 +123,4 @@ func (u *DeleteStaffUsecase) Execute(
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	u.auditLogger.Log(ctx, applogger.AuditEvent{
-		Category:   "user_action",
-		Action:     "delete_staff",
-		Resource:   "staff",
-		ResourceID: input.StaffID.String(),
-		Outcome:    applogger.OutcomeSuccess,
-		Metadata:   map[string]any{"staff_id": input.StaffID.String(), "user_id": staff.UserID.String()},
-	})
-
-	return nil
 }

@@ -7,7 +7,6 @@ import (
 
 	appclock "service-core/internal/common/clock"
 	apperrors "service-core/internal/common/errors"
-	applogger "service-core/internal/common/logger"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
 	authorDomain "service-core/internal/modules/authorization/domain"
@@ -25,8 +24,6 @@ type MeUsecase struct {
 	userRepo    userRepo.UserRepository
 	actorSvc    authorRepo.ActorService
 	oauthRepo   repository.OAuthConnectionRepository
-	auditLogger applogger.AuditLogger
-	sysLogger   applogger.Logger
 }
 
 func NewMeUsecase(
@@ -45,14 +42,6 @@ func NewMeUsecase(
 	}
 }
 
-func (u *MeUsecase) SetAuditLogger(auditLogger applogger.AuditLogger) {
-	u.auditLogger = auditLogger
-}
-
-func (u *MeUsecase) SetSysLogger(sysLogger applogger.Logger) {
-	u.sysLogger = sysLogger
-}
-
 type MeResult struct {
 	Account domain.Account
 	Actor   authorDomain.Actor
@@ -63,26 +52,15 @@ type MeResult struct {
 func (u *MeUsecase) Execute(
 	ctx context.Context,
 	authCtx domain.AuthContext,
-) (result *MeResult, err error) {
-	audit := &applogger.AuditScope{
-		Category:   "user_action",
-		Action:     "me",
-		Resource:   "account",
-		ResourceID: authCtx.UserID.String(),
-	}
-	defer applogger.TrackAudit(ctx, u.auditLogger, u.sysLogger, audit, &err)()
-
+) (*MeResult, error) {
 	account, err := u.accountRepo.GetByUserID(ctx, u.exec, authCtx.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 	if account == nil {
-		audit.SetReason("account not found")
 		return nil, apperrors.NewNotFound("account not found")
 	}
-
 	if account.Status != domain.AccountActive {
-		audit.SetReason("account not active")
 		return nil, apperrors.NewForbidden(domain.ErrEmailNotVerified.Error())
 	}
 

@@ -36,7 +36,21 @@ func NewDeleteCustomerAccountUsecase(
 func (u *DeleteCustomerAccountUsecase) Execute(
 	ctx context.Context,
 	authCtx authenDomain.AuthContext,
-) error {
+) (err error) {
+	audit := &applogger.AuditScope{
+		Category: "user_action",
+		Action:   "delete_account",
+		Resource: "customer",
+		Metadata: map[string]any{
+			"user_id": authCtx.UserID.String(),
+		},
+	}
+	if authCtx.CustomerID != nil {
+		audit.SetResourceID(authCtx.CustomerID.String())
+		audit.SetMeta("customer_id", authCtx.CustomerID.String())
+	}
+	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
+
 	// Must be customer to perform
 	// customer account deletion
 	if authCtx.CustomerID == nil {
@@ -46,49 +60,19 @@ func (u *DeleteCustomerAccountUsecase) Execute(
 	userID := authCtx.UserID
 	customerID := *authCtx.CustomerID
 
-	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		// Delete customer-domain data
 		// owned by the customer module.
-		if err := u.customerDeletionService.
-			DeleteCustomerRecord(ctx, exec, customerID); err != nil {
+		if err := u.customerDeletionService.DeleteCustomerRecord(ctx, exec, customerID); err != nil {
 			return fmt.Errorf("failed to delete customer record: %w", err)
 		}
 
 		// Delete identity and authentication data
 		// owned by the authentication module.
-		if err := u.userDeletionService.
-			DeleteUserRecord(ctx, exec, userID); err != nil {
+		if err := u.userDeletionService.DeleteUserRecord(ctx, exec, userID); err != nil {
 			return fmt.Errorf("failed to delete user record: %w", err)
 		}
 
 		return nil
 	})
-
-	if err != nil {
-		u.auditLogger.Log(ctx, applogger.AuditEvent{
-			Category: "user_action",
-			Action:   "delete_account",
-			Resource: "customer",
-			Outcome:  applogger.OutcomeFailure,
-			Metadata: map[string]any{
-				"customer_id": customerID.String(),
-				"user_id":     userID.String(),
-				"error":       err.Error(),
-			},
-		})
-		return err
-	}
-
-	u.auditLogger.Log(ctx, applogger.AuditEvent{
-		Category: "user_action",
-		Action:   "delete_account",
-		Resource: "customer",
-		Outcome:  applogger.OutcomeSuccess,
-		Metadata: map[string]any{
-			"customer_id": customerID.String(),
-			"user_id":     userID.String(),
-		},
-	})
-
-	return nil
 }

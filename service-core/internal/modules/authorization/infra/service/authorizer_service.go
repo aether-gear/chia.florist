@@ -7,6 +7,7 @@ import (
 
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
+	applogger "service-core/internal/common/logger"
 	appmiddleware "service-core/internal/common/middleware"
 	authendomain "service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authorization/domain"
@@ -187,6 +188,9 @@ func (s *authorizer) LoadActor(
 				actorContextKey{},
 				actor,
 			)
+			if actor != nil && actor.AccountID != uuid.Nil {
+				ctx = applogger.WithActorID(ctx, actor.AccountID.String())
+			}
 
 			return next(w, r.WithContext(ctx))
 		}
@@ -216,6 +220,9 @@ func (s *authorizer) OptionalLoadActor(
 				actorContextKey{},
 				actor,
 			)
+			if actor != nil && actor.AccountID != uuid.Nil {
+				ctx = applogger.WithActorID(ctx, actor.AccountID.String())
+			}
 
 			return next(w, r.WithContext(ctx))
 		}

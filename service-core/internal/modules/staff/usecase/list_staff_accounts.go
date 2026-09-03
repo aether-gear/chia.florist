@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	apperrors "service-core/internal/common/errors"
-	applogger "service-core/internal/common/logger"
 	authzDomain "service-core/internal/modules/authorization/domain"
 	authzRepo "service-core/internal/modules/authorization/repository"
 	staffDomain "service-core/internal/modules/staff/domain"
@@ -19,20 +18,17 @@ type ListStaffAccountsUsecase struct {
 	executor       transaction.Executor
 	staffRepo      staffRepo.StaffRepository
 	membershipRepo authzRepo.StaffMembershipRepository
-	auditLogger    applogger.AuditLogger
 }
 
 func NewListStaffAccountsUsecase(
 	executor transaction.Executor,
 	staffRepo staffRepo.StaffRepository,
 	membershipRepo authzRepo.StaffMembershipRepository,
-	auditLogger applogger.AuditLogger,
 ) *ListStaffAccountsUsecase {
 	return &ListStaffAccountsUsecase{
 		executor:       executor,
 		staffRepo:      staffRepo,
 		membershipRepo: membershipRepo,
-		auditLogger:    auditLogger,
 	}
 }
 

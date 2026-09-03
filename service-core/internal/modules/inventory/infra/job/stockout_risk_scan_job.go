@@ -10,14 +10,12 @@ import (
 
 type StockoutRiskScanJob struct {
 	stockoutRisksUC *analyticsUsecase.GetStockoutRisksUsecase
-	auditLogger     applogger.AuditLogger
 	logger          applogger.Logger
 	interval        time.Duration
 }
 
 func NewStockoutRiskScanJob(
 	stockoutRisksUC *analyticsUsecase.GetStockoutRisksUsecase,
-	auditLogger applogger.AuditLogger,
 	interval time.Duration,
 	logger applogger.Logger,
 ) *StockoutRiskScanJob {
@@ -26,7 +24,6 @@ func NewStockoutRiskScanJob(
 	}
 	return &StockoutRiskScanJob{
 		stockoutRisksUC: stockoutRisksUC,
-		auditLogger:     auditLogger,
 		logger:          logger,
 		interval:        interval,
 	}
@@ -57,7 +54,7 @@ func (j *StockoutRiskScanJob) Start(ctx context.Context) {
 
 func (j *StockoutRiskScanJob) Scan(ctx context.Context) {
 	if j.logger != nil {
-		j.logger.Info(ctx, "stockout risk scan job: tick — evaluating inventory stockout probabilities")
+		j.logger.Debug(ctx, "stockout risk scan job: tick — evaluating inventory stockout probabilities")
 	}
 
 	risks, err := j.stockoutRisksUC.Execute(ctx, analyticsUsecase.GetStockoutRisksInput{})
@@ -74,31 +71,19 @@ func (j *StockoutRiskScanJob) Scan(ctx context.Context) {
 	for _, item := range risks {
 		if item.RiskLevel == "CRITICAL" {
 			criticalCount++
-			if j.auditLogger != nil {
-				j.auditLogger.Log(ctx, applogger.AuditEvent{
-					Category:   "inventory",
-					Action:     "critical_stockout_risk_alert",
-					Resource:   "inventory",
-					ResourceID: item.ProductID.String(),
-					Outcome:    applogger.OutcomeSuccess,
-					Metadata: map[string]any{
-						"product_name":               item.ProductName,
-						"shop_id":                    item.ShopID.String(),
-						"shop_name":                  item.ShopName,
-						"stock":                      item.Stock,
-						"reserved_stock":             item.ReservedStock,
-						"available_stock":            item.AvailableStock,
-						"stock_burn_rate_7d":         item.StockBurnRate7d,
-						"estimated_days_to_stockout": item.EstimatedDaysToStockout,
-						"reorder_urgency_ratio":      item.ReorderUrgencyRatio,
-						"stockout_probability":       item.StockoutProbability,
-					},
-				})
+			if j.logger != nil {
+				j.logger.Warn(ctx, "critical stockout risk detected",
+					applogger.Field{Key: "product_id", Value: item.ProductID.String()},
+					applogger.Field{Key: "product_name", Value: item.ProductName},
+					applogger.Field{Key: "shop_id", Value: item.ShopID.String()},
+					applogger.Field{Key: "stockout_probability", Value: item.StockoutProbability},
+					applogger.Field{Key: "days_until_stockout", Value: item.EstimatedDaysToStockout},
+				)
 			}
 		}
 	}
 
-	if j.logger != nil {
+	if j.logger != nil && (len(risks) > 0 || criticalCount > 0) {
 		j.logger.Info(ctx, "stockout risk scan job: completed",
 			applogger.Field{Key: "total_items_scanned", Value: len(risks)},
 			applogger.Field{Key: "critical_risks_count", Value: criticalCount},
