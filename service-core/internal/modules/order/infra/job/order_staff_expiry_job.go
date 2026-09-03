@@ -43,9 +43,7 @@ func (j *OrderStaffExpiryJob) Start(ctx context.Context) {
 			j.logger.Info(ctx, "order staff expiry job: stopped")
 			return
 		case <-ticker.C:
-			if j.logger != nil {
-				j.logger.Debug(ctx, "order staff expiry job: tick — expiring unfulfilled orders exceeding 3 days SLA")
-			}
+			j.logger.Info(ctx, "order staff expiry job: tick — expiring unfulfilled orders exceeding 3 days SLA")
 			j.expiryUsecase.Execute(ctx)
 		}
 	}

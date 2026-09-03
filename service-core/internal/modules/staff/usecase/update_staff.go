@@ -52,19 +52,7 @@ type UpdateStaffInput struct {
 func (u *UpdateStaffUsecase) Execute(
 	ctx context.Context,
 	input UpdateStaffInput,
-) (err error) {
-	audit := &applogger.AuditScope{
-		Category:   "user_action",
-		Action:     "update_staff",
-		Resource:   "staff",
-		ResourceID: input.StaffID.String(),
-		Metadata: map[string]any{
-			"staff_id": input.StaffID.String(),
-			"name":     input.Name,
-		},
-	}
-	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
-
+) error {
 	if input.Name == "" {
 		return apperrors.NewBadRequest("name is required")
 	}
@@ -77,6 +65,13 @@ func (u *UpdateStaffUsecase) Execute(
 		return fmt.Errorf("failed to verify actor membership: %w", err)
 	}
 	if actorMembership == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "update_staff",
+			Resource: "staff",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "reason": "actor membership not found"},
+		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -96,6 +91,13 @@ func (u *UpdateStaffUsecase) Execute(
 		}
 	}
 	if !foundAdmin {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "update_staff",
+			Resource: "staff",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "reason": "actor lacks admin role"},
+		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -107,7 +109,7 @@ func (u *UpdateStaffUsecase) Execute(
 		return apperrors.NewNotFound(staffDomain.ErrNotFoundStaff.Error())
 	}
 
-	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.staffRepo.Update(ctx, exec,
 			input.StaffID,
 			input.Name,
@@ -119,4 +121,18 @@ func (u *UpdateStaffUsecase) Execute(
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "update_staff",
+		Resource:   "staff",
+		ResourceID: input.StaffID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"staff_id": input.StaffID.String(), "name": input.Name},
+	})
+
+	return nil
 }

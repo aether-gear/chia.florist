@@ -66,18 +66,7 @@ type AddStaffAccountParams struct {
 func (u *AddStaffAccountUsecase) Execute(
 	ctx context.Context,
 	input AddStaffAccountParams,
-) (err error) {
-	audit := &applogger.AuditScope{
-		Category: "user_action",
-		Action:   "add_staff_account",
-		Resource: "staff_account",
-		Metadata: map[string]any{
-			"staff_id": input.StaffID.String(),
-			"email":    input.Email,
-		},
-	}
-	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
-
+) error {
 	if input.Email == "" {
 		return apperrors.NewBadRequest("email is required")
 	}
@@ -93,6 +82,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to verify actor membership: %w", err)
 	}
 	if actorMembership == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "actor membership not found"},
+		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -112,6 +108,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		}
 	}
 	if !found {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "actor lacks admin role"},
+		})
 		return apperrors.NewForbidden(authzDomain.ErrInsufficientRole.Error())
 	}
 
@@ -120,6 +123,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to check existing account: %w", err)
 	}
 	if existingAcc != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "email already exists"},
+		})
 		return apperrors.NewConflict("an account with this email already exists")
 	}
 
@@ -128,6 +138,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to check existing staff: %w", err)
 	}
 	if existingStaff == nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "staff not found"},
+		})
 		return apperrors.NewNotFound(staffDomain.ErrNotFoundStaff.Error())
 	}
 
@@ -136,6 +153,13 @@ func (u *AddStaffAccountUsecase) Execute(
 		return fmt.Errorf("failed to check existing staff account: %w", err)
 	}
 	if existingUserAcc != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category: "user_action",
+			Action:   "add_staff_account",
+			Resource: "staff_account",
+			Outcome:  applogger.OutcomeFailure,
+			Metadata: map[string]any{"staff_id": input.StaffID.String(), "email": input.Email, "reason": "staff user already has a bound account"},
+		})
 		return apperrors.NewConflict("this staff entity already has a bound account (1 account per user limit)")
 	}
 
@@ -149,7 +173,6 @@ func (u *AddStaffAccountUsecase) Execute(
 
 	now := appclock.Now()
 	newAccountID := uuid.New()
-	audit.SetResourceID(newAccountID.String())
 
 	hash, err := u.pwHasher.Hash(input.Password)
 	if err != nil {
@@ -175,13 +198,29 @@ func (u *AddStaffAccountUsecase) Execute(
 		CreatedAt: now,
 	}
 
-	return u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
-		if err := u.accountRepo.Create(ctx, exec, newAccount); err != nil {
+	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+		if err := u.accountRepo.
+			Create(ctx, exec, newAccount); err != nil {
 			return fmt.Errorf("failed to create account: %w", err)
 		}
-		if err := u.membershipRepo.Save(ctx, exec, newMembership); err != nil {
+		if err := u.membershipRepo.
+			Save(ctx, exec, newMembership); err != nil {
 			return fmt.Errorf("failed to save membership: %w", err)
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "add_staff_account",
+		Resource:   "staff_account",
+		ResourceID: newAccountID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"staff_id": input.StaffID.String(), "email": input.Email},
+	})
+
+	return nil
 }

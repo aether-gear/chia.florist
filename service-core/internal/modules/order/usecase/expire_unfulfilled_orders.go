@@ -125,24 +125,12 @@ func (u *ExpireUnfulfilledOrdersUsecase) Execute(ctx context.Context) {
 func (u *ExpireUnfulfilledOrdersUsecase) expireSingleOrder(
 	ctx context.Context,
 	order orderDomain.Order,
-) (err error) {
-	audit := &applogger.AuditScope{
-		Category:   "system_job",
-		Action:     "expire_unfulfilled_order",
-		Resource:   "order",
-		ResourceID: order.ID.String(),
-		Metadata: map[string]any{
-			"old_status": string(order.Status),
-			"new_status": string(orderDomain.OrderStatusExpired),
-		},
-	}
-	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
-
+) error {
 	if err := order.UpdateStatus(orderDomain.OrderStatusExpired); err != nil {
 		return fmt.Errorf("invalid domain state transition: %w", err)
 	}
 
-	err = u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
+	err := u.transactor.WithinTransaction(ctx, func(exec transaction.Executor) error {
 		if err := u.orderRepo.UpdateStatus(ctx, exec,
 			order.ID,
 			orderDomain.OrderStatusExpired,
@@ -174,7 +162,18 @@ func (u *ExpireUnfulfilledOrdersUsecase) expireSingleOrder(
 
 		return nil
 	})
+
 	if err != nil {
+		u.auditLogger.Log(ctx, applogger.AuditEvent{
+			Category:   "system_job",
+			Action:     "expire_unfulfilled_order",
+			Resource:   "order",
+			ResourceID: order.ID.String(),
+			Outcome:    applogger.OutcomeFailure,
+			Metadata: map[string]any{
+				"error": err.Error(),
+			},
+		})
 		return err
 	}
 
@@ -189,6 +188,18 @@ func (u *ExpireUnfulfilledOrdersUsecase) expireSingleOrder(
 			applogger.Field{Key: "error", Value: refundErr.Error()},
 		)
 	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "system_job",
+		Action:     "expire_unfulfilled_order",
+		Resource:   "order",
+		ResourceID: order.ID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata: map[string]any{
+			"old_status": string(order.Status),
+			"new_status": string(orderDomain.OrderStatusExpired),
+		},
+	})
 
 	return nil
 }

@@ -171,6 +171,19 @@ func WAF(
 				return apperrors.NewForbidden("request bocked")
 			}
 
+			auditLogger.Log(r.Context(), applogger.AuditEvent{
+				Category: "waf_event",
+				Action:   "request_allowed",
+				Resource: "request",
+				Outcome:  applogger.OutcomeSuccess,
+				Metadata: map[string]any{
+					"path":       r.URL.RequestURI(),
+					"ip":         ip,
+					"method":     r.Method,
+					"user_agent": r.UserAgent(),
+				},
+			})
+
 			return next(w, r)
 		}
 	}

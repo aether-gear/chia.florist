@@ -51,10 +51,13 @@ func TestListStaffAccounts_Success(t *testing.T) {
 		},
 	}
 
+	auditLogger := &mockAuditLogger{}
+
 	uc := NewListStaffAccountsUsecase(
 		&mockExecutor{},
 		staffRepo,
 		membershipRepo,
+		auditLogger,
 	)
 
 	results, err := uc.Execute(ctx, ListStaffAccountsParams{
@@ -99,6 +102,7 @@ func TestListStaffAccounts_UnauthorizedRole(t *testing.T) {
 		&mockExecutor{},
 		staffRepo,
 		membershipRepo,
+		&mockAuditLogger{},
 	)
 
 	_, err := uc.Execute(ctx, ListStaffAccountsParams{
@@ -141,6 +145,7 @@ func TestListStaffAccounts_StaffNotFound(t *testing.T) {
 		&mockExecutor{},
 		staffRepo,
 		membershipRepo,
+		&mockAuditLogger{},
 	)
 
 	_, err := uc.Execute(ctx, ListStaffAccountsParams{

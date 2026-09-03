@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -165,6 +166,7 @@ func (u *GetOrderTrackingUsecase) Execute(
 			if err != nil {
 				msg := fmt.Sprintf("Live courier tracking is unavailable for %s (AWB: %s). Manual status updates are required.", shipment.Courier, *shipment.TrackingNumber)
 				warningMsg = &msg
+				log.Printf("[GetOrderTracking Warning] %s (detail: %v)", msg, err)
 				// Fail-safe: if external provider returns rate limit (429) or error, try returning stale cached events if available
 				if staleEvents, staleHit := u.trackingCache.GetStale(shipment.Courier, *shipment.TrackingNumber); staleHit {
 					externalEvents = staleEvents

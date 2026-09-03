@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -163,6 +164,8 @@ func (h *auditHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) error
 }
 
 func (h *auditHandler) DeleteAuditLogs(w http.ResponseWriter, r *http.Request) error {
+	fmt.Printf("[DEBUG] DeleteAuditLogs hit: Method=%s URL=%s ContentLength=%d Query=%+v\n", r.Method, r.URL.String(), r.ContentLength, r.URL.Query())
+
 	var input usecase.DeleteAuditLogsInput
 	var msg string
 
@@ -218,9 +221,11 @@ func (h *auditHandler) DeleteAuditLogs(w http.ResponseWriter, r *http.Request) e
 	}
 
 	if err := h.deleteAuditLogs.Execute(r.Context(), input); err != nil {
+		fmt.Printf("[DEBUG] DeleteAuditLogs EXECUTE ERROR: %v\n", err)
 		return err
 	}
 
+	fmt.Println("[DEBUG] DeleteAuditLogs completed successfully")
 	apphttp.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": msg,
 	})

@@ -34,17 +34,8 @@ func NewLogoutUsecase(
 func (u *LogoutUsecase) Execute(
 	ctx context.Context,
 	authCtx domain.AuthContext,
-) (err error) {
-	audit := &applogger.AuditScope{
-		Category:   "user_action",
-		Action:     "logout",
-		Resource:   "session",
-		ResourceID: authCtx.SessionID.String(),
-		Metadata:   map[string]any{"user_id": authCtx.UserID.String()},
-	}
-	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
-
-	return u.transactor.WithinTransaction(
+) error {
+	err := u.transactor.WithinTransaction(
 		ctx,
 		func(exec transaction.Executor) error {
 			if err := u.refreshTknRepo.
@@ -68,4 +59,18 @@ func (u *LogoutUsecase) Execute(
 			return nil
 		},
 	)
+	if err != nil {
+		return err
+	}
+
+	u.auditLogger.Log(ctx, applogger.AuditEvent{
+		Category:   "user_action",
+		Action:     "logout",
+		Resource:   "session",
+		ResourceID: authCtx.SessionID.String(),
+		Outcome:    applogger.OutcomeSuccess,
+		Metadata:   map[string]any{"user_id": authCtx.UserID.String()},
+	})
+
+	return nil
 }

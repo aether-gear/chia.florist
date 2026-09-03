@@ -10,7 +10,6 @@ import (
 	apperrors "service-core/internal/common/errors"
 	apphttp "service-core/internal/common/http"
 	appcookie "service-core/internal/common/http/cookie"
-	applogger "service-core/internal/common/logger"
 	commonmiddleware "service-core/internal/common/middleware"
 	"service-core/internal/modules/authentication/domain"
 	"service-core/internal/modules/authentication/repository"
@@ -74,13 +73,12 @@ func (aM *jwtAuthenticator) RequireAuth(
 				return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
 			}
 
-			ctx := domain.WithAuthContext(
+			r = r.WithContext(domain.WithAuthContext(
 				r.Context(),
 				authCtx,
-			)
-			ctx = applogger.WithActorID(ctx, authCtx.UserID.String())
+			))
 
-			return next(w, r.WithContext(ctx))
+			return next(w, r)
 		}
 	}
 }
@@ -121,13 +119,12 @@ func (aM *jwtAuthenticator) RequireAnyAuth(
 					continue
 				}
 
-				ctx := domain.WithAuthContext(
+				r = r.WithContext(domain.WithAuthContext(
 					r.Context(),
 					authCtx,
-				)
-				ctx = applogger.WithActorID(ctx, authCtx.UserID.String())
+				))
 
-				return next(w, r.WithContext(ctx))
+				return next(w, r)
 			}
 
 			return apperrors.NewUnauthorized(domain.ErrAuthenticationRequired.Error())
@@ -182,7 +179,6 @@ func (aM *jwtAuthenticator) RequireMultiAuth(
 
 			ctx := domain.WithMultiAuthContext(r.Context(), collected)
 			ctx = domain.WithAuthContext(ctx, collected[0])
-			ctx = applogger.WithActorID(ctx, collected[0].UserID.String())
 
 			return next(w, r.WithContext(ctx))
 		}
@@ -231,7 +227,6 @@ func (aM *jwtAuthenticator) OptionalAuth(
 			if len(collected) > 0 {
 				ctx := domain.WithMultiAuthContext(r.Context(), collected)
 				ctx = domain.WithAuthContext(ctx, collected[0])
-				ctx = applogger.WithActorID(ctx, collected[0].UserID.String())
 				return next(w, r.WithContext(ctx))
 			}
 

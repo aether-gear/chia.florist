@@ -44,9 +44,7 @@ func (j *PaymentExpiryJob) Start(ctx context.Context) {
 			j.logger.Info(ctx, "payment expiry job: stopped")
 			return
 		case <-ticker.C:
-			if j.logger != nil {
-				j.logger.Debug(ctx, "payment expiry job: tick — expiring past-due payments")
-			}
+			j.logger.Info(ctx, "payment expiry job: tick — expiring past-due payments")
 			j.expiryUsecase.Execute(ctx)
 		}
 	}

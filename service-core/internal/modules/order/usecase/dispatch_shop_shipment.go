@@ -80,16 +80,34 @@ func (u *DispatchShopShipmentUsecase) Execute(
 	ctx context.Context,
 	input DispatchShopShipmentInput,
 ) (res *DispatchShopShipmentResult, err error) {
-	audit := &applogger.AuditScope{
-		Category:   "user_action",
-		Action:     "dispatch_shop_shipment",
-		Resource:   "order",
-		ResourceID: input.OrderID.String(),
-		Metadata: map[string]any{
-			"shop_id": input.ShopID.String(),
-		},
-	}
-	defer applogger.TrackAudit(ctx, u.auditLogger, nil, audit, &err)()
+	defer func() {
+		if err != nil {
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category:   "user_action",
+				Action:     "dispatch_shop_shipment",
+				Resource:   "order",
+				ResourceID: input.OrderID.String(),
+				Outcome:    applogger.OutcomeFailure,
+				Metadata: map[string]any{
+					"error":   err.Error(),
+					"shop_id": input.ShopID.String(),
+				},
+			})
+		} else {
+			u.auditLogger.Log(ctx, applogger.AuditEvent{
+				Category:   "user_action",
+				Action:     "dispatch_shop_shipment",
+				Resource:   "order",
+				ResourceID: input.OrderID.String(),
+				Outcome:    applogger.OutcomeSuccess,
+				Metadata: map[string]any{
+					"shop_id":     input.ShopID.String(),
+					"shipment_id": res.Shipment.ID.String(),
+					"all_shipped": res.AllItemsShipped,
+				},
+			})
+		}
+	}()
 
 	if len(input.ItemIDs) == 0 {
 		return nil, apperrors.NewInvalidInput("each shipment must contain at least one order item")
@@ -102,8 +120,8 @@ func (u *DispatchShopShipmentUsecase) Execute(
 	if order == nil {
 		return nil, apperrors.NewNotFound("order not found")
 	}
-	if order.Status != domain.OrderStatusProcessing &&
-		order.Status != domain.OrderStatusConfirmed {
+
+	if order.Status != domain.OrderStatusProcessing && order.Status != domain.OrderStatusConfirmed {
 		return nil, apperrors.NewInvalidInput(fmt.Sprintf("cannot dispatch shipment for order in %s status", order.Status))
 	}
 
@@ -323,9 +341,6 @@ func (u *DispatchShopShipmentUsecase) Execute(
 		rollbackLogistics()
 		return nil, err
 	}
-
-	audit.SetMeta("shipment_id", shipment.ID.String())
-	audit.SetMeta("all_shipped", allItemsShipped)
 
 	return &DispatchShopShipmentResult{
 		Order:           *order,

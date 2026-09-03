@@ -54,6 +54,7 @@ func NewScheduler(cfg Config, container *Container, logger applogger.Logger) *Sc
 
 	stockoutRiskScanJob := inventoryJob.NewStockoutRiskScanJob(
 		&container.GetStockoutRisks,
+		container.AuditLogger,
 		6*time.Hour,
 		logger,
 	)
