@@ -302,6 +302,52 @@ export function useShopViewModel(initialShopId?: string) {
     }
   };
 
+  const updateCourier = async (
+    shopId: string,
+    code: string,
+    data: { active: boolean; name?: string; location_address?: string }
+  ) => {
+    try {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${shopId}/couriers/${code}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      await fetchShopDetails(shopId);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const verifyCourier = async (
+    shopId: string,
+    code: string,
+    action: 'verify' | 'reject',
+    rejectionReason?: string
+  ) => {
+    try {
+      setDetailsLoading(true);
+      await fetchApi(`/shops/${shopId}/couriers/${code}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({
+          action,
+          rejection_reason: rejectionReason || undefined,
+        }),
+      });
+      await fetchShopDetails(shopId);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   return {
     shops,
     total,
@@ -321,6 +367,8 @@ export function useShopViewModel(initialShopId?: string) {
     createAddress,
     updateAddress,
     deleteAddress,
+    updateCourier,
+    verifyCourier,
     saveShop,
     createShop,
     deleteShop,

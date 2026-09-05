@@ -32,8 +32,6 @@ type listShopsResponse struct {
 	Shops []getShopResponse `json:"shops"`
 }
 
-
-
 type shopAddressResponse struct {
 	ID          uuid.UUID  `json:"id"`
 	Label       string     `json:"label"`
@@ -50,8 +48,16 @@ type shopAddressResponse struct {
 }
 
 type shopCourierResponse struct {
-	Code   string `json:"code"`
-	Active bool   `json:"active"`
+	ShopID             uuid.UUID  `json:"shop_id"`
+	Code               string     `json:"code"`
+	BranchName         string     `json:"branch_name"`
+	Name               *string    `json:"name"`
+	LocationAddress    *string    `json:"location_address"`
+	Active             bool       `json:"active"`
+	VerificationStatus string     `json:"verification_status"`
+	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
+	VerifiedBy         *uuid.UUID `json:"verified_by,omitempty"`
+	RejectionReason    *string    `json:"rejection_reason,omitempty"`
 }
 
 type shopProductInventoryResponse struct {

@@ -15,6 +15,9 @@ import {
   ArrowRight,
   ShieldCheck,
   ShoppingBag,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -51,9 +54,10 @@ import { useShopViewModel } from '../../viewmodels/useShopViewModel';
 import { useAuthMeViewModel } from '../../viewmodels/useAuthMeViewModel';
 import Pagination from '../../components/Pagination';
 import SearchInput from '../../components/SearchInput';
-import { DataCard, DataCardList } from '../../components/DataCard';
+import { DataCard, DataCardList, DataCardGridHeader } from '../../components/DataCard';
 import InventoryFormSheet from '../../components/shops/InventoryFormSheet';
 import AddressFormSheet from '../../components/shops/AddressFormSheet';
+import CourierFormSheet from '../../components/shops/CourierFormSheet';
 import Breadcrumb from '../../components/Breadcrumb';
 
 export default function ShopManagementPage() {
@@ -80,6 +84,8 @@ export default function ShopManagementPage() {
     detailsError,
     setPage,
     deleteAddress,
+    updateCourier,
+    verifyCourier,
     saveShop,
     createShop,
     deleteShop,
@@ -88,6 +94,124 @@ export default function ShopManagementPage() {
     loadShopById,
     refresh,
   } = useShopViewModel(urlShopId);
+
+  // Courier states
+  const [courierSearchQuery, setCourierSearchQuery] = useState('');
+  const [courierStatusFilter, setCourierStatusFilter] = useState<'active' | 'all' | 'pending' | 'inactive'>('active');
+  const [editingCourier, setEditingCourier] = useState<any | null>(null);
+  const [isCourierSheetOpen, setIsCourierSheetOpen] = useState(false);
+
+  // Admin Verification Dialog states
+  const [verifyingCourier, setVerifyingCourier] = useState<any | null>(null);
+  const [verifyAction, setVerifyAction] = useState<'verify' | 'reject'>('verify');
+  const [verifyRejectionReason, setVerifyRejectionReason] = useState('');
+  const [isProcessingVerification, setIsProcessingVerification] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+
+  const handleOpenEditCourier = (courier: any) => {
+    setEditingCourier(courier);
+    setIsCourierSheetOpen(true);
+  };
+
+  const handleOpenVerifyModal = (courier: any, action: 'verify' | 'reject') => {
+    setVerifyingCourier(courier);
+    setVerifyAction(action);
+    setVerifyRejectionReason('');
+    setVerificationError(null);
+  };
+
+  const handleConfirmVerification = async () => {
+    if (!selectedShopId || !verifyingCourier) return;
+    setIsProcessingVerification(true);
+    setVerificationError(null);
+    try {
+      await verifyCourier(
+        selectedShopId,
+        verifyingCourier.code,
+        verifyAction,
+        verifyAction === 'reject' ? verifyRejectionReason.trim() : undefined
+      );
+      setVerifyingCourier(null);
+      if (selectedShopInfo) {
+        selectShop(selectedShopInfo);
+      }
+    } catch (err: any) {
+      setVerificationError(err.message || `Failed to ${verifyAction} courier`);
+    } finally {
+      setIsProcessingVerification(false);
+    }
+  };
+
+  const filteredCouriers = useMemo(() => {
+    if (!couriers) return [];
+    let result = couriers;
+
+    // Filter by display filter (by default: 'active')
+    if (courierStatusFilter === 'active') {
+      result = result.filter((c) => c.active);
+    } else if (courierStatusFilter === 'pending') {
+      result = result.filter((c) => c.verification_status === 'pending');
+    } else if (courierStatusFilter === 'inactive') {
+      result = result.filter((c) => !c.active);
+    }
+    // If 'all', keep all couriers
+
+    if (courierSearchQuery.trim()) {
+      const q = courierSearchQuery.toLowerCase().trim();
+      result = result.filter(
+        (c) =>
+          (c.code && c.code.toLowerCase().includes(q)) ||
+          (c.branch_name && c.branch_name.toLowerCase().includes(q)) ||
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          (c.location_address && c.location_address.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [couriers, courierStatusFilter, courierSearchQuery]);
+
+  const getCourierVerificationBadge = (status?: string) => {
+    switch (status) {
+      case 'verified':
+        return (
+          <Badge
+            variant="default"
+            className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 rounded-lg scale-90"
+          >
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Verified
+          </Badge>
+        );
+      case 'pending':
+        return (
+          <Badge
+            variant="secondary"
+            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-0 rounded-lg scale-90 animate-pulse"
+          >
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Pending Review
+          </Badge>
+        );
+      case 'rejected':
+        return (
+          <Badge
+            variant="destructive"
+            className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-0 rounded-lg scale-90"
+          >
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </Badge>
+        );
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="bg-muted text-muted-foreground border-0 rounded-lg scale-90"
+          >
+            Unconfigured
+          </Badge>
+        );
+    }
+  };
 
   // Sync state with URL parameter on mount or URL change
   useEffect(() => {
@@ -800,26 +924,223 @@ export default function ShopManagementPage() {
                 {/* Couriers Tab */}
                 <TabsContent value="couriers" className="space-y-4 pt-2">
                   <div className="space-y-6">
-                    <div className="pb-4 border-b border-border/60">
-                      <h3 className="text-lg font-bold font-display text-foreground">Configured Couriers</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Shipping providers configured for this branch.
-                      </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-border/60 gap-4">
+                      <div>
+                        <h3 className="text-lg font-bold font-display text-foreground">Shop Courier Management</h3>
+                        <p className="text-muted-foreground text-sm">
+                          Shipping providers configured for this branch (bound to Komerce logistics).
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setCourierStatusFilter('all')}
+                          className="focus:outline-none"
+                        >
+                          <Badge
+                            variant={courierStatusFilter === 'all' ? 'default' : 'outline'}
+                            className="px-2.5 py-1 text-xs rounded-lg cursor-pointer hover:bg-muted/80 transition-colors"
+                          >
+                            Total: {couriers.length}
+                          </Badge>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCourierStatusFilter('active')}
+                          className="focus:outline-none"
+                        >
+                          <Badge
+                            variant="default"
+                            className={`px-2.5 py-1 text-xs rounded-lg cursor-pointer transition-colors ${
+                              courierStatusFilter === 'active'
+                                ? 'bg-emerald-600 text-white ring-2 ring-emerald-400/30'
+                                : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-0'
+                            }`}
+                          >
+                            Active: {couriers.filter((c) => c.active).length}
+                          </Badge>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCourierStatusFilter('pending')}
+                          className="focus:outline-none"
+                        >
+                          <Badge
+                            variant="secondary"
+                            className={`px-2.5 py-1 text-xs rounded-lg cursor-pointer transition-colors ${
+                              courierStatusFilter === 'pending'
+                                ? 'bg-amber-600 text-white ring-2 ring-amber-400/30'
+                                : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-0'
+                            }`}
+                          >
+                            Pending: {couriers.filter((c) => c.verification_status === 'pending').length}
+                          </Badge>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+                      <SearchInput
+                        value={courierSearchQuery}
+                        onChange={setCourierSearchQuery}
+                        placeholder="Filter couriers by brand, name, or address..."
+                        className="relative flex-1 max-w-sm w-full"
+                      />
+
+                      {/* Display Filter controls (Default: Active) */}
+                      <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60 self-stretch sm:self-auto overflow-x-auto">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCourierStatusFilter('active')}
+                          className={`h-7 px-3 text-xs font-medium rounded-lg transition-all ${
+                            courierStatusFilter === 'active'
+                              ? 'bg-background text-foreground shadow-sm font-semibold'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Active ({couriers.filter((c) => c.active).length})
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCourierStatusFilter('all')}
+                          className={`h-7 px-3 text-xs font-medium rounded-lg transition-all ${
+                            courierStatusFilter === 'all'
+                              ? 'bg-background text-foreground shadow-sm font-semibold'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          All ({couriers.length})
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCourierStatusFilter('pending')}
+                          className={`h-7 px-3 text-xs font-medium rounded-lg transition-all ${
+                            courierStatusFilter === 'pending'
+                              ? 'bg-background text-foreground shadow-sm font-semibold'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Pending ({couriers.filter((c) => c.verification_status === 'pending').length})
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCourierStatusFilter('inactive')}
+                          className={`h-7 px-3 text-xs font-medium rounded-lg transition-all ${
+                            courierStatusFilter === 'inactive'
+                              ? 'bg-background text-foreground shadow-sm font-semibold'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Inactive ({couriers.filter((c) => !c.active).length})
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
+                      <DataCardGridHeader className="hidden md:grid">
+                        <div className="col-span-3">Provider / Brand</div>
+                        <div className="col-span-3">Branch / Drop Point</div>
+                        <div className="col-span-3">Location Address</div>
+                        <div className="col-span-2 text-right">Status</div>
+                        <div className="col-span-1 text-right">Action</div>
+                      </DataCardGridHeader>
+
                       <DataCardList>
-                        {couriers.length === 0 ? (
-                          <div className="py-8 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10 text-center text-muted-foreground text-sm">
-                            No couriers found.
+                        {filteredCouriers.length === 0 ? (
+                          <div className="py-10 border border-dashed border-border/80 rounded-2xl bg-zinc-50/10 text-center text-muted-foreground text-sm space-y-3">
+                            <Truck className="h-8 w-8 text-slate-400 mb-1 mx-auto" />
+                            {courierStatusFilter === 'active' && !courierSearchQuery ? (
+                              <div className="space-y-1">
+                                <p className="font-semibold text-foreground">No active couriers configured</p>
+                                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                                  Currently showing only active couriers by default. Switch to "All" to view and activate available couriers.
+                                </p>
+                                <div className="pt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCourierStatusFilter('all')}
+                                    className="rounded-xl text-xs"
+                                  >
+                                    View All Couriers ({couriers.length})
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <p className="font-semibold text-foreground">No couriers found</p>
+                                <p className="text-xs text-muted-foreground">No couriers match your search or filter selection.</p>
+                                <div className="pt-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setCourierSearchQuery('');
+                                      setCourierStatusFilter('all');
+                                    }}
+                                    className="rounded-xl text-xs"
+                                  >
+                                    Reset Filters
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          couriers.map((courier) => (
-                            <DataCard key={courier.code} className="bg-muted/20">
-                              <div className="col-span-1 md:col-span-8 min-w-0 font-semibold uppercase text-foreground text-sm truncate">
-                                {courier.code}
+                          filteredCouriers.map((courier) => (
+                            <DataCard key={courier.code} className="bg-muted/20 hover:border-border transition-colors">
+                              {/* Col 1: Provider / Brand */}
+                              <div className="col-span-1 md:col-span-3 min-w-0 flex items-center gap-2.5">
+                                <div className="p-1.5 rounded-lg bg-primary/10 text-primary shrink-0">
+                                  <Truck className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-foreground text-sm truncate">
+                                    {courier.branch_name || courier.code.toUpperCase()}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <Badge variant="outline" className="font-mono text-[10px] uppercase px-1.5 py-0">
+                                      {courier.code}
+                                    </Badge>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="col-span-1 md:col-span-4 min-w-0 text-right">
+
+                              {/* Col 2: Branch / Drop Point */}
+                              <div className="col-span-1 md:col-span-3 min-w-0 text-xs">
+                                <span className="md:hidden font-medium text-foreground mr-1">Branch / Drop Point:</span>
+                                {courier.name ? (
+                                  <span className="font-medium text-foreground truncate block">{courier.name}</span>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Not configured</span>
+                                )}
+                              </div>
+
+                              {/* Col 3: Location Address */}
+                              <div className="col-span-1 md:col-span-3 min-w-0 text-xs">
+                                <span className="md:hidden font-medium text-foreground mr-1">Address:</span>
+                                {courier.location_address ? (
+                                  <div className="flex items-center gap-1.5 text-muted-foreground truncate" title={courier.location_address}>
+                                    <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                    <span className="truncate">{courier.location_address}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic">No address registered</span>
+                                )}
+                              </div>
+
+                              {/* Col 4: Status Badges */}
+                              <div className="col-span-1 md:col-span-2 min-w-0 flex items-center gap-1.5 flex-wrap justify-start md:justify-end">
+                                {getCourierVerificationBadge(courier.verification_status)}
                                 <Badge
                                   variant={courier.active ? 'default' : 'secondary'}
                                   className={
@@ -830,6 +1151,44 @@ export default function ShopManagementPage() {
                                 >
                                   {courier.active ? 'Active' : 'Disabled'}
                                 </Badge>
+                              </div>
+
+                              {/* Col 5: Action Triple Dots */}
+                              <div className="col-span-1 md:col-span-1 min-w-0 flex items-center justify-end">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-muted">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                      <span className="sr-only">Open menu</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
+                                    <DropdownMenuItem onClick={() => handleOpenEditCourier(courier)}>
+                                      <Edit className="h-4 w-4 mr-2 text-muted-foreground" />
+                                      Edit Configuration
+                                    </DropdownMenuItem>
+
+                                    {isAdmin && courier.verification_status === 'pending' && (
+                                      <>
+                                        <DropdownMenuSeparator className="my-1" />
+                                        <DropdownMenuItem
+                                          onClick={() => handleOpenVerifyModal(courier, 'verify')}
+                                          className="text-emerald-600 focus:text-emerald-600 font-medium"
+                                        >
+                                          <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                                          Verify & Activate
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() => handleOpenVerifyModal(courier, 'reject')}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <XCircle className="h-4 w-4 mr-2 text-destructive" />
+                                          Reject Courier
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </DataCard>
                           ))
@@ -1214,6 +1573,108 @@ export default function ShopManagementPage() {
               >
                 {isDeletingAddress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Delete Address
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Global Courier Sheet */}
+        <CourierFormSheet
+          open={isCourierSheetOpen}
+          onOpenChange={setIsCourierSheetOpen}
+          shopId={selectedShopId || ''}
+          shopName={selectedShopInfo?.name}
+          courier={editingCourier}
+          shopAddresses={addresses}
+          isAdmin={isAdmin}
+          onSave={updateCourier}
+          onVerify={verifyCourier}
+          onSuccess={() => {
+            if (selectedShopId && selectedShopInfo) {
+              selectShop(selectedShopInfo);
+            }
+          }}
+        />
+
+        {/* Admin Courier Verification Dialog */}
+        <Dialog open={!!verifyingCourier} onOpenChange={(open) => !open && setVerifyingCourier(null)}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle
+                className={`flex items-center gap-2 font-display ${
+                  verifyAction === 'verify' ? 'text-emerald-600' : 'text-destructive'
+                }`}
+              >
+                {verifyAction === 'verify' ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5" /> Verify & Activate Courier
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5" /> Reject Courier
+                  </>
+                )}
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-sm text-muted-foreground">
+                {verifyAction === 'verify' ? (
+                  <>
+                    Are you sure you want to verify and activate{' '}
+                    <strong>{verifyingCourier?.branch_name || verifyingCourier?.code?.toUpperCase()}</strong> for{' '}
+                    <strong>{selectedShopInfo?.name}</strong>? This courier will immediately become available for checkout
+                    orders.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to reject{' '}
+                    <strong>{verifyingCourier?.branch_name || verifyingCourier?.code?.toUpperCase()}</strong>? The courier
+                    will remain inactive and staff can view your rejection reason.
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {verificationError && (
+              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-xl border border-destructive/20 my-2 font-sans">
+                {verificationError}
+              </div>
+            )}
+
+            {verifyAction === 'reject' && (
+              <div className="space-y-2 py-2">
+                <Label htmlFor="quickRejectionReason" className="text-xs">
+                  Rejection Reason (visible to store staff)
+                </Label>
+                <Input
+                  id="quickRejectionReason"
+                  placeholder="e.g. Pickup address requires specific gate/room number"
+                  value={verifyRejectionReason}
+                  onChange={(e) => setVerifyRejectionReason(e.target.value)}
+                  className="rounded-xl text-sm"
+                />
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setVerifyingCourier(null)}
+                disabled={isProcessingVerification}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant={verifyAction === 'verify' ? 'default' : 'destructive'}
+                className={`rounded-xl ${
+                  verifyAction === 'verify' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''
+                }`}
+                onClick={handleConfirmVerification}
+                disabled={isProcessingVerification}
+              >
+                {isProcessingVerification && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {verifyAction === 'verify' ? 'Confirm & Activate' : 'Confirm Rejection'}
               </Button>
             </DialogFooter>
           </DialogContent>

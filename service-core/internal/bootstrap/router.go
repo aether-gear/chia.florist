@@ -231,6 +231,7 @@ func NewRouter(c *Container) *chi.Mux {
 		courierHandler = courierH.NewCourierHandler(
 			&c.ListAllCouriers,
 			&c.ConfigureShopCourier,
+			&c.VerifyShopCourier,
 		)
 
 		shipmentHandler = shipmentH.NewShipmentHandler(
@@ -438,6 +439,8 @@ func NewRouter(c *Container) *chi.Mux {
 				r.Route("/couriers", func(r chi.Router) {
 					r.Get("/", chains.Core(shopHandler.GetShopCouriers))
 					r.Post("/", requirePerm(authorzDomain.PermissionCourierManage, courierHandler.ConfigureCourierShop))
+					r.Put("/{code}", requirePerm(authorzDomain.PermissionCourierManage, courierHandler.UpdateShopCourier))
+					r.Post("/{code}/verify", chains.StaffAdminOnly(courierHandler.VerifyShopCourier))
 				})
 
 				r.Route("/products", func(r chi.Router) {

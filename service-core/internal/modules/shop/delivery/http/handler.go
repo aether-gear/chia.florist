@@ -318,8 +318,16 @@ func (h *ShopHandler) GetShopCouriers(w http.ResponseWriter, r *http.Request) er
 	couriers := make([]shopCourierResponse, 0, len(result))
 	for _, c := range result {
 		couriers = append(couriers, shopCourierResponse{
-			Code:   c.Code,
-			Active: c.Active,
+			ShopID:             c.ShopID,
+			Code:               c.Code,
+			BranchName:         c.BranchName,
+			Name:               c.Name,
+			LocationAddress:    c.LocationAddress,
+			Active:             c.Active,
+			VerificationStatus: string(c.VerificationStatus),
+			VerifiedAt:         c.VerifiedAt,
+			VerifiedBy:         c.VerifiedBy,
+			RejectionReason:    c.RejectionReason,
 		})
 	}
 

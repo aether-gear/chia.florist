@@ -164,6 +164,7 @@ type Container struct {
 
 	ListAllCouriers      courierUsecase.ListCouriersUsecase
 	ConfigureShopCourier courierUsecase.ConfigureShopCourierUsecase
+	VerifyShopCourier    courierUsecase.VerifyShopCourierUsecase
 
 	EstimateShippingOptions shipmentUsecase.EstimateShippingOptionsUsecase
 	UpdateShipmentStatus    shipmentUsecase.UpdateShipmentStatusUsecase
@@ -873,6 +874,14 @@ func NewContainer(cfg Config,
 		),
 		ConfigureShopCourier: *courierUsecase.
 			NewConfigureShopCourierUsecase(
+				infra.TransactionExecutor,
+				infra.TransactionProvider,
+				courierRepo,
+				shopCourierRepo,
+				shopRepo,
+			),
+		VerifyShopCourier: *courierUsecase.
+			NewVerifyShopCourierUsecase(
 				infra.TransactionExecutor,
 				infra.TransactionProvider,
 				courierRepo,

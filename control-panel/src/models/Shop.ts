@@ -24,9 +24,19 @@ export interface ShopAddress {
   updated_at: string | null;
 }
 
+export type CourierVerificationStatus = 'unconfigured' | 'pending' | 'verified' | 'rejected';
+
 export interface ShopCourier {
+  shop_id?: string;
   code: string;
+  branch_name?: string;
+  name?: string | null;
+  location_address?: string | null;
   active: boolean;
+  verification_status?: CourierVerificationStatus;
+  verified_at?: string | null;
+  verified_by?: string | null;
+  rejection_reason?: string | null;
 }
 
 export interface ShopProductInventory {
