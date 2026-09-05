@@ -1,9 +1,10 @@
 # Chia Florist — Automated Monorepo CI Versioning & Releases
 #
-# This workflow uses Google Release Please to:
-#   1. Track conventional commits per module path (service-core, e-commerce, control-panel, intelligence-layer).
-#   2. Open/maintain a Release PR with updated CHANGELOG.md and bumped version.
-#   3. On merge of the Release PR, automatically create the component Git tag (e.g. service-core-v0.14.0) and GitHub Release.
+# This workflow directly automates independent monorepo semantic versioning:
+#   1. Inspects conventional commits per module path (service-core, e-commerce, control-panel, intelligence-layer).
+#   2. Determines independent version bumps per package.
+#   3. Cuts Git tags and creates GitHub Releases directly via GitHub API.
+#   4. Zero bot-authored commits and zero automated release PRs.
 #
 # Trigger: Push to main branch
 
@@ -16,16 +17,25 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
-  release-please:
-    name: Release Please (SemVer & Changelog)
+  release:
+    name: Independent Monorepo Tag & Release
     runs-on: ubuntu-latest
     steps:
-      - name: Run Release Please
-        uses: googleapis/release-please-action@v4
-        id: release
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          config-file: .github/release-please-config.json
-          manifest-file: .github/.release-please-manifest.json
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Monorepo Release Engine
+        run: node .github/scripts/release-monorepo.mjs
+        env:
+          GH_TOKEN: ${{ secrets.CHIA_CURRENT_ARC || secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}

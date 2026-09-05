@@ -33,13 +33,13 @@ bun run preview
 
 ## Versioning & Commit Guidelines
 
-`e-commerce` releases are automated via GitHub Actions and **Release Please** (Current baseline: `e-commerce-v0.8.0`).
+`e-commerce` releases are automated via GitHub Actions (Current baseline: `e-commerce-v0.9.0`).
 Docker images are automatically tagged and published to GHCR upon release.
 
 | Commit Type | Version Bump | Example |
 | :--- | :--- | :--- |
-| `fix:` / `perf:` | **Patch** (`0.8.0` → `0.8.1`) | `fix(cart): resolve custom product retention in cart` |
-| `feat:` | **Minor** (`0.8.0` → `0.9.0`) | `feat(custom-product): add size selection for regular product` |
+| `fix:` / `perf:` | **Patch** (`0.9.0` → `0.9.1`) | `fix(cart): resolve custom product retention in cart` |
+| `feat:` | **Minor** (`0.9.0` → `0.10.0`) | `feat(custom-product): add size selection for regular product` |
 | `feat!:` / `BREAKING CHANGE:` | **Major** (or minor pre-1.0) | `feat!: migrate data fetching from SPA to Nuxt SSR` |
 | `docs:` / `test:` / `chore:` | *No release* | `docs: add status for cart endpoints` |
 

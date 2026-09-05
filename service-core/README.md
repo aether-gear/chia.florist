@@ -150,13 +150,13 @@ delivery → usecase → domain (interface)
 
 ### Versioning & Commit Guidelines
 
-`service-core` releases are automated via GitHub Actions and **Release Please** (Current baseline: `service-core-v0.14.0`).
+`service-core` releases are automated via GitHub Actions (Current baseline: `service-core-v0.15.0`).
 Docker images are automatically tagged and published to GHCR on release.
 
 | Commit Type | Version Bump | Example |
 | :--- | :--- | :--- |
-| `fix:` / `perf:` | **Patch** (`0.14.0` → `0.14.1`) | `fix(auth): prevent session leakage across apps` |
-| `feat:` | **Minor** (`0.14.0` → `0.15.0`) | `feat(order): implement automatic refund on cancellation` |
+| `fix:` / `perf:` | **Patch** (`0.15.0` → `0.15.1`) | `fix(auth): prevent session leakage across apps` |
+| `feat:` | **Minor** (`0.15.0` → `0.16.0`) | `feat(order): implement automatic refund on cancellation` |
 | `feat!:` / `BREAKING CHANGE:` | **Major** (or minor pre-1.0) | `feat!: restructure order shipment schema` |
 | `docs:` / `test:` / `chore:` | *No release* | `test: add unit test for checkout calculation` |
 

@@ -21,13 +21,13 @@ npx tsc --noEmit
 
 ## Versioning & Commit Guidelines
 
-`control-panel` releases are automated via GitHub Actions and **Release Please** (Current baseline: `control-panel-v0.5.0`).
+`control-panel` releases are automated via GitHub Actions (Current baseline: `control-panel-v0.6.0`).
 Production builds are deployed to Netlify on release.
 
 | Commit Type | Version Bump | Example |
 | :--- | :--- | :--- |
-| `fix:` / `perf:` | **Patch** (`0.5.0` → `0.5.1`) | `fix(staff): resolve assigned shop switcher state` |
-| `feat:` | **Minor** (`0.5.0` → `0.6.0`) | `feat(orders): add date range filter in global view` |
+| `fix:` / `perf:` | **Patch** (`0.6.0` → `0.6.1`) | `fix(staff): resolve assigned shop switcher state` |
+| `feat:` | **Minor** (`0.6.0` → `0.7.0`) | `feat(orders): add date range filter in global view` |
 | `feat!:` / `BREAKING CHANGE:` | **Major** (or minor pre-1.0) | `feat!: refactor staff assignment workflow UI` |
 | `docs:` / `test:` / `chore:` | *No release* | `chore: fix lint rule violations in orders page` |
 

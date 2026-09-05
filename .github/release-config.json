@@ -1,0 +1,29 @@
+{
+  "bumpMinorPreMajor": true,
+  "packages": [
+    {
+      "name": "service-core",
+      "path": "service-core",
+      "tagPrefix": "service-core-v",
+      "initialVersion": "0.15.0"
+    },
+    {
+      "name": "e-commerce",
+      "path": "e-commerce",
+      "tagPrefix": "e-commerce-v",
+      "initialVersion": "0.9.0"
+    },
+    {
+      "name": "control-panel",
+      "path": "control-panel",
+      "tagPrefix": "control-panel-v",
+      "initialVersion": "0.6.0"
+    },
+    {
+      "name": "intelligence-layer",
+      "path": "intelligence-layer",
+      "tagPrefix": "intelligence-layer-v",
+      "initialVersion": "0.4.0"
+    }
+  ]
+}
