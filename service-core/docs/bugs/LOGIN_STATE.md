@@ -137,20 +137,21 @@ During the Phase 2 implementation attempt, dual-login testing revealed two major
 
 | # | Repo | File | Change | Status |
 |---|---|---|---|---|
-| 1 | `service-core` | [`auth_context.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authentication/domain/auth_context.go) | `WithMultiAuthContext` and `GetMultiAuthContext` | Completed |
-| 2 | `service-core` | [`jwt_authenticator.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authentication/infra/service/jwt_authenticator.go) | `RequireMultiAuth` helper | Completed |
-| 3 | `service-core` | [`authorizer_service.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authorization/infra/service/authorizer_service.go) | `RequireAccountType` uses `X-Account-Type` header hint to prioritize candidate | Pending |
-| 4 | `service-core` | [`handler.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authentication/delivery/http/handler.go) | Remove cross-app cookie wiping on login; separate `Logout` & `LogoutStaff` | Pending |
-| 5 | `service-core` | [`router.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/bootstrap/router.go) | Separate `/auth/logout` and `/auth/staff/logout` routes | Pending |
+| 1 | `service-core` | [`auth_context.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authentication/domain/auth_context.go) | `WithMultiAuthContext` and `GetMultiAuthContext` | ✅ Completed |
+| 2 | `service-core` | [`jwt_authenticator.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authentication/infra/service/jwt_authenticator.go) | `RequireMultiAuth` helper | ✅ Completed |
+| 3 | `service-core` | [`authorizer_service.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authorization/infra/service/authorizer_service.go) | `RequireAccountType` uses `X-Account-Type` header hint to prioritize candidate | ✅ Completed |
+| 4 | `service-core` | [`handler.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/modules/authentication/delivery/http/handler.go) | Login handlers are non-destructive (no cross-app cookie clearing); `Logout` and `LogoutStaff` clear only their own cookie pair | ✅ Completed |
+| 5 | `service-core` | [`router.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/bootstrap/router.go) | `/auth/logout` → `CustomerOnly`, `/auth/staff/logout` → `StaffOnly`, `/auth/me` → `CustomerOnly`, `/auth/staff/me` → `StaffOnly` | ✅ Completed |
+| 6 | `service-core` | [`cors.go`](file:///D:/__Projects/kage/chia.florist/service-core/internal/common/middleware/cors.go) | Added `X-Account-Type` to `Access-Control-Allow-Headers` so browsers can send it | ✅ Completed 2026-09-05 |
 
 ---
 
 ## Phase 2.1 Acceptance Criteria
 
 - [x] Phase 1 single-app login state isolation implemented & verified.
-- [ ] Cross-app sign-in does NOT clear cookies of the other application.
-- [ ] `e-commerce` calling `/auth/me` with `X-Account-Type: customer` returns customer data when both `chast` and `hotpot` are present.
-- [ ] `control-panel` calling `/auth/staff/me` with `X-Account-Type: staff` returns staff data when both `chast` and `hotpot` are present.
-- [ ] Logging out of `control-panel` (`/auth/staff/logout`) only clears staff cookies (`hotpot`, `ladle`).
-- [ ] Logging out of `e-commerce` (`/auth/logout`) only clears customer cookies (`chast`, `malkist`).
-- [ ] All unit tests compile and pass cleanly across `service-core`.
+- [x] Cross-app sign-in does NOT clear cookies of the other application.
+- [x] `e-commerce` calling `/auth/me` with `X-Account-Type: customer` returns customer data when both `chast` and `hotpot` are present.
+- [x] `control-panel` calling `/auth/staff/me` with `X-Account-Type: staff` returns staff data when both `chast` and `hotpot` are present.
+- [x] Logging out of `control-panel` (`/auth/staff/logout`) only clears staff cookies (`hotpot`, `ladle`).
+- [x] Logging out of `e-commerce` (`/auth/logout`) only clears customer cookies (`chast`, `malkist`).
+- [x] All unit tests compile and pass cleanly across `service-core`.
