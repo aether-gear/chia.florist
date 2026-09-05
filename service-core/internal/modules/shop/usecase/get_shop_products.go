@@ -61,6 +61,9 @@ func (u *GetShopProductsUsecase) Execute(
 
 	productMap := make(map[uuid.UUID]productDomain.Product, len(products))
 	for _, p := range products {
+		if p.DeletedAt != nil {
+			continue
+		}
 		productMap[p.ID] = p
 	}
 
